@@ -1,0 +1,1680 @@
+[
+  {
+    "path": "browser/backgrounds/background-meadow.png",
+    "category": "backgrounds",
+    "usage": "browser",
+    "source": "art/higgsfield-combat-20261015/originals/background-meadow.png",
+    "evidence": "art/higgsfield-combat-20261015/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "HTML 장면 배경. 중앙에 집·타워·적을 합성할 여백이 있다. 지형 데이터는 별도다.",
+    "bytes": 6296828,
+    "sha256": "c77a54951c771e7304b6d16b4e78dd827b23d196ec080bf4cce0bcb44269733a",
+    "width": 2048,
+    "height": 2048,
+    "mode": "RGB"
+  },
+  {
+    "path": "browser/backgrounds/background-quarry.png",
+    "category": "backgrounds",
+    "usage": "browser",
+    "source": "art/higgsfield-combat-20261015/originals/background-quarry.png",
+    "evidence": "art/higgsfield-combat-20261015/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "HTML 장면 배경. 중앙에 집·타워·적을 합성할 여백이 있다. 지형 데이터는 별도다.",
+    "bytes": 5741016,
+    "sha256": "ce08ee9554770af6abc165680311cbde390cba4b11275723de89f44bd4d31c66",
+    "width": 2048,
+    "height": 2048,
+    "mode": "RGB"
+  },
+  {
+    "path": "browser/backgrounds/background-frost.png",
+    "category": "backgrounds",
+    "usage": "browser",
+    "source": "art/higgsfield-combat-20261015/originals/background-frost.png",
+    "evidence": "art/higgsfield-combat-20261015/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "HTML 장면 배경. 중앙에 집·타워·적을 합성할 여백이 있다. 지형 데이터는 별도다.",
+    "bytes": 6119854,
+    "sha256": "c969e614e07dae0316e5a85e196b83c6e96095a0ae80325a75b31909cd2591a5",
+    "width": 2048,
+    "height": 2048,
+    "mode": "RGB"
+  },
+  {
+    "path": "browser/backgrounds/background-ember.png",
+    "category": "backgrounds",
+    "usage": "browser",
+    "source": "art/higgsfield-combat-20261015/originals/background-ember.png",
+    "evidence": "art/higgsfield-combat-20261015/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "HTML 장면 배경. 중앙에 집·타워·적을 합성할 여백이 있다. 지형 데이터는 별도다.",
+    "bytes": 5454524,
+    "sha256": "6de94a1aa9f21d50f547c13213c2b69dbbf262e8667476aacdb2ca5fa4eeb479",
+    "width": 2048,
+    "height": 2048,
+    "mode": "RGB"
+  },
+  {
+    "path": "browser/backgrounds/grass.png",
+    "category": "backgrounds",
+    "usage": "browser",
+    "source": "art/bcd-ready-20261015/D/grass.png",
+    "evidence": "art/bcd-ready-20261015/D/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "바닥·소재·안개 텍스처. 목표 표시 크기와 반복 경계를 확인한다.",
+    "bytes": 370243,
+    "sha256": "a59b5e1221f43be1ae4ceb5141e6a99e989ab6d28d484675f37300604830a092",
+    "width": 512,
+    "height": 512,
+    "mode": "RGB"
+  },
+  {
+    "path": "browser/backgrounds/soil.png",
+    "category": "backgrounds",
+    "usage": "browser",
+    "source": "art/bcd-ready-20261015/D/soil.png",
+    "evidence": "art/bcd-ready-20261015/D/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "바닥·소재·안개 텍스처. 목표 표시 크기와 반복 경계를 확인한다.",
+    "bytes": 358093,
+    "sha256": "d2296dc4ce8b39887246381d098d187694a42cb86b4eedc00cfd6eb2a9c7d3ef",
+    "width": 512,
+    "height": 512,
+    "mode": "RGB"
+  },
+  {
+    "path": "browser/backgrounds/wood.png",
+    "category": "backgrounds",
+    "usage": "browser",
+    "source": "art/bcd-ready-20261015/D/wood.png",
+    "evidence": "art/bcd-ready-20261015/D/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "바닥·소재·안개 텍스처. 목표 표시 크기와 반복 경계를 확인한다.",
+    "bytes": 275035,
+    "sha256": "204450157d5b3e86a14a8dfb7c375fb30aa76f436ec528f5b1d40c3159cef2a7",
+    "width": 512,
+    "height": 512,
+    "mode": "RGB"
+  },
+  {
+    "path": "browser/backgrounds/stone.png",
+    "category": "backgrounds",
+    "usage": "browser",
+    "source": "art/bcd-ready-20261015/D/stone.png",
+    "evidence": "art/bcd-ready-20261015/D/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "바닥·소재·안개 텍스처. 목표 표시 크기와 반복 경계를 확인한다.",
+    "bytes": 433561,
+    "sha256": "67285af33ea06a97d7a040bd69fdb60a73012b55b7b4866eda0d7dce5f541765",
+    "width": 512,
+    "height": 512,
+    "mode": "RGB"
+  },
+  {
+    "path": "browser/backgrounds/water.png",
+    "category": "backgrounds",
+    "usage": "browser",
+    "source": "art/bcd-ready-20261015/D/water.png",
+    "evidence": "art/bcd-ready-20261015/D/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "바닥·소재·안개 텍스처. 목표 표시 크기와 반복 경계를 확인한다.",
+    "bytes": 253872,
+    "sha256": "30ad3adf34b362bde1de10928069200803afbc89ba1196695ae27180c2884d15",
+    "width": 512,
+    "height": 512,
+    "mode": "RGB"
+  },
+  {
+    "path": "browser/backgrounds/fog.png",
+    "category": "backgrounds",
+    "usage": "browser",
+    "source": "art/bcd-ready-20261015/D/fog.png",
+    "evidence": "art/bcd-ready-20261015/D/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "바닥·소재·안개 텍스처. 목표 표시 크기와 반복 경계를 확인한다.",
+    "bytes": 89158,
+    "sha256": "2cab352f225243e5b4d01d35d547b9b658e2d34c048dc42a42f31b9e0bcd8b3a",
+    "width": 512,
+    "height": 512,
+    "mode": "RGB"
+  },
+  {
+    "path": "reference/backgrounds/background-modules.png",
+    "category": "backgrounds",
+    "usage": "reference",
+    "source": "art/higgsfield-combat-20261015/originals/background-modules.png",
+    "evidence": "art/higgsfield-combat-20261015/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "나무·바위·연못·다리·꽃의 배치 참고 시트.",
+    "bytes": 4231706,
+    "sha256": "349caa7659f65367ab44f189ad04d174a13dba047b8066e97e4578e5e132262c",
+    "width": 2048,
+    "height": 2048,
+    "mode": "RGB"
+  },
+  {
+    "path": "browser/characters/chicken.png",
+    "category": "characters",
+    "usage": "browser",
+    "source": "art/ui-ready-20261015/package/Assets/Resources/Icons/chicken.png",
+    "evidence": "art/ui-ready-20261015/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "닭·수거 일꾼·관리인 정적 아이콘. 전신 모션 프레임은 별도다.",
+    "bytes": 48045,
+    "sha256": "1c8017c81568a4f6706e7e87568530ce21324321592013dacd677b2ac70648f6",
+    "width": 256,
+    "height": 256,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      42,
+      16,
+      213,
+      240
+    ]
+  },
+  {
+    "path": "browser/characters/helper.png",
+    "category": "characters",
+    "usage": "browser",
+    "source": "art/ui-ready-20261015/package/Assets/Resources/Icons/helper.png",
+    "evidence": "art/ui-ready-20261015/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "닭·수거 일꾼·관리인 정적 아이콘. 전신 모션 프레임은 별도다.",
+    "bytes": 63211,
+    "sha256": "f2be7e91c5bb9800f2ae46b315933e1a309fd5d4e1e764009604cbec177fb2c8",
+    "width": 256,
+    "height": 256,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      49,
+      34,
+      240,
+      216
+    ]
+  },
+  {
+    "path": "browser/characters/keeper.png",
+    "category": "characters",
+    "usage": "browser",
+    "source": "art/ui-ready-20261015/package/Assets/Resources/Icons/keeper.png",
+    "evidence": "art/ui-ready-20261015/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "닭·수거 일꾼·관리인 정적 아이콘. 전신 모션 프레임은 별도다.",
+    "bytes": 71277,
+    "sha256": "d0b05f139872d2333d8b83c8c24c977be712818cf74dec23c5a5386d765786a9",
+    "width": 256,
+    "height": 256,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      20,
+      16,
+      235,
+      240
+    ]
+  },
+  {
+    "path": "browser/characters/breed-1.png",
+    "category": "characters",
+    "usage": "browser",
+    "source": "art/ui-ready-20261015/package/Assets/Resources/Icons/Breeds/breed-1.png",
+    "evidence": "art/ui-ready-20261015/portrait-notes.json",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "닭 품종 초상. 작은 표시용.",
+    "bytes": 16022,
+    "sha256": "c0c51c4ffc88a0c77db6d99bc7377615d6becf3fbd38b6b6b98a4ac135439fa5",
+    "width": 128,
+    "height": 128,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      21,
+      8,
+      106,
+      120
+    ]
+  },
+  {
+    "path": "browser/characters/breed-2.png",
+    "category": "characters",
+    "usage": "browser",
+    "source": "art/ui-ready-20261015/package/Assets/Resources/Icons/Breeds/breed-2.png",
+    "evidence": "art/ui-ready-20261015/portrait-notes.json",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "닭 품종 초상. 작은 표시용.",
+    "bytes": 16420,
+    "sha256": "d122e1629162a67163038e30427755d5032792574b83494131ff944056455d5f",
+    "width": 128,
+    "height": 128,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      24,
+      8,
+      104,
+      120
+    ]
+  },
+  {
+    "path": "browser/characters/breed-3.png",
+    "category": "characters",
+    "usage": "browser",
+    "source": "art/ui-ready-20261015/package/Assets/Resources/Icons/Breeds/breed-3.png",
+    "evidence": "art/ui-ready-20261015/portrait-notes.json",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "닭 품종 초상. 작은 표시용.",
+    "bytes": 19525,
+    "sha256": "0d2027057ab3fbc48826450daa22509bb798cd803f0b556c3c3b03cd1eaaa248",
+    "width": 128,
+    "height": 128,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      23,
+      8,
+      105,
+      120
+    ]
+  },
+  {
+    "path": "browser/characters/breed-4.png",
+    "category": "characters",
+    "usage": "browser",
+    "source": "art/ui-ready-20261015/package/Assets/Resources/Icons/Breeds/breed-4.png",
+    "evidence": "art/ui-ready-20261015/portrait-notes.json",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "닭 품종 초상. 작은 표시용.",
+    "bytes": 20913,
+    "sha256": "9eec7d981d872d7c0ea745187d6bad1e854e33c7257098e0637075251772677c",
+    "width": 128,
+    "height": 128,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      17,
+      8,
+      110,
+      120
+    ]
+  },
+  {
+    "path": "browser/characters/breed-5.png",
+    "category": "characters",
+    "usage": "browser",
+    "source": "art/ui-ready-20261015/package/Assets/Resources/Icons/Breeds/breed-5.png",
+    "evidence": "art/ui-ready-20261015/portrait-notes.json",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "닭 품종 초상. 작은 표시용.",
+    "bytes": 17980,
+    "sha256": "14d7620869308a709b8bc5a8cf7a1c5cf13ca69ca3972df2e1064de482c905c1",
+    "width": 128,
+    "height": 128,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      23,
+      8,
+      105,
+      120
+    ]
+  },
+  {
+    "path": "browser/characters/breed-6.png",
+    "category": "characters",
+    "usage": "browser",
+    "source": "art/ui-ready-20261015/package/Assets/Resources/Icons/Breeds/breed-6.png",
+    "evidence": "art/ui-ready-20261015/portrait-notes.json",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "닭 품종 초상. 작은 표시용.",
+    "bytes": 18741,
+    "sha256": "9f2bf3f5a98678dd3395455f3ba9521f1ab71a139f525388f5eefd409c8cde16",
+    "width": 128,
+    "height": 128,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      21,
+      8,
+      106,
+      120
+    ]
+  },
+  {
+    "path": "browser/characters/breed-7.png",
+    "category": "characters",
+    "usage": "browser",
+    "source": "art/ui-ready-20261015/package/Assets/Resources/Icons/Breeds/breed-7.png",
+    "evidence": "art/ui-ready-20261015/portrait-notes.json",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "닭 품종 초상. 작은 표시용.",
+    "bytes": 17013,
+    "sha256": "b474c3d4ff0baa31bab9b7d305b529201a0edc5ef8e5a6da54ba55ccca7db7b7",
+    "width": 128,
+    "height": 128,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      22,
+      8,
+      106,
+      120
+    ]
+  },
+  {
+    "path": "browser/characters/breed-8.png",
+    "category": "characters",
+    "usage": "browser",
+    "source": "art/ui-ready-20261015/package/Assets/Resources/Icons/Breeds/breed-8.png",
+    "evidence": "art/ui-ready-20261015/portrait-notes.json",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "닭 품종 초상. 작은 표시용.",
+    "bytes": 19500,
+    "sha256": "7d8d13aa6cfb04609aa70bb347596f03d254ed591fe1785b4df22ba42eb5f151",
+    "width": 128,
+    "height": 128,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      19,
+      8,
+      108,
+      120
+    ]
+  },
+  {
+    "path": "browser/characters/farmer-02.png",
+    "category": "characters",
+    "usage": "browser",
+    "source": "prototype/CoopNight/Assets/Resources/Art/Expansion/Icons/farmer-02.png",
+    "evidence": "art/expansion-20261016/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "농부 성장 외형 아이콘. 정적 표시용.",
+    "bytes": 52451,
+    "sha256": "4ae868049738a448ee0ef1f28fb0404371419364c597dc87b2e5664644950e4f",
+    "width": 256,
+    "height": 256,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      64,
+      16,
+      192,
+      240
+    ]
+  },
+  {
+    "path": "browser/characters/farmer-03.png",
+    "category": "characters",
+    "usage": "browser",
+    "source": "prototype/CoopNight/Assets/Resources/Art/Expansion/Icons/farmer-03.png",
+    "evidence": "art/expansion-20261016/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "농부 성장 외형 아이콘. 정적 표시용.",
+    "bytes": 52007,
+    "sha256": "8de8e4787641f4bbd4e508dc7e0df4a90db0e8b92d30f91c1c7f5eda0bf75ece",
+    "width": 256,
+    "height": 256,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      66,
+      16,
+      189,
+      240
+    ]
+  },
+  {
+    "path": "browser/characters/farmer-04.png",
+    "category": "characters",
+    "usage": "browser",
+    "source": "prototype/CoopNight/Assets/Resources/Art/Expansion/Icons/farmer-04.png",
+    "evidence": "art/expansion-20261016/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "농부 성장 외형 아이콘. 정적 표시용.",
+    "bytes": 55711,
+    "sha256": "1ca0dcfc613e57a697da1eb348c40b9abb6d4e463ae71857dbc75853d35623ed",
+    "width": 256,
+    "height": 256,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      58,
+      16,
+      197,
+      240
+    ]
+  },
+  {
+    "path": "reference/characters/model-farmer.png",
+    "category": "characters",
+    "usage": "reference",
+    "source": "art/higgsfield-reserve-20261015/originals/model-farmer.png",
+    "evidence": "art/higgsfield-reserve-20261015/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "농부·사람 운반인·관리인 모델링 참고 PNG.",
+    "bytes": 3606658,
+    "sha256": "ea7e49667a7004e78e559eb1d1c9315f10d960df7deb4554c17f46c9b474a8f7",
+    "width": 2048,
+    "height": 2048,
+    "mode": "RGB"
+  },
+  {
+    "path": "reference/characters/model-courier-human-v2.png",
+    "category": "characters",
+    "usage": "reference",
+    "source": "art/higgsfield-reserve-20261015/originals/model-courier-human-v2.png",
+    "evidence": "art/higgsfield-reserve-20261015/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "농부·사람 운반인·관리인 모델링 참고 PNG.",
+    "bytes": 4505239,
+    "sha256": "64a0f6c610b9487f00d0fcd8e2b1c46fcd84565d230fad011b5f858975efae1c",
+    "width": 2048,
+    "height": 2048,
+    "mode": "RGB"
+  },
+  {
+    "path": "reference/characters/model-keeper.png",
+    "category": "characters",
+    "usage": "reference",
+    "source": "art/higgsfield-reserve-20261015/originals/model-keeper.png",
+    "evidence": "art/higgsfield-reserve-20261015/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "농부·사람 운반인·관리인 모델링 참고 PNG.",
+    "bytes": 3799388,
+    "sha256": "0ae6cbda277793646fcb56777f0ff8493a73314a2f385635d1926de2478ebacc",
+    "width": 2048,
+    "height": 2048,
+    "mode": "RGB"
+  },
+  {
+    "path": "browser/buildings/barn.png",
+    "category": "buildings",
+    "usage": "browser",
+    "source": "art/ui-ready-20261015/package/Assets/Resources/Icons/barn.png",
+    "evidence": "art/ui-ready-20261015/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "정적 건물·울타리·문 아이콘. 바닥 위치는 실제 배치에서 맞춘다.",
+    "bytes": 80899,
+    "sha256": "51125d227cae210097cc5dca66cec84beeb2253caf6a63185bd7cae9b8257f67",
+    "width": 256,
+    "height": 256,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      16,
+      19,
+      240,
+      237
+    ]
+  },
+  {
+    "path": "browser/buildings/coop.png",
+    "category": "buildings",
+    "usage": "browser",
+    "source": "art/ui-ready-20261015/package/Assets/Resources/Icons/coop.png",
+    "evidence": "art/ui-ready-20261015/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "정적 건물·울타리·문 아이콘. 바닥 위치는 실제 배치에서 맞춘다.",
+    "bytes": 84010,
+    "sha256": "bfe1de802a6c5189ba818c7c7d9d7b6312e63c02f24104e1dd0891ecfda4f726",
+    "width": 256,
+    "height": 256,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      18,
+      16,
+      237,
+      240
+    ]
+  },
+  {
+    "path": "browser/buildings/fence.png",
+    "category": "buildings",
+    "usage": "browser",
+    "source": "art/ui-ready-20261015/package/Assets/Resources/Icons/fence.png",
+    "evidence": "art/ui-ready-20261015/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "정적 건물·울타리·문 아이콘. 바닥 위치는 실제 배치에서 맞춘다.",
+    "bytes": 47487,
+    "sha256": "87ce251b41cb26c9a963c414008d70c4ae790910e2bde020e4268b0c7708f462",
+    "width": 256,
+    "height": 256,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      16,
+      40,
+      240,
+      215
+    ]
+  },
+  {
+    "path": "browser/buildings/gate.png",
+    "category": "buildings",
+    "usage": "browser",
+    "source": "art/ui-ready-20261015/package/Assets/Resources/Icons/gate.png",
+    "evidence": "art/ui-ready-20261015/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "정적 건물·울타리·문 아이콘. 바닥 위치는 실제 배치에서 맞춘다.",
+    "bytes": 50463,
+    "sha256": "45555fca5174d22319c1e8f10dc2a05a018955c8bb606942cc4cdbd311d9019c",
+    "width": 256,
+    "height": 256,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      16,
+      50,
+      240,
+      205
+    ]
+  },
+  {
+    "path": "browser/buildings/store.png",
+    "category": "buildings",
+    "usage": "browser",
+    "source": "art/ui-ready-20261015/package/Assets/Resources/Icons/store.png",
+    "evidence": "art/ui-ready-20261015/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "정적 건물·울타리·문 아이콘. 바닥 위치는 실제 배치에서 맞춘다.",
+    "bytes": 75310,
+    "sha256": "4ba74d270ccfec93da683faffb0997ddce2151b06ff6e65f6cfa90e2d37e99b3",
+    "width": 256,
+    "height": 256,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      16,
+      29,
+      240,
+      227
+    ]
+  },
+  {
+    "path": "browser/buildings/hatchery.png",
+    "category": "buildings",
+    "usage": "browser",
+    "source": "art/ui-ready-20261015/package/Assets/Resources/Icons/hatchery.png",
+    "evidence": "art/ui-ready-20261015/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "정적 건물·울타리·문 아이콘. 바닥 위치는 실제 배치에서 맞춘다.",
+    "bytes": 75409,
+    "sha256": "441bfcaa66a341144a100399643925e41b187b711f90c5d5d1c02db9a54e08f9",
+    "width": 256,
+    "height": 256,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      30,
+      16,
+      227,
+      240
+    ]
+  },
+  {
+    "path": "browser/buildings/tower.png",
+    "category": "buildings",
+    "usage": "browser",
+    "source": "art/ui-ready-20261015/package/Assets/Resources/Icons/tower.png",
+    "evidence": "art/ui-ready-20261015/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "정적 건물·울타리·문 아이콘. 바닥 위치는 실제 배치에서 맞춘다.",
+    "bytes": 71087,
+    "sha256": "4d654f6df1a564a7c28c9819ccd5a27ece792939aa6daad939218d0f836426b9",
+    "width": 256,
+    "height": 256,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      16,
+      23,
+      240,
+      233
+    ]
+  },
+  {
+    "path": "browser/buildings/home-01.png",
+    "category": "buildings",
+    "usage": "browser",
+    "source": "prototype/CoopNight/Assets/Resources/Art/Expansion/Icons/home-01.png",
+    "evidence": "art/expansion-20261016/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "집 5단계 아이콘. 표시 레벨은 한글 디펜스 규칙에 맞춰 연결.",
+    "bytes": 80778,
+    "sha256": "8a567e5b9a58f9e03302d8638bcf113a579e8c60449937a12fcbca6b5ab6b41a",
+    "width": 256,
+    "height": 256,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      23,
+      16,
+      233,
+      240
+    ]
+  },
+  {
+    "path": "browser/buildings/home-02.png",
+    "category": "buildings",
+    "usage": "browser",
+    "source": "prototype/CoopNight/Assets/Resources/Art/Expansion/Icons/home-02.png",
+    "evidence": "art/expansion-20261016/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "집 5단계 아이콘. 표시 레벨은 한글 디펜스 규칙에 맞춰 연결.",
+    "bytes": 78427,
+    "sha256": "23dd7f6a6cdcfb872afabb76629c247daaf76b782858689ec2ee932236ff6b24",
+    "width": 256,
+    "height": 256,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      16,
+      28,
+      240,
+      228
+    ]
+  },
+  {
+    "path": "browser/buildings/home-03.png",
+    "category": "buildings",
+    "usage": "browser",
+    "source": "prototype/CoopNight/Assets/Resources/Art/Expansion/Icons/home-03.png",
+    "evidence": "art/expansion-20261016/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "집 5단계 아이콘. 표시 레벨은 한글 디펜스 규칙에 맞춰 연결.",
+    "bytes": 73740,
+    "sha256": "5c9129ba52b9d14ab289e0d9f9f9d05ac28d4aef2c76bd881c6500f5bfe9f688",
+    "width": 256,
+    "height": 256,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      20,
+      16,
+      236,
+      240
+    ]
+  },
+  {
+    "path": "browser/buildings/home-04.png",
+    "category": "buildings",
+    "usage": "browser",
+    "source": "prototype/CoopNight/Assets/Resources/Art/Expansion/Icons/home-04.png",
+    "evidence": "art/expansion-20261016/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "집 5단계 아이콘. 표시 레벨은 한글 디펜스 규칙에 맞춰 연결.",
+    "bytes": 97650,
+    "sha256": "f69511a6b0fd83455bafb2c54c9514517f1727954188c22c6e5469891c6ecf03",
+    "width": 256,
+    "height": 256,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      16,
+      16,
+      240,
+      239
+    ]
+  },
+  {
+    "path": "browser/buildings/home-05.png",
+    "category": "buildings",
+    "usage": "browser",
+    "source": "prototype/CoopNight/Assets/Resources/Art/Expansion/Icons/home-05.png",
+    "evidence": "art/expansion-20261016/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "집 5단계 아이콘. 표시 레벨은 한글 디펜스 규칙에 맞춰 연결.",
+    "bytes": 92263,
+    "sha256": "fed2c28ea492124e3b787d443401d611214cee8366c595b93a09c03a6c4728e1",
+    "width": 256,
+    "height": 256,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      25,
+      16,
+      230,
+      240
+    ]
+  },
+  {
+    "path": "browser/buildings/tower-01.png",
+    "category": "buildings",
+    "usage": "browser",
+    "source": "art/ui-ready-20261015/package/Assets/Resources/Icons/Towers/tower-01.png",
+    "evidence": "art/ui-ready-20261015/A5/provenance.json",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "씨앗 타워 레벨 아이콘. 첫 적용 후보는 01~05.",
+    "bytes": 11540,
+    "sha256": "6e6995fbee52fd6de06db5350752c27ba0d996588a4b66740c69cb55c04a69f7",
+    "width": 96,
+    "height": 96,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      18,
+      6,
+      78,
+      90
+    ]
+  },
+  {
+    "path": "browser/buildings/tower-02.png",
+    "category": "buildings",
+    "usage": "browser",
+    "source": "art/ui-ready-20261015/package/Assets/Resources/Icons/Towers/tower-02.png",
+    "evidence": "art/ui-ready-20261015/A5/provenance.json",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "씨앗 타워 레벨 아이콘. 첫 적용 후보는 01~05.",
+    "bytes": 11960,
+    "sha256": "adc354a197d0d97c8db0cbcb81d73b6708da33a502eca863c8fb2a50fe6bd388",
+    "width": 96,
+    "height": 96,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      17,
+      6,
+      78,
+      90
+    ]
+  },
+  {
+    "path": "browser/buildings/tower-03.png",
+    "category": "buildings",
+    "usage": "browser",
+    "source": "art/ui-ready-20261015/package/Assets/Resources/Icons/Towers/tower-03.png",
+    "evidence": "art/ui-ready-20261015/A5/provenance.json",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "씨앗 타워 레벨 아이콘. 첫 적용 후보는 01~05.",
+    "bytes": 12111,
+    "sha256": "a2b0db1cb81bfb3800267b8aaf0ea139444b5ead8ae82919112deb9080463fb6",
+    "width": 96,
+    "height": 96,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      17,
+      6,
+      79,
+      90
+    ]
+  },
+  {
+    "path": "browser/buildings/tower-04.png",
+    "category": "buildings",
+    "usage": "browser",
+    "source": "art/ui-ready-20261015/package/Assets/Resources/Icons/Towers/tower-04.png",
+    "evidence": "art/ui-ready-20261015/A5/provenance.json",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "씨앗 타워 레벨 아이콘. 첫 적용 후보는 01~05.",
+    "bytes": 12451,
+    "sha256": "295e1321022ce63f10b5ba617a83be945cea541854001240b4e2a0e67e869463",
+    "width": 96,
+    "height": 96,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      18,
+      6,
+      78,
+      90
+    ]
+  },
+  {
+    "path": "browser/buildings/tower-05.png",
+    "category": "buildings",
+    "usage": "browser",
+    "source": "art/ui-ready-20261015/package/Assets/Resources/Icons/Towers/tower-05.png",
+    "evidence": "art/ui-ready-20261015/A5/provenance.json",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "씨앗 타워 레벨 아이콘. 첫 적용 후보는 01~05.",
+    "bytes": 13154,
+    "sha256": "68f054a8e3b9306414ec719aa6998f002b6aff2b79ed6e0cdee7f0ed80a911ef",
+    "width": 96,
+    "height": 96,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      15,
+      6,
+      81,
+      90
+    ]
+  },
+  {
+    "path": "browser/buildings/tower-06.png",
+    "category": "buildings",
+    "usage": "browser",
+    "source": "art/ui-ready-20261015/package/Assets/Resources/Icons/Towers/tower-06.png",
+    "evidence": "art/ui-ready-20261015/A5/provenance.json",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "씨앗 타워 레벨 아이콘. 첫 적용 후보는 01~05.",
+    "bytes": 10860,
+    "sha256": "144d9e7cac5e7cc8dd3c7ae1edc7104e92ffbeb6089d5fdc1f3eaaf19bd32345",
+    "width": 96,
+    "height": 96,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      22,
+      6,
+      74,
+      90
+    ]
+  },
+  {
+    "path": "browser/buildings/tower-07.png",
+    "category": "buildings",
+    "usage": "browser",
+    "source": "art/ui-ready-20261015/package/Assets/Resources/Icons/Towers/tower-07.png",
+    "evidence": "art/ui-ready-20261015/A5/provenance.json",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "씨앗 타워 레벨 아이콘. 첫 적용 후보는 01~05.",
+    "bytes": 11227,
+    "sha256": "67161cfda7d97eddf82c11e821ddfdb77a7854b2c76d83604175224269803dd3",
+    "width": 96,
+    "height": 96,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      22,
+      6,
+      74,
+      90
+    ]
+  },
+  {
+    "path": "browser/buildings/tower-08.png",
+    "category": "buildings",
+    "usage": "browser",
+    "source": "art/ui-ready-20261015/package/Assets/Resources/Icons/Towers/tower-08.png",
+    "evidence": "art/ui-ready-20261015/A5/provenance.json",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "씨앗 타워 레벨 아이콘. 첫 적용 후보는 01~05.",
+    "bytes": 10833,
+    "sha256": "11b6ddb0e156cf5d63eec4bc0739a072fa15d0488a2ebc4eb60b21551911bf3f",
+    "width": 96,
+    "height": 96,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      23,
+      6,
+      72,
+      90
+    ]
+  },
+  {
+    "path": "browser/buildings/tower-09.png",
+    "category": "buildings",
+    "usage": "browser",
+    "source": "art/ui-ready-20261015/package/Assets/Resources/Icons/Towers/tower-09.png",
+    "evidence": "art/ui-ready-20261015/A5/provenance.json",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "씨앗 타워 레벨 아이콘. 첫 적용 후보는 01~05.",
+    "bytes": 10472,
+    "sha256": "6e2ce45960e4b1dd6a46f9afb59111ce2aa7cc3d87d9c76d104301843538b577",
+    "width": 96,
+    "height": 96,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      24,
+      6,
+      71,
+      90
+    ]
+  },
+  {
+    "path": "browser/buildings/tower-10.png",
+    "category": "buildings",
+    "usage": "browser",
+    "source": "art/ui-ready-20261015/package/Assets/Resources/Icons/Towers/tower-10.png",
+    "evidence": "art/ui-ready-20261015/A5/provenance.json",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "씨앗 타워 레벨 아이콘. 첫 적용 후보는 01~05.",
+    "bytes": 10239,
+    "sha256": "e2938ffca353f9e34e1380ec7cf76370b8a42e760c5884a73e985018383ba03e",
+    "width": 96,
+    "height": 96,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      25,
+      6,
+      70,
+      90
+    ]
+  },
+  {
+    "path": "reference/buildings/model-coop.png",
+    "category": "buildings",
+    "usage": "reference",
+    "source": "art/higgsfield-reserve-20261015/originals/model-coop.png",
+    "evidence": "art/higgsfield-reserve-20261015/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "닭장·시장·부화장·울타리 설계 참고 PNG.",
+    "bytes": 3729912,
+    "sha256": "8d000650cb78fe6db1840766a5a97d11e3bf40e5a6679ac7c1b4aeab85c5b02f",
+    "width": 2048,
+    "height": 2048,
+    "mode": "RGB"
+  },
+  {
+    "path": "reference/buildings/model-market.png",
+    "category": "buildings",
+    "usage": "reference",
+    "source": "art/higgsfield-reserve-20261015/originals/model-market.png",
+    "evidence": "art/higgsfield-reserve-20261015/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "닭장·시장·부화장·울타리 설계 참고 PNG.",
+    "bytes": 3690974,
+    "sha256": "a71b154d5b62ef0d79038b74339c56c35b88b8cdbdae9feb14dec5c7347ae33d",
+    "width": 2048,
+    "height": 2048,
+    "mode": "RGB"
+  },
+  {
+    "path": "reference/buildings/model-hatchery.png",
+    "category": "buildings",
+    "usage": "reference",
+    "source": "art/higgsfield-reserve-20261015/originals/model-hatchery.png",
+    "evidence": "art/higgsfield-reserve-20261015/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "닭장·시장·부화장·울타리 설계 참고 PNG.",
+    "bytes": 3816604,
+    "sha256": "a766bf213b70647a37447a30c4944f1a36c50582d4ef5e2ecaba5296751e9ff2",
+    "width": 2048,
+    "height": 2048,
+    "mode": "RGB"
+  },
+  {
+    "path": "reference/buildings/model-fence-kit.png",
+    "category": "buildings",
+    "usage": "reference",
+    "source": "art/higgsfield-reserve-20261015/originals/model-fence-kit.png",
+    "evidence": "art/higgsfield-reserve-20261015/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "닭장·시장·부화장·울타리 설계 참고 PNG.",
+    "bytes": 3159548,
+    "sha256": "b8e7c76ae8b4985077ed5fe02c040bebd5aefe31c06382bb965d27dcfc7a9db8",
+    "width": 2048,
+    "height": 2048,
+    "mode": "RGB"
+  },
+  {
+    "path": "browser/wolves/wolf.png",
+    "category": "wolves",
+    "usage": "browser",
+    "source": "art/ui-ready-20261015/package/Assets/Resources/Icons/Portraits/wolf.png",
+    "evidence": "art/ui-ready-20261015/portrait-notes.json",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "늑대 전면 초상. 작은 적 마커나 초상용.",
+    "bytes": 20817,
+    "sha256": "506e9834328f493edfeb83946691abf751b6d8cea4e4dbec8e7c22c8f2dca3c0",
+    "width": 128,
+    "height": 128,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      19,
+      8,
+      108,
+      117
+    ]
+  },
+  {
+    "path": "reference/wolves/wolf-base.png",
+    "category": "wolves",
+    "usage": "reference",
+    "source": "art/higgsfield-combat-20261015/originals/wolf-base.png",
+    "evidence": "art/higgsfield-combat-20261015/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "늑대 전신과 보스 4종. 정지 이미지 시안으로 가장자리의 반투명 광륜과 표시 대비 확인.",
+    "bytes": 4623882,
+    "sha256": "ec68b66ad68ac95a600e2ffd036b96a9c5712b2d7df73cd85e2ba59f7d320b2f",
+    "width": 2048,
+    "height": 2048,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      254
+    ],
+    "alpha_bbox_128_xyxy": [
+      262,
+      173,
+      1833,
+      1944
+    ]
+  },
+  {
+    "path": "reference/wolves/boss-bramble.png",
+    "category": "wolves",
+    "usage": "reference",
+    "source": "art/higgsfield-combat-20261015/originals/boss-bramble.png",
+    "evidence": "art/higgsfield-combat-20261015/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "늑대 전신과 보스 4종. 정지 이미지 시안으로 가장자리의 반투명 광륜과 표시 대비 확인.",
+    "bytes": 4969357,
+    "sha256": "feb4a201452740355a5ed0f2c39769bbed62914bd1b2183db6c9c7afff37f975",
+    "width": 2048,
+    "height": 2048,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      254
+    ],
+    "alpha_bbox_128_xyxy": [
+      99,
+      114,
+      1943,
+      1953
+    ]
+  },
+  {
+    "path": "reference/wolves/boss-granite.png",
+    "category": "wolves",
+    "usage": "reference",
+    "source": "art/higgsfield-combat-20261015/originals/boss-granite.png",
+    "evidence": "art/higgsfield-combat-20261015/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "늑대 전신과 보스 4종. 정지 이미지 시안으로 가장자리의 반투명 광륜과 표시 대비 확인.",
+    "bytes": 4911061,
+    "sha256": "7b3eb6d08961f8561a5dd8c60ad530c36055dcaf1646980cafe19e1a0a4c8ba0",
+    "width": 2048,
+    "height": 2048,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      254
+    ],
+    "alpha_bbox_128_xyxy": [
+      146,
+      195,
+      1943,
+      1931
+    ]
+  },
+  {
+    "path": "reference/wolves/boss-frost.png",
+    "category": "wolves",
+    "usage": "reference",
+    "source": "art/higgsfield-combat-20261015/originals/boss-frost.png",
+    "evidence": "art/higgsfield-combat-20261015/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "늑대 전신과 보스 4종. 정지 이미지 시안으로 가장자리의 반투명 광륜과 표시 대비 확인.",
+    "bytes": 4379852,
+    "sha256": "5bf59f366a16935ce0fc62abbae97f00d418b3b0d4338f4964e32800d6124f1b",
+    "width": 2048,
+    "height": 2048,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      254
+    ],
+    "alpha_bbox_128_xyxy": [
+      92,
+      253,
+      1912,
+      1909
+    ]
+  },
+  {
+    "path": "reference/wolves/boss-ember.png",
+    "category": "wolves",
+    "usage": "reference",
+    "source": "art/higgsfield-combat-20261015/originals/boss-ember.png",
+    "evidence": "art/higgsfield-combat-20261015/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "늑대 전신과 보스 4종. 정지 이미지 시안으로 가장자리의 반투명 광륜과 표시 대비 확인.",
+    "bytes": 4947650,
+    "sha256": "ae0562d8c00b7c19c319bd64745a247ae5e9d8e76e38c22faacca44dc924ee0c",
+    "width": 2048,
+    "height": 2048,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      254
+    ],
+    "alpha_bbox_128_xyxy": [
+      132,
+      122,
+      1905,
+      1961
+    ]
+  },
+  {
+    "path": "browser/animation/front.png",
+    "category": "animation",
+    "usage": "browser",
+    "source": "prototype/CoopNight/Assets/Resources/Art/Expansion/FX/fx-coin-rotation/front.png",
+    "evidence": "art/expansion-20261016/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "금화 회전 개별 프레임. 순서는 front → quarter → edge → reverse-quarter.",
+    "bytes": 320019,
+    "sha256": "4d5c90201d8b94def9d38cc39d031ae239d70b528b771c2ef28889300d3a1d78",
+    "width": 512,
+    "height": 512,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      34,
+      35,
+      477,
+      476
+    ]
+  },
+  {
+    "path": "browser/animation/quarter.png",
+    "category": "animation",
+    "usage": "browser",
+    "source": "prototype/CoopNight/Assets/Resources/Art/Expansion/FX/fx-coin-rotation/quarter.png",
+    "evidence": "art/expansion-20261016/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "금화 회전 개별 프레임. 순서는 front → quarter → edge → reverse-quarter.",
+    "bytes": 256779,
+    "sha256": "4a3e931fe17d0e636e81c75d25b1070716c9f1ae8a45fe5d977e279596240687",
+    "width": 512,
+    "height": 512,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      85,
+      35,
+      427,
+      477
+    ]
+  },
+  {
+    "path": "browser/animation/edge.png",
+    "category": "animation",
+    "usage": "browser",
+    "source": "prototype/CoopNight/Assets/Resources/Art/Expansion/FX/fx-coin-rotation/edge.png",
+    "evidence": "art/expansion-20261016/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "금화 회전 개별 프레임. 순서는 front → quarter → edge → reverse-quarter.",
+    "bytes": 105399,
+    "sha256": "6458d160887637de5875aeb1ca21228dabd5700ad08ab69243da4b8c0538e633",
+    "width": 512,
+    "height": 512,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      202,
+      35,
+      309,
+      478
+    ]
+  },
+  {
+    "path": "browser/animation/reverse-quarter.png",
+    "category": "animation",
+    "usage": "browser",
+    "source": "prototype/CoopNight/Assets/Resources/Art/Expansion/FX/fx-coin-rotation/reverse-quarter.png",
+    "evidence": "art/expansion-20261016/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "금화 회전 개별 프레임. 순서는 front → quarter → edge → reverse-quarter.",
+    "bytes": 247558,
+    "sha256": "4f9542c77f9641ca99ee8a3a8d13be8c410c8b388913368b55c2d00389ecbc48",
+    "width": 512,
+    "height": 512,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      87,
+      35,
+      425,
+      478
+    ]
+  },
+  {
+    "path": "browser/animation/fx-impact.png",
+    "category": "animation",
+    "usage": "browser",
+    "source": "prototype/CoopNight/Assets/Resources/Art/Generated/FX/fx-impact.png",
+    "evidence": "art/higgsfield-reserve-20261015/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "착탄·고리·먼지와 알껍질·깃털. 껍질·깃털은 2×2 파티클 조각이고 연속 동작은 따로 합성한다.",
+    "bytes": 127689,
+    "sha256": "6934bab713759f18e31a470550a806d236af8cf8a20b682ebd2629c50b48eb50",
+    "width": 512,
+    "height": 512,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      41,
+      19,
+      471,
+      493
+    ]
+  },
+  {
+    "path": "browser/animation/fx-ring.png",
+    "category": "animation",
+    "usage": "browser",
+    "source": "prototype/CoopNight/Assets/Resources/Art/Generated/FX/fx-ring.png",
+    "evidence": "art/higgsfield-reserve-20261015/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "착탄·고리·먼지와 알껍질·깃털. 껍질·깃털은 2×2 파티클 조각이고 연속 동작은 따로 합성한다.",
+    "bytes": 154194,
+    "sha256": "74a401306dd444d90d4a3cf84592aa0c77069ff818719ff8fc419fb4828c0b17",
+    "width": 512,
+    "height": 512,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      21,
+      34,
+      481,
+      472
+    ]
+  },
+  {
+    "path": "browser/animation/fx-dust.png",
+    "category": "animation",
+    "usage": "browser",
+    "source": "prototype/CoopNight/Assets/Resources/Art/Generated/FX/fx-dust.png",
+    "evidence": "art/higgsfield-reserve-20261015/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "착탄·고리·먼지와 알껍질·깃털. 껍질·깃털은 2×2 파티클 조각이고 연속 동작은 따로 합성한다.",
+    "bytes": 219751,
+    "sha256": "2db511f2241889825824fac3412e3db1eeac8a0b387cba952fda0ad88a899b67",
+    "width": 512,
+    "height": 512,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      253
+    ],
+    "alpha_bbox_128_xyxy": [
+      37,
+      81,
+      477,
+      435
+    ]
+  },
+  {
+    "path": "browser/animation/fx-hatch.png",
+    "category": "animation",
+    "usage": "browser",
+    "source": "prototype/CoopNight/Assets/Resources/Art/Generated/FX/fx-hatch.png",
+    "evidence": "art/higgsfield-reserve-20261015/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "착탄·고리·먼지와 알껍질·깃털. 껍질·깃털은 2×2 파티클 조각이고 연속 동작은 따로 합성한다.",
+    "bytes": 476404,
+    "sha256": "32167e170c89895e4543d9866efb4ea39a52d3165e7efbc26bd39a47b4bd8c07",
+    "width": 1024,
+    "height": 1024,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      50,
+      129,
+      979,
+      941
+    ]
+  },
+  {
+    "path": "browser/animation/fx-feathers.png",
+    "category": "animation",
+    "usage": "browser",
+    "source": "prototype/CoopNight/Assets/Resources/Art/Generated/FX/fx-feathers.png",
+    "evidence": "art/higgsfield-reserve-20261015/HANDOFF.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "착탄·고리·먼지와 알껍질·깃털. 껍질·깃털은 2×2 파티클 조각이고 연속 동작은 따로 합성한다.",
+    "bytes": 350802,
+    "sha256": "a99b59f3b5273ade4db05f69d651f6a5894a85490316f19be32842a28b1b4874",
+    "width": 1024,
+    "height": 1024,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      129,
+      94,
+      948,
+      947
+    ]
+  },
+  {
+    "path": "reference/animation/wolf-walk-reference.mp4",
+    "category": "animation",
+    "usage": "reference",
+    "source": "art/higgsfield-combat-20261015/motions/wolf-walk-reference.mp4",
+    "evidence": "art/higgsfield-combat-20261015/MOTION-REVIEW.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "배경이 포함된 동작 참고 영상. 게임용 프레임을 만들 때 배경 분리와 방향·루프를 확인한다.",
+    "bytes": 2407590,
+    "sha256": "db462918d917666a762b6cac0cdaa516fac2c1e7e708a508de3089f52e6d3eff",
+    "codec_name": "h264",
+    "width": 960,
+    "height": 960,
+    "avg_frame_rate": "24/1",
+    "nb_frames": "97",
+    "duration_seconds": 4.041667
+  },
+  {
+    "path": "reference/animation/wolf-run-reference.mp4",
+    "category": "animation",
+    "usage": "reference",
+    "source": "art/higgsfield-combat-20261015/motions/wolf-run-reference.mp4",
+    "evidence": "art/higgsfield-combat-20261015/MOTION-REVIEW.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "배경이 포함된 동작 참고 영상. 게임용 프레임을 만들 때 배경 분리와 방향·루프를 확인한다.",
+    "bytes": 2455320,
+    "sha256": "f62cee6038bd499f072009b12d292b3cc9722218a99de7ec78b037a3a25a571a",
+    "codec_name": "h264",
+    "width": 960,
+    "height": 960,
+    "avg_frame_rate": "24/1",
+    "nb_frames": "97",
+    "duration_seconds": 4.041667
+  },
+  {
+    "path": "reference/animation/bramble-bite-reference.mp4",
+    "category": "animation",
+    "usage": "reference",
+    "source": "art/higgsfield-combat-20261015/motions/bramble-bite-reference.mp4",
+    "evidence": "art/higgsfield-combat-20261015/MOTION-REVIEW.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "배경이 포함된 동작 참고 영상. 게임용 프레임을 만들 때 배경 분리와 방향·루프를 확인한다.",
+    "bytes": 2342154,
+    "sha256": "6215d5172d057d28537bc3c62c3a1a4631e727a6e340e5a52e4acb4508d1c58b",
+    "codec_name": "h264",
+    "width": 960,
+    "height": 960,
+    "avg_frame_rate": "24/1",
+    "nb_frames": "97",
+    "duration_seconds": 4.041667
+  },
+  {
+    "path": "reference/animation/granite-slam-reference.mp4",
+    "category": "animation",
+    "usage": "reference",
+    "source": "art/higgsfield-combat-20261015/motions/granite-slam-reference.mp4",
+    "evidence": "art/higgsfield-combat-20261015/MOTION-REVIEW.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "배경이 포함된 동작 참고 영상. 게임용 프레임을 만들 때 배경 분리와 방향·루프를 확인한다.",
+    "bytes": 2368373,
+    "sha256": "5c904fd0862900f7c34c8d26a40bce7f4e856c63e3503d121cf3c94f5dbc508b",
+    "codec_name": "h264",
+    "width": 960,
+    "height": 960,
+    "avg_frame_rate": "24/1",
+    "nb_frames": "97",
+    "duration_seconds": 4.041667
+  },
+  {
+    "path": "reference/animation/frost-dash-reference.mp4",
+    "category": "animation",
+    "usage": "reference",
+    "source": "art/higgsfield-combat-20261015/motions/frost-dash-reference.mp4",
+    "evidence": "art/higgsfield-combat-20261015/MOTION-REVIEW.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "배경이 포함된 동작 참고 영상. 게임용 프레임을 만들 때 배경 분리와 방향·루프를 확인한다.",
+    "bytes": 2318271,
+    "sha256": "bddc3e9802d85a7b7b2b62259ffa2857395e38ffd03374775a6b2210b3194219",
+    "codec_name": "h264",
+    "width": 960,
+    "height": 960,
+    "avg_frame_rate": "24/1",
+    "nb_frames": "97",
+    "duration_seconds": 4.041667
+  },
+  {
+    "path": "reference/animation/ember-roar-reference.mp4",
+    "category": "animation",
+    "usage": "reference",
+    "source": "art/higgsfield-combat-20261015/motions/ember-roar-reference.mp4",
+    "evidence": "art/higgsfield-combat-20261015/MOTION-REVIEW.md",
+    "origin": "CoopNight project art, Higgsfield output or derivative",
+    "note": "배경이 포함된 동작 참고 영상. 게임용 프레임을 만들 때 배경 분리와 방향·루프를 확인한다.",
+    "bytes": 2159164,
+    "sha256": "fd99d2fdae1a902ded92142e46640377e3497edaa21db42d74afdc880aeb5a56",
+    "codec_name": "h264",
+    "width": 960,
+    "height": 960,
+    "avg_frame_rate": "24/1",
+    "nb_frames": "97",
+    "duration_seconds": 4.041667
+  },
+  {
+    "path": "source-3d/models/farmer.glb",
+    "category": "models",
+    "usage": "source-3d",
+    "source": "art/art013/farmer.glb",
+    "evidence": "art/art013/PROVENANCE.md",
+    "origin": "CoopNight Blender 3D Jutsu",
+    "note": "Blender 모델링 원본과 포터블 모델. 농부 기본 자세와 피벗이 포함된다.",
+    "bytes": 464220,
+    "sha256": "07168294eadf7efc2b7691faa52b647b250969a883846193f15c86645a0fbdb8",
+    "meshes": 38,
+    "nodes": 49,
+    "animations": 0,
+    "external_uris": []
+  },
+  {
+    "path": "source-3d/models/farmer.blend",
+    "category": "models",
+    "usage": "source-3d",
+    "source": "art/art013/farmer.blend",
+    "evidence": "art/art013/PROVENANCE.md",
+    "origin": "CoopNight Blender 3D Jutsu",
+    "note": "Blender 모델링 원본과 포터블 모델. 농부 기본 자세와 피벗이 포함된다.",
+    "bytes": 1702736,
+    "sha256": "99315bba9b006e8833c8263850bfc752ead0dc3668440d73a24b015dc82e6c33"
+  },
+  {
+    "path": "source-3d/models/farmer-preview.png",
+    "category": "models",
+    "usage": "source-3d",
+    "source": "art/art013/farmer-preview.png",
+    "evidence": "art/art013/PROVENANCE.md",
+    "origin": "CoopNight Blender 3D Jutsu",
+    "note": "Blender 모델링 원본과 포터블 모델. 농부 기본 자세와 피벗이 포함된다.",
+    "bytes": 250280,
+    "sha256": "31fcbcfbc065e5b76dab263c61c11b05ec9f91ea094d04ce97d2ca5ffb7670f9",
+    "width": 640,
+    "height": 640,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      190,
+      97,
+      450,
+      559
+    ]
+  },
+  {
+    "path": "source-3d/models/environment-pack.glb",
+    "category": "models",
+    "usage": "source-3d",
+    "source": "art/art014/environment-pack.glb",
+    "evidence": "art/art014/PROVENANCE.md",
+    "origin": "CoopNight Blender 3D Jutsu",
+    "note": "닭장·시장·씨앗/옥수수 타워·닭·병아리·울타리·문·나무·덤불·바위의 합본. 노드 선택 또는 개별 렌더 필요.",
+    "bytes": 1750036,
+    "sha256": "854676e21616e24e23cf8a726cbcb742b8a0f8782d12f07968f2caff5bfaf6cc",
+    "meshes": 283,
+    "nodes": 309,
+    "animations": 0,
+    "external_uris": []
+  },
+  {
+    "path": "source-3d/models/environment-pack.blend",
+    "category": "models",
+    "usage": "source-3d",
+    "source": "art/art014/environment-pack.blend",
+    "evidence": "art/art014/PROVENANCE.md",
+    "origin": "CoopNight Blender 3D Jutsu",
+    "note": "닭장·시장·씨앗/옥수수 타워·닭·병아리·울타리·문·나무·덤불·바위의 합본. 노드 선택 또는 개별 렌더 필요.",
+    "bytes": 5211570,
+    "sha256": "a00cf0b5575bac1fa3f1dae484892a3c9ee6eda89f096989a3a7af38ebddde4b"
+  },
+  {
+    "path": "source-3d/models/environment-pack-preview.png",
+    "category": "models",
+    "usage": "source-3d",
+    "source": "art/art014/environment-pack-preview.png",
+    "evidence": "art/art014/PROVENANCE.md",
+    "origin": "CoopNight Blender 3D Jutsu",
+    "note": "닭장·시장·씨앗/옥수수 타워·닭·병아리·울타리·문·나무·덤불·바위의 합본. 노드 선택 또는 개별 렌더 필요.",
+    "bytes": 577361,
+    "sha256": "acc7a427e8431e78c232754634e69f47c40d17f91b74de2b78f1e61a7462a6f0",
+    "width": 1100,
+    "height": 760,
+    "mode": "RGBA",
+    "alpha_range": [
+      0,
+      255
+    ],
+    "alpha_bbox_128_xyxy": [
+      110,
+      105,
+      1028,
+      598
+    ]
+  }
+]
