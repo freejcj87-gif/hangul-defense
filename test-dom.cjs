@@ -7,6 +7,7 @@ ok(simulate(0,0).leaked===2,'no tower must leak');
 ok(simulate(1,0).leaked===0,'first tower can defend introduction');
 ok(simulate(1,24).leaked>0,'one tower is not automatic victory');
 ok(simulate(5,24).kills>simulate(1,24).kills,'upgrading improves actual combat');
+ok(simulate(5,24).leaked===0,'maximum tower can defend capped difficulty');
 let b=Combat.create(0);const before=JSON.stringify(b);Combat.step(b,1,0);ok(JSON.stringify(b)===before,'zero delta does not advance');
 Combat.step(b,1,100);ok(b.elapsed<=.1,'large frame cannot fast-forward');
 ok(Combat.valid(JSON.parse(JSON.stringify(b))),'combat snapshot roundtrip');

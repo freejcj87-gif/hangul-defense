@@ -29,7 +29,7 @@
       }
       const target=b.enemies.filter(e=>e.hp>0&&!e.escaped&&e.x<=67).sort((a,b)=>a.x-b.x)[0];
       if(level>0&&target&&b.cooldown===0){
-        const damage=6+level*4;target.hp=Math.max(0,target.hp-damage);
+        const damage=6+level*5;target.hp=Math.max(0,target.hp-damage);
         b.cooldown=Math.max(.45,1.3-level*.15);
         events.push({type:'hit',id:target.id,x:target.x,damage});
         if(target.hp===0){b.kills++;events.push({type:'kill',id:target.id,x:target.x});}

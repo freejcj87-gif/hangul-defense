@@ -18,12 +18,12 @@
 - 320/390px 화면을 고려한 버튼과 문항 배치, 탭 숨김 자동 정지.
 
 ## 검사
-- `node test-dom.cjs`: 결정적 전투 규칙과 모의 DOM 30개 검사.
+- `node test-dom.cjs`: 결정적 전투 규칙과 모의 DOM 31개 검사.
 - `npm install --no-save playwright@1.56.1`
 - `npx playwright install --with-deps chromium webkit`
 - `node test.cjs`: Chromium/WebKit, 1366/390/320px, 터치 에뮬레이션, 저장 재개·전투·독해 검사 및 스크린샷.
 - GitHub Actions는 최대 10분, 검사 후 종료합니다. 실제 결과는 해당 커밋의 실행 결과로 확인합니다.
-- 개발 세션 자체에는 로컬 터미널/브라우저가 없어 JavaScript 실행기에서 30개 모의 검사를 수행했습니다. 실제 기기 음성·모바일 사용감·아동 관찰은 별도입니다.
+- 개발 세션 자체에는 로컬 터미널/브라우저가 없어 JavaScript 실행기에서 31개 모의 검사를 수행했습니다. 실제 기기 음성·모바일 사용감·아동 관찰은 별도입니다.
 
 ## 자산 적용 대기
 `docs/asset-integration.md` 참고. 기존 로컬 CoopNight에는 접근하지 않았습니다.

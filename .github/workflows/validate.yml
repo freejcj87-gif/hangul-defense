@@ -4,11 +4,14 @@ on:
     branches: [improve/village-combat-v02]
   pull_request:
     branches: [main]
+concurrency:
+  group: prototype-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
   prototype:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
