@@ -6,7 +6,10 @@ on:
     paths:
       - index.html
       - combat.js
+      - src/village.js
       - art-handoff/coopnight/browser/**
+      - art-handoff/coopnight/source-3d/models/environment-pack.glb
+      - scripts/build-pages.cjs
       - .github/workflows/package-test.yml
 permissions:
   contents: read
@@ -19,18 +22,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Check game rules
-        run: node test-dom.cjs
-      - name: Package browser files only
-        run: |
-          mkdir -p playable/art-handoff/coopnight
-          cp index.html combat.js playable/
-          cp -R art-handoff/coopnight/browser playable/art-handoff/coopnight/
-          cp art-handoff/coopnight/README.md art-handoff/coopnight/USAGE.md playable/art-handoff/coopnight/
-          git rev-parse HEAD > playable/SOURCE_COMMIT.txt
+      - run: node test-dom.cjs
+      - run: npm install --no-save --package-lock=false three@0.180.0 esbuild@0.25.10
+      - run: node scripts/build-pages.cjs
       - uses: actions/upload-artifact@v4
         with:
           name: hangul-defense-playable
-          path: playable/
+          path: .pages-build/
           retention-days: 14
           if-no-files-found: error

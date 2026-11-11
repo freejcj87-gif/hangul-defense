@@ -5,6 +5,8 @@ on:
     paths:
       - index.html
       - combat.js
+      - src/village.js
+      - art-handoff/coopnight/source-3d/models/environment-pack.glb
       - art-handoff/coopnight/browser/**
       - scripts/build-pages.cjs
       - .github/workflows/pages.yml
@@ -25,6 +27,7 @@ jobs:
           node-version: '22'
       - name: Validate game rules
         run: node test-dom.cjs
+      - run: npm install --no-save --package-lock=false three@0.180.0 esbuild@0.25.10
       - name: Package game and used artwork
         run: node scripts/build-pages.cjs
       - uses: actions/upload-pages-artifact@v4
@@ -72,12 +75,14 @@ jobs:
           assert '꼬꼬마을: 읽어서 지켜요' in html
           assert 'combat.js' in html
           assert len(fetch('combat.js')) > 1000
-          images = ['backgrounds/background-meadow.png', 'characters/chicken.png', 'wolves/wolf.png', 'buildings/coop.png', 'buildings/store.png']
+          images = ['backgrounds/background-meadow.png', 'backgrounds/grass.png', 'characters/chicken.png', 'wolves/wolf.png', 'buildings/coop.png', 'buildings/store.png']
           images += ['buildings/home-' + n + '.png' for n in ['01','02','03','04','05']]
           images += ['buildings/tower-' + n + '.png' for n in ['01','03','05','08','10']]
           images += ['animation/' + n + '.png' for n in ['fx-impact','front','quarter','edge','reverse-quarter']]
           for image in images:
               assert fetch('art-handoff/coopnight/browser/' + image).startswith(bytes.fromhex('89504e470d0a1a0a')), image
-          print('PASS: live HTML, combat script, deployed commit and 20 PNG assets.')
+          assert len(fetch('village.js')) > 10000
+          assert fetch('art-handoff/coopnight/source-3d/models/environment-pack.glb').startswith(b'glTF')
+          print('PASS: live HTML, combat + village scripts, deployed commit, GLB and 21 PNG assets.')
           print('Playable URL: ' + base)
           PY
