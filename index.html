@@ -147,14 +147,16 @@ function recommend(){const o=outlook();if(o.now===0)return state.chickens<SHOP.c
 function canBuy(kind){const s=SHOP[kind];return !!s&&!paused&&state.gold>=s.cost&&state[s.key]<s.max}
 function affordable(){return Object.keys(SHOP).some(canBuy)}
 
-function render(){ document.body.classList.toggle('paused',paused); $('gold').textContent='🪙 '+state.gold+'골드';$('hp').textContent='💚 성문 '+state.hp;$('level').textContent='🗼'+state.level+' 🐔'+state.chickens+' 🪵'+state.fence;$('level').setAttribute('aria-label','타워 '+state.level+'단계, 닭 '+state.chickens+'마리, 울타리 '+state.fence+'칸');$('stage').textContent='🏅 방어 성공 '+state.wins+'회';$('tower').dataset.level=state.level;updateVillageArt();
+/* 값이 같으면 다시 쓰지 않는다. 전투 중 0.1초마다 버튼 글자를 갈아 끼우면 누르는 도중 글자가 교체되어 클릭이 사라질 수 있다. */
+function put(el,text){if(el.textContent!==text)el.textContent=text}
+function render(){ document.body.classList.toggle('paused',paused); put($('gold'),'🪙 '+state.gold+'골드');put($('hp'),'💚 성문 '+state.hp);put($('level'),'🗼'+state.level+' 🐔'+state.chickens+' 🪵'+state.fence);$('level').setAttribute('aria-label','타워 '+state.level+'단계, 닭 '+state.chickens+'마리, 울타리 '+state.fence+'칸');put($('stage'),'🏅 방어 성공 '+state.wins+'회');$('tower').dataset.level=state.level;updateVillageArt();
  const rec=phase==='question'?recommend():null,can=affordable();
- for(const kind in SHOP){const s=SHOP[kind],n=state[s.key],b=$(s.id),full=n>=s.max;b.disabled=!canBuy(kind);b.classList.toggle('recommended',rec===kind&&!b.disabled);b.classList.toggle('maxed',full);$(s.id+'Count').textContent=n+'/'+s.max;$(s.id+'Price').textContent=full?'완성!':'🪙 '+s.cost}
- $('buildName').textContent=state.level>=SHOP.tower.max?'최고 타워':state.level?'타워 강화':'타워 세우기';$('buildNote').textContent=state.level>=SHOP.tower.max?'가장 튼튼해요':state.level?'공격이 더 세져요':'늑대를 물리쳐요';
+ for(const kind in SHOP){const s=SHOP[kind],n=state[s.key],b=$(s.id),full=n>=s.max;b.disabled=!canBuy(kind);b.classList.toggle('recommended',rec===kind&&!b.disabled);b.classList.toggle('maxed',full);put($(s.id+'Count'),n+'/'+s.max);put($(s.id+'Price'),full?'완성!':'🪙 '+s.cost)}
+ put($('buildName'),state.level>=SHOP.tower.max?'최고 타워':state.level?'타워 강화':'타워 세우기');put($('buildNote'),state.level>=SHOP.tower.max?'가장 튼튼해요':state.level?'공격이 더 세져요':'늑대를 물리쳐요');
  $('choices').classList.toggle('ready',offered&&can);
- $('buildPrompt').textContent=offered&&can?'🎁 맞았어요! 하나 골라 마을에 지어 보세요':can?'🪙 골드가 있어요. 하나 골라 지어 보세요':answered&&phase==='question'?'👍 준비 끝! 이제 늑대를 막으러 가요':'문제를 맞히면 골드로 마을을 키울 수 있어요';
- const o=phase==='question'?outlook():null;$('outlook').className=o&&o.now?'warn':'';$('outlook').textContent=!o?'':o.now===0?'🛡️ 지금 마을이면 늑대를 모두 막을 수 있어요.':state.level===0?'⚠️ 타워가 없으면 늑대를 막을 수 없어요.':'⚠️ 늑대 '+o.now+'마리가 성문까지 올 것 같아요. 타워나 울타리로 대비해요.';
- $('battle').disabled=!answered||phase!=='question'||paused;$('shield').textContent=paused?'⏸️ 쉬는 중이에요':phase==='battle'?'⚔️ 타워가 늑대를 막고 있어요':'🛡️ 읽는 동안 마을은 안전해요';$('pause').textContent=paused?'계속하기':'잠깐 쉬기';$('mode').disabled=phase==='battle'||paused;$('speak').disabled=phase==='battle'||paused;$('age').disabled=phase==='battle'||paused;$('speak').classList.toggle('nudge',phase==='question'&&!answered&&!heard&&state.mode==='sound');}
+ put($('buildPrompt'),offered&&can?'🎁 맞았어요! 하나 골라 마을에 지어 보세요':can?'🪙 골드가 있어요. 하나 골라 지어 보세요':answered&&phase==='question'?'👍 준비 끝! 이제 늑대를 막으러 가요':'문제를 맞히면 골드로 마을을 키울 수 있어요');
+ const o=phase==='question'?outlook():null;$('outlook').className=o&&o.now?'warn':'';put($('outlook'),!o?'':o.now===0?'🛡️ 지금 마을이면 늑대를 모두 막을 수 있어요.':state.level===0?'⚠️ 타워가 없으면 늑대를 막을 수 없어요.':'⚠️ 늑대 '+o.now+'마리가 성문까지 올 것 같아요. 타워나 울타리로 대비해요.');
+ $('battle').disabled=!answered||phase!=='question'||paused;put($('shield'),paused?'⏸️ 쉬는 중이에요':phase==='battle'?'⚔️ 타워가 늑대를 막고 있어요':'🛡️ 읽는 동안 마을은 안전해요');put($('pause'),paused?'계속하기':'잠깐 쉬기');$('mode').disabled=phase==='battle'||paused;$('speak').disabled=phase==='battle'||paused;$('age').disabled=phase==='battle'||paused;$('speak').classList.toggle('nudge',phase==='question'&&!answered&&!heard&&state.mode==='sound');}
 
 /* 문제: 나이·모드·순번으로 문제은행에서 꺼낸다. 이미 정답 처리된 문제는 맞힌 때의 나이(qage)로 다시 보여 준다. */
 function token(){return state.mode+':'+state.index}

@@ -124,11 +124,16 @@ const KEY='hangul-defense-v1',SWIFT=['--enable-webgl','--use-gl=angle','--use-an
   await frames(page,4);
   eq(await residents(page),reduced,'reduced motion freezes residents');
  }
- await page.locator('#battle').click();ok(await page.locator('#age').isDisabled(),'age locked during battle');await page.waitForTimeout(4000);
+ await page.evaluate(()=>{window.__pointer=[];for(const type of ['mousedown','mouseup','click'])document.addEventListener(type,e=>window.__pointer.push(type+':'+(e.target.id||e.target.nodeName)),true)});
+ const before=await page.evaluate(()=>JSON.stringify([document.hidden,getVillageState(),document.getElementById('battle').disabled]));
+ await page.locator('#battle').click();ok(await page.locator('#age').isDisabled(),'age locked during battle; before '+before+' after '+await page.evaluate(()=>JSON.stringify([document.hidden,getVillageState(),window.__pointer]))+' errors '+JSON.stringify(errors));await page.waitForTimeout(3500);
+ /* 전투는 0.1초마다 화면을 다시 그린다. 그때 버튼 글자를 갈아 끼우면 누르는 도중 글자가 교체되어 클릭이 사라질 수 있다. */
+ ok(await page.evaluate(async()=>{const label=()=>document.getElementById('pause').firstChild,first=label();await new Promise(r=>setTimeout(r,450));return first===label()}),'battle ticks leave the pause button label in place');
  eq(await page.evaluate(()=>[document.hidden,getVillageState().paused,getVillageState().phase]),[false,false,'battle'],'battle is running before the pause click');
+ await page.evaluate(()=>{window.__pointer.length=0});
  await page.locator('#pause').click();
- eq([await page.locator('#pause').textContent(),await page.evaluate(()=>getVillageState().paused)],['계속하기',true],'pause click pauses the battle');
- ok(await page.locator('.enemy img').count()>0,'wolves drawn');
+ eq([await page.locator('#pause').textContent(),await page.evaluate(()=>getVillageState().paused)],['계속하기',true],'pause click pauses the battle; pointer events seen: '+await page.evaluate(()=>window.__pointer.join(' ')));
+ ok(await page.locator('.enemy img').count()>0,'wolves drawn; '+await page.evaluate(()=>JSON.stringify([getVillageState().phase,getVillageState().combat,document.getElementById('enemies').childElementCount])));
  if(name==='chromium')ok((await page.evaluate(()=>window.VillageView.inspect())).enemies>0,'3D wolves');
  ok(await page.locator('.enemy img').first().evaluate(i=>i.complete&&i.naturalWidth===128),'wolf art');
  if(name==='chromium')await shot(page.locator('.scene'),'battle-390');
