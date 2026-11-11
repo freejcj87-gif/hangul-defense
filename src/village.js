@@ -337,9 +337,9 @@ async function start(){
   const level=count(s.level,5),chickens=count(s.chickens,6),fence=count(s.fence,6),wins=Math.max(0,Math.floor(Number(s.wins)||0));
   if(!first&&level===shown.level&&chickens===shown.chickens&&fence===shown.fence&&wins===shown.wins)return;
   if(level<shown.level||chickens<shown.chickens||fence<shown.fence||wins<shown.wins)clearEffects();
-  if(first||level!==shown.level){silent.level=level===shown.level+1?time:-9;shown.level=level;applyLevel(level)}
-  if(first||chickens!==shown.chickens){silent.chickens=chickens===shown.chickens+1?time:-9;shown.chickens=chickens;applyChickens(chickens)}
-  if(first||fence!==shown.fence){silent.fence=fence===shown.fence+1?time:-9;shown.fence=fence;applyFence(fence)}
+  if(first||level!==shown.level){silent.level=!first&&level===shown.level+1?time:-9;shown.level=level;applyLevel(level)}
+  if(first||chickens!==shown.chickens){silent.chickens=!first&&chickens===shown.chickens+1?time:-9;shown.chickens=chickens;applyChickens(chickens)}
+  if(first||fence!==shown.fence){silent.fence=!first&&fence===shown.fence+1?time:-9;shown.fence=fence;applyFence(fence)}
   if(first||wins!==shown.wins){const before=shown.wins;shown.wins=wins;applyWins(wins);
    if(!first)for(const [a,at] of EXTRAS)if(before<at&&wins>=at){tween(0,.6,(u,t)=>{const k=Math.max(.001,springy(t));a.sx*=k;a.sy*=k});dustBurst(a.x,a.z,8,.9);sparkles(a.x,1,a.z,6,.8)}}
  }

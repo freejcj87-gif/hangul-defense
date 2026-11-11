@@ -33,6 +33,8 @@ const KEY='hangul-defense-v1',SWIFT=['--enable-webgl','--use-gl=angle','--use-an
  async function answersFit(page){return page.evaluate(()=>{const r=[...document.querySelectorAll('#answers button')].map(b=>b.getBoundingClientRect());const inside=r.every(x=>x.left>=0&&x.right<=innerWidth+.5&&x.width>=44&&x.height>=44);const apart=r.every((a,i)=>r.every((b,j)=>i>=j||a.right<=b.left+.5||b.right<=a.left+.5||a.bottom<=b.top+.5||b.bottom<=a.top+.5));return inside&&apart})}
  /* 상단 상태 표시(골드·성문·방어·마을)가 서로 겹치거나 띠 밖으로 나가지 않는지 */
  const pillsFit=page=>page.evaluate(()=>{const s=document.querySelector('.stats').getBoundingClientRect(),r=[...document.querySelectorAll('.stats .pill')].map(p=>p.getBoundingClientRect());return r.length===4&&r.every((a,i)=>a.width>0&&a.left>=s.left-.5&&a.right<=s.right+.5&&r.every((b,j)=>i>=j||a.right<=b.left+.5||b.right<=a.left+.5||a.bottom<=b.top+.5||b.bottom<=a.top+.5))});
+ /* 주민이 멈출 때까지 기다린다(느린 기계에서는 멈춤이 다음 프레임에야 반영된다). 200ms 간격의 두 표본이 같아야 멈춘 것으로 본다. */
+ async function settled(page){let prev='';for(let i=0;i<25;i++){const cur=JSON.stringify(await page.evaluate(()=>window.VillageView.inspect().residents));if(cur===prev)return JSON.parse(cur);prev=cur;await page.waitForTimeout(200)}throw new Error('residents never stopped moving')}
  const ready=page=>page.waitForFunction(()=>['three','fallback'].includes(document.querySelector('.scene').dataset.renderer),{},{timeout:45000});
  async function seed(page,s){await page.evaluate(s=>{Object.assign(state,{claimed:null,completed:null,combat:null,qage:null},s);save()},s);await page.reload();await ready(page)}
  const stored=page=>page.evaluate(k=>JSON.parse(localStorage.getItem(k)),KEY);
@@ -112,12 +114,12 @@ const KEY='hangul-defense-v1',SWIFT=['--enable-webgl','--use-gl=angle','--use-an
   const initial=await page.evaluate(()=>window.VillageView.inspect().residents);
   await page.waitForTimeout(700);
   assert.notDeepEqual(await page.evaluate(()=>window.VillageView.inspect().residents),initial);checks++;
-  await page.locator('#pause').click();await page.waitForTimeout(150);
-  const frozen=await page.evaluate(()=>window.VillageView.inspect().residents);
+  await page.locator('#pause').click();
+  const frozen=await settled(page);
   await page.waitForTimeout(300);
   eq(await page.evaluate(()=>window.VillageView.inspect().residents),frozen,'pause freezes residents');
-  await page.locator('#pause').click();await page.emulateMedia({reducedMotion:'reduce'});await page.waitForTimeout(150);
-  const reduced=await page.evaluate(()=>window.VillageView.inspect().residents);
+  await page.locator('#pause').click();await page.emulateMedia({reducedMotion:'reduce'});
+  const reduced=await settled(page);
   await page.waitForTimeout(250);
   eq(await page.evaluate(()=>window.VillageView.inspect().residents),reduced,'reduced motion freezes residents');
  }
