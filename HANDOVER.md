@@ -1,6 +1,6 @@
 # Claude Code 작업 인계
 
-기준일: 2026-11-11. 0.5([PR #3](https://github.com/freejcj87-gif/hangul-defense/pull/3), 브랜치 `claude/village-polish`) 기준으로 갱신했습니다. 0.4 인계 시점의 기록은 main `800f3f9` 기준이며 아래 “확인된 검증과 배포”에 그대로 남겼습니다. 문서 커밋 자체는 이후 이력에서 확인하세요.
+기준일: 2026-11-11. 0.5([PR #3](https://github.com/freejcj87-gif/hangul-defense/pull/3), main `965ad4e`로 병합·배포) 기준으로 갱신했습니다. 0.4 인계 시점의 기록은 main `800f3f9` 기준이며 아래 “확인된 검증과 배포”에 그대로 남겼습니다. 문서 커밋 자체는 이후 이력에서 확인하세요.
 
 ## 먼저 알아야 할 것
 
@@ -111,6 +111,18 @@ Playwright 시스템 의존성 설치는 WSL/Ubuntu 환경에 맞춰 수행하�
 - 후속 main `800f3f9`는 다운로드 패키지의 숨김 출력 디렉터리 업로드 수정만 포함합니다. 게임 배포 내용은 동일합니다.
 - [다운로드 패키지 검사](https://github.com/freejcj87-gif/hangul-defense/actions/runs/42944850204) 성공.
 - 실제 iPhone/Android 성능·발열·한국어 음성, 아동 사용성, 학습효과는 아직 검증하지 않았습니다. 모바일 화면 모사를 실기기 검증이라고 보고하지 마세요.
+
+### 0.5 (2026-11-11)
+
+- [PR #3](https://github.com/freejcj87-gif/hangul-defense/pull/3) main 병합 완료. 병합 커밋 `965ad4e79a92b23bada2f0183393a9c5c4422c05`, 브랜치 끝 `21ab7e9`.
+- [0.5 CI](https://github.com/freejcj87-gif/hangul-defense/actions/runs/42968363993): 문제은행 3,016 + 규칙/모의 DOM 748 + 브라우저 1,015개 검사 통과. 직전 커밋 `5cc897f`의 로컬 실행(Windows, Chromium SwiftShader + WebKit)에서도 1,015개 통과.
+- 브라우저 검사 범위: Chromium/WebKit × 1366/390/320px에서 나이 7~10세 × 소리/읽기 8조합 전환, 정답 뒤 타워·닭·울타리 구매와 이름표, 전투·일시정지·저장 재개. Chromium 3D에서 짓기 연출 횟수와 반영(타워 단계·닭·울타리 수), GLB 실패 시 대체 화면의 구매·생성 표시.
+- [Pages 배포](https://github.com/freejcj87-gif/hangul-defense/actions/runs/42968917130): `965ad4e` 배포. 실제 URL에서 version.json의 커밋, index.html, questions.js, village.js, `fx-feathers.png` 응답을 직접 확인.
+- [다운로드 패키지 검사](https://github.com/freejcj87-gif/hangul-defense/actions/runs/42968917176) 성공.
+- CI 통과까지 다섯 번 실패했고 원인은 네 가지였습니다. 세 가지는 검사가 벽시계 시간에 기대던 문제(움직임 줄이기 정지 확인, 3D 짓기 반영 대기, 대체 화면에서 떨어지는 중인 울타리 크기 측정)였고 프레임 수·조건·연출 종료 기준으로 바꿨습니다. 한 가지는 게임 쪽 문제였습니다. 전투 중 0.1초마다 “잠깐 쉬기” 버튼 글자를 다시 써서 누름이 사라질 수 있었고, 값이 바뀔 때만 쓰도록 고쳤습니다(`put()`).
+- 미해결: 고친 뒤 로컬 브라우저 검사에서 “늑대가 그려짐”과 “전투 중 나이 잠금”이 한 번씩 실패했고, 이후 같은 구간은 로컬 2회·CI 2회 모두 통과했습니다. 원인을 확정하지 못했습니다. 두 검사에는 실패 시 상태·클릭 기록·페이지 오류를 출력하는 진단을 넣어 두었으니 재발하면 그 출력부터 보세요.
+- 통합 화면 스크린샷 66장: `work\verification-20261111\integrated-0.5\`. 짓기 연출 프레임 시트는 `work\verification-20261111\village-3d\`(연출 주입 하네스 기준).
+- 0.5에서도 실기기(iPhone/Android), 실제 한국어 음성, 문제 난도와 그림 보기의 직관성(아동·교육 전문가 검수), 생성 손맛의 사용자 체감은 확인하지 않았습니다.
 
 ## 자동 배포와 협업
 
