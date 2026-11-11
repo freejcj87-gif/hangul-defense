@@ -1,7 +1,7 @@
 name: Validate prototype
 on:
   push:
-    branches: [improve/village-combat-v02]
+    branches: [improve/village-combat-v02, improve/living-village-v04]
   pull_request:
     branches: [main]
 concurrency:
@@ -19,8 +19,9 @@ jobs:
         with:
           node-version: '22'
       - run: node test-dom.cjs
-      - run: npm install --no-save --package-lock=false playwright@1.56.1
+      - run: npm install --no-save --package-lock=false playwright@1.56.1 three@0.180.0 esbuild@0.25.10
       - run: npx playwright install --with-deps chromium webkit
+      - run: node scripts/build-pages.cjs
       - run: node test.cjs
       - uses: actions/upload-artifact@v4
         if: always()
