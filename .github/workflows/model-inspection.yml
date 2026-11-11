@@ -1,0 +1,22 @@
+name: Inspect handoff model structure
+on:
+  push:
+    branches: [improve/living-village-v04]
+    paths: [.github/workflows/model-inspection.yml]
+permissions:
+  contents: read
+jobs:
+  models:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          node - <<'JS'
+          const fs=require('fs');
+          for(const name of ['environment-pack','farmer']){
+            const b=fs.readFileSync('art-handoff/coopnight/source-3d/models/'+name+'.glb');
+            const g=JSON.parse(b.subarray(20,20+b.readUInt32LE(12)).toString());
+            console.log('MODEL_JSON:'+JSON.stringify({name,roots:g.scenes[0].nodes.map(i=>({i,...g.nodes[i]})),nodes:g.nodes.map((n,i)=>({i,name:n.name,children:n.children,translation:n.translation,scale:n.scale}))}));
+          }
+          JS
