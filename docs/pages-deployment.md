@@ -13,11 +13,11 @@ main의 지정된 게임 파일을 변경하면 `Deploy game to GitHub Pages`가
 - 문서만 변경하면 자동 배포되지 않습니다.
 - 새 소스/자산을 추가하면 paths 필터와 빌드 포함 목록을 함께 검토하세요.
 - 배포 결과는 Actions의 deploy 작업과 Environment URL로 확인하세요.
-- 실제 URL 검사에서 version.json의 커밋, HTML, combat.js, village.js, GLB와 PNG 21개 응답을 확인합니다.
+- 실제 URL 검사에서 version.json의 커밋, HTML, combat.js, questions.js, village.js, GLB와 PNG 25개 응답을 확인합니다.
 
 ## 배포 범위
 
-`scripts/build-pages.cjs`는 `.pages-build/`에 HTML, 전투 스크립트, 번들링한 3D 스크립트, environment-pack.glb, 사용 PNG 21개, Three.js 라이선스와 배포 메타데이터를 만듭니다. BLEND·참고 영상·미사용 원본은 웹 배포에 포함하지 않습니다. 다만 공개 GitHub 저장소의 파일 공개 여부와 웹 배포 목록은 서로 다릅니다.
+`scripts/build-pages.cjs`는 `.pages-build/`에 HTML, 전투 스크립트, 번들링한 3D 스크립트, environment-pack.glb, 사용 PNG 25개, Three.js 라이선스와 배포 메타데이터를 만듭니다. BLEND·참고 영상·미사용 원본은 웹 배포에 포함하지 않습니다. 다만 공개 GitHub 저장소의 파일 공개 여부와 웹 배포 목록은 서로 다릅니다.
 
 Three.js 0.180.0과 esbuild 0.25.10을 빌드에 사용하며 실행 중 외부 CDN은 필요하지 않습니다. robots.txt는 검색 수집 제외 요청이며 접근 제어는 아닙니다.
 
