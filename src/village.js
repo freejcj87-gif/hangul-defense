@@ -324,6 +324,7 @@ async function start(){
  const hay=actor(solid([['cyl',0xe9c75a,[-.33,.3,0],[.3,.62,.3],[Math.PI/2,0,0]],['cyl',0xe9c75a,[.33,.3,0],[.3,.62,.3],[Math.PI/2,0,0]],['cyl',0xf4d877,[0,.82,0],[.3,.62,.3],[Math.PI/2,0,0]],
   ['cyl',0xc79a3a,[-.33,.3,0],[.31,.09,.31],[Math.PI/2,0,0]],['cyl',0xc79a3a,[.33,.3,0],[.31,.09,.31],[Math.PI/2,0,0]],['cyl',0xc79a3a,[0,.82,0],[.31,.09,.31],[Math.PI/2,0,0]]]),5,.9,-.35);
  const barn=actor(G.coop,-5.7,.15,.35,.6),EXTRAS=[[nursery,2],[hay,4],[barn,6]];
+ let frames=0;
  const shown={level:0,chickens:0,fence:0,wins:0},builds={tower:0,chicken:0,fence:0},silent={level:-9,chickens:-9,fence:-9};
  let time=0,pipPop=-9,applied=0;
  function setTrim(mesh,level,isCorn){const key=(isCorn?'c':'t')+level;if(!trimCache.has(key))trimCache.set(key,towerDeco(level,isCorn,isCorn?CORN.h:TOWER.h));const g=trimCache.get(key);mesh.visible=!!g;if(g)mesh.geometry=g}
@@ -470,7 +471,7 @@ async function start(){
  window.VillageView={events,reward,build,upgrade:()=>build('tower'),
   inspect(){return {ready:true,time,level:shown.level,wins:shown.wins,extraBuildings:EXTRAS.filter(([a])=>a.obj.visible).length,towers:Number(tower.obj.visible)+Number(corn.obj.visible),
    residents:flock.filter(c=>c.obj.visible).map(c=>c.obj.position.toArray()),farmer:farmer.obj.position.toArray(),enemies:wolves.size,drawCalls:renderer.info.render.calls,
-   chickens:flock.filter((c,i)=>i>1&&c.obj.visible).length,fences:fences.filter(f=>f.obj.visible).length,towerLevel:applied,builds:{...builds},effects:particles.length+anims.length,shake:shakeNow,
+   chickens:flock.filter((c,i)=>i>1&&c.obj.visible).length,fences:fences.filter(f=>f.obj.visible).length,towerLevel:applied,frames,builds:{...builds},effects:particles.length+anims.length,shake:shakeNow,
    memory:{geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures}}}};
 
  /* ----- input ----- */
@@ -527,12 +528,12 @@ async function start(){
  }
 
  /* ----- frame loop: 30fps cap, dt-driven, frozen while paused ----- */
- let last=0,lastPhase='',wasLess=reduced(),dirty=true;
+ let last=0,lastPhase='',wasLess=reduced(),dirty=true;   // frames: processed-frame counter for tests (inspect().frames)
  sync(read(),true);for(const a of actors)pose(a,0);
  host.classList.add('is3d');host.dataset.renderer='three';status.textContent='닭과 일꾼이 마을을 돌보고 있어요';
  function frame(now){
   if(last&&now-last<1000/30)return;
-  const dt=Math.min(.05,last?(now-last)/1000:0);last=now;
+  const dt=Math.min(.05,last?(now-last)/1000:0);last=now;frames++;
   const s=read(),still=!!s.paused||document.hidden,less=reduced();
   if(!still)time+=dt;
   host.classList.toggle('village-paused',still);host.dataset.phase=s.phase;
