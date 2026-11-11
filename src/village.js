@@ -83,7 +83,7 @@ async function start(){
  for(let i=0;i<6;i++)put('EnvFence',.65,-5.6+i*1.6,-4.4);
  for(let i=0;i<4;i++)put('EnvFence',.65,-5.6,-3.2+i*1.6,Math.PI/2);
  for(let i=0;i<5;i++)put('EnvFence',.65,-4.2+i*1.75,3.1);
- const trees=[];for(const [x,z,h] of [[-7,-5,3.5],[-6,-6.8,4],[1,-6,3.1],[5,-5.5,3.7],[7,-3,3.3],[8,2,3],[-8,1,3.2],[-7,6.8,2.9],[5,7,3]]){
+ const trees=[];for(const [x,z,h] of [[-7,-5,3.5],[-6,-6.8,4],[1,-6,3.1],[5,-5.5,3.7],[7,-3,3.3],[8,2,3],[-8,1,3.2],[-10,7.8,2.9],[9.5,8.5,3]]){
   const tree=put('EnvTree',h,x,z);trees.push({obj:tree,phase:x+z});
  }
  for(const [x,z] of [[-5,-5],[.3,-4.4],[5,-3.7],[6,1],[-6.9,2],[3,6.5],[-3,6.8]])put('EnvBush',.65,x,z);
@@ -126,6 +126,7 @@ async function start(){
  canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();host.classList.remove('is3d');host.dataset.renderer='fallback';status.textContent='화면을 다시 불러오면 입체 마을로 돌아와요';renderer.setAnimationLoop(null)});
  host.classList.add('is3d');host.dataset.renderer='three';status.textContent='닭과 일꾼이 마을을 돌보고 있어요';
  function frame(now){
+  if(last&&now-last<1000/30)return;
   const dt=Math.min(.05,last?(now-last)/1000:0);last=now;
   const s=read(),still=s.paused||document.hidden,less=reduced();
   if(!still)time+=dt;

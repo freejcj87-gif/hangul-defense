@@ -83,6 +83,7 @@ const assert=require('node:assert/strict'),http=require('node:http'),fs=require(
  await p.getByRole('button',{name:'나',exact:true}).click();await p.locator('#build').click();
  assert.equal(await p.locator('#gold').textContent(),'🪙 0골드');checks++;
  assert.equal(await p.locator('.scene').getAttribute('data-renderer'),'fallback');checks++;
+ assert(await p.locator('#villageCanvas').isHidden());checks++;
  }finally{await fallbackBrowser.close()}
  console.log('PASS '+checks+' browser assertions (Chromium/WebKit, desktop + mobile emulation). Physical audio/device validation remains manual.');
  }finally{server.close()}
