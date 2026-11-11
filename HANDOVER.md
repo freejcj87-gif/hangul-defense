@@ -128,10 +128,22 @@ Playwright 시스템 의존성 설치는 WSL/Ubuntu 환경에 맞춰 수행하�
 - 통합 화면 스크린샷 66장: `work\verification-20261111\integrated-0.5\`. 짓기 연출 프레임 시트는 `work\verification-20261111\village-3d\`(연출 주입 하네스 기준).
 - 0.5에서도 실기기(iPhone/Android), 실제 한국어 음성, 문제 난도와 그림 보기의 직관성(아동·교육 전문가 검수), 생성 손맛의 사용자 체감은 확인하지 않았습니다.
 
+### 0.6 (2026-11-11)
+
+- [PR #5](https://github.com/freejcj87-gif/hangul-defense/pull/5) main 병합 완료. 병합 커밋 `d8d95f5b63859779190ea008383c999023e88ab9`, 브랜치 끝 `9bb8952`.
+- [0.6 CI](https://github.com/freejcj87-gif/hangul-defense/actions/runs/43015108126): 문제은행 3,016 + 규칙/모의 DOM 1,510 + 브라우저 1,504개 검사 통과. 같은 커밋 내용의 로컬 전체 실행(Windows, Chromium SwiftShader + WebKit)에서도 1,504개 통과.
+- 브라우저 검사 범위: Chromium 1366/390/320×844·320×568과 WebKit 1366/390/320에서 시작 화면, 나이 7~10세 × 소리/읽기 8조합 전환, 시간 바·정지, 정답 → 카드 → 다음 문제, 오답 → 성큼 → 두 번째 정답, 시간 초과 → 숨은 닭, 쉬기, 이어하기, 휴대폰에서 시간 바·장면·보기(카드) 한 화면. 실제 인터벌 시계 1회. Chromium 3D에서 늑대 접근·생산 연출·짓기 7종 반영, GLB 실패 시 그림 화면의 늑대 접근·짓기.
+- [Pages 배포](https://github.com/freejcj87-gif/hangul-defense/actions/runs/43016613646): `d8d95f5` 배포, 실제 URL 검사(커밋·HTML·스크립트·GLB·PNG 25개) 통과. 실제 URL을 Chromium(390px)으로 열어 3D 장면, 늑대 접근, 정답 → 알 판매(+15) → 카드 3장, 페이지 오류 0건을 직접 확인.
+- [다운로드 패키지 검사](https://github.com/freejcj87-gif/hangul-defense/actions/runs/43016613790) 성공.
+- 첫 CI(`ee758ac`)는 그림 화면 구간에서 실패했습니다. 새 문제 직후 소리 읽기 단계에 보기를 누른 검사 쪽 타이밍 문제였고, 답하기 전에 풀이 단계를 기다리도록 고쳤습니다(`9bb8952`). 게임 동작 변경은 없습니다.
+- 효과음 16종은 OfflineAudioContext로 렌더링해 모두 소리가 나고 찢어지지 않는 것(최고 진폭 0.04~0.17)을 확인했습니다. 실제 스피커 체감은 확인하지 않았습니다.
+- 통합 화면 스크린샷 70장 + 실제 URL 2장: `work\verification-20261111\integrated-0.6\`. 3D 연출 점검 스크린샷: `work\verification-20261111\v06-village\`.
+- 0.6에서도 실기기(iPhone/Android), 실제 한국어 음성, 효과음 체감, 아이 읽기 속도 가정, 사용자 체감은 확인하지 않았습니다.
+
 ## 자동 배포와 협업
 
 - `.github/workflows/pages.yml`: main의 지정된 게임 경로 변경 → 규칙 검사 → 빌드 → Pages → 실제 URL 검사.
-- `.github/workflows/validate.yml`: main 대상 PR과 지정 브랜치(improve 두 개, `claude/village-polish`) push에 문제은행·규칙·브라우저 검사. 같은 브랜치에 PR이 열려 있으면 push 쪽 실행은 취소로 표시되는 것이 정상이며 PR 쪽 결과를 보세요. 다른 이름의 새 브랜치는 PR을 열어야 실행됩니다.
+- `.github/workflows/validate.yml`: main 대상 PR과 지정 브랜치(improve 두 개, `claude/village-polish`) push에 문제은행·규칙·브라우저 검사(0.6 브랜치 `claude/realtime-loop`는 목록에 없어 PR로 검사). 같은 브랜치에 PR이 열려 있으면 push 쪽 실행은 취소로 표시되는 것이 정상이며 PR 쪽 결과를 보세요. 다른 이름의 새 브랜치는 PR을 열어야 실행됩니다.
 - `.github/workflows/package-test.yml`: 다운로드용 동일 실행판. `.pages-build`가 숨김 폴더이므로 `include-hidden-files: true`가 필요합니다.
 - src의 새 파일·학습 데이터·새 자산 경로를 만들면 build-pages.cjs와 workflow paths 필터도 함께 검토하세요. 현재 필터는 index.html, combat.js, questions.js, src/village.js 등 특정 경로 위주입니다.
 - README/인계 문서만 변경하면 게임 재배포가 발생하지 않는 것이 정상입니다.
