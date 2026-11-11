@@ -49,6 +49,7 @@ const assert=require('node:assert/strict'),http=require('node:http'),fs=require(
  }
  await page.locator('#battle').click();await page.waitForTimeout(4000);await page.locator('#pause').click();
  assert(await page.locator('.enemy img').count()>0);checks++;
+ if(name==='chromium'){assert((await page.evaluate(()=>window.VillageView.inspect())).enemies>0);checks++;}
  assert(await page.locator('.enemy img').first().evaluate(i=>i.complete&&i.naturalWidth===128));checks++;
  if(name==='chromium'){const visual=await page.locator('.scene').screenshot({type:'jpeg',quality:50});console.log('VISUAL_BATTLE:'+visual.toString('base64'))}
  const combat=await page.evaluate(()=>JSON.parse(localStorage.getItem('hangul-defense-v1')).combat);
@@ -63,9 +64,10 @@ const assert=require('node:assert/strict'),http=require('node:http'),fs=require(
  assert.equal(await page.locator('#gold').textContent(),'🪙 40골드');checks++;
  }
  if(name==='chromium'&&width===390){
-  await page.evaluate(()=>{const s=JSON.parse(localStorage.getItem('hangul-defense-v1'));Object.assign(s,{wins:8,level:4,gold:200,claimed:null,completed:null,combat:null});localStorage.setItem('hangul-defense-v1',JSON.stringify(s))});
+  await page.evaluate(()=>{Object.assign(state,{wins:8,level:4,gold:200,claimed:null,completed:null,combat:null});save();render()});
   await page.reload();await page.waitForFunction(()=>window.VillageView?.inspect().ready,{},{timeout:45000});
   assert.equal(await page.locator('.scene').getAttribute('data-renderer'),'three');checks++;
+  const grown=await page.evaluate(()=>window.VillageView.inspect());assert.equal(grown.level,4);assert.equal(grown.wins,8);assert.equal(grown.towers,2);assert(grown.extraBuildings);checks+=4;
   console.log('VISUAL_MATURE:'+(await page.locator('.scene').screenshot({type:'jpeg',quality:55})).toString('base64'));
   console.log('SCENE_METRICS:'+JSON.stringify(await page.evaluate(()=>window.VillageView.inspect())));
  }
@@ -73,6 +75,15 @@ const assert=require('node:assert/strict'),http=require('node:http'),fs=require(
  }
  }finally{await browser.close()}
  }
+ const fallbackBrowser=await chromium.launch({headless:true,args:['--enable-webgl','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+ try{
+ const p=await fallbackBrowser.newPage({viewport:{width:390,height:844}});
+ await p.route('**/environment-pack.glb',route=>route.abort());
+ await p.goto(url);await p.waitForFunction(()=>document.querySelector('.scene').dataset.renderer==='fallback');
+ await p.getByRole('button',{name:'나',exact:true}).click();await p.locator('#build').click();
+ assert.equal(await p.locator('#gold').textContent(),'🪙 0골드');checks++;
+ assert.equal(await p.locator('.scene').getAttribute('data-renderer'),'fallback');checks++;
+ }finally{await fallbackBrowser.close()}
  console.log('PASS '+checks+' browser assertions (Chromium/WebKit, desktop + mobile emulation). Physical audio/device validation remains manual.');
  }finally{server.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});

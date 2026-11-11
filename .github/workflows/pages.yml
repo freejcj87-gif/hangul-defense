@@ -75,7 +75,7 @@ jobs:
           assert '꼬꼬마을: 읽어서 지켜요' in html
           assert 'combat.js' in html
           assert len(fetch('combat.js')) > 1000
-          images = ['backgrounds/background-meadow.png', 'characters/chicken.png', 'wolves/wolf.png', 'buildings/coop.png', 'buildings/store.png']
+          images = ['backgrounds/background-meadow.png', 'backgrounds/grass.png', 'characters/chicken.png', 'wolves/wolf.png', 'buildings/coop.png', 'buildings/store.png']
           images += ['buildings/home-' + n + '.png' for n in ['01','02','03','04','05']]
           images += ['buildings/tower-' + n + '.png' for n in ['01','03','05','08','10']]
           images += ['animation/' + n + '.png' for n in ['fx-impact','front','quarter','edge','reverse-quarter']]
@@ -83,6 +83,6 @@ jobs:
               assert fetch('art-handoff/coopnight/browser/' + image).startswith(bytes.fromhex('89504e470d0a1a0a')), image
           assert len(fetch('village.js')) > 10000
           assert fetch('art-handoff/coopnight/source-3d/models/environment-pack.glb').startswith(b'glTF')
-          print('PASS: live HTML, combat + village scripts, deployed commit, GLB and 20 PNG assets.')
+          print('PASS: live HTML, combat + village scripts, deployed commit, GLB and 21 PNG assets.')
           print('Playable URL: ' + base)
           PY

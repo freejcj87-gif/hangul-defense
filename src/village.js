@@ -48,12 +48,12 @@ function makeWolf(){
  const hp=new THREE.Group();hp.position.y=1.6;wolf.add(hp);
  piece(hp,cube,0x35473a,[0,0,0],[.78,.075,.06]);
  const fill=piece(hp,cube,0x95c75c,[0,.01,.04],[.72,.06,.04]);
- wolf.userData={legs,fill,tail};wolf.scale.setScalar(.8);return wolf;
+ wolf.userData={legs,fill,tail,hp};wolf.scale.setScalar(.8);return wolf;
 }
 async function start(){
  const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'low-power'});
  renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));renderer.setClearColor(0xb3cc91);renderer.outputColorSpace=THREE.SRGBColorSpace;
- renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.12;
+ renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.0;
  renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
  const canvas=renderer.domElement;canvas.id='villageCanvas';canvas.setAttribute('role','img');canvas.setAttribute('aria-label','닭과 일꾼이 움직이는 꼬꼬마을');host.prepend(canvas);
  const world=new THREE.Scene();world.add(new THREE.HemisphereLight(0xfff5de,0x6d8c57,2.2));
@@ -61,7 +61,10 @@ async function start(){
  const camera=new THREE.OrthographicCamera(-9,9,9,-9,.1,80);camera.position.set(9,14,16);camera.lookAt(0,0,0);
  const resize=()=>{const w=host.clientWidth,h=host.clientHeight,aspect=w/h;const span=aspect<1?7.2/aspect:7.2;camera.left=-span*aspect;camera.right=span*aspect;camera.top=span;camera.bottom=-span;camera.updateProjectionMatrix();renderer.setSize(w,h,false)};
  new ResizeObserver(resize).observe(host);resize();
- const ground=new THREE.Mesh(new THREE.PlaneGeometry(45,45),material(0xa4c875));ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;world.add(ground);
+ const grass=await new THREE.TextureLoader().loadAsync('art-handoff/coopnight/browser/backgrounds/grass.png');
+ grass.colorSpace=THREE.SRGBColorSpace;grass.wrapS=grass.wrapT=THREE.RepeatWrapping;grass.repeat.set(12,12);grass.anisotropy=Math.min(4,renderer.capabilities.getMaxAnisotropy());
+ const ground=new THREE.Mesh(new THREE.PlaneGeometry(45,45),new THREE.MeshStandardMaterial({map:grass,color:0xe5edcc,roughness:1}));ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;world.add(ground);
+ const grid=new THREE.GridHelper(40,20,0xc4d79e,0xc4d79e);grid.position.y=.028;grid.material.transparent=true;grid.material.opacity=.13;world.add(grid);
  const path=new THREE.Mesh(new THREE.PlaneGeometry(16,1.35),material(0xd7c28c));path.rotation.x=-Math.PI/2;path.position.set(0,.015,4.5);path.receiveShadow=true;world.add(path);
  const farmPath=new THREE.Mesh(new THREE.PlaneGeometry(8,1),material(0xcdb888));farmPath.rotation.x=-Math.PI/2;farmPath.position.set(0,.02,-.2);farmPath.receiveShadow=true;world.add(farmPath);
  // Ground speckles stay deterministic and require no textures or network calls.
@@ -87,16 +90,16 @@ async function start(){
  for(const [x,z] of [[6.6,-1.8],[-6.9,5.8],[4.8,6.8]])put('EnvRock',.5,x,z);
  const chickens=[];
  for(let i=0;i<7;i++){
-  const g=model(i<2?'EnvChick':'EnvChicken',i<2?.38:.57,false);world.add(g);
+  const g=model(i<2?'EnvChick':'EnvChicken',i<2?.5:.85,false);world.add(g);
   chickens.push({obj:g,seed:i,head:g.getObjectByName(i<2?'Round_inquisitive_head003':'Round_inquisitive_head002')});
  }
- const farmer=normalized(pack.scene.getObjectByName('FarmerPolished'),1.45,false);world.add(farmer);
+ const farmer=normalized(pack.scene.getObjectByName('FarmerPolished'),1.75,false);world.add(farmer);
  const limbs=['ArmL','ArmR','LegL','LegR'].map(name=>farmer.getObjectByName(name));
  const egg=piece(farmer,sphere,0xfff3d3,[0,2.1,0],[.2,.28,.2]);egg.castShadow=false;
  // Daily-life loops are cosmetic: only reading answers award spendable gold.
  const smoke=[];for(let i=0;i<3;i++){const p=piece(world,sphere,0xfff4d6,[-3.3,2.7,-1.6],[.15,.15,.15]);p.castShadow=false;p.material=p.material.clone();p.material.transparent=true;smoke.push(p)}
  const enemies=new Map(),particles=[];
- let time=0,last=0,lastPhase='',lastLevel=-1,lastWins=-1,kick=0,celebrate=0;
+ let shotNumber=0,time=0,last=0,lastPhase='',lastLevel=-1,lastWins=-1,kick=0,celebrate=0;
  const shotOrigin=new THREE.Vector3(1,1.55,2.4);
  const enemyPosition=e=>new THREE.Vector3(-6+(e.x-15)/85*14,0,4.5+Math.sin(e.id*2.1)*.2);
  function particle(kind,from,to){
@@ -108,11 +111,11 @@ async function start(){
  }
  function confetti(at){for(let i=0;i<10;i++)particle('dust',at,new THREE.Vector3(at.x+Math.sin(i*2.3)*1.1,.3+Math.abs(Math.sin(i))*1.6,at.z+Math.cos(i)*.8))}
  window.VillageView={
-  events(events){const s=read();if(s.paused||reduced())return;for(const e of events){if(e.type==='hit'){const pos=enemyPosition(e);pos.y=.7;particle('shot',shotOrigin,pos);kick=.2}
+  events(events){const s=read();if(s.paused||reduced())return;for(const e of events){if(e.type==='hit'){const pos=enemyPosition(e);pos.y=.7;particle('shot',s.level>=3&&shotNumber++%2?new THREE.Vector3(3.8,1.7,1.8):shotOrigin,pos);kick=.2}
    if(e.type==='kill')confetti(enemyPosition(e));if(e.type==='leak'){gate.userData.hit=.35;confetti(new THREE.Vector3(-6,.4,4.5))}}},
   reward(){if(reduced())return;celebrate=1.1;for(let i=0;i<6;i++)particle('coin',new THREE.Vector3(-2+i*.4,1.4,.3),new THREE.Vector3(2.8,2,-2.4))},
   upgrade(){if(!reduced()){kick=.65;confetti(shotOrigin)}},
-  inspect(){return {ready:true,time,residents:chickens.map(c=>c.obj.position.toArray()),farmer:farmer.position.toArray(),enemies:enemies.size,drawCalls:renderer.info.render.calls}}
+  inspect(){return {ready:true,time,level:lastLevel,wins:lastWins,extraBuildings:nursery.visible,towers:Number(tower.visible)+Number(cornTower.visible),residents:chickens.map(c=>c.obj.position.toArray()),farmer:farmer.position.toArray(),enemies:enemies.size,drawCalls:renderer.info.render.calls}}
  };
  const raycaster=new THREE.Raycaster(),pointer=new THREE.Vector2();
  canvas.addEventListener('pointerup',e=>{
@@ -138,13 +141,13 @@ async function start(){
    for(let i=0;i<chickens.length;i++){const c=chickens[i],a=t*(.16+i*.018)+i*2.4;
     const x=-2.5+Math.cos(a)*(i%2?1.5:.8),z=.4+Math.sin(a)*1.35;
     c.obj.position.set(x,less?0:Math.abs(Math.sin(t*6+i))*.045,z);c.obj.rotation.y=-a;
-    if(celebrate>0)c.obj.position.y+=Math.abs(Math.sin(celebrate*13+i))*.2;
+    if(!less&&celebrate>0)c.obj.position.y+=Math.abs(Math.sin(celebrate*13+i))*.2;
    }
-   const a=t*.24,fx=Math.sin(a)*2.4,fz=-.5+Math.cos(a)*.9;
-   farmer.position.set(fx,less?0:Math.abs(Math.sin(t*7))*.035,fz);
-   farmer.rotation.y=Math.atan2(Math.cos(a)*2.4,-Math.sin(a)*.9);
-   limbs.forEach((limb,i)=>{if(limb)limb.rotation.x=less?0:Math.sin(t*7+(i===1||i===2?Math.PI:0))*.25});
-   egg.visible=Math.cos(a)>0;egg.position.y=2.1+(less?0:Math.sin(t*3)*.04);
+   const a=t*.3,u=(1-Math.cos(a))/2,fx=-3+u*5.5,fz=-.2-u*.8,walking=!less&&Math.abs(Math.sin(a))>.12;
+   farmer.position.set(fx,walking?Math.abs(Math.sin(t*7))*.035:0,fz);
+   farmer.rotation.y=Math.sin(a)>=0?1.72:-1.42;
+   limbs.forEach((limb,i)=>{if(limb)limb.rotation.x=!walking?0:Math.sin(t*7+(i===1||i===2?Math.PI:0))*.25});
+   egg.visible=Math.sin(a)>=0;egg.position.y=2.1+(less?0:Math.sin(t*3)*.04);
    for(const item of trees)item.obj.rotation.z=less?0:Math.sin(t*.8+item.phase)*.012;
    smoke.forEach((p,i)=>{const cycle=(t*.22+i/3)%1;p.position.set(-3.3+Math.sin(t+i)*.13,2.5+cycle*1.1,-1.6);p.scale.setScalar(.1+cycle*.22);p.material.opacity=less?0:(1-cycle)*.35});
    kick=Math.max(0,kick-dt);celebrate=Math.max(0,celebrate-dt);
@@ -161,6 +164,7 @@ async function start(){
    const dest=enemyPosition(e);
    if(!still){wolf.position.lerp(dest,less?1:1-Math.exp(-dt*18));wolf.rotation.y=-Math.PI/2;wolf.position.y=less?0:Math.abs(Math.sin(t*10+e.id))*.045;wolf.userData.legs.forEach((leg,i)=>leg.rotation.x=less?0:Math.sin(t*10+i*Math.PI)*.35)}
    wolf.userData.fill.scale.x=.72*e.hp/e.maxHp;
+   wolf.userData.hp.quaternion.copy(wolf.quaternion).invert().multiply(camera.quaternion);
   }
   for(const [id,wolf] of enemies)if(!visible.has(id)){world.remove(wolf);wolf.traverse(o=>{if(o.isMesh&&o.geometry!==sphere&&o.geometry!==cube)o.geometry.dispose()});enemies.delete(id)}
   if(!document.hidden)renderer.render(world,camera);

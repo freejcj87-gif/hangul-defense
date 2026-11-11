@@ -7,6 +7,7 @@ const out = path.join(root, '.pages-build');
 const prefix = 'art-handoff/coopnight/browser/';
 const assets = [
   "backgrounds/background-meadow.png",
+  "backgrounds/grass.png",
   "characters/chicken.png",
   "wolves/wolf.png",
   "buildings/coop.png",
