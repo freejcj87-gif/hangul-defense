@@ -224,6 +224,8 @@ const KEY='hangul-defense-v1',SWIFT=['--enable-webgl','--use-gl=angle','--use-an
  for(let n=1;n<=3;n++){await p.locator('#buyChicken').click();eq(await p.locator('#flock img').count(),n,'fallback chicken '+n);ok(await p.locator('#flock img').last().evaluate(e=>e.classList.contains('spawn')),'fallback chicken pops in')}
  for(let n=1;n<=3;n++){await p.locator('#buyFence').click();eq(await p.locator('#fenceRow img').count(),n,'fallback fence '+n);ok(await p.locator('#fenceRow img').last().evaluate(e=>e.classList.contains('spawn')),'fallback fence pops in')}
  await p.evaluate(()=>Promise.all([...document.images].map(i=>i.decode())));
+ /* 방금 지은 것은 작게 떨어지며 나타나는 중이다. 자리를 재기 전에 그 연출이 끝나기를 기다린다. */
+ await p.evaluate(()=>Promise.all(document.getAnimations().filter(a=>a.animationName==='spawnPop').map(a=>a.finished.catch(()=>{}))));
  ok(await inScene('#flock img'),'fallback chickens are visible inside the scene');ok(await inScene('#fenceRow img'),'fallback fences are visible inside the scene');
  eq(await gold(p),'🪙 0골드','fallback purchases charged');
  await p.waitForTimeout(700);await shot(p.locator('.scene'),'fallback-390-built');await shot(p,'fallback-390');
