@@ -46,3 +46,38 @@ jobs:
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Verify live game and artwork
+        env:
+          DEPLOYED_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          python3 - <<'PY'
+          import json, os, time, urllib.request
+          base = os.environ['DEPLOYED_URL'].rstrip('/') + '/'
+          commit = os.environ['GITHUB_SHA']
+          def fetch(path):
+              request = urllib.request.Request(base + path + '?build=' + commit, headers={'Cache-Control': 'no-cache'})
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  assert response.status == 200, path
+                  return response.read()
+          for attempt in range(6):
+              try:
+                  assert json.loads(fetch('version.json'))['commit'] == commit
+                  break
+              except Exception:
+                  if attempt == 5:
+                      raise
+                  time.sleep(5)
+          html = fetch('').decode('utf-8')
+          assert '꼬꼬마을: 읽어서 지켜요' in html
+          assert 'combat.js' in html
+          assert len(fetch('combat.js')) > 1000
+          images = ['backgrounds/background-meadow.png', 'characters/chicken.png', 'wolves/wolf.png', 'buildings/coop.png', 'buildings/store.png']
+          images += ['buildings/home-' + n + '.png' for n in ['01','02','03','04','05']]
+          images += ['buildings/tower-' + n + '.png' for n in ['01','03','05','08','10']]
+          images += ['animation/' + n + '.png' for n in ['fx-impact','front','quarter','edge','reverse-quarter']]
+          for image in images:
+              assert fetch('art-handoff/coopnight/browser/' + image).startswith(bytes.fromhex('89504e470d0a1a0a')), image
+          print('PASS: live HTML, combat script, deployed commit and 20 PNG assets.')
+          print('Playable URL: ' + base)
+          PY
