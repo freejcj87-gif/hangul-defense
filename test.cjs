@@ -38,7 +38,7 @@ const FAKE_TTS=()=>{const S={speak(u){setTimeout(()=>{u.onstart&&u.onstart();u.o
  async function begin(page,{age=8,mode='sound'}={},touch){const tap=l=>touch?l.tap():l.click();
   await tap(page.locator('#ageRow button[data-age="'+age+'"]'));await tap(page.locator(mode==='sound'?'#startSound':'#startStory'));await tap(page.locator('#go'));await phaseIs(page,'ask')}
  /* right=true면 정답, false면 첫 번째 오답. 보기 잠금(0.3초·글 먼저 읽기)은 틱으로 넘긴다. */
- async function answer(page,right,touch,k=0){await page.evaluate(()=>{const g=window.__game();if(g.phase==='ask'&&g.round.lock>0)window.__tick(g.round.lock)});
+ async function answer(page,right,touch,k=0){await phaseIs(page,'ask');await page.evaluate(()=>{const g=window.__game();if(g.phase==='ask'&&g.round.lock>0)window.__tick(g.round.lock)});
   const g=await game(page),wrongs=g.round.choices.map((_,i)=>i).filter(i=>i!==g.round.answer),i=right?g.round.answer:wrongs[k];
   const b=page.locator('#answers button[data-i="'+i+'"]');if(touch)await b.tap();else await b.click();return g}
  const gold=page=>page.locator('#gold').textContent();
