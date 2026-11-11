@@ -185,8 +185,10 @@ const KEY='hangul-defense-v1',SWIFT=['--enable-webgl','--use-gl=angle','--use-an
    eq(count('fx-dust'),id==='buyChicken'?0:2,id+' dust');eq(tag.t,labels[id][n],id+' name tag '+(n+1));ok(tag.inside,id+' name tag stays inside the scene: '+tag.box);
    ok(await page.locator('#'+id).evaluate(b=>b.classList.contains('bought')),id+' card reacts');
    for(const t of [60,180,360,700]){await page.waitForTimeout(t===60?60:t===180?120:t===360?180:340);if(n===0)await shot(page.locator('.scene'),'feel-'+width+'-'+id+'-'+String(t).padStart(3,'0'))}
+   /* 3D 연출은 장면 시간(프레임당 최대 0.05초)으로 흐른다. 느린 기계에서는 벽시계 0.7초 안에 끝나지 않으므로 반영될 때까지 기다린다. */
+   if(!INTERIM){await page.waitForFunction(([f,v])=>window.VillageView.inspect()[f]>=v,[field[id],before[field[id]]+1],{timeout:30000}).catch(()=>{});
    const after=await page.evaluate(()=>window.VillageView.inspect());
-   if(!INTERIM){eq(after[field[id]],before[field[id]]+1,id+' appears in the 3D village ('+field[id]+')');
+   eq(after[field[id]],before[field[id]]+1,id+' appears in the 3D village ('+field[id]+')');
    const kind={build:'tower',buyChicken:'chicken',buyFence:'fence'}[id];eq(after.builds[kind],before.builds[kind]+1,id+' plays one 3D build effect')}
    await page.waitForFunction(()=>!document.querySelector('#effects .fx'),{},{timeout:8000});checks++;
   }
