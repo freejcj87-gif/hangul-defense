@@ -5,6 +5,7 @@ on:
     paths:
       - index.html
       - combat.js
+      - questions.js
       - src/village.js
       - art-handoff/coopnight/source-3d/models/environment-pack.glb
       - art-handoff/coopnight/browser/**
@@ -25,6 +26,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Validate question bank
+        run: node test-questions.cjs
       - name: Validate game rules
         run: node test-dom.cjs
       - run: npm install --no-save --package-lock=false three@0.180.0 esbuild@0.25.10
@@ -75,14 +78,16 @@ jobs:
           assert '꼬꼬마을: 읽어서 지켜요' in html
           assert 'combat.js' in html
           assert len(fetch('combat.js')) > 1000
-          images = ['backgrounds/background-meadow.png', 'backgrounds/grass.png', 'characters/chicken.png', 'wolves/wolf.png', 'buildings/coop.png', 'buildings/store.png']
+          assert 'questions.js' in html
+          assert len(fetch('questions.js')) > 10000
+          images = ['backgrounds/background-meadow.png', 'backgrounds/grass.png', 'characters/chicken.png', 'wolves/wolf.png', 'buildings/coop.png', 'buildings/store.png', 'buildings/fence.png']
           images += ['buildings/home-' + n + '.png' for n in ['01','02','03','04','05']]
           images += ['buildings/tower-' + n + '.png' for n in ['01','03','05','08','10']]
-          images += ['animation/' + n + '.png' for n in ['fx-impact','front','quarter','edge','reverse-quarter']]
+          images += ['animation/' + n + '.png' for n in ['fx-impact','fx-ring','fx-dust','fx-feathers','front','quarter','edge','reverse-quarter']]
           for image in images:
               assert fetch('art-handoff/coopnight/browser/' + image).startswith(bytes.fromhex('89504e470d0a1a0a')), image
           assert len(fetch('village.js')) > 10000
           assert fetch('art-handoff/coopnight/source-3d/models/environment-pack.glb').startswith(b'glTF')
-          print('PASS: live HTML, combat + village scripts, deployed commit, GLB and 21 PNG assets.')
+          print('PASS: live HTML, combat + questions + village scripts, deployed commit, GLB and ' + str(len(images)) + ' PNG assets.')
           print('Playable URL: ' + base)
           PY

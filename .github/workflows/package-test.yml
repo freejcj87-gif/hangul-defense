@@ -6,6 +6,7 @@ on:
     paths:
       - index.html
       - combat.js
+      - questions.js
       - src/village.js
       - art-handoff/coopnight/browser/**
       - art-handoff/coopnight/source-3d/models/environment-pack.glb
@@ -22,6 +23,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - run: node test-questions.cjs
       - run: node test-dom.cjs
       - run: npm install --no-save --package-lock=false three@0.180.0 esbuild@0.25.10
       - run: node scripts/build-pages.cjs
