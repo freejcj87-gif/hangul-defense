@@ -1,0 +1,36 @@
+name: Package playable test build
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - index.html
+      - combat.js
+      - art-handoff/coopnight/browser/**
+      - .github/workflows/package-test.yml
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check game rules
+        run: node test-dom.cjs
+      - name: Package browser files only
+        run: |
+          mkdir -p playable/art-handoff/coopnight
+          cp index.html combat.js playable/
+          cp -R art-handoff/coopnight/browser playable/art-handoff/coopnight/
+          cp art-handoff/coopnight/README.md art-handoff/coopnight/USAGE.md playable/art-handoff/coopnight/
+          git rev-parse HEAD > playable/SOURCE_COMMIT.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hangul-defense-playable
+          path: playable/
+          retention-days: 14
+          if-no-files-found: error
