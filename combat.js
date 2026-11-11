@@ -17,14 +17,17 @@
           Number.isFinite(e.hp)&&e.hp>=0&&Number.isFinite(e.maxHp)&&e.maxHp>0&&e.hp<=e.maxHp&&
           Number.isFinite(e.speed)&&e.speed>0&&e.speed<20&&typeof e.escaped==='boolean');
     },
-    step(b,level,dt){
+    MAX_LEVEL:5,MAX_FENCE:6,FENCE_SLOW:.06,
+    /* fence: 플레이어가 지은 울타리 칸 수(0~6). 한 칸마다 늑대가 6%씩 느려진다. 타워 없이는 막지 못한다. */
+    step(b,level,dt,fence=0){
       const events=[];
       if(b.done||!Number.isFinite(dt)||dt<=0)return events;
-      dt=Math.min(dt,.1);level=Math.max(0,Math.min(5,Math.floor(level)||0));
+      dt=Math.min(dt,.1);level=Math.max(0,Math.min(api.MAX_LEVEL,Math.floor(level)||0));
+      const slow=1-Math.max(0,Math.min(api.MAX_FENCE,Math.floor(fence)||0))*api.FENCE_SLOW;
       b.elapsed+=dt;b.cooldown=Math.max(0,b.cooldown-dt);
       for(const e of b.enemies){
         if(e.hp<=0||e.escaped)continue;
-        e.x=Math.max(0,e.x-e.speed*dt);
+        e.x=Math.max(0,e.x-e.speed*slow*dt);
         if(e.x<=15){e.escaped=true;b.leaked++;events.push({type:'leak',id:e.id,damage:15});}
       }
       const target=b.enemies.filter(e=>e.hp>0&&!e.escaped&&e.x<=67).sort((a,b)=>a.x-b.x)[0];

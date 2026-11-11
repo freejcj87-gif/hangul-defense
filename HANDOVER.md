@@ -1,22 +1,25 @@
 # Claude Code 작업 인계
 
-기준일: 2026-11-11. 이 문서는 인계 직전 main `800f3f95f18a7c19d80a3b1ed7cb6c0948a75f02`와 배포 완료된 0.4를 기준으로 작성했습니다. 문서 커밋 자체는 이후 이력에서 확인하세요.
+기준일: 2026-11-11. 0.5([PR #3](https://github.com/freejcj87-gif/hangul-defense/pull/3), 브랜치 `claude/village-polish`) 기준으로 갱신했습니다. 0.4 인계 시점의 기록은 main `800f3f9` 기준이며 아래 “확인된 검증과 배포”에 그대로 남겼습니다. 문서 커밋 자체는 이후 이력에서 확인하세요.
 
 ## 먼저 알아야 할 것
 
 - 저장소: https://github.com/freejcj87-gif/hangul-defense (공개)
 - 실제 테스트 주소: https://freejcj87-gif.github.io/hangul-defense/
 - 원본 화면 참고: https://freejcj87-gif.github.io/coopnight-web/?showcase=1
-- 기존 Windows 작업 폴더: `C:\Users\user\.codex\project\HangulDefense` (사용자가 제공한 이전 작업 화면에서 확인한 경로). 이 세션에서 로컬 파일 존재·현재 브랜치·미커밋 변경은 직접 검사하지 않았습니다.
-- 해당 Windows 폴더를 WSL2에서 열 때 일반적인 경로: `/mnt/c/Users/user/.codex/project/HangulDefense`. C 드라이브 기본 마운트 기준이며 별도 WSL 복제본이 있는지는 확인이 필요합니다.
-- 최근 구현·검사는 GitHub API와 GitHub Actions에서 수행했습니다. 로컬에 최신 코드가 있다는 뜻이 아닙니다.
+- Windows 작업 폴더: `C:\Users\user\.codex\project\HangulDefense`. 저장소 체크아웃은 그 아래 `work\`에 있습니다(2026-11-11 직접 확인).
+  - `work\art-handoff-20261111`: 기존 체크아웃(브랜치 `art-handoff/coopnight-20261111`). 0.5 작업에서 손대지 않았습니다.
+  - `work\claude-village-polish`: 0.5 작업용 worktree(브랜치 `claude/village-polish`).
+  - `work\verification-20261111`: 검증 스크린샷(저장소 밖, 커밋하지 않음).
+- WSL2에서 열 때 일반적인 경로: `/mnt/c/Users/user/.codex/project/HangulDefense`. 별도 WSL 복제본 여부는 확인하지 않았습니다.
+- 0.5는 이 Windows 폴더에서 구현하고 로컬과 GitHub Actions 양쪽에서 검사했습니다.
 - 기존 작업 폴더를 우선 확인하고 새 저장소를 만들지 마세요. 원본 CoopNight 로컬 프로젝트는 별도이며 이 작업에서 수정하지 않았습니다.
 
 ## 사용자가 원하는 제품
 
 7~10세가 나이를 선택해 시작하는 한글 읽기·문해력 게임입니다. 소리를 듣고 글자를 맞히면 골드를 얻고, 터치로 타워와 마을을 강화합니다. 이후 단어·문장·몇 문장으로 된 글과 5지선다 독해로 발전해야 합니다.
 
-핵심은 학습 중 실수 부담을 낮추면서, 방어할 때 긴장감과 타격감을 주고, 마을이 예뻐지고 커지는 성취감을 주는 것입니다. 사용자는 초기 시제품의 품질이 꼬꼬마을보다 현저히 낮다고 평가했고, “거의 베껴오다시피” 원본 화면 감각과 계속 살아 움직이는 마을을 요청했습니다. 0.4는 그 방향의 첫 3D 구현이며 사용자 품질 승인을 받은 완성판이 아닙니다.
+핵심은 학습 중 실수 부담을 낮추면서, 방어할 때 긴장감과 타격감을 주고, 마을이 예뻐지고 커지는 성취감을 주는 것입니다. 사용자는 초기 시제품의 품질이 꼬꼬마을보다 현저히 낮다고 평가했고, “거의 베껴오다시피” 원본 화면 감각과 계속 살아 움직이는 마을을 요청했습니다. 0.4는 그 방향의 첫 3D 구현이며 사용자 품질 승인을 받은 완성판이 아닙니다. 0.5에서는 사용자가 두 가지를 강조했습니다. 나이를 고르면 그 난이도의 문제로 정확히 바뀔 것, 문제를 맞히면 타워·닭·울타리 가운데 하나를 골라 짓고 생성 순간의 손맛이 살 것. 0.5도 사용자 체감 승인 전입니다.
 
 - 기존 꼬꼬마을 아트를 최대한 재사용하세요.
 - Higgsfield 복사·배포·크레딧 사용은 하지 마세요.
@@ -26,31 +29,39 @@
 
 ## 현재 구현
 
-- `index.html`: UI/CSS, 문제은행, 상태·저장, 정답 보상, 구매, 전투 진행, 브라우저 한국어 음성, 효과음, 설정.
-- `combat.js`: 렌더러와 분리된 직렬화 가능한 전투 규칙. `create/valid/step`.
-- `src/village.js`: Three.js 3D 장면. 원본 건물·농부·닭 GLB와 잔디 텍스처, 주민 이동, 알 운반, 나무·연기, 투사체·금화·반동.
+- `index.html`: UI/CSS, 상태·저장, 정답 보상, 골라서 짓기(상점), 다음 방어 예측과 추천, 전투 진행, 화면(DOM) 이펙트, 브라우저 한국어 음성, 효과음, 설정.
+- `questions.js`: 나이별 문제은행(7~10세 × 소리/읽기, 124문항)과 조회·검증. DOM 의존 없음. `Questions.get(age,mode,index)`, `count`, `validate`, `LEVELS`.
+- `combat.js`: 렌더러와 분리된 직렬화 가능한 전투 규칙. `create/valid/step`. `step(battle,level,dt,fence)`의 네 번째 인자가 울타리 칸 수입니다.
+- `src/village.js`: Three.js 3D 장면. 원본 건물·농부·닭 GLB와 잔디 텍스처, 주민 이동, 알 운반, 나무·연기, 투사체·금화·반동, 짓기 연출.
 - `window.getVillageState()`: UI 상태를 장면에 전달합니다.
-- `window.VillageView.events/reward/upgrade/inspect`: 전투·보상 연출과 테스트 관측 인터페이스입니다.
+- `window.VillageView.events/reward/build(kind)/upgrade/inspect`: 전투·보상·짓기 연출과 테스트 관측 인터페이스입니다. `build`는 `'tower'|'chicken'|'fence'`를 받아 생성 연출을 재생하고 화면 좌표를 돌려줍니다. `inspect()`의 `frames`는 처리한 프레임 수로, 검사가 벽시계 대신 이 값을 기준으로 기다립니다.
 - `scripts/build-pages.cjs`: `.pages-build/`에 실행 파일·사용 자산을 모으고 `village.js`를 번들링합니다. 생성물을 직접 편집하지 마세요.
+- `test-questions.cjs`: 문제은행 단독 검사(나이별 수준 규칙, 정답 위치 분포, 중복, 보기 수).
 - `test-dom.cjs`: 규칙·모의 DOM 검사.
-- `test.cjs`: Chromium/WebKit 실제 브라우저 검사와 스크린샷.
+- `test.cjs`: Chromium/WebKit 실제 브라우저 검사와 스크린샷. `ONLY=matrix|feel|fallback`으로 구간만 돌릴 수 있고(출력에 `PARTIAL` 표시), 전체 통과 수치는 `ONLY` 없이 돌린 것만 인정합니다.
 - `art-handoff/coopnight/`: 기존 인계 원본·사용 지침·manifest. 실제 장면 설명은 [docs/living-village.md](docs/living-village.md).
 
 3D는 원본 `source-3d/models/environment-pack.glb`의 EnvCoop/Market/Tower/CornTower/Chicken/Chick/FarmerPolished/Fence/Gate/Tree/Bush/Rock 등을 재사용합니다. GLB에는 애니메이션 채널이 없어 동작은 새 절차 애니메이션입니다. 늑대도 새로 만든 절차 모델이며 원본 Unity 늑대 애니메이션을 가져온 것은 아닙니다. 원본 Unity 실행 코드 자체를 포팅하지 않았습니다.
 
-주민 생활 동작은 장식이며 자동 골드를 주지 않습니다. WebGL 또는 모델 로딩 실패 시 기존 PNG 화면으로 학습·전투를 유지합니다. 픽셀비 최대 1.5, 렌더링 약 30fps 제한, 움직임 줄이기·일시정지를 지원합니다.
+주민 생활 동작은 장식이며 자동 골드를 주지 않습니다(닭 보너스는 정답을 맞힐 때만 붙습니다). WebGL 또는 모델 로딩 실패 시 기존 PNG 화면으로 학습·전투·짓기를 유지합니다. 픽셀비 최대 1.5, 렌더링 약 30fps 제한, 움직임 줄이기·일시정지를 지원합니다.
+
+0.5에서 3D 장면은 390px 폭 기준으로 카메라와 배치를 다시 잡았고, GLB 메시를 버텍스 컬러로 병합해 드로우콜을 줄였습니다(CI 성숙 마을 관측 약 321 → 25, 소프트웨어 렌더링 기준이며 실기기 프레임 시간은 재지 않았습니다). 짓기 연출은 예고 → 충격 → 여운 순서이고 장면 시간(프레임당 최대 0.05초)으로 흐릅니다. 파티클 상한 300, 움직임 줄이기에서는 연출 없이 완성 상태로 바로 나타납니다.
 
 ## 실제 규칙과 한계
 
-- 초기 20골드. 글자 정답 +20, 짧은 글 정답 +40. 타워 생성·강화는 매번 40골드, 최대 5단계.
+- 초기 20골드. 소리 문제 정답 +20, 읽기 문제 정답 +40, 닭 1마리당 정답마다 +5.
+- 골라서 짓기: 정답 뒤 카드 세 장 가운데 골드가 되는 것을 누르면 바로 마을에 생깁니다. 타워 40골드(최대 5단계), 닭 20골드(최대 6마리), 울타리 20골드(최대 6칸, 칸마다 늑대 6% 감속). 골드가 남으면 이어서 더 고를 수 있고, 고르지 않고 방어하러 가도 됩니다.
+- 카드 아래에 다음 방어 예측을 보여 주고(실제 전투 규칙을 미리 돌린 결과) 필요한 카드에 “추천”을 붙입니다.
 - 오답은 골드 차감 없이 재시도. 두 번 오답이면 정답을 색으로 표시합니다.
 - 문제를 푸는 동안 전투는 멈춰 있고, 정답 후 사용자가 방어 시작 버튼을 누릅니다.
 - 전투 tier는 문제 index를 기준으로 3문제마다 상승하며 최대 8. 적 2~5마리, HP·속도가 상승합니다. 타워 레벨에 따라 피해와 공격 주기가 변합니다.
 - 누출 늑대 한 마리당 성문 피해 15. 다음 문제에서 성문은 최소 60으로 회복합니다.
 - 3D 추가 닭장은 방어 성공 2회부터, 두 번째 타워는 레벨 3부터 보입니다. 두 번째 타워는 현재 별도 공격 규칙을 가진 독립 시설이 아니라 기존 레벨 기반 공격의 시각 표현입니다.
 - PNG 대체 화면은 기존 성공 3/6회 시설 규칙을 사용하여 3D와 성장 단계가 다릅니다. 후속 정리 대상입니다.
-- 문제는 글자 6개·짧은 글 2개인 시연용입니다. 7~10세 선택은 저장만 하며 연령별 적응 학습은 없습니다.
-- 저장 키: `hangul-defense-v1`, version 1. 골드·성문·레벨·성공 수·문제 index·모드·나이·보상/전투 완료 토큰·전투 상태를 저장합니다. 기존 저장 호환성을 지키거나 명시적으로 이관하세요.
+- 문제은행은 나이별로 고정된 124문항입니다. 문항 수(소리/읽기): 7세 14/16(받침 없는 글자 · 낱말과 그림, 보기 3개), 8세 16/14(받침 있는 낱말 · 한 문장, 보기 3개), 9세 20/14(헷갈리는 낱말 · 두 문장, 보기 4개), 10세 16/14(문장 받아쓰기 · 짧은 글 이해, 보기 4개/5개). 순번이 문항 수를 넘으면 처음으로 돌아갑니다.
+- 나이를 바꾸면: 아직 답하지 않았을 때는 그 자리에서 새 나이의 문제로 바뀌고, 이미 답한 뒤에는 다음 문제부터 적용됩니다. 이미 맞힌 문제는 맞힐 때의 나이(`qage`)로 다시 보여 줍니다.
+- 난도는 나이로만 정해집니다. 진단·적응 난도·복습은 없습니다. 문항 난도와 그림(이모지) 보기의 직관성은 규칙 검사만 거쳤고 아동·교육 전문가 검수는 받지 않았습니다.
+- 저장 키: `hangul-defense-v1`, version 1. 골드·성문·레벨·성공 수·문제 index·모드·나이·닭·울타리·맞힌 나이·보상/전투 완료 토큰·전투 상태를 저장합니다. 0.5에서 추가한 값(`chickens`, `fence`, `qage`)은 없으면 0 또는 빈 값으로 읽으므로 0.4 저장과 호환됩니다. 기존 저장 호환성을 지키거나 명시적으로 이관하세요.
 - 음성은 브라우저 SpeechSynthesis, ko-KR 음성을 우선 선택합니다. 녹음이나 서버 음성 인식은 없습니다.
 - 효과음·읽기 속도·움직임 설정은 현재 접속 동안만 유지됩니다.
 - 저장은 origin별 localStorage여서 로컬 테스트와 Pages의 진행은 서로 다릅니다.
@@ -81,13 +92,14 @@ Windows PowerShell에서는 마지막 줄을 `py -3 -m http.server 8000 --direct
 검증은 별도 터미널에서:
 
 ```sh
+node test-questions.cjs
 node test-dom.cjs
 npx playwright install --with-deps chromium webkit
 node scripts/build-pages.cjs
 node test.cjs
 ```
 
-Playwright 시스템 의존성 설치는 WSL/Ubuntu 환경에 맞춰 수행하세요. test.cjs는 자체 임시 HTTP 서버를 띄웁니다. 스크린샷은 test-results/에 생성됩니다.
+Playwright 시스템 의존성 설치는 WSL/Ubuntu 환경에 맞춰 수행하세요. test.cjs는 자체 임시 HTTP 서버를 띄웁니다. 스크린샷은 test-results/에 생성됩니다. 느린 PC에서는 전체 실행이 10분을 넘길 수 있으니 시간 제한을 짧게 걸지 마세요. 3D 상태를 읽는 검사는 정해진 시간만큼 기다리지 말고 `inspect().frames`나 조건이 될 때까지 기다리게 쓰세요. CI의 소프트웨어 렌더링은 프레임 간격이 200ms를 넘습니다.
 
 ## 확인된 검증과 배포
 
@@ -103,9 +115,9 @@ Playwright 시스템 의존성 설치는 WSL/Ubuntu 환경에 맞춰 수행하�
 ## 자동 배포와 협업
 
 - `.github/workflows/pages.yml`: main의 지정된 게임 경로 변경 → 규칙 검사 → 빌드 → Pages → 실제 URL 검사.
-- `.github/workflows/validate.yml`: main 대상 PR에 브라우저 검사. push 검사는 기존 improve 브랜치 두 개만 지정돼 있으므로 새 Claude 브랜치에서는 PR을 열어야 CI가 실행됩니다.
+- `.github/workflows/validate.yml`: main 대상 PR과 지정 브랜치(improve 두 개, `claude/village-polish`) push에 문제은행·규칙·브라우저 검사. 같은 브랜치에 PR이 열려 있으면 push 쪽 실행은 취소로 표시되는 것이 정상이며 PR 쪽 결과를 보세요. 다른 이름의 새 브랜치는 PR을 열어야 실행됩니다.
 - `.github/workflows/package-test.yml`: 다운로드용 동일 실행판. `.pages-build`가 숨김 폴더이므로 `include-hidden-files: true`가 필요합니다.
-- src의 새 파일·학습 데이터·새 자산 경로를 만들면 build-pages.cjs와 workflow paths 필터도 함께 검토하세요. 현재 필터는 src/village.js 등 특정 경로 위주입니다.
+- src의 새 파일·학습 데이터·새 자산 경로를 만들면 build-pages.cjs와 workflow paths 필터도 함께 검토하세요. 현재 필터는 index.html, combat.js, questions.js, src/village.js 등 특정 경로 위주입니다.
 - README/인계 문서만 변경하면 게임 재배포가 발생하지 않는 것이 정상입니다.
 - Claude와 Codex가 같은 브랜치/파일을 동시에 수정하지 않도록 작업 시작 시 담당 파일과 브랜치를 합의하세요. 권장: Claude는 화면·애니메이션, Codex는 규칙·학습·검증 검토. index.html은 둘이 동시에 편집하지 마세요.
 - main에 병합한 뒤 Actions 성공과 실제 링크를 확인하고 사용자에게 같은 URL을 전달하세요. 아직 확인하지 않은 품질·기능을 완료라고 쓰지 마세요.
