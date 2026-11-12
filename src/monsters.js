@@ -216,6 +216,8 @@ function rigDepthCompile(shader){patch(shader,this.userData.uHead,false)}
 const headUniform=kind=>({value:new V3(...RIG[kind].H)});
 export function rigMaterial(kind){const m=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.86,metalness:0});m.userData.uHead=headUniform(kind);m.onBeforeCompile=rigColorCompile;return m}
 export function rigDepthMaterial(kind){const m=new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking});m.userData.uHead=headUniform(kind);m.onBeforeCompile=rigDepthCompile;return m}
+// The same rig for any baked figure (0.9 farmers: arms and legs on bones 4-7, head on bone 1 turning about `head`).
+export function rigMaterialAt(head,roughness=.86){const m=new THREE.MeshStandardMaterial({vertexColors:true,roughness,metalness:0,side:THREE.DoubleSide});m.userData.uHead={value:new V3(head[0],head[1],head[2])};m.onBeforeCompile=rigColorCompile;return m}
 
 /* ---------- gaits: writes leg angles/lifts and body motion for stride phase `ph` (m = how much it is moving, 0..1) ---------- */
 export function gaitPose(type,ph,m,o){

@@ -1,7 +1,10 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { KIND_ORDER, RIG, GAIT, RIG_TIME, monsterGeometry, shadowGeometry, rigMaterial, rigDepthMaterial, gaitPose } from './monsters.js';
+import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
+import { SimplifyModifier } from 'three/addons/modifiers/SimplifyModifier.js';
+import { KIND_ORDER, RIG, GAIT, RIG_TIME, monsterGeometry, shadowGeometry, rigMaterial, rigDepthMaterial, rigMaterialAt, gaitPose } from './monsters.js';
+import { prep, fuse, solid, flat, merge } from './geo.js';
+import { STOREY_H, storeyGeometry, basketGeometry, basketEggs, railGeometry, wallGeometry, marketExtras, STALL_OMIT, NESTS, NEST_MAX, nestSpots, villageProps, lanterns, LANTERN_TOP, drawHammer } from './props.js';
 
 const host=document.querySelector('.scene');
 const motion=matchMedia('(prefers-reduced-motion: reduce)');
@@ -15,7 +18,7 @@ const num=v=>{const n=Number(v);return Number.isFinite(n)?n:0};
 const ART='art-handoff/coopnight/browser/';
 const V3=THREE.Vector3;
 // Until the 3D village is ready (or when it falls back) the page still gets a safe API.
-const stubView=()=>({events(){},reward(){},build(){return null},upgrade(){return null},inspect(){return {ready:false}}});
+const stubView=()=>({events(){},reward(){},build(){return null},upgrade(){return null},marketScreen(){return null},inspect(){return {ready:false}}});
 window.VillageView=stubView();
 // Hands the scene back to the DOM picture village (index.html draws it when .is3d is gone).
 function useFallback(){host.classList.remove('is3d');host.dataset.renderer='fallback';window.VillageView=stubView()}
@@ -24,7 +27,10 @@ function useFallback(){host.classList.remove('is3d');host.dataset.renderer='fall
 const WORLD={RADIUS:[7,10,13,16],EDGE:10,SPAWNS:8,MAX_WOLVES:60,TOWER_SLOTS:[[1.2,1.4],[-3.6,1.4],[-5.6,-2],[5.8,-.4],[-.8,-6.2],[-7.6,4.2]],
  PLACE:{coop:[-2.8,-2.8],market:[4.2,-1.8],nursery:[.6,-3.6],barn:[-6.2,-4.4]},HOME:i=>[-1.8+(i%4)*1.2,-.4+Math.floor(i/4)*1.1]};
 const W=key=>{const api=window.World;return api&&api[key]!==undefined?api[key]:WORLD[key]};
-const RUNNING=new Set(['listen','ask','learn']);   // the world clock runs only in these phases, never while paused
+// 0.9: up to 20 towers, 20 hens, 10 farmers; tower places per hall stage come from World.towerSlots(hall) (0.8: the six TOWER_SLOTS).
+const MAXT=20,MAXH=20,MAXF=10,MAX_FLOORS=6;
+function towerSlotsAt(hall){const api=window.World;if(api&&typeof api.towerSlots==='function'){try{const s=api.towerSlots(hall);if(Array.isArray(s)&&s.length)return s.slice(0,MAXT)}catch{}}return W('TOWER_SLOTS').slice(0,MAXT)}
+const RUNNING=new Set(['listen','ask','learn','reward']);   // fallback when getVillageState().running is absent: phases where the world clock runs (never while paused)
 function radiusOf(s,w){
  const r=Number(s.radius);if(r>0&&r<80)return r;
  const R=W('RADIUS'),hall=w&&w.hall!==undefined?w.hall:s.hall;return R[clamp(Math.floor(Number(hall)||0),0,R.length-1)];
@@ -33,14 +39,17 @@ function radiusOf(s,w){
 // One stable object with stable ids, so a bought tower still gets its build effect.
 const fake={fake:true,t:0,hall:0,wolves:[],hens:[],buildings:[],arrows:[]};let fakeKey='';
 function fakeWorld(s){
- const hall=count(s.hall,3),level=count(s.level,5),fence=count(s.fence,6),hens=count(s.chickens,8),key=hall+','+level+','+fence+','+hens;
+ const hall=count(s.hall,3),level=count(s.level,MAXT-1),fence=count(s.fence,18),hens=count(s.chickens,MAXH),key=hall+','+level+','+fence+','+hens;
  if(key===fakeKey)return fake;fakeKey=key;
- const R=W('RADIUS')[hall],P=W('PLACE'),b=[],add=(id,o)=>b.push({id,hp:1,max:1,broken:false,...o});
+ const R=W('RADIUS')[hall],P=W('PLACE'),b=[],add=(id,o)=>{const x={id,hp:1,max:1,broken:false,...o};b.push(x);return x};
  add(-1,{kind:'coop',x:P.coop[0],z:P.coop[1]});add(-2,{kind:'market',x:P.market[0],z:P.market[1]});
  if(hall>=1)add(-3,{kind:'nursery',x:P.nursery[0],z:P.nursery[1]});
  if(hall>=3)add(-4,{kind:'barn',x:P.barn[0],z:P.barn[1]});
- W('TOWER_SLOTS').slice(0,1+level).forEach(([x,z],slot)=>add(-10-slot,{kind:'tower',slot,x,z}));
- for(let k=0;k<fence;k++){const a=(k+.5)*Math.PI/3;add(-20-k,{kind:'fence',side:k,x:Math.cos(a)*R,z:Math.sin(a)*R})}
+ // the contract's rule: as many towers as there are places, the rest raise the lowest tower one floor at a time
+ const slots=towerSlotsAt(hall),n=1+level,built=Math.min(n,slots.length),tw=slots.slice(0,built).map(([x,z],slot)=>add(-10-slot,{kind:'tower',slot,x,z}));
+ for(let k=built;k<n&&tw.length;k++){let low=tw[0];for(const t of tw)if((t.floor|0)<(low.floor|0))low=t;low.floor=(low.floor|0)+1}
+ // fences: empty sides first (layer 1), then the weakest side gets the next layer
+ for(let k=0;k<Math.min(6,fence);k++){const a=(k+.5)*Math.PI/3;add(-40-k,{kind:'fence',side:k,layer:Math.min(3,Math.floor(fence/6)+(k<fence%6?1:0)),x:Math.cos(a)*R,z:Math.sin(a)*R})}
  const list=[];for(let i=0;i<hens;i++){const [x,z]=W('HOME')(i);list.push({id:-100-i,slot:i,x,z,state:'yard'})}
  fake.hall=hall;fake.buildings=b;fake.hens=list;return fake;
 }
@@ -51,36 +60,24 @@ const rnd=()=>{seed=(seed+0x6d2b79f5)|0;let t=Math.imul(seed^seed>>>15,1|seed);t
 const span=(a,b)=>a+(b-a)*rnd();
 const hash=i=>{const x=Math.sin(i*127.1+311.7)*43758.5453;return x-Math.floor(x)};
 
-/* ---------- geometry baking: every object becomes one vertex-coloured mesh ---------- */
+/* ---------- geometry baking: every object becomes one vertex-coloured mesh (prep/solid/flat live in geo.js) ---------- */
 const lit=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.82,metalness:0,side:THREE.DoubleSide});
 const hot=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.82,metalness:0,side:THREE.DoubleSide,emissive:0xfff0c0,emissiveIntensity:.8});
-function prep(source,matrix,color){
- const pos=source.attributes.position,nor=source.attributes.normal,index=source.index,n=index?index.count:pos.count;
- const P=new Float32Array(n*3),N=new Float32Array(n*3),C=new Float32Array(n*3);
- const v=new V3(),normalMatrix=new THREE.Matrix3().getNormalMatrix(matrix),flip=matrix.determinant()<0;
- for(let i=0;i<n;i++){
-  const corner=i%3,k=flip&&corner?i-corner+(3-corner):i,src=index?index.getX(k):k;
-  v.fromBufferAttribute(pos,src).applyMatrix4(matrix);P[i*3]=v.x;P[i*3+1]=v.y;P[i*3+2]=v.z;
-  if(nor){v.fromBufferAttribute(nor,src).applyMatrix3(normalMatrix).normalize();N[i*3]=v.x;N[i*3+1]=v.y;N[i*3+2]=v.z}
-  C[i*3]=color.r;C[i*3+1]=color.g;C[i*3+2]=color.b;
- }
- const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(P,3));g.setAttribute('normal',new THREE.BufferAttribute(N,3));g.setAttribute('color',new THREE.BufferAttribute(C,3));
- if(!nor)g.computeVertexNormals();
- return g;
-}
-function fuse(list){const g=mergeGeometries(list,false);for(const item of list)item.dispose();if(!g)throw new Error('Model merge failed');return g}
-const PRIM={sphere:new THREE.SphereGeometry(1,10,8),ball:new THREE.SphereGeometry(1,8,6),box:new THREE.BoxGeometry(1,1,1),cone:new THREE.ConeGeometry(1,1,6),cone8:new THREE.ConeGeometry(1,1,8),
- cyl:new THREE.CylinderGeometry(1,1,1,12),cyl6:new THREE.CylinderGeometry(1,1,1,6),disc:new THREE.CircleGeometry(1,20),gem:new THREE.OctahedronGeometry(1,0),plane:new THREE.PlaneGeometry(1,1),dot:new THREE.CircleGeometry(1,6)};
-// parts: [primitive, colour, [x,y,z], scale | [sx,sy,sz], [rx,ry,rz]?]
-function solid(parts){
- const m=new THREE.Matrix4(),q=new THREE.Quaternion(),e=new THREE.Euler();
- return fuse(parts.map(([prim,color,p,s,r=[0,0,0]])=>prep(PRIM[prim],m.compose(new V3(...p),q.setFromEuler(e.set(...r)),typeof s==='number'?new V3(s,s,s):new V3(...s)),new THREE.Color(color))));
-}
 // GLB names are sanitised by the loader ("Seed cannon barrel.001" -> "Seed_cannon_barrel001"), so names are compared loosely.
 const norm=name=>String(name||'').replace(/[\s_.\d]/g,'').toLowerCase();
 const named=(obj,root,want)=>{for(let p=obj;p&&p!==root.parent;p=p.parent)if(norm(p.name).startsWith(want))return true;return false};
+// 0.9 crowds (20 towers, 20 hens, 10 farmers) draw a lighter copy of the GLB figures: each child mesh is decimated on load
+// (edge collapse keeps the silhouette; UVs are dropped first since everything is vertex-coloured). `keep` = share of vertices kept.
+const simplifier=new SimplifyModifier(),simpleCache=new Map();
+function simpler(geometry,keep){
+ const key=geometry.uuid+':'+keep;if(simpleCache.has(key))return simpleCache.get(key);
+ let g=geometry.clone();for(const k of Object.keys(g.attributes))if(k!=='position'&&k!=='normal')g.deleteAttribute(k);
+ g=mergeVertices(g);const n=g.attributes.position.count,cut=Math.floor(n*(1-keep));
+ let out=g;if(n>=40&&cut>0){try{out=simplifier.modify(g,cut);if(!out.attributes.position.count)out=g}catch{out=g}}
+ simpleCache.set(key,out);return out;
+}
 // Bakes a GLB node to `height`, feet on y=0, centred on x/z. Children named in `split` come back as separate limbs with their pivots.
-// opt.omit drops children by name; opt.anchors returns the baked bounding box of named children (where to mount extra parts).
+// opt.omit drops children by name; opt.anchors returns the baked bounding box of named children (where to mount extra parts); opt.keep decimates.
 function bake(node,height,split=[],opt={}){
  if(!node)throw new Error('Required model is missing');
  node.updateWorldMatrix(true,true);
@@ -94,7 +91,7 @@ function bake(node,height,split=[],opt={}){
   if(!obj.isMesh||omit.some(o=>named(obj,node,o)))return;
   let key='main';for(let p=obj;p&&p!==node.parent;p=p.parent)if(p!==node&&groups.has(p.name)){key=p.name;break}
   const group=groups.get(key);m.makeTranslation(-group.pivot.x,-group.pivot.y,-group.pivot.z).multiply(frame).multiply(obj.matrixWorld);
-  group.list.push(prep(obj.geometry,m,obj.material.color));
+  group.list.push(prep(opt.keep?simpler(obj.geometry,opt.keep):obj.geometry,m,obj.material.color));
  });
  const out={anchors:{}};for(const [name,group] of groups)if(group.list.length)out[name]={geometry:fuse(group.list),pivot:group.pivot};
  for(const name of opt.anchors||[]){const want=norm(name),b=new THREE.Box3();node.traverse(o=>{if(o.isMesh&&named(o,node,want))b.expandByObject(o)});if(!b.isEmpty())out.anchors[name]=b.applyMatrix4(frame)}
@@ -114,7 +111,7 @@ function lowPoly(node,height,shape,extra=[]){
 }
 
 /* ---------- effect atlas: every sprite effect shares one texture and two draw calls ---------- */
-const CELL={dust:0,ring:1,impact:2,star:3,feather:4,coin:8,sparkle:12,glow:13,solid:14,halo:15,egg:16,dot:17,bang:18,flame:19,scorch:20,swirl:21};
+const CELL={dust:0,ring:1,impact:2,star:3,feather:4,coin:8,sparkle:12,glow:13,solid:14,halo:15,egg:16,dot:17,bang:18,flame:19,scorch:20,swirl:21,hammer:22};
 const GRID=5;
 async function makeAtlas(){
  const S=204,pad=6,inner=S-pad*2,canvas=document.createElement('canvas');canvas.width=canvas.height=GRID*S;
@@ -149,6 +146,8 @@ async function makeAtlas(){
   ctx.beginPath();for(let i=0;i<18;i++){const a=i/18*6.283,r=inner*(i%2?.36:.48)*(.85+.15*Math.sin(i*2.7));ctx.lineTo(h+Math.cos(a)*r,h+Math.sin(a)*r)}ctx.closePath();ctx.fill()});
  // dizzy swirl over a stunned tower
  cell(CELL.swirl,h=>{ctx.strokeStyle='#fff';ctx.lineWidth=13;ctx.lineCap='round';ctx.beginPath();for(let i=0;i<=60;i++){const a=i/60*6.283*2.2,r=8+i*1.35;ctx.lineTo(h+Math.cos(a)*r,h+Math.sin(a)*r*.8)}ctx.stroke()});
+ // 🔨 repair hint over a broken building (drawn in colour: tint it white)
+ cell(CELL.hammer,h=>drawHammer(ctx,h,inner));
  const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;texture.generateMipmaps=false;texture.minFilter=texture.magFilter=THREE.LinearFilter;
  return texture;
 }
@@ -196,13 +195,18 @@ const easeIn=u=>u*u,easeOut=u=>1-(1-u)*(1-u),easeInOut=u=>u<.5?2*u*u:1-2*(1-u)*(
 // Economy decor sits inside the village, clear of world buildings, tower slots and hen homes.
 const POND={x:3.2,z:2.5},POND_R=[0,.62,.82,1.0];
 const HAY={x:5.6,z:1.8};
-const FARM_HOME=[[-1.0,-1.9],[-4.3,-.4],[1.6,-1.7]];                          // base farmer + 2 hired farmers (the coop door stays clear for peeking hens)
-const PICK=[[-.1,-.3],[-.8,.45],[.6,.55]],DROP=[[3.45,.3],[2.55,.45],[4.3,.5]]; // egg pick-up spots and market counter spots per farmer
-const MARKET_FRONT={x:3.9,z:-.1},SALE_END=1.95;
+// base farmer + up to nine hired farmers (the coop door stays clear for peeking hens). Each strolls one zone so ten never queue
+// on one line: the coop-market road, the hen yard, the market front, beside the nests. [ax,az, bx,bz, lateral half-width]
+const ZONE={road:[-1.5,-1.15,3.4,.25,.45],yard:[-1.7,.5,1.5,1.5,.6],market:[2.2,1.0,5.2,.55,.4],nests:[-2.3,-1.25,-.2,-.85,.3]};
+const FARM_ZONE=['road','road','market','yard','road','nests','market','yard','road','market'];
+const FARM_HOME=[[-1.0,-1.9],[1.6,-1.0],[3.3,.9],[-.6,1.0],[2.4,-.4],[-1.3,-1.0],[4.6,.7],[.8,1.3],[.2,-.75],[2.6,1.0]];
+// egg pick-up spots (among the hens, near the nests) and market counter spots, one per farmer (two rows in front of the market)
+const PICK=[[-.1,-.3],[-.8,.45],[.6,.55],[-1.3,-.9],[.4,-1.05],[-.45,1.15],[1.15,-.2],[-1.6,.3],[1.0,1.1],[-.9,-1.6]];
+const DROP=[[3.45,.3],[2.55,.45],[4.3,.5],[3.0,1.05],[3.9,1.15],[2.05,.95],[4.75,1.05],[2.5,1.6],[3.45,1.75],[4.4,1.7]];
+const MARKET_FRONT={x:3.9,z:-.1},SALE_END=1.95,BASKET=4;   // a farmer carries four eggs
 const TOWER_H=2.3,WS=1.05,FOREST=4.5,FENCE_IN=.4;                                  // tower height, wolf scale, forest edge (radius + 6), fence ring inset
 const EYE_DIR=new V3(-9,14,16).normalize(),EYE_DIST=48;
 const CANNON=['Seed cannon barrel','Cannon brass hoop','Dark muzzle inset'];      // the egg cannon gives way to a crossbow: the towers shoot arrows
-const flat=(prim,color,x,z,sx,sz,y=.02,rot=0)=>[prim,color,[x,y,z],[sx,sz,1],[-Math.PI/2,0,rot]];
 const spawnAngle=p=>(p+.5)*Math.PI*2/W('SPAWNS');
 // lateral distance from the nearest wolf trail (the eight spawn directions)
 function laneOf(x,z){const n=W('SPAWNS'),a=Math.atan2(z,x),r=Math.hypot(x,z);let best=9;for(let p=0;p<n;p++){let d=Math.abs(a-spawnAngle(p))%(Math.PI*2);if(d>Math.PI)d=Math.PI*2-d;if(d<Math.PI/2)best=Math.min(best,r*Math.sin(d))}return best*1}
@@ -306,14 +310,26 @@ async function start(){
  const decor=new THREE.Mesh(groundDecor(),lit);decor.receiveShadow=true;world.add(decor);
 
  /* ----- models ----- */
+ const bakeStart=performance.now();   // model baking time (incl. decimation) is reported by debug().bakeMs
  const node=name=>pack.scene.getObjectByName(name),one=(name,height)=>bake(node(name),height).main.geometry;
  const coopArt=bake(node('EnvCoop'),2.7,[],{anchors:['Door dark opening']});
- const towerArt=[bake(node('EnvTower'),TOWER_H,[],{omit:CANNON,anchors:['Seed cannon barrel']}),bake(node('EnvCornTower'),TOWER_H,[],{omit:CANNON,anchors:['Seed cannon barrel']})];
- const G={coop:coopArt.main.geometry,market:one('EnvMarket',2.6),hen:one('EnvChicken',.95),tree:one('EnvTree',1),bush:one('EnvBush',.7),rock:one('EnvRock',.5),panel:one('EnvFence',.85),
+ // crowd figures are decimated (KEEP = share of vertices kept): 20 towers, 20 hens and 10 farmers stay inside the phone budget
+ const KEEP={tower:.32,hen:.34,farmer:.3,panel:.5};
+ const towerArt=[bake(node('EnvTower'),TOWER_H,[],{omit:CANNON,anchors:['Seed cannon barrel'],keep:KEEP.tower}),bake(node('EnvCornTower'),TOWER_H,[],{omit:CANNON,anchors:['Seed cannon barrel'],keep:KEEP.tower})];
+ const G={coop:coopArt.main.geometry,hen:bake(node('EnvChicken'),.95,[],{keep:KEEP.hen}).main.geometry,tree:one('EnvTree',1),bush:one('EnvBush',.7),rock:one('EnvRock',.5),panel:bake(node('EnvFence'),.85,[],{keep:KEEP.panel}).main.geometry,
   crossbow:[0,1,2,3].map(crossbowGeometry),arrow:arrowParts()};
  G.lowTree=lowPoly(node('EnvTree'),1,n=>n.includes('crown')?'cone8':n.includes('trunk')?'cyl6':null,[flat('disc',0x5f7f3a,-.1,-.14,.4,.32,.012)]);
  G.lowBush=lowPoly(node('EnvBush'),.7,n=>n.includes('foliage')?'ball':null);
  G.panel.computeBoundingBox();const FENCE_W=Math.max(.5,G.panel.boundingBox.max.x-G.panel.boundingBox.min.x);
+ G.rail=railGeometry(FENCE_W);G.wall=wallGeometry(FENCE_W);
+ // market tiers by hall stage: 0 stall (no awning) · 1 roofed shop (the GLB market) · 2 tent market · 3 big market
+ {const full=one('EnvMarket',2.6),stall=bake(node('EnvMarket'),2.6,[],{omit:STALL_OMIT}).main.geometry;
+  G.market=[0,1,2,3].map(t=>{const base=t?full:stall,extra=marketExtras(t);return extra?merge([base,extra]):base})}
+ // tower storey: a stone drum as wide as the tower's legs
+ const towerFoot=Math.max(...towerArt.map(a=>{a.main.geometry.computeBoundingBox();const b=a.main.geometry.boundingBox;return Math.max(b.max.x-b.min.x,b.max.z-b.min.z)}));
+ G.storey=storeyGeometry(towerFoot*.5);
+ G.props=[0,1,2,3].map(villageProps);
+ const bakeMs=Math.round(performance.now()-bakeStart);
  const door=coopArt.anchors['Door dark opening']||new THREE.Box3(new V3(-.3,0,1),new V3(.3,1,1.3));
  const actors=[];
  function wrap(obj,x,z,ry=0,s=1,skin=[obj]){obj.rotation.order='YXZ';world.add(obj);const a={obj,skin,x,y:0,z,ry,s,lift:0,sx:1,sy:1,tilt:0,pitch:0,spin:0,flash:0,base:lit,mat:lit,hide:false};actors.push(a);return a}
@@ -370,20 +386,28 @@ async function start(){
  function damageMat(tintHex,tier){const key=tintHex+':'+tier;if(!matCache.has(key)){const c=new THREE.Color(tintHex).multiply(new THREE.Color(DAMAGE[tier]));matCache.set(key,tier===0&&tintHex===0xffffff?lit:new THREE.MeshStandardMaterial({vertexColors:true,roughness:tier===3?1:.85,metalness:0,side:THREE.DoubleSide,color:c}))}return matCache.get(key)}
  const slot=(kind,a,o={})=>{a.obj.visible=false;return Object.assign({kind,a,id:null,on:false,b:null,born:-9,fxDone:true,wasBroken:false,brokeAt:-9,lean:1,smash:0,chipT:0,tint:0xffffff,height:2.6,size:1.4,hp:1},o)};
  const home=slot('coop',actor(G.coop,P.coop[0],P.coop[1]),{height:2.7,size:1.4,lean:-1});
- const market=slot('market',actor(G.market,P.market[0],P.market[1]),{height:2.6,size:1.6});
+ const market=slot('market',actor(G.market[0],P.market[0],P.market[1]),{height:2.6,size:1.6,mtier:-1,down:false});
  const nursery=slot('nursery',actor(G.coop,P.nursery[0],P.nursery[1],0,.74),{height:2.0,size:1,lean:-1});
  const barn=slot('barn',actor(G.coop,P.barn[0],P.barn[1],.35,.95),{height:2.6,size:1.6,tint:0xffcdb4});
  const bowAt=towerArt.map(art=>{const b=art.anchors['Seed cannon barrel'];return b?b.getCenter(new V3()).setY(b.min.y-.02):new V3(0,TOWER_H*.62,0)});
- const towers=W('TOWER_SLOTS').map((_,i)=>{
-  const art=i%2,a=actor(towerArt[art].main.geometry,0,0),bow=new THREE.Mesh(G.crossbow[0],lit);a.obj.castShadow=false;bow.castShadow=false;bow.receiveShadow=true;bow.position.copy(bowAt[art]);bow.scale.setScalar(1.25);a.obj.add(bow);a.skin.push(bow);
-  return slot('tower',a,{height:TOWER_H,size:.9,lean:i%2?1:-1,slot:i,bow,art,aim:0,aimId:0,aimAt:-9,kick:0,shotAt:-9,tier:0,stunAt:-9,smokeT:0});
+ // Towers (up to 20) are proxies drawn through instanced meshes: two tower models, the stone storeys under raised towers, the crossbows.
+ // Draw calls stay at four however many towers stand. A tower's `floors` extra storeys lift the wooden tower (and its crossbow) up.
+ const towerBody=towerArt.map(art=>instanced(art.main.geometry,MAXT,false)),storeys=instanced(G.storey,MAXT*MAX_FLOORS,true),bows=instanced(G.crossbow[0],MAXT,false);
+ const towers=Array.from({length:MAXT},(_,i)=>{
+  const art=i%2,a=proxy(1),bow=new THREE.Object3D();bow.position.copy(bowAt[art]);bow.scale.setScalar(1.25);
+  return slot('tower',a,{height:TOWER_H,size:.9,lean:i%2?1:-1,slot:i,bow,art,aim:0,aimId:0,aimAt:-9,kick:0,shotAt:-9,tier:0,stunAt:-9,smokeT:0,floors:0,floorAt:-9,floorFx:true,dmg:0});
  });
  const BUILDINGS=[home,market,nursery,barn,...towers];
- const towerShade=['EnvTower','EnvCornTower'].map(n=>shadowOnly(lowPoly(node(n),TOWER_H,s=>/seedcannon|cannonbrass|darkmuzzle/.test(s)?null:'cyl6'),6));
- const sides=[0,1,2,3,4,5].map(k=>({kind:'fence',side:k,id:null,on:false,b:null,born:-9,fxDone:true,wasBroken:false,brokeAt:-9,pop:-9,smash:0}));
- const fences=instanced(G.panel,6*24,false),FP=FENCE_W/2-.06;
- const fenceShade=shadowOnly(solid([['box',0,[-FP,.42,0],[.1,.84,.1]],['box',0,[FP,.42,0],[.1,.84,.1]],['box',0,[0,.34,0],[FENCE_W,.08,.06]],['box',0,[0,.62,0],[FENCE_W,.08,.06]]]),6*24);
- const FENCE_TINT=DAMAGE.map(h=>new THREE.Color(h));for(let i=0;i<6*24;i++)fences.setColorAt(i,FENCE_TINT[0]);
+ const towerShade=['EnvTower','EnvCornTower'].map(n=>shadowOnly(lowPoly(node(n),TOWER_H,s=>/seedcannon|cannonbrass|darkmuzzle/.test(s)?null:'cyl6'),MAXT));
+ // Fence sides carry a layer: 1 wooden panels · 2 panels with a second pair of rails · 3 a dry-stone wall.
+ const sides=[0,1,2,3,4,5].map(k=>({kind:'fence',side:k,id:null,on:false,b:null,born:-9,fxDone:true,wasBroken:false,brokeAt:-9,pop:-9,smash:0,layer:1,layerAt:-9,layerFx:true}));
+ const FCAP=6*24,fences=instanced(G.panel,FCAP,false),rails=instanced(G.rail,FCAP,false),walls=instanced(G.wall,FCAP,true),FP=FENCE_W/2-.06;
+ const fenceShade=shadowOnly(solid([['box',0,[-FP,.42,0],[.1,.84,.1]],['box',0,[FP,.42,0],[.1,.84,.1]],['box',0,[0,.34,0],[FENCE_W,.08,.06]],['box',0,[0,.62,0],[FENCE_W,.08,.06]]]),FCAP);
+ const FENCE_TINT=DAMAGE.map(h=>new THREE.Color(h));for(let i=0;i<FCAP;i++)for(const m of [fences,rails,walls])m.setColorAt(i,FENCE_TINT[0]);
+ for(const m of [...towerBody,bows])for(let i=0;i<MAXT;i++)m.setColorAt(i,FENCE_TINT[0]);for(let i=0;i<MAXT*MAX_FLOORS;i++)storeys.setColorAt(i,FENCE_TINT[0]);
+ // What each hall stage adds (egg nests from the start; dirt paths, lanterns, hay and feast flags later): one mesh, swapped per stage.
+ const props=new THREE.Mesh(G.props[0],lit);props.castShadow=props.receiveShadow=true;world.add(props);let propsStage=0;
+ const NEST_SPOTS=nestSpots();
  const hay=actor(solid([['cyl',0xe9c75a,[-.33,.3,0],[.3,.62,.3],[Math.PI/2,0,0]],['cyl',0xe9c75a,[.33,.3,0],[.3,.62,.3],[Math.PI/2,0,0]],['cyl',0xf4d877,[0,.82,0],[.3,.62,.3],[Math.PI/2,0,0]],
   ['cyl',0xc79a3a,[-.33,.3,0],[.31,.09,.31],[Math.PI/2,0,0]],['cyl',0xc79a3a,[.33,.3,0],[.31,.09,.31],[Math.PI/2,0,0]],['cyl',0xc79a3a,[0,.82,0],[.31,.09,.31],[Math.PI/2,0,0]]]),HAY.x,HAY.z,-.35);
  hay.obj.visible=false;
@@ -394,23 +418,12 @@ async function start(){
  const garlands=[bunting([[-2.8,3.68,-2.8],[.6,1.95,-3.6],[2.6,2.1,-3.1]],.42,[[-2.8,-2.8,3.0,3.8],[2.6,-3.1,0,2.2]]),bunting([[-2.8,3.5,-2.8],[-6.2,2.35,-4.4]],.34)].map(({geometry,center})=>{
   const mesh=new THREE.Mesh(geometry,lit),a=wrap(mesh,center.x,center.z);a.y=center.y;mesh.visible=false;return a});
 
- /* ----- hens: eight world hens + three peeking from the coop door, one instanced mesh ----- */
- const henMesh=instanced(G.hen,12,false),henShade=shadowOnly(solid([['sphere',0,[0,.36,-.03],[.3,.28,.36]],['sphere',0,[0,.68,.16],[.16,.19,.16]]]),12);
- const henSlots=[];for(let i=0;i<8;i++)henSlots.push({i,a:proxy(.9+(i*37%10)*.012),id:null,on:false,h:null,fx:0,fz:0,tx:0,tz:0,born:-9,fxDone:true,phase:i*1.7,face:i*2.1,featherT:0,lastX:0,lastZ:0});
+ /* ----- hens: up to twenty world hens + three peeking from the coop door, one instanced mesh ----- */
+ const HCAP=MAXH+3,henMesh=instanced(G.hen,HCAP,false),henShade=shadowOnly(solid([['sphere',0,[0,.36,-.03],[.3,.28,.36]],['sphere',0,[0,.68,.16],[.16,.19,.16]]]),HCAP);
+ const henSlots=[];for(let i=0;i<MAXH;i++)henSlots.push({i,a:proxy(.9+(i*37%10)*.012),id:null,on:false,h:null,fx:0,fz:0,tx:0,tz:0,born:-9,fxDone:true,phase:i*1.7,face:i*2.1,featherT:0,lastX:0,lastZ:0});
  const peeks=[0,1,2].map(()=>proxy(.76));
  const PLAIN=new THREE.Color(1,1,1),FLASH=new THREE.Color(2.1,1.9,1.5),SHY=new THREE.Color(.72,.78,.9),DEAD=new THREE.Color(.62,.62,.68);
- for(let i=0;i<12;i++)henMesh.setColorAt(i,PLAIN);
-
- /* ----- farmers: one rig, shared geometry; the base farmer is always there, two more can be hired ----- */
- const farmerParts=bake(node('FarmerPolished'),1.9,['ArmL','ArmR','LegL','LegR']),eggGeo=solid([['sphere',0xfff3d3,[0,0,0],[.2,.27,.2]]]),farmers=[];
- for(let k=0;k<3;k++){
-  const group=new THREE.Group(),skin=[],limbs=[];
-  for(const [name,part] of Object.entries(farmerParts)){if(name==='anchors')continue;const mesh=new THREE.Mesh(part.geometry,lit);mesh.position.copy(part.pivot);mesh.castShadow=false;mesh.receiveShadow=true;group.add(mesh);skin.push(mesh);if(name!=='main')limbs.push(mesh)}
-  const egg=new THREE.Mesh(eggGeo,lit);egg.position.set(0,2.28,0);egg.visible=false;group.add(egg);
-  const a=wrap(group,FARM_HOME[k][0],FARM_HOME[k][1],0,1,skin);group.visible=k===0;
-  farmers.push({k,a,limbs,egg,tx:a.x,tz:a.z,wait:.5+k*.8,carry:false,job:null,off:[0,.6,-.6][k],range:[[0,1],[0,.5],[.5,1]][k]});
- }
- const farmerShade=shadowOnly(solid([['cyl',0,[0,.55,0],[.27,1.0,.22]],['sphere',0,[0,1.32,.02],[.36,.34,.33]],['cyl',0,[0,1.62,0],[.5,.07,.5]]]),3);
+ for(let i=0;i<HCAP;i++)henMesh.setColorAt(i,PLAIN);
 
  /* ----- monsters: one rigged instanced mesh per kind (head, jaw, tail and legs move in the vertex shader) and one shared,
     low-poly shadow stand-in. Draw calls = kinds on screen + 1, whatever the pack size. ----- */
@@ -425,6 +438,29 @@ async function start(){
  const shade=rigMesh(shadowGeometry(),herd.wolf.mesh.material,WCAP,false);shade.mesh.castShadow=true;shade.mesh.receiveShadow=false;shade.mesh.customDepthMaterial=rigDepthMaterial('wolf');
  // The stand-in only draws into the shadow map: in the main pass it has zero instances (no draw call).
  shade.mesh.onBeforeRender=function(){this.userData.n=this.count;this.count=0};shade.mesh.onAfterRender=function(){this.count=this.userData.n};
+
+ /* ----- farmers: up to ten, one rigged instanced mesh like the monsters (arms and legs on bones 4-7, head on bone 1).
+    Each has a basket (one more instanced mesh): in the left hand while strolling, carried on the head with both arms up when it
+    holds eggs, so the eggs read from any side. Basket eggs and the left-over eggs in the nests are one instanced egg mesh. ----- */
+ const farmerArt=bake(node('FarmerPolished'),1.9,['ArmL','ArmR','LegL','LegR','Head'],{keep:KEEP.farmer,anchors:['Mitten hand']});
+ const ARM_UP=-2.75,FBONE={main:0,Head:1,ArmL:4,ArmR:5,LegL:6,LegR:7};   // arms raised to steady the basket on the head
+ const shoulder=farmerArt.ArmL?farmerArt.ArmL.pivot.clone():new V3(.3,1.2,0),hands=farmerArt.anchors['Mitten hand'];
+ const handL=(hands?hands.getCenter(new V3()):new V3(0,.75,.1)).setX(shoulder.x*1.12);   // the left hand at rest
+ farmerArt.main.geometry.computeBoundingBox();const HEAD_TOP=Math.max(1.6,farmerArt.Head?(()=>{const g=farmerArt.Head.geometry;g.computeBoundingBox();return g.boundingBox.max.y+farmerArt.Head.pivot.y})():1.86);
+ const BASKET_EGGS=basketEggs(new V3());
+ const headAt=farmerArt.Head?farmerArt.Head.pivot:new V3(0,1.3,0);
+ const crew=(()=>{const list=[];
+  for(const [name,part] of Object.entries(farmerArt)){if(name==='anchors')continue;const g=part.geometry.clone();g.translate(part.pivot.x,part.pivot.y,part.pivot.z);list.push([g,part.pivot,FBONE[name]??0])}
+  const geo=merge(list.map(([g,p,bone])=>{const n=g.attributes.position.count,R=new Float32Array(n*4);for(let i=0;i<n;i++){R[i*4]=p.x;R[i*4+1]=p.y;R[i*4+2]=p.z;R[i*4+3]=bone}g.setAttribute('aRig',new THREE.BufferAttribute(R,4));return g}));
+  const r=rigMesh(geo,rigMaterialAt([headAt.x,headAt.y,headAt.z],.82),MAXF,true);r.mesh.castShadow=false;r.mesh.receiveShadow=true;return r})();
+ const baskets=instanced(basketGeometry(new V3()),MAXF,false);
+ const RANGE=[[0,1],[.5,1],[0,1],[0,1],[0,.5],[0,1],[0,1],[0,1],[.25,.75],[0,1]],OFF=[0,.6,-.5,-.6,-.6,0,.6,.6,-.2,0];   // where in its zone each farmer strolls
+ const farmers=Array.from({length:MAXF},(_,k)=>{const a=proxy(1);a.hide=false;a.x=FARM_HOME[k][0];a.z=FARM_HOME[k][1];
+  return {k,a,on:k===0,limb:[0,0,0,0],nod:0,eggs:0,up:0,tx:a.x,tz:a.z,wait:.5+k*.55,job:null,off:OFF[k],range:RANGE[k]}});
+ const farmerShade=shadowOnly(solid([['cyl',0,[0,.55,0],[.27,1.0,.22]],['sphere',0,[0,1.32,.02],[.36,.34,.33]],['cyl',0,[0,1.62,0],[.5,.07,.5]]]),MAXF);
+ const ECAP=MAXF*BASKET+NEST_MAX,eggMesh=instanced(solid([['egg',0xfff6e2,[0,0,0],[1,1.3,1]]]),ECAP,false),EGG_TINT=[new THREE.Color(1,1,1),new THREE.Color(.98,.88,.74),new THREE.Color(1,.95,.86)];
+ for(let i=0;i<ECAP;i++)eggMesh.setColorAt(i,EGG_TINT[i%3]);
+ let nestShown=0,lastLeft=0;const nestPop=new Array(NEST_MAX).fill(-9);
  const SHADE_FIT={boar:new V3(1.12,.74,1.02)};   // the stand-in has wolf proportions; the boar is lower and wider
  const arrowMesh=instanced(G.arrow,240,false);
  const malletGeo=solid([['cyl',0x9a6a3a,[0,.45,0],[.06,.9,.06]],['cyl',0xc98f52,[0,.95,0],[.2,.5,.2],[0,0,Math.PI/2]],['cyl',0x8a5a2e,[.26,.95,0],[.21,.04,.21],[0,0,Math.PI/2]],['cyl',0x8a5a2e,[-.26,.95,0],[.21,.04,.21],[0,0,Math.PI/2]]]);
@@ -521,7 +557,7 @@ async function start(){
  const yardHens=()=>henSlots.filter(c=>c.on&&c.h&&(c.h.state==='yard'||c.h.state==='home'));
  function startle(x,z,radius,power=1,skip=null){
   for(const c of yardHens()){const a=c.a;if(a===skip)continue;const d=Math.hypot(a.x-x,a.z-z);if(d<radius)hop(a,(.25+.3*(1-d/radius))*power,d*.03,.34)}
-  for(const f of farmers)if(f.a.obj.visible&&!f.job&&Math.hypot(f.a.x-x,f.a.z-z)<radius)hop(f.a,.22*power,.05,.3);
+  for(const f of farmers)if(f.on&&!f.job&&Math.hypot(f.a.x-x,f.a.z-z)<radius)hop(f.a,.22*power,.05,.3);
  }
  function rattle(x,z,radius,amp=.1,skip=null){
   for(const s of BUILDINGS){const a=s.a;if(a===skip||!s.on)continue;const d=Math.hypot(a.x-x,a.z-z);if(d<radius)wobble(a,amp*(1-d/radius*.7),d*.035)}
@@ -532,19 +568,25 @@ async function start(){
  /* ----- what the village shows (persistent) ----- */
  let frames=0,dirty=true,lastRepair=null,sunDim=0;
  // Economy-only parts (not in the world simulation): hired farmers, pond, hall decor, feast bunting.
- const KEYS={farmer:'farmers',pond:'pond',hall:'hall',feast:'feast'},ECON={farmers:2,pond:3,hall:3,feast:99};
+ const KEYS={farmer:'farmers',pond:'pond',hall:'hall',feast:'feast'},ECON={farmers:MAXF-1,pond:3,hall:3,feast:99};
  const shown={farmers:0,pond:0,hall:0,feast:0},silent={},builds={tower:0,fence:0,chicken:0,farmer:0,pond:0,hall:0,feast:0,repair:0,power:0};
  let powerShown=-1,powerAt=-9;   // tower power tier on the crossbows (0-3) and when it last went up
  const pending={tower:-9,fence:-9,chicken:-9,hall:-9};
+ // Market by hall stage: 0 stall · 1 roofed shop · 2 tent market · 3 big market (heights/sizes for effects and the repair hint)
+ const MARKET_TIER=[{height:1.7,size:1.4},{height:2.6,size:1.6},{height:3.1,size:2.4},{height:3.2,size:2.8}];
+ function setMarketTier(t){t=clamp(t|0,0,3);if(market.mtier===t)return false;market.mtier=t;market.a.obj.geometry=G.market[t];Object.assign(market,MARKET_TIER[t]);return true}
+ function setProps(n){n=clamp(n|0,0,3);if(propsStage===n)return false;propsStage=n;props.geometry=G.props[n];return true}
  const APPLY={
-  farmers:n=>farmers.forEach((f,k)=>{const on=k<=n;if(on&&!f.a.obj.visible){f.a.x=f.tx=FARM_HOME[k][0];f.a.z=f.tz=FARM_HOME[k][1]}f.a.obj.visible=on}),
+  farmers:n=>farmers.forEach((f,k)=>{const on=k<=n;if(on&&!f.on){f.a.x=f.tx=FARM_HOME[k][0];f.a.z=f.tz=FARM_HOME[k][1]}f.on=on}),
   pond:n=>{pond.obj.visible=n>0;pond.s=POND_R[n]||.001},
-  hall:n=>{hay.obj.visible=n>=2;home.a.s=1+n*.07},
+  hall:n=>{hay.obj.visible=n>=2;home.a.s=1+n*.07;setMarketTier(n);setProps(n)},
   feast:n=>garlands.forEach((g,i)=>{g.obj.visible=n>i})};
+ // 0.9 hands over farmersTotal (1 + hired); 0.8 only the hired count
+ const econ=(s,key)=>key==='farmers'&&Number.isFinite(Number(s.farmersTotal))?count(Number(s.farmersTotal)-1,ECON.farmers):count(s[key],ECON[key]);
  // Numbers that change without a build() call (saved game, reset) are simply shown: no effects.
  function syncEconomy(s,first=false){
   let changed=false,drop=false;const next={};
-  for(const key in APPLY){next[key]=count(s[key],ECON[key]);if(next[key]!==shown[key]){changed=true;if(next[key]<shown[key])drop=true}}
+  for(const key in APPLY){next[key]=econ(s,key);if(next[key]!==shown[key]){changed=true;if(next[key]<shown[key])drop=true}}
   if(!first&&!changed)return false;
   if(drop)clearEffects();
   for(const key in APPLY){const v=next[key];if(first||v!==shown[key]){silent[key]=!first&&v===shown[key]+1?time:-9;shown[key]=v;APPLY[key](v)}}
@@ -553,7 +595,7 @@ async function start(){
  // Tower power tier: swaps the crossbow model (brazier, pennant, triple bow). The flare plays only for a bought upgrade.
  function syncPower(s,fx){
   const p=count(s.power,3);if(p===powerShown&&!fx)return false;powerShown=p;
-  for(const t of towers){t.tier=p;t.bow.geometry=G.crossbow[p]}
+  for(const t of towers)t.tier=p;bows.geometry=G.crossbow[p];
   if(fx)powerUp();return true;
  }
 
@@ -561,8 +603,15 @@ async function start(){
  let wRef=null,lastT=0,blendT=1,blendDur=.1,blendTicks=0,blendEase=false,sinceTick=1,stamp=0,initial=true;
  const bById=new Map(),towerById=new Map(),smashOn=new Map(),henById=new Map(),henCarrier=new Map(),wolfVis=new Map(),arrowVis=new Map(),gone=new Map();
  const sideOf=b=>Number.isInteger(b.side)&&b.side>=0&&b.side<6?sides[b.side]:null;
- const slotOf=b=>b.kind==='coop'?home:b.kind==='market'?market:b.kind==='nursery'?nursery:b.kind==='barn'?barn:b.kind==='tower'?(Number.isInteger(b.slot)?towers[b.slot]:null)||null:b.kind==='fence'?sideOf(b):null;
+ const slotOf=b=>b.kind==='coop'?home:b.kind==='market'?market:b.kind==='nursery'?nursery:b.kind==='barn'?barn:b.kind==='tower'?(Number.isInteger(b.slot)&&b.slot>=0?towers[b.slot]:null)||null:b.kind==='fence'?sideOf(b):null;
  const pendKey=k=>k==='tower'?'tower':k==='fence'?'fence':k==='nursery'||k==='barn'?'hall':null;
+ // Tower floors. The contract adds `floor` (1 or more) to tower buildings; whether 1 means "the plain tower" or "one extra storey"
+ // is read from the numbers: if every tower has floor >= 1 and they add up to the economy's tower count (1 + level), floor counts
+ // storeys (plain = 1); otherwise it counts extra storeys (absent = 0). Both give the same picture for a consistent world.
+ let floorTotal=false;
+ function floorMode(w,s){const ts=w.buildings.filter(b=>b&&b.kind==='tower');let sum=0,all=ts.length>0;for(const b of ts){const f=Number(b.floor);if(Number.isInteger(f)&&f>=1)sum+=f;else all=false}floorTotal=all&&sum===1+count(s&&s.level,99)}
+ const extraFloors=b=>clamp((Number.isFinite(Number(b.floor))?Math.floor(Number(b.floor)):0)-(floorTotal?1:0),0,MAX_FLOORS);
+ const layerOf=b=>clamp(Number.isFinite(Number(b.layer))?Math.floor(Number(b.layer)):1,1,3);
  function syncRecords(s,volley=false){
   const real=s&&s.world&&typeof s.world==='object'&&Array.isArray(s.world.buildings)?s.world:null,w=real||fakeWorld(s);
   const init=w!==wRef;
@@ -570,26 +619,44 @@ async function start(){
   const t=num(w.t);let ticked=false;
   // Ticks that arrive before a frame has drawn (a wrong-answer fast-forward forwarded step by step) add up into one longer bound.
   if(!init&&t!==lastT){let n=t-lastT;lastT=t;sinceTick=0;if(n>0){if(blendT<=1e-4)n+=blendTicks;blendTicks=n;blendDur=n<=2?.1*n:clamp(.12+n*.012,.3,.5);blendEase=n>2;blendT=0;ticked=true}else{blendDur=.1;blendT=1;blendEase=false;ticked=true}}   // rewound (restored save): snap
+  floorMode(w,s);market.down=!!(s&&Number(s.marketDown)>0);
   syncBuildings(w,init||initial);syncWolves(w,ticked);syncHens(w,init||initial,ticked);syncArrows(w,volley);
   Rgoal=radiusOf(s||IDLE,w);initial=false;
   return w;
  }
  function syncBuildings(w,init){
-  bById.clear();towerById.clear();const seen=new Set();
-  for(const b of Array.isArray(w.buildings)?w.buildings:[]){
-   if(!b||typeof b!=='object')continue;const sl=slotOf(b);if(!sl||seen.has(sl))continue;seen.add(sl);
+  bById.clear();towerById.clear();const seen=new Set(),list=Array.isArray(w.buildings)?w.buildings:[];
+  // One record per fence side: if the world keeps a building per layer, the strongest standing one speaks for the side.
+  const rep=new Map();for(const b of list){if(!b||b.kind!=='fence')continue;const sd=sideOf(b);if(!sd)continue;const o=rep.get(sd);
+   if(!o||(!!o.broken)>(!!b.broken)||(!!o.broken)===(!!b.broken)&&layerOf(b)>layerOf(o))rep.set(sd,b)}
+  const spare=towers.filter(t=>!list.some(b=>b&&b.kind==='tower'&&slotOf(b)===t));   // places for towers without a usable slot number
+  for(const b of list){
+   if(!b||typeof b!=='object')continue;let sl=slotOf(b);
+   if(b.kind==='tower'&&(!sl||seen.has(sl)))sl=spare.shift()||null;
+   if(b.kind==='fence'&&sl&&rep.get(sl)!==b)continue;
+   if(!sl||seen.has(sl))continue;seen.add(sl);
    bById.set(b.id,b);if(b.kind==='tower')towerById.set(b.id,sl);
-   if(sl.id!==b.id){
+   const fresh=sl.id!==b.id;sl.b=b;
+   if(fresh){
     if(sl.a){sl.a.x=num(b.x);sl.a.z=num(b.z)}
-    sl.id=b.id;sl.on=true;sl.born=time;sl.fxDone=init;sl.wasBroken=!!b.broken;sl.brokeAt=b.broken?-9:sl.brokeAt;if(sl.a)sl.a.obj.visible=true;
+    sl.id=b.id;sl.on=true;sl.born=time;sl.fxDone=init;sl.wasBroken=isBroken(sl);sl.brokeAt=sl.wasBroken?-9:sl.brokeAt;if(sl.a)sl.a.obj.visible=true;
+    if(sl.kind==='tower'){sl.floors=extraFloors(b);sl.floorFx=true}
+    if(sl.kind==='fence'){sl.layer=layerOf(b);sl.layerFx=true}
     const key=pendKey(b.kind);if(!init&&key&&time-pending[key]<2.5){pending[key]=-9;sl.fxDone=true;playBuilt(sl)}
    }
    sl.b=b;if(sl.a){sl.a.x=num(b.x);sl.a.z=num(b.z)}
-   if(!init){if(b.broken&&!sl.wasBroken)brokenFx(sl);else if(!b.broken&&sl.wasBroken)repairFx(sl)}
-   sl.wasBroken=!!b.broken;
+   if(!fresh&&sl.kind==='tower'){const f=extraFloors(b);if(f!==sl.floors){const up=f>sl.floors;sl.floors=f;   // a bought tower raised this one a storey
+     if(up&&!init){sl.floorAt=time;sl.floorFx=false;if(time-pending.tower<2.5){pending.tower=-9;sl.floorFx=true;raiseStorey(sl)}}}}
+   if(!fresh&&sl.kind==='fence'){const L=layerOf(b);if(L!==sl.layer){const up=L>sl.layer;sl.layer=L;   // a bought fence thickened this side
+     if(up&&!init){sl.layerAt=time;sl.layerFx=false;if(time-pending.fence<2.5){pending.fence=-9;sl.layerFx=true;hammerFence(sl)}}}}
+   if(sl.kind==='tower')sl.height=TOWER_H+sl.floors*STOREY_H;
+   const br=isBroken(sl);if(!init){if(br&&!sl.wasBroken)brokenFx(sl);else if(!br&&sl.wasBroken)repairFx(sl)}
+   sl.wasBroken=br;
   }
   for(const sl of [...BUILDINGS,...sides])if(!seen.has(sl)&&sl.on){sl.on=false;sl.id=null;sl.b=null;if(sl.a)sl.a.obj.visible=false}
  }
+ // a real building counts as broken when the world says so; the market also when the page reports it down (half-price eggs)
+ const isBroken=sl=>!!(sl.b&&sl.b.broken)||sl===market&&market.down&&sl.on;
  let insideWolves=0;
  const hl=new Map();   // wolf id -> time its "new monster!" highlight ends
  const KIND_FALLBACK={wolf:{size:1,speed:1},bramble:{size:.85,speed:1.3},boar:{size:1.1,speed:.85},granite:{size:1.25,speed:.6},frost:{size:.95,speed:1.7},ember:{size:1.8,speed:.7,boss:true}};
@@ -646,7 +713,8 @@ async function start(){
   }
   for(const o of arrowVis.values())if(!live.has(o.id)&&o.fin<0){o.fin=time;o.u0=o.u}
  }
- const bowWorld=t=>{const a=t.a,off=bowAt[t.art],s=a.s;return {x:a.x+off.x*s,y:(off.y+.32)*s,z:a.z+off.z*s}};
+ const bowWorld=t=>{const a=t.a,off=bowAt[t.art],s=a.s;return {x:a.x+off.x*s,y:(off.y+.32+t.floors*STOREY_H)*s,z:a.z+off.z*s}};
+ const towerTop=t=>t.height*t.a.s;
 
  /* ----- build effects: telegraph -> impact -> afterglow. Final state is set first, so reduced motion is simply "done". ----- */
  function mallet(){let m=mallets.find(m=>!m.busy);if(!m&&mallets.length<3){m=actor(malletGeo,0,0,0,1.8);m.obj.receiveShadow=false;m.obj.visible=false;mallets.push(m)}if(m)m.busy=true;return m}
@@ -660,7 +728,7 @@ async function start(){
   if(m){const ry=Math.PI-a;m.ry=ry;m.x=x+Math.cos(ry)*R;m.y=1.21;m.z=z-Math.sin(ry)*R;m.obj.visible=true;   // stands inside the ring and swings outward onto the side
    tween(0,.62,(u,t)=>{if(t<.12){m.sx*=.001;m.sy*=.001;return}const k=Math.min(1,(t-.12)/.07)*(t>.5?Math.max(.001,1-(t-.5)/.12):1);m.sx*=k;m.sy*=k;
     m.tilt+=t<HIT?swing(t):Math.PI/2-.6*Math.sin(Math.min(1,(t-HIT)/.14)*Math.PI/2)},()=>{m.obj.visible=false;m.busy=false})}
-  after(HIT,()=>{flashAt(x,.95,z,2);for(const k of [-.32,0,.32]){const b=a+k*Math.PI/3,R2=Rd-FENCE_IN;dustBurst(Math.cos(b)*R2,Math.sin(b)*R2,6,.9)}chipBurst(x,.75,z,8);ringWave(x,z,4.4,WHITE,.4,0,CELL.halo,.55);shake(.12);startle(x,z,3.5,.9)});
+  after(HIT,()=>{flashAt(x,.95,z,2);for(const k of [-.32,0,.32]){const b=a+k*Math.PI/3,R2=Rd-FENCE_IN;dustBurst(Math.cos(b)*R2,Math.sin(b)*R2,6,.9)}chipBurst(x,.75,z,8,side.layer>=3?[STONE,ROCK]:side.layer===2?[WOOD,WOOD,CREAM]:undefined);ringWave(x,z,4.4,WHITE,.4,0,CELL.halo,.55);shake(.12);startle(x,z,3.5,.9)});
   after(HIT+.2,()=>sparkles(x,.8,z,8,1.6,GOLD,0,.6));
  }
  function buildChicken(c){          // pops out in a puff of feathers, hops, spins once, then joins the flock
@@ -675,8 +743,16 @@ async function start(){
   after(T+.38,()=>{dustBurst(x,z,7,.7);ringWave(x,z,2.4,GOLD,.35);shake(.06);startle(x,z,2.6,.8,a);featherBurst(x,.4,z,4,.6)});
   after(T+.76,()=>{dustBurst(x,z,5,.5);sparkles(x,.7,z,7,.6,GOLD,0,.6)});
  }
+ function raiseStorey(t){           // every tower place is taken: the bought tower lifts an existing one a storey (stone drum pushes up from below)
+  const a=t.a,x=a.x,z=a.z,H=t.height,from=Math.max(.3,(H-STOREY_H)/H),T=.12;
+  telegraph(x,z,3,GOLD);
+  tween(0,T+.8,(u,tt)=>{if(tt<T){const k=Math.sin(tt/T*Math.PI/2);a.sy*=from*(1-.06*k);a.sx*=1+.06*k;return}const q=tt-T,k=from+(1-from)*Math.max(.001,springy(q));a.sy*=k;a.sx*=1+.08*Math.exp(-8*q)});
+  after(T,()=>{a.flash=.1;dustBurst(x,z,12,1.2);ringWave(x,z,4.6,GOLD,.5);ringWave(x,z,3.2,WHITE,.36,0,CELL.halo,.6);chipBurst(x,.5,z,8,[STONE,ROCK,WOOD]);shake(.12);rattle(x,z,5,.08,a);startle(x,z,4)});
+  after(T+.22,()=>{starBurst(x,H*1.05,z,12,1,[GOLD,WHITE,SKY]);risingRings(x,z,H*1.05,2.2,GOLD,3)});
+  after(T+.35,()=>sparkles(x,H*.75,z,10,1,GOLD,0,.7));
+ }
  function raiseTower(t){            // a new arrow tower erupts out of the ground
-  const a=t.a,x=a.x,z=a.z,H=TOWER_H,T=.14;
+  const a=t.a,x=a.x,z=a.z,H=t.height,T=.14;
   telegraph(x,z,3.4);emit({cell:CELL.ring,flat:true,x,y:.09,z,size:4.4,end:1.2,life:T+.03,color:GOLD,add:.5,fade:.8,pop:.3});
   tween(0,T+.75,(u,tt)=>{if(tt<T){a.sx*=.001;a.sy*=.001;return}const q=tt-T,k=Math.max(.001,springy(q)),e=Math.exp(-9*q);a.sy*=k*(1+.32*e);a.sx*=k*(1-.2*e)});
   after(T,()=>{a.flash=.1;pillar(x,z,5.2,1.7);risingRings(x,z,H*1.15,2.3);dustBurst(x,z,12,1.2);ringWave(x,z,5,GOLD,.5);ringWave(x,z,3.6,WHITE,.36,0,CELL.halo,.6);shake(.14);rattle(x,z,5.5,.1,a);startle(x,z,4.6)});
@@ -711,7 +787,7 @@ async function start(){
  function powerUp(){                // tower power: every crossbow flares, the brazier lights, rings rise
   powerAt=time;let k=0;
   for(const t of towers){if(!t.on||t.b&&t.b.broken)continue;const p=bowWorld(t),d=k++*.08;
-   wobble(t.a,.08,d);after(d,()=>{t.a.flash=.1;flashAt(p.x,p.y,p.z,2,ORANGE);pillar(t.a.x,t.a.z,4.6,1.4,ORANGE,.55);risingRings(t.a.x,t.a.z,TOWER_H*1.1,2,ORANGE,3);
+   wobble(t.a,.08,d);after(d,()=>{t.a.flash=.1;flashAt(p.x,p.y,p.z,2,ORANGE);pillar(t.a.x,t.a.z,4.6,1.4,ORANGE,.55);risingRings(t.a.x,t.a.z,towerTop(t)*1.1,2,ORANGE,3);
     for(let i=0;i<8;i++)emit({cell:CELL.flame,x:p.x+span(-.2,.2),y:p.y,z:p.z+span(-.2,.2),vx:span(-.5,.5),vy:span(1.5,2.6),vz:span(-.5,.5),drag:2,life:span(.5,.75),size:.5,end:.15,color:WHITE,add:.8,fade:.4,pop:.1})});
    after(d+.18,()=>starBurst(p.x,p.y+.3,p.z,8,.8,[ORANGE,GOLD,WHITE]))}
   shake(.08);
@@ -723,7 +799,7 @@ async function start(){
  }
  function buildFarmer(k){           // a hired farmer jumps out of a puff, spins once and waves
   const f=farmers[k];if(!f)return;const a=f.a,[x,z]=FARM_HOME[k],T=.1;
-  a.obj.visible=true;a.x=f.tx=x;a.z=f.tz=z;a.ry=.4;f.wait=1.4;f.job=null;f.carry=false;
+  f.on=true;a.x=f.tx=x;a.z=f.tz=z;a.ry=.4;f.wait=1.4;f.job=null;f.eggs=0;
   telegraph(x,z,2.2,CREAM);popIn(a,T,.9);
   tween(T,.5,u=>{leap(a,u,.75);a.spin+=6.283*easeInOut(u)});
   after(T,()=>{a.flash=.08;flashAt(x,1,z,1.6,CREAM);ringWave(x,z,2.8,WHITE,.36,0,CELL.halo,.55);dustBurst(x,z,8,.8)});
@@ -742,8 +818,10 @@ async function start(){
   after(.04,()=>{pond.flash=.08;ringWave(x,z,4.6*POND_R[n],SKY,.5,0,CELL.halo,.6,.06);ringWave(x,z,3.2*POND_R[n],WHITE,.42,.12,CELL.halo,.5,.06);splash(x,z,14,1.1);shake(.05)});
   fishJump(.3);after(.4,()=>sparkles(x,.6,z,8,.9,SKY,0,.6));
  }
- function buildHall(n){             // the coop swells, a new building pops in, and the village (and the view) grows outward
-  APPLY.hall(n);const a=home.a,T=.12;
+ function buildHall(n){             // the coop swells, a new building pops in, the market grows a tier, and the village (and the view) grows outward
+  const tier0=market.mtier,stage0=propsStage;APPLY.hall(n);const a=home.a,T=.12;
+  if(market.mtier!==tier0&&market.on){const m=market.a;popIn(m,.3,.85);after(.3,()=>{m.flash=.1;dustBurst(m.x,m.z,14,1.3);ringWave(m.x,m.z,5.5,GOLD,.5);starBurst(m.x,market.height,m.z,12,1,[GOLD,WHITE,PINK]);confetti(m.x,market.height*.8,m.z,22,2.2)})}
+  if(propsStage>stage0)lanterns(propsStage).forEach(([x,z],i)=>after(.45+i*.06,()=>{flashAt(x+.24,LANTERN_TOP,z,1.2,GOLD);sparkles(x,1.2,z,4,.4,GOLD,0,.3)}));
   telegraph(a.x,a.z,3.8);
   tween(0,T+.75,(u,t)=>{if(t<T){const k=Math.sin(t/T*Math.PI/2);a.sy*=1-.18*k;a.sx*=1+.1*k;return}const w=settle(t-T,15,5.5);a.sy*=1+.28*w;a.sx*=1-.13*w});
   after(T,()=>{a.flash=.1;pillar(a.x,a.z,5.4,2.4);risingRings(a.x,a.z,3.2,2.8);dustBurst(a.x,a.z+1.2,10,1.1);shake(.1);rattle(a.x,a.z,5,.08,a);startle(a.x,a.z,5)});
@@ -757,7 +835,7 @@ async function start(){
   APPLY.feast(n);const g=garlands[n===2?1:0],x=g.x,y=g.y,z=g.z;
   if(n<=2)popIn(g,.08,.7);else{wobble(garlands[0],.08);wobble(garlands[1],.08,.06)}
   after(.08,()=>{g.flash=.1;flashAt(x,y,z,2.4,PINK);starBurst(x,y+.3,z,14,1,[GOLD,PINK,SKY,LEAF]);confetti(x,y+.4,z,40,2.6);shake(.07)});
-  after(.3,()=>{yardHens().forEach((c,i)=>hop(c.a,.35,i*.05,.34));farmers.forEach((f,k)=>{if(f.a.obj.visible&&!f.job)hop(f.a,.4,k*.07,.36)})});
+  after(.3,()=>{yardHens().forEach((c,i)=>hop(c.a,.35,i*.05,.34));farmers.forEach((f,k)=>{if(f.on&&!f.job)hop(f.a,.4,k*.07,.36)})});
   after(.45,()=>sparkles(x,y,z,10,1.6,GOLD,0,.7));
  }
  function playEconomy(kind,n){
@@ -776,20 +854,23 @@ async function start(){
  // A world part bought just now: play its effect if the frame loop already showed it, or wait (2.5 s) for the page to add it to the world.
  function buildWorld(kind){
   const list=kind==='tower'?towers:kind==='fence'?sides:henSlots,sl=newest(list);
-  if(sl&&!sl.fxDone&&time-sl.born<2.5){sl.fxDone=true;if(kind==='chicken')buildChicken(sl);else playBuilt(sl)}
-  else{pending[kind]=time;if(sl){if(kind==='tower')wobble(sl.a,.06);else if(kind==='chicken')hop(sl.a,.25);else sl.pop=time}}
+  if(sl&&!sl.fxDone&&time-sl.born<2.5){sl.fxDone=true;if(kind==='chicken')buildChicken(sl);else playBuilt(sl);return sl}
+  // all tower places taken: the purchase raised a tower one storey · all sides fenced: the purchase added a layer to one side
+  const grown=kind==='tower'?towers.filter(t=>t.on&&!t.floorFx&&time-t.floorAt<2.5).sort((a,b)=>b.floorAt-a.floorAt)[0]:kind==='fence'?sides.filter(f=>f.on&&!f.layerFx&&time-f.layerAt<2.5).sort((a,b)=>b.layerAt-a.layerAt)[0]:null;
+  if(grown){if(kind==='tower'){grown.floorFx=true;raiseStorey(grown)}else{grown.layerFx=true;hammerFence(grown)}return grown}
+  pending[kind]=time;if(sl){if(kind==='tower')wobble(sl.a,.06);else if(kind==='chicken')hop(sl.a,.25);else sl.pop=time}
   return sl;
  }
  function spotOf(kind,sl){
-  if(kind==='tower'&&sl)return new V3(sl.a.x,TOWER_H*.55,sl.a.z);
-  if(kind==='fence'&&sl){const p=sideMid(sl.side);return new V3(p.x,.45,p.z)}
+  if(kind==='tower'&&sl)return new V3(sl.a.x,sl.height*.55,sl.a.z);
+  if(kind==='fence'){const sd=sl||sides.find(f=>!f.on)||sides[0],p=sideMid(sd.side);return new V3(p.x,.45,p.z)}   // no side yet: where the first one goes
   if(kind==='chicken'&&sl)return new V3(sl.a.x,.45,sl.a.z);
-  if(kind==='farmer'){const a=farmers[clamp(shown.farmers,0,2)].a;return new V3(a.x,1,a.z)}
+  if(kind==='farmer'){const a=farmers[clamp(shown.farmers,0,MAXF-1)].a;return new V3(a.x,1,a.z)}
   if(kind==='pond')return new V3(POND.x,.2,POND.z);
   if(kind==='hall'){const ex=shown.hall>=3&&barn.on?barn:shown.hall===2?{a:hay,height:1}:shown.hall>=1&&nursery.on?nursery:null;return ex?new V3(ex.a.x,1,ex.a.z):new V3(home.a.x,1.5,home.a.z)}
   if(kind==='repair'){const r=lastRepair&&time-lastRepair.t<3?lastRepair.sl:null;if(r&&r.kind==='fence'){const p=sideMid(r.side);return new V3(p.x,.5,p.z)}return r?new V3(r.a.x,r.height*.5,r.a.z):new V3(home.a.x,1.5,home.a.z)}
   if(kind==='feast'){const g=garlands[shown.feast===2?1:0];return new V3(g.x,g.y,g.z)}
-  if(kind==='power'){const t=towers.find(t=>t.on);return t?new V3(t.a.x,TOWER_H*.8,t.a.z):null}
+  if(kind==='power'){const t=towers.find(t=>t.on);return t?new V3(t.a.x,towerTop(t)*.8,t.a.z):null}
   return null;
  }
  function build(kind){
@@ -801,7 +882,7 @@ async function start(){
   else if(kind==='repair'){if(!(lastRepair&&time-lastRepair.t<2.5))wobble(home.a,.05)}
   else if(kind==='power'){syncPower(s,true)}
   else{
-   const key=KEYS[kind],target=count(s[key],ECON[key]),from=shown[key];
+   const key=KEYS[kind],target=econ(s,key),from=shown[key];
    if(target<from)syncEconomy(s);
    else if(target>from){shown[key]=target;for(let n=from+1;n<=target;n++)playEconomy(kind,n)}
    else if(target>0&&time-(silent[key]??-9)<2){silent[key]=-9;playEconomy(kind,target)}   // the frame loop showed it a moment before build() arrived
@@ -814,23 +895,40 @@ async function start(){
 
  /* ----- one-shot effects pushed by the page (persistent state always comes from the pull) ----- */
  const warns=[];
- function produceFx(e){             // hens lay -> eggs fly into the farmers' baskets -> farmers run to the market -> coins
-  const crew=farmers.filter(f=>f.a.obj.visible);if(!crew.length)return;
-  sale={t:0};
-  crew.forEach((f,k)=>{f.job={fx:f.a.x,fz:f.a.z,px:PICK[k][0],pz:PICK[k][1],mx:DROP[k][0],mz:DROP[k][1],lag:k*.07};f.carry=false;f.wait=0});
-  const eggs=count(e.eggs,8),layers=yardHens().map(c=>c.a);
-  for(let i=0;layers.length&&i<eggs;i++){
-   const c=layers[i%layers.length],j=crew[i%crew.length].job,d=.04+i*.045+(i>=layers.length?.18:0);
-   tween(d,.42,(u,t)=>{const s=Math.sin(Math.min(1,t/.16)*Math.PI);c.sy*=1-.3*s;c.sx*=1+.2*s;if(t>.16)c.lift+=.28*Math.sin((t-.16)/.26*Math.PI)});
-   after(d+.14,()=>{const x=c.x,y=.5,z=c.z,T=Math.max(.2,.64-(d+.14)),g=9;flashAt(x,.6,z,.7,CREAM);
-    emit({cell:CELL.egg,x,y,z,vx:(j.px-x)/T,vy:(2.15-y)/T+.5*g*T,vz:(j.pz-z)/T,gravity:g,life:T,size:.3,end:.38,aspect:1.15,spin:5,color:WHITE,fade:.97,pop:.15})});
+ // The market (and so the counter spots and the coin burst) follows the world's market building.
+ const marketShift=()=>({x:market.a.x-WORLD.PLACE.market[0],z:market.a.z-WORLD.PLACE.market[1]});
+ const marketFront=()=>{const m=marketShift();return {x:MARKET_FRONT.x+m.x,z:MARKET_FRONT.z+m.z}};
+ const coopDoor=()=>{const s=home.a.s;return {x:home.a.x+(door.min.x+door.max.x)/2*s,z:home.a.z+door.max.z*s+.25}};
+ // 0.9 produce: hens lay `laid` eggs; the farmers carry the `sold` eggs to the market in baskets of four (as many farmers as needed);
+ // `left` eggs stay in the nests by the hall until the next sale. 0.8 sends only `eggs` (= sold, nothing left over).
+ function produceFx(e){             // hens lay -> eggs fly into baskets (and the nests) -> farmers run to the market -> coins
+  const crewOn=farmers.filter(f=>f.on);
+  const laid=count(e.laid??e.eggs,99),sold=count(e.sold??e.eggs,99),left=count(e.left??0,NEST_MAX);
+  const nest0=nestShown,fresh=Math.min(laid,sold),fromNest=Math.min(nest0,sold-fresh),kept=nest0-fromNest,toNest=Math.max(0,Math.min(laid-fresh,left-kept));
+  sale={t:0,nest0,kept,left};lastLeft=left;
+  const carriers=Math.min(crewOn.length,Math.ceil(sold/BASKET)),mk=marketShift(),jobs=[];
+  for(const f of crewOn)f.job=null;
+  for(let k=0;k<carriers;k++){const f=crewOn[k];
+   f.job={fx:f.a.x,fz:f.a.z,px:PICK[k][0],pz:PICK[k][1],mx:DROP[k][0]+mk.x,mz:DROP[k][1]+mk.z,lag:k*.03,eggs:clamp(sold-k*BASKET,1,BASKET)};f.wait=0;jobs.push(f.job)}
+  const layers=yardHens().map(c=>c.a),pops=Math.min(laid,MAXH),gap=Math.min(.045,.5/Math.max(1,pops)),dr=coopDoor(),toBasket=jobs.length?Math.min(fresh,jobs.length*BASKET):0;
+  const fly=(x,y,z,d,tx,ty,tz,arrive)=>{const T=Math.max(.18,arrive-d),g=9;emit({cell:CELL.egg,x,y,z,vx:(tx-x)/T,vy:(ty-y)/T+.5*g*T,vz:(tz-z)/T,gravity:g,life:T,size:.26,end:.3,aspect:1.15,spin:5,color:WHITE,fade:.97,pop:.15})};
+  for(let i=0;i<pops;i++){
+   const c=layers.length?layers[i%layers.length]:null,d=.04+i*gap+(layers.length&&i>=layers.length?.12:0);
+   if(c)tween(d,.42,(u,t)=>{const s=Math.sin(Math.min(1,t/.16)*Math.PI);c.sy*=1-.3*s;c.sx*=1+.2*s;if(t>.16)c.lift+=.28*Math.sin((t-.16)/.26*Math.PI)});
+   const j=i<toBasket?jobs[Math.floor(i/BASKET)%jobs.length]:null,ns=!j&&i>=fresh&&i-fresh<toNest?NEST_SPOTS[Math.min(NEST_MAX-1,kept+i-fresh)]:null;
+   after(d+.14,()=>{const x=c?c.x:dr.x,z=c?c.z:dr.z;flashAt(x,.6,z,.7,CREAM);
+    if(j)fly(x,.5,z,d+.14,j.px,BASKET_UP+.12,j.pz,.64);else if(ns)fly(x,.5,z,d+.14,ns[0],ns[1]+.12,ns[2],.56)});
+  }
+  for(let k=0;k<fromNest&&jobs.length;k++){   // yesterday's eggs leave the nests first
+   const s=NEST_SPOTS[Math.max(0,Math.min(NEST_MAX-1,nest0-1-k))],j=jobs[Math.floor((fresh+k)/BASKET)%jobs.length],d=.12+k*.025;
+   after(d,()=>fly(s[0],s[1]+.1,s[2],d,j.px,BASKET_UP+.12,j.pz,.64));
   }
   if((Number(e.fish)||0)>0)fishJump(.12);
-  after(.66,()=>crew.forEach(f=>sparkles(f.a.x,2.3,f.a.z,3,.3,CREAM,0,.15)));
-  after(1.55,()=>{const {x,z}=MARKET_FRONT;wobble(market.a,.1);market.a.flash=.1;flashAt(x,1.8,z,2.2,GOLD);ringWave(x,z,3.4,GOLD,.45);
-   const n=clamp(Math.round(3+(Number(e.gold)||0)/12),4,12);for(let i=0;i<n;i++){const a=i/n*6.283;coinPop(x,2,z,Math.cos(a)*1.3,span(4,5.2),Math.sin(a)*.8,i*.03,1)}
-   sparkles(x,2.4,z,6,1,GOLD,.15,.5);shake(.05)});
-  after(1.6,()=>crew.forEach((f,k)=>hop(f.a,.38,k*.05,.34)));
+  after(.66,()=>{for(const f of crewOn)if(f.job)sparkles(f.a.x,BASKET_UP+.35,f.a.z,3,.3,CREAM,0,.15)});
+  after(1.55,()=>{const {x,z}=marketFront(),H=Math.min(2,market.height*.75);wobble(market.a,.1);market.a.flash=.1;flashAt(x,H,z,2.2,GOLD);ringWave(x,z,3.4,GOLD,.45);
+   const n=clamp(Math.round(3+(Number(e.gold)||0)/12),4,12);for(let i=0;i<n;i++){const a=i/n*6.283;coinPop(x,H+.2,z,Math.cos(a)*1.3,span(4,5.2),Math.sin(a)*.8,i*.03,1)}
+   sparkles(x,H+.6,z,6,1,GOLD,.15,.5);shake(.05)});
+  after(1.6,()=>crewOn.forEach((f,k)=>hop(f.a,.38,(k%5)*.05,.34)));
  }
  function towerFire(t,big,fast=false,hot=false){   // recoil + a twang of light at the crossbow (orange once the towers shoot fire arrows)
   if(!t||!t.on||t.b&&t.b.broken)return;t.kick=1;
@@ -858,7 +956,7 @@ async function start(){
   for(const e of list){if(!e||typeof e!=='object')continue;
    const wolf=wolfVis.get(e.wolf);
    switch(e.type){
-    case 'produce':if(reduced())popUntil=time+1.4;else produceFx(e);break;
+    case 'produce':if(reduced()){popUntil=time+1.4;lastLeft=count(e.left??0,NEST_MAX)}else produceFx(e);break;
     case 'shoot':towerFire(towerById.get(e.tower),false,false,!!e.splash);break;
     case 'volley':for(const t of towers)towerFire(t,true,!!e.fast);shake(e.fast?.07:.05);break;   // the arrows themselves come from the pull (marked as a volley above)
     case 'hit':if(wolf){wolf.hit=.14;wolf.hitT=time;const [dx,dz]=hitFrom(wolf);knock(wolf,dx,dz,2.4);flashAt(wolf.x,.85*wolf.size,wolf.z,.8);
@@ -897,7 +995,8 @@ async function start(){
   if(opt&&num(opt.advance)>0)advance+=Math.min(10,num(opt.advance));
   if(opt&&Number.isFinite(opt.face))for(const o of wolfVis.values())o.ry=opt.face;   // turn every drawn monster (lineup shots)
   if(opt&&opt.trace){traceNext=true}   // record every draw of the next rendered frame (read it back with debug({})).trace
-  const out={focus:focusHalf?[FOCUS.x,FOCUS.z,focusHalf]:null,hold,advance,trace:traced,monsterTris:Object.fromEntries(KIND_ORDER.map(k=>[k,herd[k].tris])),shadowStandInTris:shade.tris};
+  const out={focus:focusHalf?[FOCUS.x,FOCUS.z,focusHalf]:null,hold,advance,trace:traced,monsterTris:Object.fromEntries(KIND_ORDER.map(k=>[k,herd[k].tris])),shadowStandInTris:shade.tris,bakeMs,
+   crowdTris:{tower:towerBody.map(m=>Math.round((m.geometry.index?m.geometry.index.count:m.geometry.attributes.position.count)/3)),hen:Math.round(G.hen.attributes.position.count/3),farmer:Math.round(crew.tris),storey:Math.round(G.storey.attributes.position.count/3),wall:Math.round(G.wall.attributes.position.count/3)}};
   if(opt&&opt.tris){const list=[];world.traverse(o=>{if(!o.isMesh||!o.visible)return;let p=o;while(p){if(!p.visible)return;p=p.parent}
     const g=o.geometry,per=(g.index?g.index.count:g.attributes.position.count)/3,n=o.isInstancedMesh?(o===shade.mesh?0:o.count):1;if(!n&&!o.castShadow)return;
     const sh=o.castShadow?(o.isInstancedMesh?(o===shade.mesh?o.count:o.count):1):0;list.push({name:o.name||g.type||'mesh',main:Math.round(per*n),shadow:Math.round(per*sh)})});
@@ -905,7 +1004,13 @@ async function start(){
    out.tris=Object.values(merged).sort((a,b)=>b.main+b.shadow-a.main-a.shadow)}
   return out;
  }
- window.VillageView={events,reward(){},build,upgrade:()=>build('tower'),debug,
+ // Where the market's coins burst, as fractions of the scene canvas (0..1 from the top left): the page starts its coin flight here.
+ const mv2=new V3();
+ function marketScreen(){
+  if(!market.on||!(viewW>1))return null;const {x,z}=marketFront();mv2.set(x,Math.min(2,market.height*.75)+.2,z).project(camera);
+  if(!Number.isFinite(mv2.x)||!Number.isFinite(mv2.y))return null;return {x:clamp((mv2.x+1)/2,0,1),y:clamp((1-mv2.y)/2,0,1)};
+ }
+ window.VillageView={events,reward(){},build,upgrade:()=>build('tower'),debug,marketScreen,
   inspect(){
    const states={},kinds={};let onScreenW=0,shownW=0,ghosts=0;
    for(const o of wolfVis.values()){if(o.ghost){ghosts++;continue}shownW++;states[o.state]=(states[o.state]||0)+1;kinds[o.kind]=(kinds[o.kind]||0)+1;ndc.set(o.x,.6,o.z).project(camera);if(Math.abs(ndc.x)<=1&&Math.abs(ndc.y)<=1)onScreenW++}
@@ -918,7 +1023,10 @@ async function start(){
     hensVisible:hensDrawn,hensHidden,hensPeeking:peeking,hensCarried:carriedDrawn,
     buildingsBroken:[...BUILDINGS,...sides].filter(sl=>sl.on&&sl.b&&sl.b.broken).length,
     towers:towers.filter(t=>t.on).length,fences:sides.filter(f=>f.on).length,fencePanels:fences.count,
-    hall:shown.hall,farmers:shown.farmers,pond:shown.pond,feast:shown.feast,farmerActors:farmers.filter(f=>f.a.obj.visible).length,
+    hall:shown.hall,farmers:shown.farmers,pond:shown.pond,feast:shown.feast,farmerActors:farmers.filter(f=>f.on).length,
+    towerFloors:towers.reduce((n,t)=>n+(t.on?t.floors:0),0),farmersVisible:farmersDrawn,farmersCarrying:farmers.filter(f=>f.on&&f.eggs>0).length,basketEggs:basketDrawn,nestEggs:nestShown,
+    fenceLayers:(()=>{const o={1:0,2:0,3:0};for(const sd of sides)if(sd.on)o[sd.layer]++;return o})(),wallSegments:walls.count,railSegments:rails.count,
+    marketTier:market.mtier,marketDown:market.on&&isBroken(market),hammers:hammersDrawn,propsStage,lanterns:lanterns(propsStage).length,
     pondVisible:pond.obj.visible,garlands:garlands.filter(g=>g.obj.visible).length,sale:!!sale||time<popUntil,
     decor:{forest:forest.count,grove:grove.count,bushes:shrubs.count,rocks:stones.count},
     drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,builds:{...builds},effects:particles.length+anims.length,warnings:warns.length,blend:{t:+blendT.toFixed(3),dur:+blendDur.toFixed(3),ticks:blendTicks},shake:shakeNow,
@@ -928,7 +1036,9 @@ async function start(){
  const raycaster=new THREE.Raycaster(),pointer=new THREE.Vector2(),probe=new V3();
  canvas.addEventListener('pointerup',e=>{try{
   const s=read();if(s.paused)return;const r=canvas.getBoundingClientRect();pointer.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);raycaster.setFromCamera(pointer,camera);
-  for(const t of towers)if(t.on&&raycaster.intersectObject(t.a.obj,true).length){wobble(t.a,.08);sparkles(t.a.x,TOWER_H*t.a.s,t.a.z,4,.5);dirty=true;return}
+  {let best=null,near=40;   // towers are instanced: pick by screen distance to the tower's middle
+   for(const t of towers){if(!t.on)continue;probe.set(t.a.x,towerTop(t)*.55,t.a.z).project(camera);const d=Math.hypot((probe.x-pointer.x)*r.width/2,(probe.y-pointer.y)*r.height/2);if(d<near){near=d;best=t}}
+   if(best){wobble(best.a,.08);sparkles(best.a.x,towerTop(best),best.a.z,4,.5);dirty=true;return}}
   if(reduced())return;
   let best=null,near=36;
   for(const c of yardHens()){probe.set(c.a.x,.4,c.a.z).project(camera);const d=Math.hypot((probe.x-pointer.x)*r.width/2,(probe.y-pointer.y)*r.height/2);if(d<near){near=d;best=c}}
@@ -954,14 +1064,14 @@ async function start(){
  const bw=new V3();
  function brazierWorld(t){   // the fire basket on a tower's crossbow, in world space (bow scale 1.25, swivels with the aim)
   const b=BRAZIER[Math.max(1,t.tier)],s=t.a.s,c=Math.cos(t.aim),sn=Math.sin(t.aim),off=bowAt[t.art],lx=b.x*1.25,lz=b.z*1.25;
-  return bw.set(t.a.x+(off.x+lx*c+lz*sn)*s,(off.y+b.y*1.25)*s,t.a.z+(off.z-lx*sn+lz*c)*s);
+  return bw.set(t.a.x+(off.x+lx*c+lz*sn)*s,(off.y+b.y*1.25+t.floors*STOREY_H)*s,t.a.z+(off.z-lx*sn+lz*c)*s);
  }
  function animateBuildings(dt,wdt,less){const fdt=dt;
-  for(const sl of BUILDINGS){if(!sl.on||!sl.b)continue;const a=sl.a,b=sl.b;
+  for(const sl of BUILDINGS){if(!sl.on||!sl.b)continue;const a=sl.a,b=sl.b,br=isBroken(sl);
    a.x=num(b.x);a.z=num(b.z);
-   const f=num(b.max)>0?clamp(num(b.hp)/num(b.max),0,1):1,tier=b.broken?3:f<=.34?2:f<=.67?1:0;sl.hp=f;
+   const f=br?0:num(b.max)>0?clamp(num(b.hp)/num(b.max),0,1):1,tier=br?3:f<=.34?2:f<=.67?1:0;sl.hp=f;sl.dmg=tier;
    a.base=damageMat(sl.tint,tier);
-   if(b.broken){const k=less?1:easeIn(clamp((time-sl.brokeAt)/.4,0,1));a.tilt+=sl.lean*.26*k;a.pitch+=.1*k;a.sy*=1-.38*k;a.lift-=.05*k}
+   if(br){const k=less?1:easeIn(clamp((time-sl.brokeAt)/.4,0,1));a.tilt+=sl.lean*.26*k;a.pitch+=.1*k;a.sy*=1-.38*k;a.lift-=.05*k}
    else a.tilt+=sl.lean*.06*(1-f);
    const n=smashOn.get(b.id)||0;sl.smash=n;
    if(n&&!less){const q=Math.min(3,n);a.tilt+=Math.sin(wclock*31+sl.lean)*.016*q;a.sx*=1+.012*q*Math.abs(Math.sin(wclock*31));
@@ -974,29 +1084,32 @@ async function start(){
     if(sl.kick>0)sl.kick=Math.max(0,sl.kick-dt*6);
     const off=bowAt[sl.art],back=less?0:.12*sl.kick,dizzy=stun&&!less;
     sl.bow.rotation.set(b.broken?.5:stun?.42+(dizzy?Math.sin(time*7)*.08:0):0,sl.aim+(dizzy?Math.sin(time*3.1)*.45:0),b.broken?.4:dizzy?Math.sin(time*5)*.12:0);sl.bow.position.set(off.x-Math.sin(sl.aim)*back,off.y,off.z-Math.cos(sl.aim)*back);
-    if(dizzy){a.tilt+=Math.sin(time*6+sl.slot)*.02;if(fdt>0&&(sl.smokeT-=fdt)<=0){sl.smokeT=.32;const H=TOWER_H*a.s;emit({cell:CELL.glow,x:a.x+span(-.3,.3),y:H*.9,z:a.z+span(-.3,.3),vy:span(.6,1),drag:1,life:span(.8,1.1),size:.45,end:1.1,color:ASH,alpha:.55,fade:.3,pop:.2})}}
+    if(dizzy){a.tilt+=Math.sin(time*6+sl.slot)*.02;if(fdt>0&&(sl.smokeT-=fdt)<=0){sl.smokeT=.32;const H=towerTop(sl);emit({cell:CELL.glow,x:a.x+span(-.3,.3),y:H*.9,z:a.z+span(-.3,.3),vy:span(.6,1),drag:1,life:span(.8,1.1),size:.45,end:1.1,color:ASH,alpha:.55,fade:.3,pop:.2})}}
     if(sl.tier>0&&!b.broken&&!less&&fdt>0&&(sl.emberT=(sl.emberT||0)-fdt)<=0){sl.emberT=sl.tier>=2?.22:.4;const p=brazierWorld(sl);
      emit({cell:CELL.dot,x:p.x+span(-.06,.06),y:p.y+.15,z:p.z+span(-.06,.06),vx:span(-.25,.25),vy:span(.8,1.4),vz:span(-.25,.25),gravity:-.2,drag:1,life:span(.5,.9),size:.07,end:.02,color:EMBER,add:.9,fade:.5,pop:0})}
    }
   }
  }
  const pm=new THREE.Matrix4(),pq=new THREE.Quaternion(),pe=new THREE.Euler(0,0,0,'YXZ'),pp=new V3(),ps=new V3();
+ // Each side is a row of segments along the ring: layer 1 panels, layer 2 panels + outer rails, layer 3 stone wall (same layout).
  function updateFences(less){
-  let n=0;const Rf=Rd-FENCE_IN,max=fences.instanceMatrix.count;
+  let n=0,nr=0,nw=0;const Rf=Rd-FENCE_IN,max=FCAP;
   for(const side of sides){if(!side.on||!side.b)continue;
-   const b=side.b,k=side.side,a0=k*Math.PI/3,arc=Rf*Math.PI/3,cnt=Math.max(3,Math.round(arc/FENCE_W)),step=Math.PI/3/cnt,sx=arc/cnt/FENCE_W*1.03;
+   const b=side.b,k=side.side,L=side.layer,a0=k*Math.PI/3,arc=Rf*Math.PI/3,cnt=Math.max(3,Math.round(arc/FENCE_W)),step=Math.PI/3/cnt,sx=arc/cnt/FENCE_W*1.03;
    const f=num(b.max)>0?clamp(num(b.hp)/num(b.max),0,1):1,tier=b.broken?3:f<=.34?2:f<=.67?1:0,fall=b.broken?(less?1:easeIn(clamp((time-side.brokeAt)/.4,0,1))):0;
-   const smash=!less&&smashOn.get(b.id)?Math.min(3,smashOn.get(b.id)):0;
-   for(let i=0;i<cnt&&n<max;i++){
+   const smash=!less&&smashOn.get(b.id)?Math.min(3,smashOn.get(b.id)):0,heavy=L>=3?.45:1;   // a stone wall barely shakes and tips over less
+   for(let i=0;i<cnt;i++){
     const a=a0+(i+.5)*step,j=hash(k*31+i);let r=Rf,y=0,rx=0,ry=-a-Math.PI/2,rz=0,sy=1;
     if(!less&&time-side.pop<1.5){const t=time-side.pop-.035*i;sy=t<0?.001:Math.max(.001,springy(t))}
-    if(fall>0){rx=(j>.5?1:-1)*1.42*fall;r+=(j-.5)*.9*fall;ry+=(j-.5)*.7*fall;y=.03*fall}
-    else{rx=(1-f)*(j-.5)*.5;rz=(1-f)*(hash(k*17+i)-.5)*.25;if(smash)rz+=Math.sin(wclock*33+i*1.7)*.035*smash}
+    if(fall>0){rx=(j>.5?1:-1)*1.42*fall*heavy;r+=(j-.5)*.9*fall;ry+=(j-.5)*.7*fall;y=.03*fall;if(L>=3)sy*=1-.45*fall}
+    else{rx=(1-f)*(j-.5)*.5*heavy;rz=(1-f)*(hash(k*17+i)-.5)*.25*heavy;if(smash)rz+=Math.sin(wclock*33+i*1.7)*.035*smash*heavy}
     pe.set(rx,ry,rz);pq.setFromEuler(pe);pm.compose(pp.set(Math.cos(a)*r,y,Math.sin(a)*r),pq,ps.set(sx,sy,1));
-    fences.setMatrixAt(n,pm);fences.setColorAt(n,FENCE_TINT[tier]);n++;
+    if(L>=3){if(nw<max){walls.setMatrixAt(nw,pm);walls.setColorAt(nw,FENCE_TINT[tier]);nw++}continue}
+    if(n<max){fences.setMatrixAt(n,pm);fences.setColorAt(n,FENCE_TINT[tier]);n++}
+    if(L===2&&nr<max){rails.setMatrixAt(nr,pm);rails.setColorAt(nr,FENCE_TINT[tier]);nr++}
    }
   }
-  fences.count=n;fences.instanceMatrix.needsUpdate=true;if(fences.instanceColor)fences.instanceColor.needsUpdate=true;
+  for(const [m,c] of [[fences,n],[rails,nr],[walls,nw]]){m.count=c;m.instanceMatrix.needsUpdate=true;if(m.instanceColor)m.instanceColor.needsUpdate=true}
   fenceShade.instanceMatrix.array.set(fences.instanceMatrix.array.subarray(0,n*16));fenceShade.count=n;fenceShade.instanceMatrix.needsUpdate=true;
  }
  /* ----- monsters: gaits, attacks, reactions and falls, written straight into the per-kind instanced meshes.
@@ -1170,9 +1283,49 @@ async function start(){
   let m=0;
   for(const a of [...henSlots.map(c=>c.a),...peeks]){if(a.hide)continue;a.obj.updateMatrix();henMesh.setMatrixAt(m,a.obj.matrix);henShade.setMatrixAt(m,a.obj.matrix);henMesh.setColorAt(m,a.flash>0?FLASH:a.shy?SHY:PLAIN);m++}
   henMesh.count=henShade.count=m;henMesh.instanceMatrix.needsUpdate=henShade.instanceMatrix.needsUpdate=true;if(henMesh.instanceColor)henMesh.instanceColor.needsUpdate=true;
-  // farmers and towers cast their shadows through low-poly stand-ins too
-  let f=0;for(const fm of farmers)if(fm.a.obj.visible)copyShade(farmerShade,f++,fm.a.obj);farmerShade.count=f;farmerShade.instanceMatrix.needsUpdate=true;
-  const tn=[0,0];for(const t of towers)if(t.on){const k=t.art;copyShade(towerShade[k],tn[k]++,t.a.obj)}towerShade.forEach((m,k)=>{m.count=tn[k];m.instanceMatrix.needsUpdate=true});
+  writeTowers();writeFarmers();
+ }
+ // Towers: stone storeys stacked from the ground, the wooden tower on top, its crossbow on the deck (all follow the proxy's pose).
+ const upM=new THREE.Matrix4(),tm=new THREE.Matrix4(),TOWER_TINT=DAMAGE.map(h=>new THREE.Color(h));
+ function writeTowers(){
+  const tn=[0,0];let ns=0,nb=0;
+  for(const t of towers){if(!t.on)continue;const a=t.a,k=t.art,c=a.flash>0?FLASH:TOWER_TINT[t.dmg|0];a.obj.updateMatrix();
+   for(let f=0;f<t.floors&&ns<MAXT*MAX_FLOORS;f++){tm.copy(a.obj.matrix).multiply(upM.makeTranslation(0,f*STOREY_H,0));storeys.setMatrixAt(ns,tm);storeys.setColorAt(ns,c);ns++}
+   tm.copy(a.obj.matrix).multiply(upM.makeTranslation(0,t.floors*STOREY_H,0));
+   towerBody[k].setMatrixAt(tn[k],tm);towerBody[k].setColorAt(tn[k],c);towerShade[k].setMatrixAt(tn[k],tm);tn[k]++;
+   t.bow.updateMatrix();tm.multiply(t.bow.matrix);bows.setMatrixAt(nb,tm);bows.setColorAt(nb,c);nb++;
+  }
+  towerBody.forEach((m,k)=>{m.count=towerShade[k].count=tn[k];m.instanceMatrix.needsUpdate=towerShade[k].instanceMatrix.needsUpdate=true;if(m.instanceColor)m.instanceColor.needsUpdate=true});
+  storeys.count=ns;bows.count=nb;for(const m of [storeys,bows]){m.instanceMatrix.needsUpdate=true;if(m.instanceColor)m.instanceColor.needsUpdate=true}
+ }
+ // Farmers: one rigged instance each (arms, legs, head nod from the pose attributes), basket eggs and nest eggs as egg instances.
+ let farmersDrawn=0,basketDrawn=0;const em=new THREE.Matrix4(),bm=new THREE.Matrix4(),eq=new THREE.Quaternion(),ev=new V3(),es=new V3(),hv2=new V3(),XAX=new V3(1,0,0);
+ const BASKET_UP=HEAD_TOP+.07;   // basket centre when carried on the head
+ function writeFarmers(){
+  let n=0,e=0;const [A,B,C,D]=crew.pose;
+  for(const f of farmers){if(!f.on)continue;const a=f.a;a.obj.updateMatrix();a.obj.matrix.toArray(crew.mesh.instanceMatrix.array,n*16);
+   const k=n*4;A.array[k]=0;A.array[k+1]=f.nod;A.array[k+2]=0;A.array[k+3]=0;B.array[k]=0;B.array[k+1]=f.limb[0];B.array[k+2]=f.limb[1];B.array[k+3]=f.limb[2];
+   C.array[k]=f.limb[3];C.array[k+1]=0;C.array[k+2]=0;C.array[k+3]=0;D.array[k]=D.array[k+1]=D.array[k+2]=D.array[k+3]=0;
+   crew.mesh.setColorAt(n,a.flash>0?FLASH:PLAIN);copyShade(farmerShade,n,a.obj);
+   // basket: hangs from the left hand (follows the arm swing) or rides on the head while it holds eggs
+   hv2.copy(handL).sub(shoulder).applyAxisAngle(XAX,f.limb[0]).add(shoulder);hv2.y-=.25;
+   ev.set(hv2.x*(1-f.up),hv2.y+(BASKET_UP-hv2.y)*f.up,hv2.z*(1-f.up)+.02*f.up);
+   bm.copy(a.obj.matrix).multiply(tm.compose(ev,eq.setFromAxisAngle(XAX,(1-f.up)*f.limb[0]*.5),es.setScalar(1+.25*f.up)));baskets.setMatrixAt(n,bm);
+   for(let i=0;i<f.eggs&&i<BASKET&&e<ECAP;i++){em.copy(bm).multiply(tm.compose(BASKET_EGGS[i],eq.identity(),es.set(.08,.08,.08)));eggMesh.setMatrixAt(e++,em)}
+   n++;
+  }
+  farmersDrawn=n;basketDrawn=e;crew.mesh.count=farmerShade.count=baskets.count=n;crew.mesh.visible=n>0;crew.mesh.instanceMatrix.needsUpdate=farmerShade.instanceMatrix.needsUpdate=baskets.instanceMatrix.needsUpdate=true;
+  for(const p of crew.pose)p.needsUpdate=true;if(crew.mesh.instanceColor)crew.mesh.instanceColor.needsUpdate=true;
+  // left-over eggs wait in the nests by the hall (each new one pops in)
+  const less=reduced();
+  for(let i=0;i<nestShown&&e<ECAP;i++){const s=NEST_SPOTS[i],p=less?1:Math.max(.001,springy(clamp(time-nestPop[i],0,2)));eggMesh.setMatrixAt(e++,em.compose(ev.set(s[0],s[1],s[2]),eq.setFromAxisAngle(es.set(0,0,1),(i%3-1)*.25),es.set(.095*p,.095*p,.095*p)))}
+  eggMesh.count=e;eggMesh.instanceMatrix.needsUpdate=true;
+ }
+ // How many eggs the nests show: scripted during a sale, otherwise the page's `nest` (0.9) or the last sale's left-over.
+ function updateNest(s){
+  const st=Number(s&&s.nest),want=sale?(sale.t<.12?sale.nest0:sale.t<.58?sale.kept:sale.left):Number.isFinite(st)?st:lastLeft,n=clamp(Math.floor(want)||0,0,NEST_MAX);
+  if(n>nestShown)for(let i=nestShown;i<n;i++)nestPop[i]=time+(i-nestShown)*.04;
+  nestShown=n;
  }
  let arrowsDrawn=0,fireDrawn=0;
  const aq=new THREE.Quaternion(),Zf=new V3(0,0,1),tan=new V3(),ap=new V3(),as=new V3(),WARM=new THREE.Color(1.25,.82,.55);
@@ -1204,32 +1357,33 @@ async function start(){
  }
 
  /* ----- daily life (farmers keep their own clock: they are decor, not part of the world simulation) ----- */
- const WALK_A=new V3(-1.5,0,-1.15),WALK_B=new V3(3.4,0,.25);
- function farmerIdle(f,dt){        // strolls the coop-market path, carrying an egg on the way to the market
+ function farmerIdle(f,dt){        // strolls the coop-market path with an empty basket (eggs only ever come from a right answer)
   const a=f.a;if(f.wait>0){f.wait-=dt;return false}
   const dx=f.tx-a.x,dz=f.tz-a.z,d=Math.hypot(dx,dz);
-  if(d<.05){const [u0,u1]=f.range,u=span(u0,u1),side=f.off+span(-.25,.25);f.wait=span(.8,2.2);f.tx=WALK_A.x+(WALK_B.x-WALK_A.x)*u-.2*side;f.tz=WALK_A.z+(WALK_B.z-WALK_A.z)*u+side;f.carry=f.tx>a.x+.5;return false}
+  if(d<.05){const [ax,az,bx,bz,w]=ZONE[FARM_ZONE[f.k]]||ZONE.road,[u0,u1]=f.range,u=span(u0,u1),side=clamp(f.off+span(-.3,.3),-1,1)*w,L=Math.hypot(bx-ax,bz-az)||1;
+   f.wait=span(.8,2.4);f.tx=ax+(bx-ax)*u-(bz-az)/L*side;f.tz=az+(bz-az)*u+(bx-ax)/L*side;return false}
   const step=Math.min(d,.95*dt);a.x+=dx/d*step;a.z+=dz/d*step;turnTo(a,Math.atan2(dx,dz),dt*7);return true;
  }
  function farmersLife(dt,less){
   if(sale&&!less){sale.t+=dt;if(sale.t>=SALE_END)sale=null}
-  for(const f of farmers){const a=f.a;if(!a.obj.visible)continue;let moving=false,run=false;
+  for(const f of farmers){const a=f.a;if(!f.on)continue;let moving=false,run=false,up=0;f.eggs=0;f.nod=0;
    if(f.job&&sale&&!less){
     const j=f.job,t=Math.max(0,sale.t-j.lag);let x,z,face=null;
     if(t<.5){const u=easeInOut(t/.5);x=j.fx+(j.px-j.fx)*u;z=j.fz+(j.pz-j.fz)*u;run=moving=Math.hypot(j.px-j.fx,j.pz-j.fz)>.05}
-    else if(t<.66){x=j.px;z=j.pz;a.pitch+=.35*Math.sin((t-.5)/.16*Math.PI)}                   // scoops the eggs into the basket
-    else if(t<1.5){const u=easeInOut((t-.66)/.84);x=j.px+(j.mx-j.px)*u;z=j.pz+(j.mz-j.pz)*u;run=moving=true;f.carry=true}
-    else{x=j.mx;z=j.mz;f.carry=t<1.58;face=Math.atan2(market.a.x-x,market.a.z-z)}
+    else if(t<.66){x=j.px;z=j.pz;const k=Math.sin((t-.5)/.16*Math.PI);a.pitch+=.35*k;f.nod=.4*k}   // scoops the eggs into the basket
+    else if(t<1.5){const u=easeInOut((t-.66)/.84);x=j.px+(j.mx-j.px)*u;z=j.pz+(j.mz-j.pz)*u;run=moving=true}
+    else{x=j.mx;z=j.mz;face=Math.atan2(market.a.x-x,market.a.z-z)}
+    if(t>=.6&&sale.t<1.55){f.eggs=j.eggs;up=1}   // a full basket on the head until the coins burst at the market
     const dx=x-a.x,dz=z-a.z;if(Math.hypot(dx,dz)>.004)turnTo(a,Math.atan2(dx,dz),dt*14);else if(face!==null)turnTo(a,face,dt*8);
     a.x=x;a.z=z;
    }else{
-    if(f.job){f.job=null;f.carry=false;f.tx=a.x;f.tz=a.z;f.wait=span(.4,1)}
+    if(f.job){f.job=null;f.tx=a.x;f.tz=a.z;f.wait=span(.4,1)}
     if(!less&&dt>0)moving=farmerIdle(f,dt);
    }
-   const pace=run?14:7;
-   f.limbs.forEach((limb,i)=>{limb.rotation.x=moving&&!less?Math.sin(time*pace+f.k+(i===1||i===2?Math.PI:0))*(run?.7:.42):0});
+   f.up=less?up:f.up+(up-f.up)*Math.min(1,dt*12);   // the basket swings up onto the head and back down to the hand
+   const pace=run?14:7,sw=i=>moving&&!less?Math.sin(time*pace+f.k+(i===1||i===2?Math.PI:0))*(run?.7:.42):0,hold=ARM_UP+(less?0:Math.sin(time*pace+f.k)*.06);
+   f.limb[0]=sw(0)*.55+(hold-sw(0)*.55)*f.up;f.limb[1]=sw(1)+(hold-sw(1))*f.up;f.limb[2]=sw(2);f.limb[3]=sw(3);   // the basket arm swings less; both arms up under a full basket
    if(moving&&!less)a.lift+=Math.abs(Math.sin(time*pace+f.k))*(run?.08:.045);
-   f.egg.visible=f.carry;f.egg.position.y=2.28+(less?0:Math.sin(time*3+f.k)*.04);
   }
  }
 
@@ -1242,9 +1396,13 @@ async function start(){
   if(home.on&&home.b&&!home.b.broken&&!less)for(let i=0;i<3;i++){const cycle=(t*.22+i/3)%1;sprite(CELL.glow,home.a.x-.55+Math.sin(t+i)*.13,2.75*home.a.s+cycle*1.3,home.a.z-.3,.45+cycle*.7,.45+cycle*.7,WHITE,(1-cycle)*.5)}
   for(const tw of towers)if(tw.on){decal(CELL.dot,tw.a.x,tw.a.z,1.9,STONE,.92,0,.03);decal(CELL.halo,tw.a.x,tw.a.z,1.9,PADRIM,.6,0,.032)}
   if(barn.on)decal(CELL.dot,barn.a.x,barn.a.z+.2,3.6,SAND,.85,0,.02);
+  hammersDrawn=0;
   for(const sl of BUILDINGS){if(!sl.on||!sl.b)continue;const a=sl.a,H=sl.height*a.s;
-   if(sl.b.broken){decal(CELL.glow,a.x,a.z,sl.size*3.2,INK,.38,0,.05);
-    if(!less)for(let i=0;i<3;i++){const cyc=(t*.35+i/3+sl.lean*.17)%1;sprite(CELL.glow,a.x+Math.sin(t*.7+i*2)*.3,H*.45+cyc*2.4,a.z,.7+cyc*1.3,.7+cyc*1.3,SOOT,(1-cyc)*.55)}}
+   if(isBroken(sl)){decal(CELL.glow,a.x,a.z,sl.size*3.2,INK,.38,0,.05);
+    if(!less)for(let i=0;i<3;i++){const cyc=(t*.35+i/3+sl.lean*.17)%1;sprite(CELL.glow,a.x+Math.sin(t*.7+i*2)*.3,H*.45+cyc*2.4,a.z,.7+cyc*1.3,.7+cyc*1.3,SOOT,(1-cyc)*.55)}
+    // 🔨 repair hint: a hammer bubble blinks over every broken real building (fences mend themselves)
+    const blink=less?1:.5+.5*Math.max(0,Math.sin(time*5.5+sl.lean)),b=(sl.kind==='tower'?1.5:1.8)*Math.max(1,fxScale*.8),bob=less?0:.12*Math.abs(Math.sin(time*3+a.x)),y=H*.55+.45+b*.45+bob;
+    sprite(CELL.glow,a.x,y,a.z,b*1.6,b*1.6,GOLD,.4*blink,1);sprite(CELL.hammer,a.x,y,a.z,b,b,WHITE,.35+.65*blink);hammersDrawn++}
    else if(sl.hp<.999){bar(a.x,H+.45,a.z,sl.hp,1.1,hpColor(sl.hp));
     const cracks=sl.hp<=.34?3:sl.hp<=.67?2:sl.hp<.9?1:0,r=sl.size*.85;
     for(let i=0;i<cracks;i++){const off=(i-(cracks-1)/2)*r*.7,y=H*(.28+.17*((i*7)%3));sprite(CELL.impact,a.x-fwdXZ.x*r+camRight.x*off,y,a.z-fwdXZ.z*r+camRight.z*off,.55,.55,CRACK,.8,0,i*1.3)}}
@@ -1266,7 +1424,7 @@ async function start(){
     decal(CELL.halo,o.x,o.z,2.3*s*(1+.15*p),GOLD,.95*k,.6);decal(CELL.glow,o.x,o.z,2.6*s,GOLD,.35*k,.8);
     topOf(o,tv);const b=.75*Math.max(1,fxScale*.85);sprite(CELL.bang,tv.x,tv.y+.35+(less?0:.12*Math.abs(Math.sin(time*6))),tv.z,b,b,WHITE,k)}
   }
-  for(const tw of towers)if(tw.on&&tw.stunned){const H=TOWER_H*tw.a.s+.5,f=Math.max(1,fxScale*.8);   // stunned by the roar: stars and a swirl circle the top
+  for(const tw of towers)if(tw.on&&tw.stunned){const H=towerTop(tw)+.5,f=Math.max(1,fxScale*.8);   // stunned by the roar: stars and a swirl circle the top
    sprite(CELL.swirl,tw.a.x,H+.1,tw.a.z,.95*f,.75*f,WHITE,.75,.2,less?0:-time*5);
    for(let i=0;i<3;i++){const a=(less?0:time*4.2)+i*2.094;sprite(CELL.star,tw.a.x+Math.cos(a)*.55,H+.12+Math.sin(a)*.18,tw.a.z+Math.sin(a)*.35,.42*f,.42*f,GOLD,.95,.3,a)}}
   if(powerShown>=1)for(const tw of towers)if(tw.on&&tw.b&&!tw.b.broken){const p=brazierWorld(tw),big=powerShown>=2?1.35:1,fl=less?1:.85+.12*Math.sin(time*17+tw.slot)+.08*Math.sin(time*31+tw.slot*2),f=Math.max(1,fxScale*.7);   // brazier fire on the crossbow
@@ -1276,19 +1434,22 @@ async function start(){
    sprite(CELL.halo,p.x,.6,p.z,s*(1+.25*pulse),s*(1+.25*pulse),wn.color,k*pulse,.6);sprite(CELL.glow,p.x,.6,p.z,s*1.3,s*1.3,wn.color,k*.5,.9)}
   if(pond.obj.visible&&!less)for(let j=0;j<2;j++){const cyc=(t*.3+j*.5)%1;decal(CELL.halo,POND.x+.12-j*.3,POND.z-.08+j*.2,pond.s*(.7+cyc*1.3),WHITE,(1-cyc)*.22,.2,.06)}
   for(const a of peeks)if(!a.hide){const cyc=(wclock*.8+a.x)%1;sprite(CELL.dot,a.x+camRight.x*.22,.78-cyc*.2,a.z+camRight.z*.22,.08,.12,SKY,less?.9:1-cyc*.8)}
-  if(time<popUntil){const {x,z}=MARKET_FRONT;sprite(CELL.glow,x,2.1,z,1.7,1.7,GOLD,.5,1);for(let i=0;i<3;i++)sprite(CELL.coin,x+camRight.x*(i-1)*.5,2.1+(i%2)*.28,z+camRight.z*(i-1)*.5,.5,.5,WHITE)}
+  if(time<popUntil){const {x,z}=marketFront();sprite(CELL.glow,x,2.1,z,1.7,1.7,GOLD,.5,1);for(let i=0;i<3;i++)sprite(CELL.coin,x+camRight.x*(i-1)*.5,2.1+(i%2)*.28,z+camRight.z*(i-1)*.5,.5,.5,WHITE)}
+  for(const [x,z] of lanterns(propsStage)){const fl=less?1:.85+.15*Math.sin(time*6+x*3);sprite(CELL.glow,x+.24,1.46,z,1.1*fl,1.1*fl,EMBER,.55,1);decal(CELL.glow,x+.2,z,1.6,EMBER,.22*fl,.8,.04)}   // lanterns glow warm
  }
+ let hammersDrawn=0;
 
  /* ----- frame loop: 30fps cap, dt-driven, frozen while paused or hidden; the world clock only runs in listen/ask/learn ----- */
  // names only label the debug({tris}) breakdown
  Object.entries({meadow:land,yard,decor,forest,grove,shrubs,stones,fences,hens:henMesh,arrows:arrowMesh,fxFlat:flatPool.mesh,fxAir:airPool.mesh,shadowStandIn:shade.mesh,'garden-bush':garden[0],'garden-rock':garden[1],hay:hay.obj,pond:pond.obj,
-  'shade-fence':fenceShade,'shade-hen':henShade,'shade-farmer':farmerShade,'shade-tower-a':towerShade[0],'shade-tower-b':towerShade[1],'shade-bush':garden[2]})
+  'shade-fence':fenceShade,'shade-hen':henShade,'shade-farmer':farmerShade,'shade-tower-a':towerShade[0],'shade-tower-b':towerShade[1],'shade-bush':garden[2],
+  'tower-a':towerBody[0],'tower-b':towerBody[1],'tower-storey':storeys,crossbow:bows,'fence-rails':rails,'fence-wall':walls,props,farmer:crew.mesh,baskets,eggs:eggMesh})
   .forEach(([n,m])=>{m.name=n});
- for(const k of KIND_ORDER)herd[k].mesh.name='monster-'+k;for(const sl of BUILDINGS)sl.a.obj.name=sl.kind;for(const t of towers)t.bow.name='crossbow';
- for(const f of farmers)f.a.obj.traverse(o=>{o.name='farmer'});garlands.forEach(g=>{g.obj.name='garland'});
- let last=0,wasLess=reduced();
+ for(const k of KIND_ORDER)herd[k].mesh.name='monster-'+k;for(const sl of BUILDINGS)sl.a.obj.name=sl.kind;
+ garlands.forEach(g=>{g.obj.name='garland'});
+ let last=0,wasLess=reduced(),curS=IDLE;
  const SUN_COLOR=sun.color.clone(),RED_LIGHT=new THREE.Color(0xff4a2a);
- {const s=read();syncEconomy(s,true);syncPower(s,false);syncRecords(s);Rd=Rgoal;resize();const less=reduced();
+ {const s=read();curS=s;syncEconomy(s,true);syncPower(s,false);syncRecords(s);updateNest(s);Rd=Rgoal;resize();const less=reduced();
   animateBuildings(0,0,less);updateFences(less);animateWolves(0,0,less);animateHens(0,0,less);animateArrows(less);for(const a of actors)pose(a,0);writeHens()}
  host.classList.add('is3d');host.dataset.renderer='three';
  // One step of the view: dt-driven; `still` freezes everything (paused, hidden tab), the world clock only runs in listen/ask/learn.
@@ -1303,19 +1464,19 @@ async function start(){
    // the light dims while wolves are inside the village, and flushes red when the ember king arrives or roars
    sunDim+=((insideWolves>0?1:0)-sunDim)*(less?1:Math.min(1,fdt*2));sun.intensity=2.8-.7*sunDim;
    redPulse=Math.max(0,redPulse-fdt*.8);sun.color.copy(SUN_COLOR).lerp(RED_LIGHT,redPulse*.6);
-   RIG_TIME.value=time;
+   RIG_TIME.value=time;updateNest(curS);
    for(const a of actors)pose(a,fdt);writeHens();dirty=false;
   }
  }
  function frame(now){
   if(last&&now-last<1000/30)return;
   const dt=Math.min(.05,last?(now-last)/1000:0);last=now;frames++;
-  const s=read(),still=!!s.paused||document.hidden,less=reduced(),running=!still&&RUNNING.has(s.phase);
+  const s=read(),still=!!s.paused||document.hidden,less=reduced(),running=!still&&(typeof s.running==='boolean'?s.running:RUNNING.has(s.phase));   // 0.9: index.html tells whether the world clock runs (it keeps running during the reward/sale beat)
   host.classList.toggle('village-paused',still);host.dataset.phase=s.phase||'';
   if(less&&!wasLess){clearEffects();dirty=true}wasLess=less;
   if(syncEconomy(s))dirty=true;
   if(syncPower(s,false))dirty=true;
-  syncRecords(s);
+  syncRecords(s);curS=s;{const nb=nestShown;updateNest(s);if(nestShown!==nb)dirty=true}
   if(hold){let n=0;while(advance>1e-6&&n<300){const h=Math.min(1/30,advance);advance-=h;n++;step(h,still,less,running)}if(!n&&dirty)step(0,true,less,false)}   // test-only frozen view
   else step(dt,still,less,running);
   flatPool.begin();airPool.begin();animateArrows(less);ambient(less);drawParticles();flatPool.end();airPool.end();
