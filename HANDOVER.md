@@ -173,8 +173,19 @@ Playwright 시스템 의존성 설치는 WSL/Ubuntu 환경에 맞춰 수행하�
 - [0.7 CI](https://github.com/freejcj87-gif/hangul-defense/actions/runs/43148414220): 문제은행 3,016 + 규칙/모의 DOM 1,540 + 브라우저 1,541개 검사 통과. 로컬(Windows)에서는 구간별로 실행해 모두 통과(화면 매트릭스·실제 시계, 손맛·그림 화면 152).
 - [Pages 배포](https://github.com/freejcj87-gif/hangul-defense/actions/runs/43149257558): `08e8ec7` 배포, 실제 URL 검사 통과(world.js 포함). 실제 URL을 Chromium(390px)으로 열어 3D 장면, 숲길에서 다가오는 늑대, 정답 → 일제 사격 → 알 판매 → 카드 3장, 페이지 오류 0건을 직접 확인.
 - 3D 관측(SwiftShader): 회관 0단계 드로우콜 22~25, 회관 3단계·늑대 49마리 52~53(약 41만 삼각형). 실기기 성능은 재지 않았습니다.
-- 스크린샷: 통합 화면 `workerification-20261112\integrated-0.7\`, 3D 연출 점검 70장 `workerification-2026111207-village\`.
+- 스크린샷: 통합 화면 `work\verification-20261112\integrated-0.7\`, 3D 연출 점검 70장 `work\verification-20261112\v07-village\`.
 - 확인하지 못한 것: 실기기 성능·발열, 실제 한국어 음성, 효과음 체감, 건물 부서짐 빈도의 체감, 아이 읽기 속도 가정.
+
+### 0.8 (2026-11-12)
+
+- [PR #9](https://github.com/freejcj87-gif/hangul-defense/pull/9) main 병합 완료. 병합 커밋 `4700136664365444aa39a89aef4b17e83bec82f9`, 브랜치 끝 `64b9c59`.
+- [0.8 CI](https://github.com/freejcj87-gif/hangul-defense/actions/runs/43223387570): 문제은행 6,846 + 규칙/모의 DOM 2,228 + 브라우저 검사 통과(8분 4초). 로컬(Windows) 전체 `node test.cjs` PASS 1,702(Chromium·WebKit, 320~1366px, 실제 시계, 그림 화면, 체험 주소, 흐름 가장자리).
+- [Pages 배포](https://github.com/freejcj87-gif/hangul-defense/actions/runs/43226637799): `4700136` 배포(빌드·배포 성공). 실제 URL에서 index(0.8, 체험 주소), world.js(몬스터·`intervalFor`·`MERCY_CAP`), combat.js(`isFast`·`POWER_NOTE`), questions.js(섞인 문제), village.js(677KB 번들), GLB 응답 확인. 실제 URL `?demo=3`을 Chromium(390px, SwiftShader)으로 열어 3D 장면, 몬스터 6종 등장, 늑대 43마리, 그리기 호출 59회, 페이지 오류 0 확인(`work\verification-20261112\v08-live\live-demo3-390.png`).
+- 3D 관측(SwiftShader): 회관 3단계·타워 6·강화 3·늑대 90마리 그리기 호출 56회·삼각형 약 42만(본 패스). 실기기 성능은 재지 않았습니다.
+- 스크린샷: 몬스터·모션·폭발 `work\verification-20261112\v08-monsters\`, 화면 점검 `work\verification-20261112\v08-ui\`.
+- 배포 뒤 발견: 위쪽 상태 줄의 🐺 늑대 수가 문제를 바꾸거나 살 때만 갱신되어 늑대가 오가는 동안 멈춰 보임(0.7부터). 0.9에서 틱마다 갱신하도록 고칩니다.
+- 확인하지 못한 것: 실기기 성능·발열(늑대 90마리), 실제 한국어 음성(섞인 문제 질문 읽기 포함), 효과음 체감, 아이 읽기 속도 가정, 상식·수학·영어 문항의 아동·교사 검수.
+- 다음: 프로듀서 5대 방향을 반영한 0.9(마스터 기획서 [docs/game-plan.md](docs/game-plan.md))를 브랜치 `claude/shop-economy`(규칙·화면)와 `claude/shop-3d`(3D)에서 작업 중.
 
 ## 자동 배포와 협업
 
