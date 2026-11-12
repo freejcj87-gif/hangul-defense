@@ -7,7 +7,7 @@ on:
       - combat.js
       - world.js
       - questions.js
-      - src/village.js
+      - src/**
       - art-handoff/coopnight/source-3d/models/environment-pack.glb
       - art-handoff/coopnight/browser/**
       - scripts/build-pages.cjs
