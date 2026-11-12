@@ -13,7 +13,7 @@ const FAKE_TTS=()=>{const S={speak(u){setTimeout(()=>{u.onstart&&u.onstart();u.o
  const output=path.join(__dirname,'.pages-build'),shots=path.join(__dirname,'test-results');
  const server=http.createServer((req,res)=>{
  const pathname=new URL(req.url,'http://localhost').pathname;
- const file=pathname==='/'?'index.html':['/combat.js','/questions.js','/village.js'].includes(pathname)?pathname.slice(1):pathname==='/art-handoff/coopnight/source-3d/models/environment-pack.glb'?pathname.slice(1):/^\/art-handoff\/coopnight\/browser\/[a-z/-]+[0-9a-z-]*\.png$/.test(pathname)?pathname.slice(1):null;
+ const file=pathname==='/'?'index.html':['/combat.js','/world.js','/questions.js','/village.js'].includes(pathname)?pathname.slice(1):pathname==='/art-handoff/coopnight/source-3d/models/environment-pack.glb'?pathname.slice(1):/^\/art-handoff\/coopnight\/browser\/[a-z/-]+[0-9a-z-]*\.png$/.test(pathname)?pathname.slice(1):null;
  if(!file||!fs.existsSync(path.join(output,file))){res.writeHead(404);return res.end()}
  res.setHeader('Content-Type',file.endsWith('.glb')?'model/gltf-binary':file.endsWith('.png')?'image/png':file.endsWith('.js')?'text/javascript; charset=utf-8':'text/html; charset=utf-8');
  res.end(fs.readFileSync(path.join(output,file)));
@@ -78,10 +78,11 @@ const FAKE_TTS=()=>{const S={speak(u){setTimeout(()=>{u.onstart&&u.onstart();u.o
  await begin(page,{age:8,mode:'sound'},touch);ok(await page.locator('#start').isHidden(),'start screen closes');
  eq(await gold(page),'🪙 20','initial gold');ok(await noOverflow(page),'no horizontal overflow');ok(await pillsFit(page),'status pills do not overlap');
  await expectQuestion(page,8,'sound',0,tag+' default');
- let g=await game(page);eq(g.round.T,Combat.limit(Questions.get(8,'sound',0),Combat.fresh(8)),'time limit from rules');
+ let g=await game(page);ok(g.world.interval>=200&&g.world.radius===7,'wave rhythm and starting village radius');
  ok(!(await page.locator('#speak').isHidden()),'sound mode: replay button');
  await tick(page,20);g=await game(page);eq(g.round.t,20,'held clock advances only by explicit ticks');
- const bar=await page.locator('#timeFill').evaluate(n=>n.style.width);eq(bar,(Math.round((1-20/g.round.T)*1000)/10)+'%','time bar shrinks with the clock');
+ const bar=await page.locator('#timeFill').evaluate(n=>n.style.width),left=Math.max(0,Math.min(1,(g.world.wave.arrive-g.world.t)/g.world.interval));eq(bar,(Math.round(left*1000)/10)+'%','time bar = time until the next wolf pack');
+ ok((await page.locator('#timeTag').textContent()).startsWith('다음 무리'),'time bar label counts down to the next pack');
  if(touch){const v=await stickyView(page,'answers');ok(together(v,true),tag+' time bar, scene, question and answers on one screen: '+JSON.stringify(v))}
  if(name==='chromium'&&(FULL_SHOTS||width===390||height===568))await shot(page,'ask-'+width+'x'+height);
 
@@ -112,7 +113,7 @@ const FAKE_TTS=()=>{const S={speak(u){setTimeout(()=>{u.onstart&&u.onstart();u.o
  eq((await game(page)).phase,'pick','first-try correct opens the cards');eq(await gold(page),'🪙 '+(20+expGold),'gold from eggs (+⚡)');
  ok((await fxLog(page)).some(x=>x.c==='sale'&&x.t.includes('🧑‍🌾')),'egg → farmer → market strip');
  ok(await page.locator('#answers button.correct.yay').count()===1,'the answered button celebrates');ok(await page.locator('#answers').isVisible(),'answers stay for the celebration');
- const frozen=(await game(page)).round.t;await tick(page,60);eq((await game(page)).round.t,frozen,'clock frozen while choosing');
+ const frozen=(await game(page)).world.t;await tick(page,60);eq((await game(page)).world.t,frozen,'wolf world frozen while choosing');
  eq(await page.locator('#cards .choice').count(),3,'three cards');ok(await page.locator('#answers').isHidden(),'cards replace the answers');
  ok(await page.locator('#cards .choice .icon img').evaluateAll(a=>a.length>=2&&a.every(i=>i.complete&&i.naturalWidth>0)),'card art loads');
  eq(await page.locator('#cards .choice').evaluateAll(a=>a.map(b=>b.dataset.kind)),Combat.offers((await game(page)).state),'cards = rules');
@@ -123,10 +124,10 @@ const FAKE_TTS=()=>{const S={speak(u){setTimeout(()=>{u.onstart&&u.onstart();u.o
  const kind=width===1366?'chicken':width===390?'tower':'hall';
  const card=page.locator('#cards .choice[data-kind="'+kind+'"]');if(touch)await card.tap();else await card.click();
  eq((await game(page)).phase,'build','buying starts the build');
- const label=(await fxLog(page)).filter(x=>x.c==='fx-label');eq(label.map(x=>x.t),[{chicken:'🐔 꼬꼬 2마리!',tower:'🗼 타워 1층!',hall:'🏠 마을회관 1단계!'}[kind]],'name tag (reduced motion: label only)');
+ const label=(await fxLog(page)).filter(x=>x.c==='fx-label');eq(label.map(x=>x.t),[{chicken:'🐔 꼬꼬 2마리!',tower:'🏹 화살 타워 2개!',hall:'🏠 마을회관 1단계!'}[kind]],'name tag (reduced motion: label only)');
  const vs=await page.evaluate(()=>getVillageState());eq([vs.chickens,vs.level,vs.fence],{chicken:[2,0,0],tower:[1,1,0],hall:[1,0,0]}[kind],'village state after buying');
  await tick(page,12);await phaseIs(page,'ask');ok(true,'next question right after building');await expectQuestion(page,8,'sound',1,'next question');
- if(three&&!INTERIM){const i=await page.evaluate(()=>window.VillageView.inspect());eq([i.chickens,i.towerLevel,i.fences],[vs.chickens,vs.level,vs.fence],'3D village shows the purchase')}
+ if(three&&!INTERIM){await frames(page,2);const i=await page.evaluate(()=>window.VillageView.inspect());eq([i.chickens,i.towers,i.fences],[vs.chickens,1+vs.level,vs.fence],'3D village shows the purchase')}
 
  /* 오답 → 늑대 성큼 → 두 번째 정답(막기만, 금화·카드 없음) → 초록 답을 눌러 다음 */
  const before=await gold(page);g=await game(page);
@@ -134,38 +135,53 @@ const FAKE_TTS=()=>{const S={speak(u){setTimeout(()=>{u.onstart&&u.onstart();u.o
  await tick(page,Combat.DASH_TICKS);await answer(page,true,touch);g=await game(page);eq([g.phase,g.round.result],['learn','second'],'second try only stops the wolves');eq(await gold(page),before,'no gold on the second try');
  await quiet(page);await tick(page,12);ok(await page.locator('#answers button.tap-me').count()===1,tag+' the right answer glows after it is read: '+JSON.stringify(await game(page)));
  await page.locator('#answers button.tap-me').click();await phaseIs(page,'ask');await expectQuestion(page,8,'sound',2,'continue after learning');
- /* 시간 초과 → 늑대가 마을에 와서 닭이 숨음 */
- g=await game(page);const raid=Combat.raid(g.state);await tick(page,g.round.T);g=await game(page);eq([g.phase,g.round.result,g.state.hidden],['learn','miss',raid.scared],'time out: wolves reach the village (scared '+raid.scared+', tower shot '+raid.shot+')');
- if(raid.scared){ok((await page.locator('#flockPill').textContent()).includes('🙈'+raid.scared),'hidden hen shown');ok((await page.locator('#feedback').textContent()).includes('숨었'),'raid explained')}
- else ok((await page.locator('#feedback').textContent()).includes('타워'),'tower defence explained');
- if(name==='chromium'&&width===390)await shot(page,'miss-390');
- await quiet(page);await tick(page,12);await page.locator('#answers button.tap-me').click();await phaseIs(page,'ask');
+ /* 늑대가 닭을 물어 가고 건물이 부서지면: 닭 수가 줄고, 다음 정답 때 고치기 카드 */
+ g=await game(page);const hensBefore=g.state.chickens;
+ await page.evaluate(()=>{const hen=world.hens[0];for(const b of world.buildings)if(b.kind==='tower')b.broken=true;hen.state='carried';world.wolves.push({id:9999,x:0,z:-16.9,sx:0,sz:-17,hp:20,max:20,speed:.8,state:'carry',target:0,timer:0,inside:0,hen:hen.id})});
+ await tick(page,3);g=await game(page);eq(g.state.chickens,hensBefore-1,'a carried-off hen is lost');ok((await page.locator('#villageStatus').textContent()).includes('물어 갔어요'),'loss explained');
+ if(name==='chromium'&&width===390)await shot(page,'raid-390');
+ await page.evaluate(()=>{state.gold=500});await answer(page,true,touch);await tick(page,7);ok(await page.locator('#cards .choice[data-kind="repair"]').count()===1,'repair card when something is broken');
+ const rp=page.locator('#cards .choice[data-kind="repair"]');if(touch)await rp.tap();else await rp.click();eq((await game(page)).world.broken,0,'repair fixes every broken building');
+ await tick(page,12);await phaseIs(page,'ask');
 
  /* 쉬기: 문제를 가리고 시계를 멈춘다 */
  await page.locator('#pause').click();ok(await page.locator('body').evaluate(b=>b.classList.contains('covered')),'pause covers the question');
- g=await game(page);await tick(page,30);eq((await game(page)).round.t,g.round.t,'paused clock does not move');await page.locator('#pause').click();
+ g=await game(page);await tick(page,30);eq((await game(page)).round.t,g.round.t,'paused clock does not move');eq((await game(page)).world.t,g.world.t,'paused wolf world does not move');await page.locator('#pause').click();
 
- /* 3D: 3D 늑대가 시간에 맞춰 다가온다 */
- if(three&&!INTERIM){const a=await page.evaluate(()=>window.VillageView.inspect());await tick(page,30);await frames(page,2);const b=await page.evaluate(()=>window.VillageView.inspect());
-  ok(b.wolvesVisible>=1,'3D wolves visible while asking');ok(Array.isArray(b.wolfX)&&b.wolfX.length>=1&&Array.isArray(a.wolfX)&&b.wolfX[0]<a.wolfX[0],'3D lead wolf walks toward the gate: '+JSON.stringify([a.wolfX,b.wolfX]))}
+ /* 늑대 무리가 가장자리에서 나타나 마을로 걸어온다(세계 시뮬레이션 + 3D) */
+ {const until=await page.evaluate(()=>{const g=window.__game();return g.world.wave.arrive-g.world.t});await tick(page,Math.max(1,until-60));}
+ g=await game(page);ok(g.world.wolves>=1,'a wolf pack is on the map before it arrives: '+JSON.stringify(g.world));
+ const d1=await page.evaluate(()=>Math.min(...world.wolves.filter(v=>v.state==='walk').map(v=>Math.hypot(v.x,v.z))));await tick(page,20);const d2=await page.evaluate(()=>Math.min(...world.wolves.filter(v=>v.state!=='dead').map(v=>Math.hypot(v.x,v.z))));
+ ok(d2<d1,'wolves walk toward the village: '+[d1,d2]);
+ if(three&&!INTERIM){await frames(page,3);const i=await page.evaluate(()=>window.VillageView.inspect());ok(i.wolvesVisible>=1,'3D wolves visible: '+i.wolvesVisible);eq(i.wolvesVisible,(await game(page)).world.wolves,'3D wolf count = simulated wolves')}
+ if(name==='chromium'&&(width===390||width===1366))await shot(page.locator('.scene'),'pack-'+width);
  ok(await noOverflow(page),'no overflow after a few rounds');
  await page.screenshot({path:path.join(shots,name+'-'+width+'x'+height+'.png'),fullPage:true});
 
  if(name==='chromium'&&width===390){
   /* 움직임 켜기: 주민이 움직이고, 쉬기·움직임 줄이기에서 멈춘다 */
-  await page.emulateMedia({reducedMotion:'no-preference'});const initial=await residents(page);await frames(page,6);
-  assert.notDeepEqual(await residents(page),initial,'residents move while the village is live');checks++;
-  await page.locator('#pause').click();await frames(page,2);const still=await residents(page);await frames(page,4);eq(await residents(page),still,'pause freezes residents');
-  await page.locator('#pause').click();await page.emulateMedia({reducedMotion:'reduce'});await frames(page,2);const reduced=await residents(page);await frames(page,4);eq(await residents(page),reduced,'reduced motion freezes residents');
+  if(three&&!INTERIM){
+   /* 세계가 흐르면 3D 늑대가 움직이고, 쉬기에서는 멈춘다 */
+   await page.emulateMedia({reducedMotion:'no-preference'});
+   await page.evaluate(()=>{const g=window.__game();if(!world.wolves.some(v=>v.state!=='dead'&&v.state!=='gone'))window.__tick(Math.max(1,g.world.wave.arrive-g.world.t-60))});
+   const wp=async()=>(await page.evaluate(()=>window.VillageView.inspect())).wolfPos;
+   await frames(page,3);const p0=await wp();await tick(page,10);await frames(page,6);const p1=await wp();
+   assert.notDeepEqual(p1,p0,'3D wolves move when the world ticks');checks++;
+   await page.locator('#pause').click();await frames(page,2);const s0=await wp();await tick(page,10);await frames(page,4);eq(await wp(),s0,'pause freezes 3D wolves');await page.locator('#pause').click();
+   await page.emulateMedia({reducedMotion:'reduce'});
+  }
   /* 다 자란 마을 */
-  await seed(page,{gold:900,level:4,fence:4,chickens:8,hidden:2,farmers:2,pond:2,hall:3,feast:1,wins:40,index:5,mode:'sound',age:8});await begin(page,{age:8,mode:'sound'},touch);
+  const smallHalf=three&&!INTERIM?(await page.evaluate(()=>window.VillageView.inspect())).cameraHalf:0;
+  await page.evaluate(()=>{localStorage.removeItem('hangul-defense-v1')});
+  await seed(page,{gold:900,level:4,fence:4,chickens:8,farmers:2,pond:2,hall:3,feast:1,wins:40,index:5,mode:'sound',age:8});await begin(page,{age:8,mode:'sound'},touch);
   await page.waitForFunction(()=>window.VillageView?.inspect().ready,{},{timeout:45000});
+  await frames(page,40);
   const grown=await page.evaluate(()=>window.VillageView.inspect());
-  if(!INTERIM)eq([grown.towerLevel,grown.chickens,grown.hidden,grown.farmers,grown.pond,grown.hall,grown.feast],[4,8,2,2,2,3,1],'3D grown village state');
+  if(!INTERIM){eq([grown.towers,grown.chickens,grown.farmers,grown.pond,grown.hall,grown.feast,grown.radius],[5,8,2,2,3,1,16],'3D grown village state');ok(grown.cameraHalf>smallHalf+4,'camera pulls back for a big village: '+[smallHalf,grown.cameraHalf])}
   await tick(page,40);await frames(page,3);await shot(page.locator('.scene'),'grown-390');console.log('SCENE_METRICS:'+JSON.stringify(await page.evaluate(()=>window.VillageView.inspect())));
  }
  /* 숫자가 가장 길어지는 상태에서도 상단 표시가 겹치지 않아야 한다. */
- await page.evaluate(()=>{Object.assign(state,{gold:12800,wins:999,level:5,chickens:8,hidden:3,fence:6,hall:3,pond:3,farmers:2});render()});
+ await page.evaluate(()=>{Object.assign(state,{gold:12800,wins:999,level:5,chickens:8,broken:9,fence:6,hall:3,pond:3,farmers:2});render()});
  ok(await pillsFit(page),'status pills fit with the longest values');ok(await noOverflow(page),'no overflow with the longest values');
  if(name==='chromium')await shot(page.locator('.stage-card'),'stats-full-'+width+'x'+height);
  eq(errors,[],tag+' page errors');await ctx.close();
@@ -197,9 +213,11 @@ const FAKE_TTS=()=>{const S={speak(u){setTimeout(()=>{u.onstart&&u.onstart();u.o
   await begin(page,{age:8,mode:'sound'});
   const want=['tower','chicken','hall','fence','farmer','hall','pond','hall','feast'],made=[];
   for(const target of want){
+   /* 3D 알 판매 연출은 2초 남짓이라, 누르기 전부터 프레임마다 지켜보다가 한 번이라도 재생되면 기록한다 */
+   await page.evaluate(()=>{window.__saleSeen=false;const watch=()=>{try{if(window.VillageView.inspect().sale){window.__saleSeen=true;return}}catch{}requestAnimationFrame(watch)};requestAnimationFrame(watch)});
    await answer(page,true,false);await phaseIs(page,'pick');
    const strip=(await fxLog(page)).filter(x=>x.c==='sale');eq(strip.length,1,'sale strip on every first-try answer');
-   if(!INTERIM){await page.waitForFunction(()=>window.VillageView.inspect().sale===true,{},{timeout:30000}).then(()=>checks++).catch(()=>ok(false,'3D sale sequence plays'))}
+   if(!INTERIM){await page.waitForFunction(()=>window.__saleSeen===true,{},{timeout:30000}).then(()=>checks++).catch(()=>ok(false,'3D sale sequence plays'))}
    await tick(page,7);
    const kinds=await page.locator('#cards .choice').evaluateAll(a=>a.map(b=>b.dataset.kind));ok(kinds.includes(target),'card '+target+' offered: '+kinds);
    const before=await page.evaluate(()=>window.VillageView.inspect());
@@ -225,9 +243,9 @@ const FAKE_TTS=()=>{const S={speak(u){setTimeout(()=>{u.onstart&&u.onstart();u.o
  await p.route('**/environment-pack.glb',route=>route.abort());
  await p.goto(url);await p.waitForFunction(()=>document.querySelector('.scene').dataset.renderer==='fallback');
  await begin(p,{age:8,mode:'sound'});await expectQuestion(p,8,'sound',0,'fallback default');
- const wolfLeft=()=>p.locator('#enemies .enemy:not(.hidden)').first().evaluate(n=>parseFloat(n.style.left));
- eq(await p.locator('#enemies .enemy:not(.hidden)').count(),1,'fallback: one wolf');const l0=await wolfLeft();await tick(p,40);ok(await wolfLeft()<l0,'fallback wolf walks toward the village');
- await answer(p,true,false);ok(await p.locator('#enemies .enemy.stunned:not(.hidden)').count()===1,'fallback wolf stops when answered');
+ const wolfPos=()=>p.locator('#enemies .enemy:not(.hidden)').first().evaluate(n=>n.style.left+'|'+n.style.bottom);
+ await tick(p,200);eq(await p.locator('#enemies .enemy:not(.hidden)').count(),(await game(p)).world.wolves,'fallback: wolves drawn where the simulation has them');const l0=await wolfPos();await tick(p,40);ok(await wolfPos()!==l0,'fallback wolf moves');
+ await answer(p,true,false);const fz=await wolfPos();await tick(p,30);eq(await wolfPos(),fz,'fallback wolves stop while choosing');
  await tick(p,7);
  const still=await p.locator('#cards .choice[data-kind="chicken"]').evaluate(async b=>{const a=b.getBoundingClientRect();await new Promise(r=>setTimeout(r,330));const c=b.getBoundingClientRect();return [getComputedStyle(b).animationName,getComputedStyle(b.querySelector('.icon')).animationName,Math.abs(a.top-c.top)<.01]});
  eq(still,['none','choiceBob',true],'cards: the picture bobs, the tap target stays still');

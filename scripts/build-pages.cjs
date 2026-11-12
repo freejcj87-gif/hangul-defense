@@ -32,7 +32,7 @@ const assets = [
   "animation/edge.png",
   "animation/reverse-quarter.png"
 ];
-const files = ['index.html', 'combat.js', 'questions.js', 'art-handoff/coopnight/source-3d/models/environment-pack.glb', ...assets.map(file => prefix + file)];
+const files = ['index.html', 'combat.js', 'world.js', 'questions.js', 'art-handoff/coopnight/source-3d/models/environment-pack.glb', ...assets.map(file => prefix + file)];
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 for (const match of html.matchAll(/art-handoff\/coopnight\/browser\/[a-zA-Z0-9_/-]+\.png/g)) {
   assert(files.includes(match[0]), 'Missing static artwork in Pages package: ' + match[0]);
