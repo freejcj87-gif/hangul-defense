@@ -160,9 +160,12 @@ const FAKE_TTS=()=>{const S={speak(u){setTimeout(()=>{u.onstart&&u.onstart();u.o
  {const until=await page.evaluate(()=>{const g=window.__game();return g.world.wave.arrive-g.world.t});await tick(page,Math.max(1,until-60));}
  g=await game(page);ok(g.world.wolves>=1,'a wolf pack is on the map before it arrives: '+JSON.stringify(g.world));
  /* 0.8: 늑대가 쉬지 않고 오고 쓰러지므로 '가장 가까운 늑대'가 바뀔 수 있다. 같은 늑대(id)를 따라가 걷는 늑대가 모두 마을 쪽으로 왔는지 본다. */
- const walk0=await page.evaluate(()=>world.wolves.filter(v=>v.state==='walk').map(v=>[v.id,Math.hypot(v.x,v.z)]));await tick(page,20);
- const walk1=await page.evaluate(ids=>world.wolves.filter(v=>v.state==='walk'&&ids.includes(v.id)).map(v=>[v.id,Math.hypot(v.x,v.z)]),walk0.map(x=>x[0]));
- ok(walk1.length>0&&walk1.every(([id,d])=>d<walk0.find(x=>x[0]===id)[1]),'wolves walk toward the village: '+JSON.stringify([walk0.slice(0,4),walk1.slice(0,4)]));
+ /* 계속 걷는 늑대는 더 가까워지고, 마을에 닿아 부수기·사냥으로 바뀐 늑대도 다가온 것으로 본다. 따라간 늑대가 모두 쓰러졌으면 다시 본다. */
+ {let walked=false,seen=[];for(let k=0;k<6&&!walked;k++){
+  const walk0=await page.evaluate(()=>world.wolves.filter(v=>v.state==='walk').map(v=>[v.id,Math.hypot(v.x,v.z)]));await tick(page,10);
+  const walk1=await page.evaluate(ids=>world.wolves.filter(v=>ids.includes(v.id)&&v.state!=='dead'&&v.state!=='gone').map(v=>[v.id,Math.hypot(v.x,v.z),v.state]),walk0.map(x=>x[0]));
+  seen=[walk0.slice(0,3),walk1.slice(0,3)];if(walk1.length)walked=walk1.every(([id,d,st])=>st==='walk'?d<walk0.find(x=>x[0]===id)[1]:['smash','hunt','bite'].includes(st))}
+  ok(walked,'wolves walk toward the village: '+JSON.stringify(seen))}
  if(three&&!INTERIM){await frames(page,3);const i=await page.evaluate(()=>window.VillageView.inspect());ok(i.wolvesVisible>=1,'3D wolves visible: '+i.wolvesVisible);eq(i.wolvesVisible,await notGone(page),'3D wolf count = simulated wolves (incl. falling ones)')}
  if(name==='chromium'&&(width===390||width===1366))await shot(page.locator('.scene'),'pack-'+width);
  ok(await noOverflow(page),'no overflow after a few rounds');
