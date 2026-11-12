@@ -12,6 +12,7 @@
   const HELP=.2,MAX_HELP=3; /* 시간 초과가 2번 이어지면 도움 1단계(+20%, 최대 3단계). 번개로 맞히면 1단계씩 내려간다 */
   const FAST=.4;           /* 남은 시간이 40% 이상일 때 맞히면 번개 보너스 */
   const FAST_BONUS=.25;    /* 번개 보너스 = 그 정답 금화의 25% */
+  const FAST_MIN=.3;       /* 번개는 보통 아이 필요 시간의 30%(글을 읽을 만한 최소 시간)가 지나야 받는다. 마구 누르기로는 못 받는다 */
   const BOUNTY=30;          /* 우두머리(불씨 왕)를 쓰러뜨리면 금화 +30 */
   const STREAK={step:.1,max:5}; /* 연속 정답: 한 번에 맞힌 것이 이어질 때마다 금화 +10%(2연속 ×1.1 … 6연속부터 ×1.5). 한 번이라도 틀리면 처음부터 */
   const DASH=.35;          /* 한 번 틀리면 늑대가 제한시간의 35%만큼 성큼 다가온다 */
@@ -67,15 +68,20 @@
     if(q.mode!=='story'||age<8)return 3; /* 소리·상식·수학·영어 문제와 7세 낱말은 바로 보인다 */
     return Math.max(3,Math.round(syl(q.passage)/(1.5*SPEED[age])/TICK));
   }
-  /* 놓쳤을 때 읽어 줄 글: 소리 모드는 정답 낱말, 읽기 모드는 지문 · 질문 · 정답 */
+  /* 놓쳤을 때 읽어 줄 글: 소리 모드는 정답 낱말, 읽기 모드는 지문 · 질문 · 정답.
+     상식·수학·영어는 질문을 다시 읽고, 정답이 한국어 음성으로 읽을 수 있는 글(한글·숫자)일 때만 '정답은 …'을 붙인다.
+     그림 문자·영어 정답은 기기마다 엉뚱하게 읽히므로 화면의 초록 보기로 보여 준다. */
+  const sayable=a=>/[가-힣0-9]/.test(a)&&!/[A-Za-z]/.test(a);
   function lesson(q){
     const answer=q.choices[q.answer];
-    if(q.mode==='quiz')return q.speak+' 정답은 '+answer+'.';
+    if(q.mode==='quiz')return q.speak+(sayable(answer)?' 정답은 '+answer+'.':' 정답은 초록색 보기예요.');
     if(q.mode!=='story')return answer;
     return q.passage.replace(/\n/g,' ')+' '+(q.age>=8?q.prompt+' ':'')+'정답은 '+answer+'.';
   }
   /* 긴 글은 문제 하나에 시간이 더 드는 만큼 금화도 더 준다(분당 수입이 비슷해지도록). 느리게 푼다고 더 주지는 않는다. */
   const scale=q=>Math.max(1,baseSeconds(q)/10);
+  /* 번개(빨리 맞힘): 풀이 시작부터 ticks틱 만에 맞혔을 때, 기본 시간의 60% 안이면서 최소 읽기 시간은 지났는지 */
+  const isFast=(q,ticks)=>ticks<=(1-FAST)*baseSeconds(q)/TICK+1e-6&&ticks>=FAST_MIN*needSeconds(q)/TICK-1e-6;
   /* 한 번에 맞혔을 때 고를 수 있는 카드 수: 긴 글일수록 많이(글 길이 배수 반올림, 1~3장). 짧은 문제를 빨리 많이 푸는 아이와 짓는 횟수를 맞춘다. */
   const picks=q=>Math.min(3,Math.max(1,Math.round(scale(q))));
 
@@ -151,7 +157,7 @@
     return s;
   }
 
-  const api={API:2,TICK,SPEED,MIN_SEC,MAX_SEC,SLACK,FENCE,HELP,FAST,FAST_BONUS,STREAK,BOUNTY,combo,DASH,DASH_TICKS,MAX_WOLVES,PAY,ITEMS,ORDER,POWER_NOTE,THINK,units,
+  const api={API:2,TICK,SPEED,MIN_SEC,MAX_SEC,SLACK,FENCE,HELP,FAST,FAST_BONUS,FAST_MIN,isFast,sayable,STREAK,BOUNTY,combo,DASH,DASH_TICKS,MAX_WOLVES,PAY,ITEMS,ORDER,POWER_NOTE,THINK,units,
     syl,fresh,max,needSeconds,baseSeconds,limit,reveal,lesson,scale,picks,built,wolves,income,raid,settle,price,open,offers,canBuy,buy,restore};
   if(typeof module!=='undefined')module.exports=api;
   else root.Combat=api;

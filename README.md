@@ -5,7 +5,7 @@
 
 GitHub Pages가 연결되어 있으며 main의 게임 파일을 변경하면 같은 주소에 자동 배포됩니다.
 
-개발 인계: [HANDOVER.md](HANDOVER.md) · 우선순위별 작업: [TODO.md](TODO.md)
+기획서(정본): [docs/game-plan.md](docs/game-plan.md) · 개발 인계: [HANDOVER.md](HANDOVER.md) · 우선순위별 작업: [TODO.md](TODO.md)
 
 ## 이번 장면
 꼬꼬마을에서 인계한 실제 3D 모델로 농장 장면을 구성했습니다. 닭·병아리 배회, 일꾼 이동과 알 운반, 나무와 연기, 타워 발사·반동, 금화 연출을 포함합니다.

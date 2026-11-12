@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { KIND_ORDER, RIG, GAIT, RIG_TIME, monsterGeometry, shadowGeometry, rigMaterial, rigDepthMaterial, gaitPose } from './monsters.js';
 
 const host=document.querySelector('.scene');
 const motion=matchMedia('(prefers-reduced-motion: reduce)');
@@ -113,7 +114,7 @@ function lowPoly(node,height,shape,extra=[]){
 }
 
 /* ---------- effect atlas: every sprite effect shares one texture and two draw calls ---------- */
-const CELL={dust:0,ring:1,impact:2,star:3,feather:4,coin:8,sparkle:12,glow:13,solid:14,halo:15,egg:16,dot:17};
+const CELL={dust:0,ring:1,impact:2,star:3,feather:4,coin:8,sparkle:12,glow:13,solid:14,halo:15,egg:16,dot:17,bang:18,flame:19,scorch:20,swirl:21};
 const GRID=5;
 async function makeAtlas(){
  const S=204,pad=6,inner=S-pad*2,canvas=document.createElement('canvas');canvas.width=canvas.height=GRID*S;
@@ -137,6 +138,17 @@ async function makeAtlas(){
  cell(CELL.halo,h=>{ctx.strokeStyle='#fff';ctx.lineWidth=15;ctx.shadowColor='#fff';ctx.shadowBlur=10;ctx.beginPath();ctx.arc(h,h,inner*.4,0,7);ctx.stroke()});
  cell(CELL.egg,h=>{const g=ctx.createRadialGradient(h-18,h-26,6,h,h,inner*.5);g.addColorStop(0,'#ffffff');g.addColorStop(.7,'#fff1d2');g.addColorStop(1,'#e8cf9f');ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(h,h+4,inner*.34,inner*.44,0,0,7);ctx.fill()});
  cell(CELL.dot,h=>{ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(h,h,inner*.47,0,7);ctx.fill()});
+ // "!" bubble over a monster seen for the first time (drawn in colour: tint it white)
+ cell(CELL.bang,h=>{ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(h,h-6,inner*.4,0,7);ctx.moveTo(h-20,h+60);ctx.lineTo(h,h+90);ctx.lineTo(h+20,h+60);ctx.fill();
+  ctx.fillStyle='#ffcf3a';ctx.beginPath();ctx.arc(h,h-6,inner*.4-9,0,7);ctx.fill();ctx.fillStyle='#5a2a10';ctx.beginPath();ctx.roundRect(h-11,h-62,22,66,10);ctx.fill();ctx.beginPath();ctx.arc(h,h+26,12,0,7);ctx.fill()});
+ // flame tongue: white core, yellow, orange, red edge (drawn in colour)
+ cell(CELL.flame,h=>{const g=ctx.createRadialGradient(h,h+34,4,h,h+16,inner*.46);g.addColorStop(0,'rgba(255,255,236,1)');g.addColorStop(.3,'rgba(255,226,92,1)');g.addColorStop(.62,'rgba(255,128,40,.95)');g.addColorStop(1,'rgba(224,48,24,0)');
+  ctx.fillStyle=g;ctx.beginPath();ctx.moveTo(h,pad+4);ctx.bezierCurveTo(h+30,h-40,h+inner*.34,h,h+inner*.28,h+30);ctx.arc(h,h+30,inner*.28,0,Math.PI);ctx.bezierCurveTo(h-inner*.34,h,h-30,h-40,h,pad+4);ctx.fill()});
+ // scorch mark left by a fire-arrow blast (ragged dark blotch)
+ cell(CELL.scorch,h=>{const g=ctx.createRadialGradient(h,h,6,h,h,inner*.48);g.addColorStop(0,'rgba(255,255,255,1)');g.addColorStop(.55,'rgba(255,255,255,.8)');g.addColorStop(1,'rgba(255,255,255,0)');ctx.fillStyle=g;
+  ctx.beginPath();for(let i=0;i<18;i++){const a=i/18*6.283,r=inner*(i%2?.36:.48)*(.85+.15*Math.sin(i*2.7));ctx.lineTo(h+Math.cos(a)*r,h+Math.sin(a)*r)}ctx.closePath();ctx.fill()});
+ // dizzy swirl over a stunned tower
+ cell(CELL.swirl,h=>{ctx.strokeStyle='#fff';ctx.lineWidth=13;ctx.lineCap='round';ctx.beginPath();for(let i=0;i<=60;i++){const a=i/60*6.283*2.2,r=8+i*1.35;ctx.lineTo(h+Math.cos(a)*r,h+Math.sin(a)*r*.8)}ctx.stroke()});
  const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;texture.generateMipmaps=false;texture.minFilter=texture.magFilter=THREE.LinearFilter;
  return texture;
 }
@@ -172,7 +184,8 @@ function makePool(map,max,flat){
 }
 const tint=hex=>{const c=new THREE.Color(hex);return [c.r,c.g,c.b]};
 const WHITE=tint(0xffffff),GOLD=tint(0xffd24a),CREAM=tint(0xfff3d6),DUST=tint(0xf2dfb4),WOOD=tint(0xb97a3c),RED=tint(0xff5a4a),PINK=tint(0xff8fb3),SKY=tint(0x6fd3ff),LEAF=tint(0x9be05c),
- SOOT=tint(0x4a4440),INK=tint(0x2b2420),CRACK=tint(0x4a3020),STONE=tint(0xd8d2bd),HPBG=tint(0x2a2a30),PADRIM=tint(0xb9b3a0),SAND=tint(0xdcc793);
+ SOOT=tint(0x4a4440),INK=tint(0x2b2420),CRACK=tint(0x4a3020),STONE=tint(0xd8d2bd),HPBG=tint(0x2a2a30),PADRIM=tint(0xb9b3a0),SAND=tint(0xdcc793),
+ ORANGE=tint(0xff8a2a),FIRE=tint(0xff5a1e),EMBER=tint(0xffc04a),ASH=tint(0x6a6058),ROCK=tint(0xb8b2a6),ICE=tint(0xbfe9ff),FLAME_TINT=tint(0xffa060);
 
 /* ---------- easing ---------- */
 const springy=t=>1-Math.exp(-7.7*t)*Math.cos(17.5*t);            // 0 -> 1.25 -> 0.94 -> 1
@@ -220,20 +233,22 @@ function yardGeometry(){
  }
  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,4));return g;
 }
-function wolfParts(){
- const fur=0x4f5b68,dark=0x39434e,parts=[
-  ['ball',fur,[0,.65,0],[.3,.31,.6]],['ball',0x5d6a78,[0,1,.36],[.33,.33,.34]],['ball',0xf3e9d5,[0,.86,.62],[.21,.17,.24]],['ball',0x1c2426,[0,.9,.83],[.1,.075,.065]],
-  ['cone',fur,[0,.82,-.68],[.18,.65,.18],[-.7,0,0]],['ball',0xe9dfca,[0,1.02,-.9],[.09,.12,.09]],['ball',0xffffff,[0,.74,.8],[.13,.035,.04]]];
- for(const side of [-1,1])parts.push(['cone',fur,[side*.22,1.36,.32],[.15,.36,.15]],['cone',0xe59a9a,[side*.22,1.33,.37],[.08,.22,.06]],
-  ['ball',0xffd84a,[side*.17,1.07,.63],[.075,.085,.045]],['ball',0x1c2426,[side*.165,1.06,.67],[.035,.045,.02]],['box',0x232c33,[side*.17,1.17,.65],[.17,.04,.04],[0,0,side*-.45]]);
- return {body:solid(parts),leg:solid([['box',dark,[0,-.23,0],[.13,.46,.16]],['ball',dark,[0,-.45,.03],[.09,.05,.12]]])};
-}
-// A crossbow on the lookout deck (faces +z, swivels toward its target).
-function crossbowGeometry(){
- const wood=0x8a5a2e,dark=0x5c3a1c,limb=0xc08848;
- return solid([['cyl6',dark,[0,.05,0],[.07,.12,.07]],['box',wood,[0,.16,0],[.13,.09,.8]],
+// A crossbow on the lookout deck (faces +z, swivels toward its target). Tower power tiers dress it up:
+// 1 펑 화살 = a small brazier, 2 큰 펑 화살 = a bigger brazier and a red pennant, 3 세 갈래 화살 = a triple crossbow with three bolts.
+const BRAZIER=[null,new V3(.24,.27,-.2),new V3(.24,.3,-.2),new V3(.24,.3,-.2)],PENNANT=new V3(-.22,.86,-.3);
+function crossbowGeometry(tier=0){
+ const wood=0x8a5a2e,dark=0x5c3a1c,limb=0xc08848,iron=0x45464e,tip=tier?0xff7a2a:0xc9d2da;
+ const parts=[['cyl6',dark,[0,.05,0],[.07,.12,.07]],['box',wood,[0,.16,0],[.13,.09,.8]],
   ['box',limb,[-.25,.17,.3],[.52,.07,.08],[0,-.3,0]],['box',limb,[.25,.17,.3],[.52,.07,.08],[0,.3,0]],['box',0xfff4dc,[0,.17,.22],[.94,.025,.025]],
-  ['box',0xefe6d2,[0,.23,.1],[.04,.04,.62]],['cone',0xc9d2da,[0,.23,.46],[.07,.16,.07],[Math.PI/2,0,0]],['box',0xe2503f,[0,.25,-.18],[.03,.08,.12]]]);
+  ['box',0xefe6d2,[0,.23,.1],[.04,.04,.62]],['cone',tip,[0,.23,.46],[.07,.16,.07],[Math.PI/2,0,0]],['box',0xe2503f,[0,.25,-.18],[.03,.08,.12]]];
+ if(tier>=1){const b=BRAZIER[tier],w=tier>=2?.13:.1;   // iron fire basket on a short post beside the stock, glowing coals
+  parts.push(['box',iron,[b.x,.11,b.z],[.035,.16,.035]],['cyl6',iron,[b.x,b.y-.06,b.z],[w,.09,w]],['cyl6',0x2a2a2e,[b.x,b.y-.1,b.z],[w*.7,.03,w*.7]],['sphere',0xff7a22,[b.x,b.y-.02,b.z],[w*.8,.04,w*.8]])}
+ if(tier>=2){const p=PENNANT;parts.push(['cyl6',0xf4efe4,[p.x,.55,p.z],[.03,.84,.03]],['sphere',0xffd24a,[p.x,.99,p.z],.055],   // mast with a red swallow-tail flag
+  ['box',0xe2332a,[p.x+.19,p.y,p.z],[.34,.22,.03]],['cone',0xe2332a,[p.x+.4,p.y,p.z],[.11,.12,.03],[0,0,-Math.PI/2]],['box',0xffd24a,[p.x+.19,p.y,p.z+.002],[.34,.04,.032]])}
+ if(tier>=3)for(const s of [-1,1]){const a=s*.42,cx=Math.sin(a)*.22,cz=Math.cos(a)*.22;   // two more rails fanned out, each with its own bolt and little bow
+  parts.push(['box',wood,[cx,.2,cz],[.09,.06,.56],[0,a,0]],['box',0xefe6d2,[cx+Math.sin(a)*.04,.25,cz+Math.cos(a)*.04],[.035,.035,.5],[0,a,0]],
+   ['cone',0xff7a2a,[Math.sin(a)*.52,.25,Math.cos(a)*.52],[.06,.14,.06],[Math.PI/2,0,-a]],['box',limb,[Math.sin(a)*.4,.21,Math.cos(a)*.4],[.4,.05,.06],[0,a,0]])}
+ return solid(parts);
 }
 // Arrow in flight (faces +z). Chunky on purpose: it has to read at phone size from far away.
 const arrowParts=()=>solid([['box',0xfff1cf,[0,0,0],[.07,.07,1.0]],['cone',0xb8c2cc,[0,0,.6],[.12,.24,.12],[Math.PI/2,0,0]],['box',0xe2503f,[0,.07,-.42],[.025,.14,.22]],['box',0xe2503f,[.07,0,-.42],[.14,.025,.22]]]);
@@ -295,7 +310,7 @@ async function start(){
  const coopArt=bake(node('EnvCoop'),2.7,[],{anchors:['Door dark opening']});
  const towerArt=[bake(node('EnvTower'),TOWER_H,[],{omit:CANNON,anchors:['Seed cannon barrel']}),bake(node('EnvCornTower'),TOWER_H,[],{omit:CANNON,anchors:['Seed cannon barrel']})];
  const G={coop:coopArt.main.geometry,market:one('EnvMarket',2.6),hen:one('EnvChicken',.95),tree:one('EnvTree',1),bush:one('EnvBush',.7),rock:one('EnvRock',.5),panel:one('EnvFence',.85),
-  crossbow:crossbowGeometry(),arrow:arrowParts()};
+  crossbow:[0,1,2,3].map(crossbowGeometry),arrow:arrowParts()};
  G.lowTree=lowPoly(node('EnvTree'),1,n=>n.includes('crown')?'cone8':n.includes('trunk')?'cyl6':null,[flat('disc',0x5f7f3a,-.1,-.14,.4,.32,.012)]);
  G.lowBush=lowPoly(node('EnvBush'),.7,n=>n.includes('foliage')?'ball':null);
  G.panel.computeBoundingBox();const FENCE_W=Math.max(.5,G.panel.boundingBox.max.x-G.panel.boundingBox.min.x);
@@ -313,6 +328,10 @@ async function start(){
  }
  const dummy=new THREE.Object3D();
  const instanced=(geometry,max,shadow)=>{const m=new THREE.InstancedMesh(geometry,lit,Math.max(1,max));m.count=0;m.frustumCulled=false;m.castShadow=shadow;m.receiveShadow=true;m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);world.add(m);return m};
+ // Shadow stand-in: a low-poly instanced copy that only draws into the shadow map (in the main pass it has zero instances, so no draw call).
+ // Detailed models (fence panels, farmers, hens, towers, garden bushes) cast their shadow through one of these: same shapes, a fraction of the triangles.
+ function shadowOnly(geometry,max){const m=instanced(geometry,max,true);m.receiveShadow=false;m.onBeforeRender=function(){this.userData.n=this.count;this.count=0};m.onAfterRender=function(){this.count=this.userData.n};return m}
+ const copyShade=(shade,i,obj)=>{obj.updateMatrix();shade.setMatrixAt(i,obj.matrix)};
 
  /* ----- decor field: meadow, a sparse approach zone and a forest ring that recedes as the village grows ----- */
  const DEC={tree:[],bush:[],rock:[]};
@@ -327,8 +346,8 @@ async function start(){
  const forest=instanced(G.lowTree,DEC.tree.length,false),groveMax=40,grove=instanced(G.tree,groveMax,true),shrubs=instanced(G.lowBush,DEC.bush.length,false),stones=instanced(G.rock,DEC.rock.length,false);
  // Fixed little garden inside the village (clear of buildings, tower slots, hen homes, pond and paths).
  const GARDEN={bush:[[-5.2,3.1,1.1],[3.6,-4.7,1],[6.3,3.6,1.15],[-1.9,4.6,.9]],rock:[[-4.8,4.2,.9],[2.2,4.4,.8],[6.6,-2.6,1],[-6.8,-.4,.8]]};
- const garden=[instanced(G.bush,GARDEN.bush.length,true),instanced(G.rock,GARDEN.rock.length,false)];
- [GARDEN.bush,GARDEN.rock].forEach((list,k)=>{list.forEach(([x,z,s],i)=>{dummy.position.set(x,0,z);dummy.rotation.set(0,i*1.7,0);dummy.scale.setScalar(s);dummy.updateMatrix();garden[k].setMatrixAt(i,dummy.matrix)});garden[k].count=list.length;garden[k].instanceMatrix.needsUpdate=true});
+ const garden=[instanced(G.lowBush,GARDEN.bush.length,false),instanced(G.rock,GARDEN.rock.length,false),shadowOnly(G.lowBush,GARDEN.bush.length)];   // low-poly bushes (5k -> 0.4k triangles each), like the meadow shrubs
+ [GARDEN.bush,GARDEN.rock,GARDEN.bush].forEach((list,k)=>{list.forEach(([x,z,s],i)=>{dummy.position.set(x,0,z);dummy.rotation.set(0,i*1.7,0);dummy.scale.setScalar(s);dummy.updateMatrix();garden[k].setMatrixAt(i,dummy.matrix)});garden[k].count=list.length;garden[k].instanceMatrix.needsUpdate=true});
  let decorR=-1;
  function layoutDecor(R){
   if(Math.abs(R-decorR)<.01)return;decorR=R;
@@ -356,12 +375,14 @@ async function start(){
  const barn=slot('barn',actor(G.coop,P.barn[0],P.barn[1],.35,.95),{height:2.6,size:1.6,tint:0xffcdb4});
  const bowAt=towerArt.map(art=>{const b=art.anchors['Seed cannon barrel'];return b?b.getCenter(new V3()).setY(b.min.y-.02):new V3(0,TOWER_H*.62,0)});
  const towers=W('TOWER_SLOTS').map((_,i)=>{
-  const art=i%2,a=actor(towerArt[art].main.geometry,0,0),bow=new THREE.Mesh(G.crossbow,lit);bow.castShadow=true;bow.position.copy(bowAt[art]);bow.scale.setScalar(1.25);a.obj.add(bow);a.skin.push(bow);
-  return slot('tower',a,{height:TOWER_H,size:.9,lean:i%2?1:-1,slot:i,bow,art,aim:0,aimId:0,aimAt:-9,kick:0,shotAt:-9});
+  const art=i%2,a=actor(towerArt[art].main.geometry,0,0),bow=new THREE.Mesh(G.crossbow[0],lit);a.obj.castShadow=false;bow.castShadow=false;bow.receiveShadow=true;bow.position.copy(bowAt[art]);bow.scale.setScalar(1.25);a.obj.add(bow);a.skin.push(bow);
+  return slot('tower',a,{height:TOWER_H,size:.9,lean:i%2?1:-1,slot:i,bow,art,aim:0,aimId:0,aimAt:-9,kick:0,shotAt:-9,tier:0,stunAt:-9,smokeT:0});
  });
  const BUILDINGS=[home,market,nursery,barn,...towers];
+ const towerShade=['EnvTower','EnvCornTower'].map(n=>shadowOnly(lowPoly(node(n),TOWER_H,s=>/seedcannon|cannonbrass|darkmuzzle/.test(s)?null:'cyl6'),6));
  const sides=[0,1,2,3,4,5].map(k=>({kind:'fence',side:k,id:null,on:false,b:null,born:-9,fxDone:true,wasBroken:false,brokeAt:-9,pop:-9,smash:0}));
- const fences=instanced(G.panel,6*24,true);
+ const fences=instanced(G.panel,6*24,false),FP=FENCE_W/2-.06;
+ const fenceShade=shadowOnly(solid([['box',0,[-FP,.42,0],[.1,.84,.1]],['box',0,[FP,.42,0],[.1,.84,.1]],['box',0,[0,.34,0],[FENCE_W,.08,.06]],['box',0,[0,.62,0],[FENCE_W,.08,.06]]]),6*24);
  const FENCE_TINT=DAMAGE.map(h=>new THREE.Color(h));for(let i=0;i<6*24;i++)fences.setColorAt(i,FENCE_TINT[0]);
  const hay=actor(solid([['cyl',0xe9c75a,[-.33,.3,0],[.3,.62,.3],[Math.PI/2,0,0]],['cyl',0xe9c75a,[.33,.3,0],[.3,.62,.3],[Math.PI/2,0,0]],['cyl',0xf4d877,[0,.82,0],[.3,.62,.3],[Math.PI/2,0,0]],
   ['cyl',0xc79a3a,[-.33,.3,0],[.31,.09,.31],[Math.PI/2,0,0]],['cyl',0xc79a3a,[.33,.3,0],[.31,.09,.31],[Math.PI/2,0,0]],['cyl',0xc79a3a,[0,.82,0],[.31,.09,.31],[Math.PI/2,0,0]]]),HAY.x,HAY.z,-.35);
@@ -374,7 +395,7 @@ async function start(){
   const mesh=new THREE.Mesh(geometry,lit),a=wrap(mesh,center.x,center.z);a.y=center.y;mesh.visible=false;return a});
 
  /* ----- hens: eight world hens + three peeking from the coop door, one instanced mesh ----- */
- const henMesh=instanced(G.hen,12,true);
+ const henMesh=instanced(G.hen,12,false),henShade=shadowOnly(solid([['sphere',0,[0,.36,-.03],[.3,.28,.36]],['sphere',0,[0,.68,.16],[.16,.19,.16]]]),12);
  const henSlots=[];for(let i=0;i<8;i++)henSlots.push({i,a:proxy(.9+(i*37%10)*.012),id:null,on:false,h:null,fx:0,fz:0,tx:0,tz:0,born:-9,fxDone:true,phase:i*1.7,face:i*2.1,featherT:0,lastX:0,lastZ:0});
  const peeks=[0,1,2].map(()=>proxy(.76));
  const PLAIN=new THREE.Color(1,1,1),FLASH=new THREE.Color(2.1,1.9,1.5),SHY=new THREE.Color(.72,.78,.9),DEAD=new THREE.Color(.62,.62,.68);
@@ -384,27 +405,34 @@ async function start(){
  const farmerParts=bake(node('FarmerPolished'),1.9,['ArmL','ArmR','LegL','LegR']),eggGeo=solid([['sphere',0xfff3d3,[0,0,0],[.2,.27,.2]]]),farmers=[];
  for(let k=0;k<3;k++){
   const group=new THREE.Group(),skin=[],limbs=[];
-  for(const [name,part] of Object.entries(farmerParts)){if(name==='anchors')continue;const mesh=new THREE.Mesh(part.geometry,lit);mesh.position.copy(part.pivot);mesh.castShadow=name==='main';group.add(mesh);skin.push(mesh);if(name!=='main')limbs.push(mesh)}
+  for(const [name,part] of Object.entries(farmerParts)){if(name==='anchors')continue;const mesh=new THREE.Mesh(part.geometry,lit);mesh.position.copy(part.pivot);mesh.castShadow=false;mesh.receiveShadow=true;group.add(mesh);skin.push(mesh);if(name!=='main')limbs.push(mesh)}
   const egg=new THREE.Mesh(eggGeo,lit);egg.position.set(0,2.28,0);egg.visible=false;group.add(egg);
   const a=wrap(group,FARM_HOME[k][0],FARM_HOME[k][1],0,1,skin);group.visible=k===0;
   farmers.push({k,a,limbs,egg,tx:a.x,tz:a.z,wait:.5+k*.8,carry:false,job:null,off:[0,.6,-.6][k],range:[[0,1],[0,.5],[.5,1]][k]});
  }
+ const farmerShade=shadowOnly(solid([['cyl',0,[0,.55,0],[.27,1.0,.22]],['sphere',0,[0,1.32,.02],[.36,.34,.33]],['cyl',0,[0,1.62,0],[.5,.07,.5]]]),3);
 
- /* ----- wolves: two instanced meshes (bodies, legs) whatever the pack size; each wolf is a proxy object tree whose matrices are copied in ----- */
- const MAXW=Math.max(60,num(W('MAX_WOLVES')))+4;
- const wolfGeo=wolfParts(),wolfBody=instanced(wolfGeo.body,MAXW,true),wolfLegs=instanced(wolfGeo.leg,MAXW*4,false);
- for(let i=0;i<MAXW;i++)wolfBody.setColorAt(i,PLAIN);for(let i=0;i<MAXW*4;i++)wolfLegs.setColorAt(i,PLAIN);
- const wolfPool=[];
- for(let i=0;i<MAXW;i++){const group=new THREE.Object3D(),legs=[];group.rotation.order='YXZ';
-  for(const x of [-.2,.2])for(const z of [-.35,.3]){const leg=new THREE.Object3D();leg.position.set(x,.51,z);group.add(leg);legs.push(leg)}
-  wolfPool.push({group,legs,free:true})}
- const arrowMesh=instanced(G.arrow,180,false);
+ /* ----- monsters: one rigged instanced mesh per kind (head, jaw, tail and legs move in the vertex shader) and one shared,
+    low-poly shadow stand-in. Draw calls = kinds on screen + 1, whatever the pack size. ----- */
+ const WCAP=Math.max(96,num(W('MAX_WOLVES')))+16;   // every world wolf plus a few falling ones the world has already dropped
+ function rigMesh(geometry,material,cap,colors){
+  const mesh=new THREE.InstancedMesh(geometry,material,cap);mesh.count=0;mesh.visible=false;mesh.frustumCulled=false;mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  const pose=[];for(const k of ['aPoseA','aPoseB','aPoseC','aPoseD']){const a=new THREE.InstancedBufferAttribute(new Float32Array(cap*4),4);a.setUsage(THREE.DynamicDrawUsage);geometry.setAttribute(k,a);pose.push(a)}
+  if(colors){for(let i=0;i<cap;i++)mesh.setColorAt(i,PLAIN);mesh.instanceColor.setUsage(THREE.DynamicDrawUsage)}
+  world.add(mesh);return {mesh,pose,n:0,tris:(geometry.index?geometry.index.count:geometry.attributes.position.count)/3};
+ }
+ const herd={};for(const k of KIND_ORDER){const r=rigMesh(monsterGeometry(k),rigMaterial(k),WCAP,true);r.mesh.castShadow=false;r.mesh.receiveShadow=true;herd[k]=r}
+ const shade=rigMesh(shadowGeometry(),herd.wolf.mesh.material,WCAP,false);shade.mesh.castShadow=true;shade.mesh.receiveShadow=false;shade.mesh.customDepthMaterial=rigDepthMaterial('wolf');
+ // The stand-in only draws into the shadow map: in the main pass it has zero instances (no draw call).
+ shade.mesh.onBeforeRender=function(){this.userData.n=this.count;this.count=0};shade.mesh.onAfterRender=function(){this.count=this.userData.n};
+ const SHADE_FIT={boar:new V3(1.12,.74,1.02)};   // the stand-in has wolf proportions; the boar is lower and wider
+ const arrowMesh=instanced(G.arrow,240,false);
  const malletGeo=solid([['cyl',0x9a6a3a,[0,.45,0],[.06,.9,.06]],['cyl',0xc98f52,[0,.95,0],[.2,.5,.2],[0,0,Math.PI/2]],['cyl',0x8a5a2e,[.26,.95,0],[.21,.04,.21],[0,0,Math.PI/2]],['cyl',0x8a5a2e,[-.26,.95,0],[.21,.04,.21],[0,0,Math.PI/2]]]);
  const mallets=[];
 
  /* ----- effect engine: dt-driven tweens + pooled sprites + camera shake ----- */
- const flatPool=makePool(atlas,360,true),airPool=makePool(atlas,1000,false);world.add(flatPool.mesh,airPool.mesh);
- const particles=[],anims=[],MAX_PARTICLES=520;
+ const flatPool=makePool(atlas,520,true),airPool=makePool(atlas,1500,false);world.add(flatPool.mesh,airPool.mesh);
+ const particles=[],anims=[],MAX_PARTICLES=620;
  let shakeAmp=0,shakeAge=9,shakeNow=0,time=0,wclock=0;
  const DEFAULTS={cell:CELL.dust,flat:false,x:0,y:0,z:0,vx:0,vy:0,vz:0,gravity:0,drag:0,age:0,life:.6,delay:0,size:.5,end:-1,aspect:1,rot:0,spin:0,color:WHITE,alpha:1,add:0,fade:.5,pop:.1,fps:0,floor:false,abs:false};
  function emit(o){if(reduced()||particles.length>=MAX_PARTICLES)return;particles.push({...DEFAULTS,...o})}
@@ -412,7 +440,7 @@ async function start(){
  function tween(delay,dur,update,done){if(reduced()){done?.();return}anims.push({t:-delay,dur,update,done})}
  const after=(delay,fn)=>tween(delay,0,null,fn);
  function shake(amp){if(reduced())return;if(amp>=shakeNow){shakeAmp=amp;shakeAge=0;shakeNow=amp}}
- const EYE=new V3().copy(EYE_DIR).multiplyScalar(EYE_DIST);
+ const EYE=new V3().copy(EYE_DIR).multiplyScalar(EYE_DIST),FOCUS=new V3();let focusHalf=0;   // FOCUS/focusHalf: test-only close-up (VillageView.debug)
  function stepEffects(dt){
   for(let i=0;i<anims.length;){const a=anims[i];a.t+=dt;if(a.t<0){i++;continue}
    if(a.update&&a.dur>0)a.update(Math.min(1,a.t/a.dur),Math.min(a.t,a.dur));
@@ -425,10 +453,10 @@ async function start(){
   }
   shakeAge+=dt;shakeNow=shakeAge<.28?shakeAmp*(1-shakeAge/.28)**2:0;
   const k=Math.max(1,camHalf/7);   // the shake grows with the view so it still reads when zoomed out
-  camera.position.copy(EYE).addScaledVector(camRight,Math.sin(shakeAge*78)*shakeNow*k).addScaledVector(camUp,Math.cos(shakeAge*61)*shakeNow*.8*k);
+  camera.position.copy(EYE).add(FOCUS).addScaledVector(camRight,Math.sin(shakeAge*78)*shakeNow*k).addScaledVector(camUp,Math.cos(shakeAge*61)*shakeNow*.8*k);
  }
  let sale=null,popUntil=-9;         // sale: the produce sequence currently playing (effects clock); popUntil: reduced-motion still frame
- function clearEffects(){for(const a of anims.splice(0))a.done?.();particles.length=0;shakeNow=0;shakeAge=9;camera.position.copy(EYE);sale=null}
+ function clearEffects(){for(const a of anims.splice(0))a.done?.();particles.length=0;shakeNow=0;shakeAge=9;camera.position.copy(EYE).add(FOCUS);sale=null}
  function drawParticles(){
   for(const p of particles){if(p.delay>0)continue;
    const u=p.age/p.life,size=(p.end<0?p.size:p.size+(p.end-p.size)*easeOut(u))*(p.pop>0?Math.min(1,u/p.pop):1)*(p.abs?1:fxScale),alpha=p.alpha*(u<p.fade?1:1-(u-p.fade)/(1-p.fade));
@@ -463,6 +491,28 @@ async function start(){
  function splash(x,z,n=10,power=1){for(let i=0;i<n;i++){const a=i/n*6.283+span(-.3,.3);
   emit({cell:CELL.dot,x:x+Math.cos(a)*.25,y:.15,z:z+Math.sin(a)*.25,vx:Math.cos(a)*span(.7,1.7)*power,vy:span(2.4,3.8)*power,vz:Math.sin(a)*span(.5,1.1)*power,gravity:11,life:span(.45,.7),size:span(.1,.16),color:i%3?SKY:WHITE,fade:.6,pop:0})}}
  function smokeBurst(x,y,z,n=8){for(let i=0;i<n;i++)emit({cell:CELL.glow,x:x+span(-.5,.5),y:y+span(0,.6),z:z+span(-.4,.4),vx:span(-.3,.3),vy:span(.8,1.6),vz:span(-.3,.3),drag:1.2,life:span(1,1.6),size:span(.5,.8),end:span(1.4,2),color:SOOT,alpha:.7,fade:.3,pop:.15})}
+ // Fire-arrow blast ("펑"): flash, fireball, a ring as wide as the blast, sparks, embers, dust and a scorch mark that fades.
+ // When many go off at once only the flash, ring and scorch play, so a phone does not choke on a big volley.
+ const booms=[],scorches=[];let boomTotal=0;
+ function boom(x,z,r,hits){
+  boomTotal++;const lite=booms.filter(b=>time-b.t0<.15).length>=3||booms.filter(b=>time-b.t0<.6).length>=10;
+  booms.push({x,z,r,t0:time,lite});if(booms.length>32)booms.shift();
+  if(scorches.length>=28)scorches.shift();scorches.push({x,z,r:Math.max(.9,r),t0:time,rot:span(0,6.283)});
+  const s=Math.max(.8,r);
+  flashAt(x,.55,z,1.2+s*.8,EMBER);ringWave(x,z,r*2.5,ORANGE,.42,0,CELL.ring,.65,.08,true);
+  if(lite)return;
+  emit({cell:CELL.glow,x,y:.5,z,size:s*1.1,end:s*2.3,life:.16,color:WHITE,add:1,fade:.1,pop:0,abs:true});
+  for(let i=0;i<5;i++){const a=i/5*6.283+span(-.3,.3),d=span(.1,.35)*s;emit({cell:CELL.glow,x:x+Math.cos(a)*d,y:span(.3,.6),z:z+Math.sin(a)*d,vx:Math.cos(a)*.7,vy:span(1,1.8),vz:Math.sin(a)*.7,drag:2.4,life:span(.38,.55),size:.5*s,end:span(1.1,1.5)*s,color:i%2?FIRE:ORANGE,add:.9,fade:.25,pop:.12,abs:true})}
+  for(let i=0;i<3;i++)emit({cell:CELL.glow,x:x+span(-.3,.3)*s,y:.7,z:z+span(-.3,.3)*s,vy:span(.7,1.1),drag:1.2,life:span(.9,1.3),delay:.16,size:.6*s,end:1.5*s,color:ASH,alpha:.5,fade:.35,pop:.2,abs:true});
+  for(let i=0;i<8;i++){const a=i/8*6.283+span(-.3,.3),v=span(2.6,4.2);emit({cell:i%2?CELL.sparkle:CELL.star,x,y:.45,z,vx:Math.cos(a)*v,vy:span(2.2,3.6),vz:Math.sin(a)*v,gravity:9,drag:.8,life:span(.45,.7),size:span(.18,.3),end:.05,spin:span(-8,8),color:i%3?EMBER:WHITE,add:.7,fade:.45,pop:0})}
+  for(let i=0;i<5;i++)emit({cell:CELL.dot,x:x+span(-.4,.4)*s,y:span(.3,.9),z:z+span(-.4,.4)*s,vx:span(-.6,.6),vy:span(.6,1.6),vz:span(-.6,.6),gravity:-.4,drag:1.5,life:span(.8,1.3),delay:span(0,.2),size:span(.06,.1),end:.02,color:EMBER,add:.9,fade:.5,pop:0});
+  dustBurst(x,z,5,.6*s);if(hits>2)shake(.04);
+ }
+ // A heavy foot or a charging boar hitting the ground: a dust ring and a puff.
+ function stomp(x,z,size,big){ringWave(x,z,(big?2.8:1.9)*size,DUST,.4,0,CELL.halo,.25);dustBurst(x,z,big?7:4,.7*size)}
+ // A monster falls: dust and stars where it lands (the king goes out with a bang).
+ function poof(x,z,size,boss){dustBurst(x,z,boss?16:7,(boss?1.3:.8)*Math.min(1.4,size));starBurst(x,.7*size,z,boss?14:6,boss?1.1:.7,boss?[GOLD,ORANGE,WHITE]:[GOLD,WHITE]);
+  if(boss){flashAt(x,1,z,4.2,ORANGE);ringWave(x,z,8,GOLD,.6);ringWave(x,z,5.5,WHITE,.42,.08,CELL.halo,.6);sparkles(x,1.3,z,12,1.4,GOLD,.1,.6);for(let i=0;i<10;i++)emit({cell:CELL.dot,x:x+span(-.8,.8),y:span(.4,1.4),z:z+span(-.8,.8),vx:span(-.8,.8),vy:span(1,2.4),vz:span(-.8,.8),gravity:-.3,drag:1.2,life:span(1,1.6),size:span(.08,.13),end:.02,color:EMBER,add:.9,fade:.5,pop:0});shake(.15)}}
  // Pose helpers: all additive, so overlapping builds simply stack.
  function wobble(a,amp=.1,delay=0,dur=.55){tween(delay,dur,(u,t)=>{const w=settle(t,23,6.5)*amp;a.tilt+=Math.sin(t*23)*amp*Math.exp(-6.5*t);a.sy*=1-w*.6;a.sx*=1+w*.4})}
  function hop(a,height=.5,delay=0,dur=.36,turn=0){tween(delay,dur,u=>{a.lift+=4*height*u*(1-u);a.spin+=turn*easeOut(u);const land=u>.8?(u-.8)/.2:0,rise=u<.15?1-u/.15:0;a.sy*=1-.18*Math.sin(land*Math.PI)-.12*rise;a.sx*=1+.14*Math.sin(land*Math.PI)+.08*rise},()=>{a.ry+=turn})}
@@ -483,7 +533,8 @@ async function start(){
  let frames=0,dirty=true,lastRepair=null,sunDim=0;
  // Economy-only parts (not in the world simulation): hired farmers, pond, hall decor, feast bunting.
  const KEYS={farmer:'farmers',pond:'pond',hall:'hall',feast:'feast'},ECON={farmers:2,pond:3,hall:3,feast:99};
- const shown={farmers:0,pond:0,hall:0,feast:0},silent={},builds={tower:0,fence:0,chicken:0,farmer:0,pond:0,hall:0,feast:0,repair:0};
+ const shown={farmers:0,pond:0,hall:0,feast:0},silent={},builds={tower:0,fence:0,chicken:0,farmer:0,pond:0,hall:0,feast:0,repair:0,power:0};
+ let powerShown=-1,powerAt=-9;   // tower power tier on the crossbows (0-3) and when it last went up
  const pending={tower:-9,fence:-9,chicken:-9,hall:-9};
  const APPLY={
   farmers:n=>farmers.forEach((f,k)=>{const on=k<=n;if(on&&!f.a.obj.visible){f.a.x=f.tx=FARM_HOME[k][0];f.a.z=f.tz=FARM_HOME[k][1]}f.a.obj.visible=on}),
@@ -499,6 +550,12 @@ async function start(){
   for(const key in APPLY){const v=next[key];if(first||v!==shown[key]){silent[key]=!first&&v===shown[key]+1?time:-9;shown[key]=v;APPLY[key](v)}}
   return true;
  }
+ // Tower power tier: swaps the crossbow model (brazier, pennant, triple bow). The flare plays only for a bought upgrade.
+ function syncPower(s,fx){
+  const p=count(s.power,3);if(p===powerShown&&!fx)return false;powerShown=p;
+  for(const t of towers){t.tier=p;t.bow.geometry=G.crossbow[p]}
+  if(fx)powerUp();return true;
+ }
 
  /* ----- pulling the world: records for buildings, hens, wolves and arrows; positions blend between simulation ticks ----- */
  let wRef=null,lastT=0,blendT=1,blendDur=.1,blendTicks=0,blendEase=false,sinceTick=1,stamp=0,initial=true;
@@ -509,7 +566,7 @@ async function start(){
  function syncRecords(s,volley=false){
   const real=s&&s.world&&typeof s.world==='object'&&Array.isArray(s.world.buildings)?s.world:null,w=real||fakeWorld(s);
   const init=w!==wRef;
-  if(init){wRef=w;lastT=num(w.t);for(const o of wolfVis.values())wolfPool[o.p].free=true;wolfVis.clear();arrowVis.clear();for(const sl of [...BUILDINGS,...sides])sl.id=null;for(const c of henSlots)c.id=null}
+  if(init){wRef=w;lastT=num(w.t);wolfVis.clear();arrowVis.clear();hl.clear();for(const sl of [...BUILDINGS,...sides])sl.id=null;for(const c of henSlots)c.id=null}
   const t=num(w.t);let ticked=false;
   // Ticks that arrive before a frame has drawn (a wrong-answer fast-forward forwarded step by step) add up into one longer bound.
   if(!init&&t!==lastT){let n=t-lastT;lastT=t;sinceTick=0;if(n>0){if(blendT<=1e-4)n+=blendTicks;blendTicks=n;blendDur=n<=2?.1*n:clamp(.12+n*.012,.3,.5);blendEase=n>2;blendT=0;ticked=true}else{blendDur=.1;blendT=1;blendEase=false;ticked=true}}   // rewound (restored save): snap
@@ -533,23 +590,37 @@ async function start(){
   }
   for(const sl of [...BUILDINGS,...sides])if(!seen.has(sl)&&sl.on){sl.on=false;sl.id=null;sl.b=null;if(sl.a)sl.a.obj.visible=false}
  }
- function freeProxy(){for(let i=0;i<wolfPool.length;i++)if(wolfPool[i].free){wolfPool[i].free=false;return i}return -1}
  let insideWolves=0;
+ const hl=new Map();   // wolf id -> time its "new monster!" highlight ends
+ const KIND_FALLBACK={wolf:{size:1,speed:1},bramble:{size:.85,speed:1.3},boar:{size:1.1,speed:.85},granite:{size:1.25,speed:.6},frost:{size:.95,speed:1.7},ember:{size:1.8,speed:.7,boss:true}};
+ const kindInfo=k=>{const K=W('KINDS');return (K&&K[k])||KIND_FALLBACK[k]||KIND_FALLBACK.wolf};
+ const deathEnd=o=>o.K.boss?1.75:1.45;   // seconds of world time the fall + poof + sink takes
+ function newWolf(v){
+  const x=num(v.x),z=num(v.z),kind=RIG[v.kind]?v.kind:'wolf',K=kindInfo(kind),seed=hash(num(v.id)*.37+1.3);
+  const fresh=v.state==='walk'&&Number.isFinite(Number(v.sx))&&Math.hypot(x-num(v.sx),z-num(v.sz))<.35;   // just came out of the forest
+  return {id:v.id,kind,K,x,z,fx:x,fz:z,tx:x,tz:z,ry:Math.atan2(-x,-z),state:v.state,deadAge:v.state==='dead'?9:0,hit:0,v,stamp:0,hp:1,
+   seed,side:seed>.5?1:-1,size:WS*(K.size||1)*(.95+.1*hash(seed*91.7)),ph:seed*6.283,spd:0,age:fresh?0:9,emerged:!fresh,
+   hy:0,phy:0,php:0,phr:0,legs:[0,0,0,0],lift:[0,0,0,0],kx:0,kz:0,kvx:0,kvz:0,ky:0,kvy:0,hitT:-9,tuck:0,roarT:-9,bossAt:-9,atk:-1,landed:false,ghost:false,mat:new THREE.Matrix4()};
+ }
  function syncWolves(w,ticked){
-  stamp++;henCarrier.clear();smashOn.clear();insideWolves=0;const R=Rgoal;
+  stamp++;henCarrier.clear();smashOn.clear();insideWolves=0;const R=Rgoal,less=reduced();
   for(const v of Array.isArray(w.wolves)?w.wolves:[]){
    if(!v||typeof v!=='object'||v.state==='gone')continue;
    let o=wolfVis.get(v.id);
-   if(!o){const p=freeProxy();if(p<0)continue;const x=num(v.x),z=num(v.z);
-    o={id:v.id,p,x,z,fx:x,fz:z,tx:x,tz:z,ry:Math.atan2(-x,-z),stride:p*1.3,state:v.state,deadAge:v.state==='dead'?9:0,hit:0,side:hash(p)>.5?1:-1,stamp:0,hp:1,v};wolfVis.set(v.id,o)}
+   if(!o){if(wolfVis.size>=WCAP){let old=null;for(const g of wolfVis.values())if(g.ghost&&(!old||g.deadAge>old.deadAge))old=g;if(!old)continue;wolfVis.delete(old.id)}
+    o=newWolf(v);wolfVis.set(v.id,o)}
    else if(ticked){o.fx=o.x;o.fz=o.z;o.tx=num(v.x);o.tz=num(v.z)}
-   if(v.state==='dead'&&o.state!=='dead')o.deadAge=0;
-   o.state=v.state;o.v=v;o.stamp=stamp;o.hp=num(v.max)>0?clamp(num(v.hp)/num(v.max),0,1):1;
+   if(v.state==='dead'&&o.state!=='dead'){o.deadAge=0;o.landed=false}
+   o.state=v.state;o.v=v;o.stamp=stamp;o.ghost=false;o.hp=num(v.max)>0?clamp(num(v.hp)/num(v.max),0,1):1;
    if(v.hen&&(v.state==='carry'||v.state==='bite'))henCarrier.set(v.hen,o);
    if(v.state==='smash')smashOn.set(v.target,(smashOn.get(v.target)||0)+1);
    if(v.state!=='dead'&&v.state!=='leave'&&Math.hypot(num(v.x),num(v.z))<R+.5)insideWolves++;
   }
-  for(const [id,o] of wolfVis)if(o.stamp!==stamp){if(o.state!=='dead')dustBurst(o.x,o.z,4,.5);wolfPool[o.p].free=true;wolfVis.delete(id);
+  for(const [id,end] of hl)if(end<time)hl.delete(id);   // highlights that ran out (or whose wolf never showed up)
+  let ghosts=0;
+  for(const [id,o] of wolfVis)if(o.stamp!==stamp){
+   if(o.state==='dead'&&!less&&o.deadAge<deathEnd(o)&&ghosts<10){o.ghost=true;ghosts++;continue}   // the world dropped it mid-fall: finish the fall first (a few at most)
+   if(o.state!=='dead')dustBurst(o.x,o.z,4,.5);wolfVis.delete(id);hl.delete(id);
    gone.set(id,{x:o.x,z:o.z});if(gone.size>80)gone.delete(gone.keys().next().value)}   // where it was last seen (for the hen-lost cue)
  }
  function syncHens(w,init,ticked){
@@ -620,6 +691,7 @@ async function start(){
  }
  function playBuilt(sl){if(sl.kind==='tower')raiseTower(sl);else if(sl.kind==='fence')hammerFence(sl);else popBuilding(sl)}
  function repairFx(sl){             // a repaired building (or fence side) pops back up, good as new
+  if(sl.kind==='fence'&&sl.b&&num(sl.b.hp)<num(sl.b.max)){rebuildFence(sl);return}   // the world put it back up by itself (half strength)
   lastRepair={sl,t:time};
   if(sl.kind==='fence'){const {x,z}=sideMid(sl.side);sl.pop=time+.04;telegraph(x,z,3,LEAF);
    after(.2,()=>{flashAt(x,.9,z,1.8);dustBurst(x,z,8,.9);ringWave(x,z,4,GOLD,.45);sparkles(x,.9,z,10,1.6,GOLD,0,.6)});return}
@@ -627,6 +699,22 @@ async function start(){
   telegraph(x,z,3,LEAF);popIn(a,T,.85);
   after(T,()=>{a.flash=.1;pillar(x,z,H*1.8,1.6,LEAF);dustBurst(x,z,10,1);ringWave(x,z,4.4,GOLD,.45);ringWave(x,z,3.4,WHITE,.36,0,CELL.halo,.55);shake(.08);startle(x,z,3.5)});
   after(T+.2,()=>sparkles(x,H*.7,z,10,1.1,GOLD,0,.7));
+ }
+ function rebuildFence(sl){         // the farmers stand a fallen fence side back up after 15 s: a mallet knocks it in, panels spring up
+  const {x,z,a}=sideMid(sl.side),HIT=.3,R=1.71;sl.rebuiltAt=time;sl.pop=time+(reduced()?0:HIT);
+  const m=reduced()?null:mallet();
+  if(m){const ry=Math.PI-a;m.ry=ry;m.x=x+Math.cos(ry)*R;m.y=1.21;m.z=z-Math.sin(ry)*R;m.obj.visible=true;
+   tween(0,.55,(u,t)=>{const k=Math.min(1,t/.08)*(t>.44?Math.max(.001,1-(t-.44)/.11):1);m.sx*=Math.max(.001,k);m.sy*=Math.max(.001,k);
+    m.tilt+=t<HIT?-.5+(Math.PI/2+.5)*easeIn(clamp(t/HIT,0,1)):Math.PI/2-.5*Math.sin(Math.min(1,(t-HIT)/.14)*Math.PI/2)},()=>{m.obj.visible=false;m.busy=false})}
+  after(reduced()?0:HIT,()=>{dustBurst(x,z,7,.8);chipBurst(x,.7,z,5);ringWave(x,z,3.4,LEAF,.4,0,CELL.halo,.5);sparkles(x,.8,z,6,1.4,LEAF,.05,.5)});
+ }
+ function powerUp(){                // tower power: every crossbow flares, the brazier lights, rings rise
+  powerAt=time;let k=0;
+  for(const t of towers){if(!t.on||t.b&&t.b.broken)continue;const p=bowWorld(t),d=k++*.08;
+   wobble(t.a,.08,d);after(d,()=>{t.a.flash=.1;flashAt(p.x,p.y,p.z,2,ORANGE);pillar(t.a.x,t.a.z,4.6,1.4,ORANGE,.55);risingRings(t.a.x,t.a.z,TOWER_H*1.1,2,ORANGE,3);
+    for(let i=0;i<8;i++)emit({cell:CELL.flame,x:p.x+span(-.2,.2),y:p.y,z:p.z+span(-.2,.2),vx:span(-.5,.5),vy:span(1.5,2.6),vz:span(-.5,.5),drag:2,life:span(.5,.75),size:.5,end:.15,color:WHITE,add:.8,fade:.4,pop:.1})});
+   after(d+.18,()=>starBurst(p.x,p.y+.3,p.z,8,.8,[ORANGE,GOLD,WHITE]))}
+  shake(.08);
  }
  function brokenFx(sl){             // smashed: a crunch of planks, dust and smoke
   sl.brokeAt=time;
@@ -701,6 +789,7 @@ async function start(){
   if(kind==='hall'){const ex=shown.hall>=3&&barn.on?barn:shown.hall===2?{a:hay,height:1}:shown.hall>=1&&nursery.on?nursery:null;return ex?new V3(ex.a.x,1,ex.a.z):new V3(home.a.x,1.5,home.a.z)}
   if(kind==='repair'){const r=lastRepair&&time-lastRepair.t<3?lastRepair.sl:null;if(r&&r.kind==='fence'){const p=sideMid(r.side);return new V3(p.x,.5,p.z)}return r?new V3(r.a.x,r.height*.5,r.a.z):new V3(home.a.x,1.5,home.a.z)}
   if(kind==='feast'){const g=garlands[shown.feast===2?1:0];return new V3(g.x,g.y,g.z)}
+  if(kind==='power'){const t=towers.find(t=>t.on);return t?new V3(t.a.x,TOWER_H*.8,t.a.z):null}
   return null;
  }
  function build(kind){
@@ -710,6 +799,7 @@ async function start(){
   let sl=null;
   if(kind==='tower'||kind==='fence'||kind==='chicken')sl=buildWorld(kind);
   else if(kind==='repair'){if(!(lastRepair&&time-lastRepair.t<2.5))wobble(home.a,.05)}
+  else if(kind==='power'){syncPower(s,true)}
   else{
    const key=KEYS[kind],target=count(s[key],ECON[key]),from=shown[key];
    if(target<from)syncEconomy(s);
@@ -742,11 +832,24 @@ async function start(){
    sparkles(x,2.4,z,6,1,GOLD,.15,.5);shake(.05)});
   after(1.6,()=>crew.forEach((f,k)=>hop(f.a,.38,k*.05,.34)));
  }
- function towerFire(t,big){          // recoil + a twang of light at the crossbow
+ function towerFire(t,big,fast=false,hot=false){   // recoil + a twang of light at the crossbow (orange once the towers shoot fire arrows)
   if(!t||!t.on||t.b&&t.b.broken)return;t.kick=1;
-  if(time-t.shotAt<.12&&!big)return;t.shotAt=time;const p=bowWorld(t);
-  emit({cell:CELL.glow,x:p.x,y:p.y,z:p.z,size:big?.9:.5,end:big?1.8:.9,life:big?.3:.16,color:big?GOLD:CREAM,add:1,fade:.3,pop:0});
-  if(big){flashAt(p.x,p.y,p.z,1.4,GOLD);ringWave(t.a.x,t.a.z,2.6,GOLD,.4);tween(0,.3,(u,tt)=>{const s=settle(tt,26,8);t.a.sy*=1-.08*s;t.a.sx*=1+.05*s})}
+  if(time-t.shotAt<.12&&!big)return;t.shotAt=time;const p=bowWorld(t),k=fast?1.4:1,fire=hot||t.tier>0;
+  emit({cell:CELL.glow,x:p.x,y:p.y,z:p.z,size:(big?.9:.5)*k,end:(big?1.8:.9)*k,life:big?.3:.16,color:fire?ORANGE:big?GOLD:CREAM,add:1,fade:.3,pop:0});
+  if(big){flashAt(p.x,p.y,p.z,1.4*k,fire?ORANGE:GOLD);ringWave(t.a.x,t.a.z,2.6*k,fire?ORANGE:GOLD,.4);if(fast){sparkles(p.x,p.y,p.z,5,.5,GOLD,0,.2);ringWave(t.a.x,t.a.z,3.6,WHITE,.36,.06,CELL.halo,.5)}
+   tween(0,.3,(u,tt)=>{const s=settle(tt,26,8);t.a.sy*=1-.08*k*s;t.a.sx*=1+.05*k*s})}
+ }
+ // Visual knock-back: pushes the drawn monster away (the world position stays authoritative; a spring pulls it back).
+ function knock(o,dx,dz,power,up=0){if(reduced()||!o)return;const d=Math.hypot(dx,dz)||1,m=power/Math.sqrt(o.K.size||1);o.kvx+=dx/d*m;o.kvz+=dz/d*m;if(up)o.kvy=Math.max(o.kvy,up/Math.sqrt(o.K.size||1))}
+ function hitFrom(o){let src=null;for(const a of arrowVis.values())if(a.a.wolf===o.id&&(!src||a.fin>src.fin))src=a;return src?[o.x-src.sx,o.z-src.sz]:[-Math.sin(o.ry),-Math.cos(o.ry)]}
+ let redPulse=0;     // a red tint on the sunlight (boss entrance, roar)
+ function roarFx(o,ids){
+  o.roarT=time;const reach=num((W('ROAR')||{}).reach)||6,m=mouthOf(o,new V3());
+  flashAt(m.x,m.y,m.z,2.6,ORANGE);ringWave(o.x,o.z,reach*2.5,FIRE,.75,.1,CELL.ring,.7,.08,true);ringWave(o.x,o.z,reach*2.3,ORANGE,.85,.32,CELL.halo,.55,.08,true);ringWave(o.x,o.z,reach*1.2,EMBER,.5,0,CELL.halo,.7,.08,true);
+  for(let i=0;i<10;i++){const a=o.ry+span(-.6,.6),v=span(3,5);emit({cell:i%2?CELL.flame:CELL.dot,x:m.x,y:m.y,z:m.z,vx:Math.sin(a)*v,vy:span(.6,1.6),vz:Math.cos(a)*v,drag:2.2,life:span(.45,.7),size:i%2?.5:.12,end:.1,color:i%2?WHITE:EMBER,add:.9,fade:.4,pop:0})}
+  shake(.13);redPulse=Math.max(redPulse,.85);
+  ids.forEach((id,i)=>{const t=towerById.get(id);if(!t)return;t.stunAt=time;const d=.22+i*.05;wobble(t.a,.12,d);
+   after(d,()=>{const H=TOWER_H*t.a.s;flashAt(t.a.x,H,t.a.z,1.8,ORANGE);smokeBurst(t.a.x,H*.8,t.a.z,4);starBurst(t.a.x,H*1.05,t.a.z,5,.6,[GOLD,WHITE])})});
  }
  function events(list){
   if(!Array.isArray(list))return;const s=read();if(s.paused)return;
@@ -756,10 +859,18 @@ async function start(){
    const wolf=wolfVis.get(e.wolf);
    switch(e.type){
     case 'produce':if(reduced())popUntil=time+1.4;else produceFx(e);break;
-    case 'shoot':towerFire(towerById.get(e.tower),false);break;
-    case 'volley':for(const t of towers)towerFire(t,true);shake(.05);break;   // the arrows themselves come from the pull (marked as a volley above)
-    case 'hit':if(wolf){wolf.hit=.14;flashAt(wolf.x,.85*WS,wolf.z,.8);for(let i=0;i<2;i++)emit({cell:CELL.star,x:wolf.x,y:.9,z:wolf.z,vx:span(-1.5,1.5),vy:span(1.4,2.6),vz:span(-1,1),gravity:8,life:.38,size:.24,end:.08,spin:9,color:GOLD,add:.3})}break;
-    case 'kill':if(wolf){flashAt(wolf.x,.8,wolf.z,1.5,GOLD);starBurst(wolf.x,.9,wolf.z,7,.7,[GOLD,WHITE]);dustBurst(wolf.x,wolf.z,6,.7)}break;
+    case 'shoot':towerFire(towerById.get(e.tower),false,false,!!e.splash);break;
+    case 'volley':for(const t of towers)towerFire(t,true,!!e.fast);shake(e.fast?.07:.05);break;   // the arrows themselves come from the pull (marked as a volley above)
+    case 'hit':if(wolf){wolf.hit=.14;wolf.hitT=time;const [dx,dz]=hitFrom(wolf);knock(wolf,dx,dz,2.4);flashAt(wolf.x,.85*wolf.size,wolf.z,.8);
+     for(let i=0;i<2;i++)emit({cell:CELL.star,x:wolf.x,y:.9*wolf.size,z:wolf.z,vx:span(-1.5,1.5),vy:span(1.4,2.6),vz:span(-1,1),gravity:8,life:.38,size:.24,end:.08,spin:9,color:GOLD,add:.3})}break;
+    case 'kill':if(wolf){const [dx,dz]=hitFrom(wolf);knock(wolf,dx,dz,3,3.2);flashAt(wolf.x,.8*wolf.size,wolf.z,e.boss?3:1.5,GOLD);if(e.boss){redPulse=Math.max(redPulse,.4);shake(.1)}}break;
+    case 'splash':{const x=num(e.x),z=num(e.z),r=Math.max(.5,num(e.r));boom(x,z,r,num(e.n));
+     for(const o of wolfVis.values()){if(o.state==='dead'||o.ghost)continue;const d=Math.hypot(o.x-x,o.z-z),reach=r+.6;if(d<reach){const f=1-d/reach;knock(o,o.x-x||span(-1,1),o.z-z||span(-1,1),3.6*f+.4,2.6*f);o.hitT=time}}break}
+    case 'newKind':{hl.set(e.wolf,time+3.2);if(wolf){ringWave(wolf.x,wolf.z,3.2*wolf.size,GOLD,.5,0,CELL.halo,.6);sparkles(wolf.x,1.2*wolf.size,wolf.z,6,.6,GOLD,0,.4)}break}
+    case 'boss':if(wolf){wolf.bossAt=time;redPulse=1;shake(.1);ringWave(wolf.x,wolf.z,9,FIRE,.8,0,CELL.halo,.6);ringWave(wolf.x,wolf.z,6,ORANGE,.6,.15,CELL.ring,.6);flashAt(wolf.x,1.4,wolf.z,3.4,ORANGE);
+     for(let i=0;i<12;i++)emit({cell:CELL.flame,x:wolf.x+span(-1,1),y:.3,z:wolf.z+span(-1,1),vy:span(1.6,2.8),drag:1.4,life:span(.6,1),delay:span(0,.4),size:.6,end:.2,color:WHITE,add:.85,fade:.45,pop:.1})}break;
+    case 'roar':if(wolf)roarFx(wolf,Array.isArray(e.towers)?e.towers:[]);break;
+    case 'straggler':{const R=Rgoal+num(W('EDGE')),a=spawnAngle(num(e.point)),x=Math.cos(a)*R,z=Math.sin(a)*R;for(let i=0;i<4;i++)emit({cell:CELL.dust,x:x+span(-.8,.8),y:span(.6,1.6),z:z+span(-.8,.8),vx:span(-.6,.6),vy:span(.4,1),vz:span(-.6,.6),drag:2,life:span(.6,.9),size:.32,end:.6,color:LEAF,alpha:.7,fade:.4});break}
     case 'bite':{const c=henById.get(e.hen);if(c){featherBurst(c.a.x,.5,c.a.z,6,.7);flashAt(c.a.x,.5,c.a.z,1,RED)}break}
     case 'henSaved':{const c=henById.get(e.hen);if(c){hop(c.a,.5,.05,.4);sparkles(c.a.x,.8,c.a.z,8,.5,PINK,0,.4);starBurst(c.a.x,.8,c.a.z,6,.6,[PINK,WHITE])}break}
     case 'henLost':{const c=henSlots.find(h=>h.id===e.hen||h.prevId===e.hen),last=wolf||gone.get(e.wolf)||(c?{x:c.lastX,z:c.lastZ}:{x:0,z:0}),x=last.x,z=last.z,p=onScreen(x,z);
@@ -768,17 +879,41 @@ async function start(){
     case 'pack':{const R=Rgoal+num(W('EDGE'));for(const p of Array.isArray(e.points)?e.points:[]){const a=spawnAngle(num(p)),x=Math.cos(a)*R,z=Math.sin(a)*R;
      warns.push({x,z,t0:time,color:RED,life:2.4});for(let i=0;i<8;i++)emit({cell:CELL.dust,x:x+span(-1.5,1.5),y:span(1,2.6),z:z+span(-1.5,1.5),vx:span(-1,1),vy:span(.5,1.4),vz:span(-1,1),drag:2,life:span(.7,1.1),size:.4,end:.8,color:LEAF,alpha:.8,fade:.4})}break}
     case 'arrive':ringWave(0,0,(Rgoal+.3)*2.5,RED,.8,0,CELL.halo,.4,.08,true);shake(.04);break;
-    case 'dash':{let k=0;for(const o of wolfVis.values()){if(o.state==='dead'||k>=24)continue;dustBurst(o.x,o.z,4,.6,k*.02);k++}shake(.06);break}
+    case 'dash':{let k=0;for(const o of wolfVis.values()){if(o.state==='dead'||o.ghost)continue;knock(o,0,0,0,2.2);if(k<24){dustBurst(o.x,o.z,4,.6,k*.02);k++}}shake(.06);break}
     default:break;   // 'broken', 'carry' and the rest are drawn from the pulled state
    }
   }
   dirty=true;
  }
- window.VillageView={events,reward(){},build,upgrade:()=>build('tower'),
+ // Test-only hook (inert unless called): {focus:[x,z,half]|null} close-up camera · {hold:true|false} freeze the view clock (still renders)
+ // · {advance:seconds} step a held view by fixed 1/30 s frames · {tris:true} triangle/draw breakdown of the last frame.
+ let hold=false,advance=0,traceNext=false,tracing=false,traced=null;
+ {const direct=renderer.renderBufferDirect.bind(renderer);renderer.renderBufferDirect=(cam,scene,geometry,material,object,group)=>{
+  if(tracing){const per=(geometry.index?geometry.index.count:geometry.attributes.position.count)/3,n=object.isInstancedMesh?object.count:1;if(n>0)traced.push([scene?'main':'shadow',object.name||geometry.type,Math.round(per*n)])}
+  return direct(cam,scene,geometry,material,object,group)}}
+ function debug(opt={}){
+  if(opt&&'focus' in opt){const f=opt.focus;if(Array.isArray(f)&&f.length>=3){FOCUS.set(num(f[0]),0,num(f[1]));focusHalf=Math.max(.8,num(f[2]))}else{FOCUS.set(0,0,0);focusHalf=0}camHalf=-1;applyView();camera.position.copy(EYE).add(FOCUS);dirty=true}
+  if(opt&&'hold' in opt)hold=!!opt.hold;
+  if(opt&&num(opt.advance)>0)advance+=Math.min(10,num(opt.advance));
+  if(opt&&Number.isFinite(opt.face))for(const o of wolfVis.values())o.ry=opt.face;   // turn every drawn monster (lineup shots)
+  if(opt&&opt.trace){traceNext=true}   // record every draw of the next rendered frame (read it back with debug({})).trace
+  const out={focus:focusHalf?[FOCUS.x,FOCUS.z,focusHalf]:null,hold,advance,trace:traced,monsterTris:Object.fromEntries(KIND_ORDER.map(k=>[k,herd[k].tris])),shadowStandInTris:shade.tris};
+  if(opt&&opt.tris){const list=[];world.traverse(o=>{if(!o.isMesh||!o.visible)return;let p=o;while(p){if(!p.visible)return;p=p.parent}
+    const g=o.geometry,per=(g.index?g.index.count:g.attributes.position.count)/3,n=o.isInstancedMesh?(o===shade.mesh?0:o.count):1;if(!n&&!o.castShadow)return;
+    const sh=o.castShadow?(o.isInstancedMesh?(o===shade.mesh?o.count:o.count):1):0;list.push({name:o.name||g.type||'mesh',main:Math.round(per*n),shadow:Math.round(per*sh)})});
+   const merged={};for(const r of list){const m=merged[r.name]||(merged[r.name]={name:r.name,main:0,shadow:0,meshes:0});m.main+=r.main;m.shadow+=r.shadow;m.meshes++}
+   out.tris=Object.values(merged).sort((a,b)=>b.main+b.shadow-a.main-a.shadow)}
+  return out;
+ }
+ window.VillageView={events,reward(){},build,upgrade:()=>build('tower'),debug,
   inspect(){
-   const states={};let onScreenW=0;for(const o of wolfVis.values()){states[o.state]=(states[o.state]||0)+1;ndc.set(o.x,.6,o.z).project(camera);if(Math.abs(ndc.x)<=1&&Math.abs(ndc.y)<=1)onScreenW++}
+   const states={},kinds={};let onScreenW=0,shownW=0,ghosts=0;
+   for(const o of wolfVis.values()){if(o.ghost){ghosts++;continue}shownW++;states[o.state]=(states[o.state]||0)+1;kinds[o.kind]=(kinds[o.kind]||0)+1;ndc.set(o.x,.6,o.z).project(camera);if(Math.abs(ndc.x)<=1&&Math.abs(ndc.y)<=1)onScreenW++}
+   const sw=read().world,stunned=sw&&Array.isArray(sw.buildings)?towers.filter(t=>t.on&&t.b&&num(t.b.stun)>0&&!t.b.broken).length:0;
    return {ready:true,time,frames,phase:read().phase,radius:Rgoal,radiusShown:Rd,cameraHalf:camHalf,aspect,
-    wolvesVisible:wolfVis.size,wolvesOnScreen:onScreenW,wolfStates:states,arrowsVisible:arrowsDrawn,wolfPos:[...wolfVis.values()].slice(0,8).map(o=>[Math.round(o.x*100)/100,Math.round(o.z*100)/100]),
+    wolvesVisible:shownW,wolvesOnScreen:onScreenW,wolfStates:states,wolfKinds:kinds,wolfGhosts:ghosts,maxWolvesDrawn,wolfCap:WCAP,highlighted:[...hl.values()].filter(t=>t>time).length,
+    power:powerShown,stunnedTowers:stunned,splashFx:{active:booms.filter(b=>time-b.t0<.8).length,total:boomTotal,scorches:scorches.length},
+    arrowsVisible:arrowsDrawn,fireArrows:fireDrawn,wolfPos:[...wolfVis.values()].filter(o=>!o.ghost).slice(0,8).map(o=>[Math.round(o.x*100)/100,Math.round(o.z*100)/100]),
     chickens:(()=>{const st=read();return st.world&&Array.isArray(st.world.hens)?st.world.hens.length:st.chickens|0})(),
     hensVisible:hensDrawn,hensHidden,hensPeeking:peeking,hensCarried:carriedDrawn,
     buildingsBroken:[...BUILDINGS,...sides].filter(sl=>sl.on&&sl.b&&sl.b.broken).length,
@@ -806,7 +941,7 @@ async function start(){
  const tickBlend=less=>{const u=less?1:clamp(blendT/blendDur,0,1);return blendEase?easeOut(u):u};
  let shadowR=-1;
  function applyView(){
-  const half=fitHalf(Rd);
+  const half=focusHalf||fitHalf(Rd);
   if(Math.abs(half-camHalf)>1e-4){camHalf=half;camera.left=-half*aspect;camera.right=half*aspect;camera.top=half;camera.bottom=-half;camera.updateProjectionMatrix()}
   fxScale=clamp(half/6.4,1,2.2)*clamp(560/viewW,1,1.25);
   yard.scale.set(Rd,1,Rd);layoutDecor(Rd);
@@ -816,7 +951,12 @@ async function start(){
   const k=less?1:1-Math.exp(-dt*3.6);Rd+=(Rgoal-Rd)*k;if(Math.abs(Rgoal-Rd)<.004)Rd=Rgoal;
   applyView();
  }
- function animateBuildings(dt,wdt,less){
+ const bw=new V3();
+ function brazierWorld(t){   // the fire basket on a tower's crossbow, in world space (bow scale 1.25, swivels with the aim)
+  const b=BRAZIER[Math.max(1,t.tier)],s=t.a.s,c=Math.cos(t.aim),sn=Math.sin(t.aim),off=bowAt[t.art],lx=b.x*1.25,lz=b.z*1.25;
+  return bw.set(t.a.x+(off.x+lx*c+lz*sn)*s,(off.y+b.y*1.25)*s,t.a.z+(off.z-lx*sn+lz*c)*s);
+ }
+ function animateBuildings(dt,wdt,less){const fdt=dt;
   for(const sl of BUILDINGS){if(!sl.on||!sl.b)continue;const a=sl.a,b=sl.b;
    a.x=num(b.x);a.z=num(b.z);
    const f=num(b.max)>0?clamp(num(b.hp)/num(b.max),0,1):1,tier=b.broken?3:f<=.34?2:f<=.67?1:0;sl.hp=f;
@@ -827,11 +967,16 @@ async function start(){
    if(n&&!less){const q=Math.min(3,n);a.tilt+=Math.sin(wclock*31+sl.lean)*.016*q;a.sx*=1+.012*q*Math.abs(Math.sin(wclock*31));
     if(wdt>0&&(sl.chipT-=wdt)<=0){sl.chipT=.5;const ang=span(0,6.283),r=sl.size*.9;chipBurst(a.x+Math.cos(ang)*r,.5,a.z+Math.sin(ang)*r,3);dustBurst(a.x+Math.cos(ang)*r,a.z+Math.sin(ang)*r,3,.5)}}
    if(sl.kind==='tower'){   // the crossbow swivels toward its latest target (or the nearest wolf) and kicks back on each shot
+    const stun=!b.broken&&num(b.stun)>0;sl.stunned=stun;   // the ember king's roar: the crossbow droops and spins dizzily until the stun runs out
     let target=time-sl.aimAt<1.5?wolfVis.get(sl.aimId):null;
     if(!target||target.state==='dead'){let bd=64;target=null;for(const o of wolfVis.values()){if(o.state==='dead')continue;const d=(o.x-a.x)**2+(o.z-a.z)**2;if(d<bd){bd=d;target=o}}}
-    if(target&&!b.broken){const want=Math.atan2(target.x-a.x,target.z-a.z);let d=(want-sl.aim)%6.283;if(d>Math.PI)d-=6.283;if(d<-Math.PI)d+=6.283;sl.aim+=d*(less?1:Math.min(1,wdt*8))}
+    if(target&&!b.broken&&!stun){const want=Math.atan2(target.x-a.x,target.z-a.z);let d=(want-sl.aim)%6.283;if(d>Math.PI)d-=6.283;if(d<-Math.PI)d+=6.283;sl.aim+=d*(less?1:Math.min(1,wdt*8))}
     if(sl.kick>0)sl.kick=Math.max(0,sl.kick-dt*6);
-    const off=bowAt[sl.art],back=less?0:.12*sl.kick;sl.bow.rotation.set(b.broken?.5:0,sl.aim,b.broken?.4:0);sl.bow.position.set(off.x-Math.sin(sl.aim)*back,off.y,off.z-Math.cos(sl.aim)*back);
+    const off=bowAt[sl.art],back=less?0:.12*sl.kick,dizzy=stun&&!less;
+    sl.bow.rotation.set(b.broken?.5:stun?.42+(dizzy?Math.sin(time*7)*.08:0):0,sl.aim+(dizzy?Math.sin(time*3.1)*.45:0),b.broken?.4:dizzy?Math.sin(time*5)*.12:0);sl.bow.position.set(off.x-Math.sin(sl.aim)*back,off.y,off.z-Math.cos(sl.aim)*back);
+    if(dizzy){a.tilt+=Math.sin(time*6+sl.slot)*.02;if(fdt>0&&(sl.smokeT-=fdt)<=0){sl.smokeT=.32;const H=TOWER_H*a.s;emit({cell:CELL.glow,x:a.x+span(-.3,.3),y:H*.9,z:a.z+span(-.3,.3),vy:span(.6,1),drag:1,life:span(.8,1.1),size:.45,end:1.1,color:ASH,alpha:.55,fade:.3,pop:.2})}}
+    if(sl.tier>0&&!b.broken&&!less&&fdt>0&&(sl.emberT=(sl.emberT||0)-fdt)<=0){sl.emberT=sl.tier>=2?.22:.4;const p=brazierWorld(sl);
+     emit({cell:CELL.dot,x:p.x+span(-.06,.06),y:p.y+.15,z:p.z+span(-.06,.06),vx:span(-.25,.25),vy:span(.8,1.4),vz:span(-.25,.25),gravity:-.2,drag:1,life:span(.5,.9),size:.07,end:.02,color:EMBER,add:.9,fade:.5,pop:0})}
    }
   }
  }
@@ -852,40 +997,145 @@ async function start(){
    }
   }
   fences.count=n;fences.instanceMatrix.needsUpdate=true;if(fences.instanceColor)fences.instanceColor.needsUpdate=true;
+  fenceShade.instanceMatrix.array.set(fences.instanceMatrix.array.subarray(0,n*16));fenceShade.count=n;fenceShade.instanceMatrix.needsUpdate=true;
  }
+ /* ----- monsters: gaits, attacks, reactions and falls, written straight into the per-kind instanced meshes.
+    The world position is authoritative; everything here (knock-back, hops, rearing) is a visual offset on top. ----- */
+ const PZ={y:0,pitch:0,roll:0,sx:1,sy:1,sz:1,hy:0,hp:0,hr:0,jaw:0,ty:0,tp:.35,legs:[0,0,0,0],lift:[0,0,0,0]};
+ const rq=new THREE.Quaternion(),re=new THREE.Euler(0,0,0,'YXZ'),rp=new V3(),rs=new V3(),rv=new V3(),rv2=new V3(),YAX=new V3(0,1,0),rm=new THREE.Matrix4();
+ const mq=new THREE.Quaternion(),me=new THREE.Euler(0,0,0,'YXZ'),mv=new V3(),tv=new V3(),hv=new V3();
+ const HL=new THREE.Color(1.4,1.32,1.08);
+ const wolfKinds={},henSpots=[];let maxWolvesDrawn=0,wolvesDrawn=0,fxBudget=0;
+ // Where the mouth (a carried hen) and the top of the head (markers) are on screen, from the same rig the shader uses.
+ function mouthOf(o,out){const R=RIG[o.kind];me.set(o.php,o.phy,o.phr,'YXZ');mq.setFromEuler(me);return out.set(R.M[0]-R.H[0],R.M[1]-R.H[1],R.M[2]-R.H[2]).applyQuaternion(mq).add(mv.set(R.H[0],R.H[1],R.H[2])).applyMatrix4(o.mat)}
+ function topOf(o,out){const R=RIG[o.kind];return out.set(R.top[0],R.top[1],R.top[2]).applyMatrix4(o.mat)}
+ function onView(x,y,z){ndc.set(x,y,z).project(camera);return Math.abs(ndc.x)<1.05&&Math.abs(ndc.y)<1.05}
+ const angleTo=(a,b)=>{let d=(a-b)%6.283;if(d>Math.PI)d-=6.283;if(d<-Math.PI)d+=6.283;return d};
+ // A paw (or snout) hitting the ground: dust ring, at most a few per frame and only on screen.
+ function impact(o,j,big){if(fxBudget<=0)return;const L=RIG[o.kind].L[j];tv.set(L[0],.05,L[2]+.12).applyMatrix4(o.mat);if(!onView(tv.x,.3,tv.z))return;fxBudget--;stomp(tv.x,tv.z,o.size*.8,big)}
+ // a heavy footfall (granite, ember king): a small puff only
+ function footfall(o,j){if(fxBudget<=0)return;const L=RIG[o.kind].L[j];tv.set(L[0],.05,L[2]).applyMatrix4(o.mat);if(!onView(tv.x,.3,tv.z))return;fxBudget--;
+  for(let i=0;i<2;i++)emit({cell:CELL.dust,x:tv.x+span(-.12,.12),y:.08,z:tv.z+span(-.12,.12),vx:span(-.5,.5),vy:span(.2,.5),vz:span(-.5,.5),drag:3,life:span(.4,.55),size:.14*o.size,end:.36*o.size,color:DUST,alpha:.75,fade:.3,abs:true})}
+ // small oscillators shared by every monster (no per-frame closures): wag = tail/head sway, sc = scratching paws
+ let wagSeed=0,wagLess=false;
+ const wag=(f,a)=>wagLess?0:Math.sin(wclock*f+wagSeed*9)*a,sc=f=>wagLess?0:Math.sin(wclock*f+wagSeed*5);
+ function writePose(pose,i,P,o){const a=pose[0].array,b=pose[1].array,c=pose[2].array,d=pose[3].array,k=i*4;
+  a[k]=P.hy;a[k+1]=P.hp;a[k+2]=P.jaw;a[k+3]=P.ty;b[k]=P.tp;b[k+1]=o.legs[0];b[k+2]=o.legs[1];b[k+3]=o.legs[2];
+  c[k]=o.legs[3];c[k+1]=P.hr;c[k+2]=o.seed*20;c[k+3]=0;d[k]=o.lift[0];d[k+1]=o.lift[1];d[k+2]=o.lift[2];d[k+3]=o.lift[3]}
  function animateWolves(dt,wdt,less){
-  const e=tickBlend(less);let m=0;
+  const e=tickBlend(less);
+  for(const k of KIND_ORDER){herd[k].n=0;wolfKinds[k]=0}shade.n=0;fxBudget=less?0:5;
+  henSpots.length=0;for(const c of henSlots)if(c.on&&c.h&&(c.h.state==='yard'||c.h.state==='home'||c.h.state==='flee'))henSpots.push(c.a);
   for(const o of wolfVis.values()){
-   const px=o.x,pz=o.z;o.x=o.fx+(o.tx-o.fx)*e;o.z=o.fz+(o.tz-o.fz)*e;
-   const dx=o.x-px,dz=o.z-pz,moved=Math.hypot(dx,dz),st=o.state,v=o.v;
+   const px=o.x,pz=o.z;if(!o.ghost){o.x=o.fx+(o.tx-o.fx)*e;o.z=o.fz+(o.tz-o.fz)*e}
+   const dx=o.x-px,dz=o.z-pz,moved=Math.hypot(dx,dz),st=o.state,v=o.v,K=o.K,G=GAIT[o.kind]||GAIT.wolf,R=RIG[o.kind],boss=!!K.boss;
+   if(wdt>0){o.spd+=(Math.min(4,moved/wdt)-o.spd)*Math.min(1,wdt*7);o.age+=wdt}else if(dt>0)o.spd*=Math.max(0,1-dt*6);
    if(o.hit>0)o.hit-=dt;
    if(st==='dead')o.deadAge+=wdt;
    let face=null;
    if(st==='smash'){const b=bById.get(v.target);face=b&&b.kind!=='fence'?Math.atan2(num(b.x)-o.x,num(b.z)-o.z):Math.atan2(-o.x,-o.z)}
    else if(st==='bite'){const c=henById.get(v.hen);if(c)face=Math.atan2(c.a.x-o.x,c.a.z-o.z)}
    else if(st!=='dead'&&moved>.0015)face=Math.atan2(dx,dz);
-   if(face!==null)turnTo(o,face,less?1:dt*10);
-   const run=st==='hunt'||st==='carry';o.stride+=moved*(run?6.2:7);
-   let y=0,pitch=0,roll=0,legs=0,fwd=0,yaw=0,k=WS;
-   if(!less&&moved>1e-4){y=Math.abs(Math.sin(o.stride))*(run?.1:.07);legs=Math.sin(o.stride)*(run?.75:.55);pitch=run?.06:0}
-   if(st==='smash'&&!less){const l=Math.max(0,Math.sin(wclock*5.2+o.p*1.7))**3;pitch=.14+.36*l;fwd=.3*l;y-=.05;legs=-.25*l}
-   if(st==='bite'&&!less){pitch=.34;yaw=Math.sin(wclock*22+o.p)*.22;y-=.06;legs=.2}
-   if(st==='leave'&&!less)pitch=-.04;
+   if(face!==null)turnTo(o,face,less?1:dt*(o.kind==='granite'||boss?6:10));
+   const P=PZ;P.y=P.pitch=P.roll=P.hy=P.hp=P.hr=P.jaw=P.ty=0;P.tp=.35;P.sx=P.sy=P.sz=1;for(let j=0;j<4;j++){P.legs[j]=0;P.lift[j]=0}
+   let fwd=0,pivZ=0,pivY=0,grow=1,ay=0;wagSeed=o.seed;wagLess=less;
+   // gait: trot / gallop / bouncy boar trot / granite plod / ember prowl, stride by distance travelled
+   if((st==='walk'||st==='hunt'||st==='carry'||st==='leave')&&!less){
+    const running=st==='hunt'||st==='carry',type=running?G.run:G.walk,base=(K.speed||1)*(st==='carry'?.65:1);
+    const mov=clamp((o.spd-.05)/(.25*base),0,1),hz=G.hz[type]*(running&&type!=='gallop'?1.25:1)*(st==='carry'?.85:1)*clamp(o.spd/base,.6,1.5);
+    o.ph+=wdt*6.283*hz;gaitPose(type,o.ph,mov,P);
+    if((o.kind==='granite'||boss)&&mov>.5&&wdt>0&&(o.stepT=(o.stepT||0)-wdt)<=0)for(let j=0;j<4;j++)if(o.lift[j]>.02&&P.lift[j]<=.004){footfall(o,j);o.stepT=.3;break}   // heavy feet leave puffs
+   }
+   // tail and head by state
+   if(st==='walk'){P.tp=.42;P.ty=(less?0:Math.sin(o.ph)*.28)+wag(3,.1)}
+   else if(st==='hunt'){P.tp=.8;P.ty=wag(15,.5)}
+   else if(st==='carry'){P.tp=.2+(less?0:.15*Math.sin(o.ph+1.2));P.ty=wag(10,.25);P.hp-=.14;P.jaw+=.34}
+   else if(st==='leave'){P.tp=-.7;P.ty=wag(4,.08);P.hp+=.2}
+   else if(st==='bite'){P.tp=.6;P.ty=wag(18,.5)}
+   else if(st==='smash'){P.tp=.7;P.ty=wag(12,.35)}
+   if(o.kind==='frost'&&(st==='walk'||st==='hunt'))P.tp=.12+(less?0:.12*Math.sin(o.ph+1));   // the plume streams out behind
+   if(o.kind==='boar'&&st!=='dead'){P.ty=wag(26,.7);P.tp=.25}
+   if(boss)P.tp+=.12;
+   if(st==='walk'||st==='hunt'){   // the head turns to a hen close by, otherwise it looks around
+    let want=0,bd=st==='hunt'?16:9,tgt=null;
+    if(o.kind!=='boar')for(const h of henSpots){const d=(h.x-o.x)**2+(h.z-o.z)**2;if(d<bd){bd=d;tgt=h}}
+    if(tgt)want=clamp(angleTo(Math.atan2(tgt.x-o.x,tgt.z-o.z),o.ry),-.8,.8);else if(!less)want=.32*Math.sin(wclock*.7+o.seed*20)*(st==='walk'?1:.4);
+    o.hy+=(want-o.hy)*(less?1:Math.min(1,dt*6));P.hy+=o.hy;
+   }else o.hy*=less?0:Math.max(0,1-dt*6);
+   // coming out of the forest: pop, hop, land in a puff, then a few sniffs
+   if(!less&&st==='walk'&&o.age<1.5){const a=o.age;
+    if(a<.42){const u=a/.42;P.y+=2*u*(1-u);P.pitch-=.25*Math.sin(u*Math.PI);grow=.4+.6*easeOut(Math.min(1,u*1.7))}
+    else if(!o.emerged){o.emerged=true;if(fxBudget>0&&onView(o.x,.3,o.z)){fxBudget--;dustBurst(o.x,o.z,3,.55)}}
+    if(a>.4){const k=Math.sin(clamp((a-.4)/1.1,0,1)*Math.PI);P.hp+=.42*k+.08*Math.sin(a*36)*k;P.hy+=.4*Math.sin(a*4.4)*k;P.jaw+=.05*k}
+   }
+   // attacks on a building or fence, one per kind
+   if(st==='smash'){
+    const rate=o.kind==='boar'?1/1.1:o.kind==='granite'?1/1.3:boss?1/1.5:1/.9,cyc=wclock*rate+o.seed,u=less?.62:cyc%1,idx=Math.floor(cyc),hitU=o.kind==='boar'||o.kind==='granite'?.55:.42;
+    if(o.kind==='boar'){   // backs up pawing the ground, charges, rams, shakes its head
+     if(u<.42){const k=easeInOut(u/.42),s1=less?0:Math.sin(u*46);fwd=.3-.75*k;P.hp+=.32*k;P.pitch+=.06*k;P.legs[0]+=.35*s1+(less?0:.45*Math.max(0,Math.sin(u*Math.PI*3)));P.legs[1]-=.35*s1;P.legs[2]-=.3*s1;P.legs[3]+=.3*s1}
+     else if(u<.55){const k=easeIn((u-.42)/.13),s2=less?0:Math.sin(u*90);fwd=-.45+.9*k;P.hp+=.38;P.pitch+=.12;P.legs[0]-=.7*s2;P.legs[1]+=.7*s2;P.legs[2]+=.6*s2;P.legs[3]-=.6*s2}
+     else{const k=easeOut((u-.55)/.45);fwd=.45-.15*k;P.hp+=.38*(1-k);P.hy+=(less?0:.4*Math.sin((u-.55)*55))*(1-k);P.sy*=1-.1*(1-k);P.sx*=1+.08*(1-k)}
+    }else if(o.kind==='granite'){   // lifts a front paw high and slams it down (alternating paws)
+     const j=idx%2;
+     if(u<.45){const k=easeOut(u/.45);P.legs[j]-=1.35*k;P.lift[j]+=.22*k;P.pitch-=.2*k;P.roll+=(j?1:-1)*.08*k;P.hp-=.15*k;pivZ=R.rear}
+     else if(u<.55){const k=easeIn((u-.45)/.1);P.legs[j]+=-1.35+1.45*k;P.lift[j]+=.22*(1-k);P.pitch+=-.2+.35*k;P.roll+=(j?1:-1)*.08*(1-k);P.hp+=-.15+.3*k;fwd=.1*k;pivZ=R.rear}
+     else{const k=easeOut((u-.55)/.45);P.pitch+=.15*(1-k);P.hp+=.15*(1-k);fwd=.1*(1-k);P.sy*=1-.07*(1-k);P.sx*=1+.05*(1-k)}
+    }else{   // wolf, bramble, frost, ember king: rears up, pounces, scratches with both front paws
+     const big=boss?.85:1,lunge=boss?.12:.32;   // the king is huge: a lower rear and a short lunge keep its head out of the roofs
+     if(u<.3){const k=easeOut(u/.3);P.pitch-=.6*k*big;P.y+=.06*k;P.legs[0]-=1.1*k;P.legs[1]-=k;P.lift[0]+=.15*k;P.lift[1]+=.15*k;P.legs[2]+=.15*k;P.legs[3]+=.15*k;P.hp-=.3*k;P.jaw+=.45*k;pivZ=R.rear}
+     else if(u<.42){const k=easeIn((u-.3)/.12);P.pitch+=-.6*big+(.6*big+.15)*k;fwd=lunge*k;P.legs[0]+=-1.1+.6*k;P.legs[1]+=-1+.5*k;P.hp+=-.3+.55*k;P.jaw+=.45;pivZ=R.rear}
+     else if(u<.85){const s=sc(boss?24:36);P.pitch+=.15;fwd=lunge;P.legs[0]+=-.5+.45*s;P.legs[1]+=-.5-.45*s;P.lift[0]+=.06*Math.max(0,s);P.lift[1]+=.06*Math.max(0,-s);P.hp+=.25+.06*sc(22);P.jaw+=.3+.15*sc(20);pivZ=R.rear}
+     else{const k=(u-.85)/.15;P.pitch+=.15*(1-k);fwd=lunge*(1-k);P.legs[0]-=.5*(1-k);P.legs[1]-=.5*(1-k);P.hp+=.25*(1-k)}
+    }
+    if(!less&&u>=hitU&&o.atk!==idx){o.atk=idx;   // the blow lands
+     if(o.kind==='boar'){impact(o,0,true);const b=bById.get(v.target),sl=b&&slotOf(b);if(sl&&sl.a&&fxBudget>0)wobble(sl.a,.05)}
+     else if(o.kind==='granite')impact(o,idx%2,true);
+     else if(boss){impact(o,0,true);if(onView(o.x,.5,o.z))for(let i=0;i<4;i++)emit({cell:CELL.dot,x:o.x+Math.sin(o.ry)*.8*o.size,y:.3,z:o.z+Math.cos(o.ry)*.8*o.size,vx:span(-1,1),vy:span(1.5,2.6),vz:span(-1,1),gravity:5,life:span(.4,.6),size:.09,end:.02,color:EMBER,add:.9,fade:.5,pop:0})}
+     else impact(o,0,false);
+    }
+   }
+   if(st==='bite'){const sh=less?0:Math.sin(wclock*26+o.seed*7);P.hp+=.48;P.hy+=.42*sh;P.hr+=.25*sh;P.jaw+=.08;P.pitch+=.1;fwd=.06;P.legs[0]-=.25;P.legs[1]-=.25;P.legs[2]+=.25;P.legs[3]+=.25;P.y-=.03}
+   // the ember king's roar: rears back, head up, mouth wide (layered over whatever it was doing)
+   const rt=time-o.roarT;
+   if(st!=='dead'&&rt>=0&&rt<1.5){const k=rt<.25?easeOut(rt/.25):rt>1.15?1-easeIn((rt-1.15)/.35):1,tr=less?0:Math.sin(rt*55)*.05;
+    P.pitch-=.34*k;pivZ=R.rear;P.hp=P.hp*(1-k)+(-.85+tr)*k;P.hy*=1-k;P.jaw=P.jaw*(1-k)+.9*k;P.legs[0]-=.45*k;P.legs[1]-=.45*k;P.lift[0]+=.1*k;P.lift[1]+=.1*k;P.tp+=.45*k;P.y+=.05*k;fwd*=1-k}
+   // hit: flinch, squash and tuck the tail
+   const ht=time-o.hitT;
+   if(!less&&ht>=0&&ht<.4&&st!=='dead'){const f=(1-ht/.4)**2;P.pitch-=.2*f;P.hp-=.3*f;P.sx*=1+.1*f;P.sy*=1-.12*f;o.tuck=Math.max(o.tuck,f)}
+   if(o.tuck>0){P.tp=P.tp*(1-o.tuck)-.85*o.tuck;if(dt>0)o.tuck=Math.max(0,o.tuck-dt*1.5)}
+   // first of its kind: bounces for a few seconds under a "!" (see ambient)
+   const hlEnd=hl.get(o.id),lit=hlEnd!==undefined&&time<hlEnd;
+   if(lit&&!less&&st!=='dead')P.y+=.3*Math.abs(Math.sin((hlEnd-time)*5.6));
    // leaping back over an intact fence on the way out
-   if((st==='carry'||st==='leave')&&!less){const r=Math.hypot(o.x,o.z),Rf=Rd-FENCE_IN,d=Math.abs(r-Rf);if(d<.75){const side=sides[Math.floor(((Math.atan2(o.z,o.x)+Math.PI*2)%(Math.PI*2))/(Math.PI/3))%6];if(side&&side.on&&side.b&&!side.b.broken){const q=d/.75;y+=.85*(1-q*q);pitch-=.25*(1-q)}}}
-   if(st==='dead'){const t=less?.5:o.deadAge,a=less?1:easeOut(Math.min(1,t/.32));roll=o.side*1.45*a;y+=.28*a;legs=.4*a;pitch=0;
-    if(!less&&t>.9){const s=Math.min(1,(t-.9)/.5);y-=.55*s;k*=1-.5*s}}
-   const p=wolfPool[o.p],g=p.group;
-   g.position.set(o.x+Math.sin(o.ry)*fwd,y,o.z+Math.cos(o.ry)*fwd);g.rotation.set(pitch,o.ry+yaw,roll);g.scale.setScalar(k*(o.hit>0?1.08:1));
-   for(let j=0;j<4;j++)p.legs[j].rotation.x=legs*(j===1||j===2?-1:1);
-   g.updateMatrixWorld(true);
-   const c=o.hit>0?FLASH:st==='dead'?DEAD:PLAIN;
-   wolfBody.setMatrixAt(m,g.matrixWorld);wolfBody.setColorAt(m,c);
-   for(let j=0;j<4;j++){wolfLegs.setMatrixAt(m*4+j,p.legs[j].matrixWorld);wolfLegs.setColorAt(m*4+j,c)}
-   m++;
+   if((st==='carry'||st==='leave')&&!less){const r=Math.hypot(o.x,o.z),Rf=Rd-FENCE_IN,d=Math.abs(r-Rf);if(d<.75){const side=sides[Math.floor(((Math.atan2(o.z,o.x)+Math.PI*2)%(Math.PI*2))/(Math.PI/3))%6];if(side&&side.on&&side.b&&!side.b.broken){const q=d/.75;ay+=.85*(1-q*q);P.pitch-=.25*(1-q)}}}
+   // falling: knocked up and over, lands in a poof, lies a moment, sinks away
+   if(st==='dead'){
+    const D=boss?.8:.55,H=boss?1.1:.65,t=less?9:o.deadAge,c=R.center,u=Math.min(1,t/D),k2=Math.min(1,u*2);pivY=c;
+    P.roll=o.side*4.712*(less?1:easeOut(u));P.y=(less?0:H*4*u*(1-u))-(c-.3)*(less?1:easeIn(u));P.pitch=0;P.sx=P.sy=P.sz=1;fwd=0;
+    P.legs[0]=P.legs[1]=-.7*k2;P.legs[2]=P.legs[3]=.7*k2;for(let j=0;j<4;j++)P.lift[j]=0;P.hp=-.35;P.hy=0;P.hr=0;P.jaw=.45;P.tp=-.2;P.ty=0;
+    if(!less&&t>=D){if(!o.landed){o.landed=true;if(boss||onView(o.x,.4,o.z))poof(o.x,o.z,o.size,boss)}
+     P.y+=.08*Math.exp(-7*(t-D))*Math.abs(Math.sin((t-D)*14));const sk=easeIn(clamp((t-D-.45)/.45,0,1));P.y-=.7*sk;grow*=Math.max(.001,1-sk)}
+   }else if(!less)P.sy*=1+.018*Math.sin(time*2.6+o.seed*6);   // breathing
+   // knock-back spring (visual only)
+   if(less){o.kx=o.kz=o.ky=o.kvx=o.kvz=o.kvy=0}
+   else if(dt>0){const h=Math.min(dt,.05);o.kvx+=(-75*o.kx-10*o.kvx)*h;o.kvz+=(-75*o.kz-10*o.kvz)*h;o.kx+=o.kvx*h;o.kz+=o.kvz*h;
+    if(o.ky>0||o.kvy>0){o.kvy-=22*h;o.ky+=o.kvy*h;if(o.ky<=0){o.ky=0;o.kvy=0}}}
+   const ls=less?1:Math.min(1,dt*24);for(let j=0;j<4;j++){o.legs[j]+=(P.legs[j]-o.legs[j])*ls;o.lift[j]+=(P.lift[j]-o.lift[j])*ls}
+   // root transform: pitch/roll about a pivot (hind hips for rearing, body centre for tumbling)
+   const S=o.size*grow;
+   re.set(P.pitch,o.ry,P.roll,'YXZ');rq.setFromEuler(re);
+   rv.set(0,pivY*S,pivZ*S);rv2.copy(rv).applyAxisAngle(YAX,o.ry);rv.applyQuaternion(rq);
+   rp.set(o.x+o.kx+Math.sin(o.ry)*fwd*S,P.y*S+o.ky+ay,o.z+o.kz+Math.cos(o.ry)*fwd*S).add(rv2).sub(rv);
+   o.mat.compose(rp,rq,rs.set(S*P.sx,S*P.sy,S*P.sz));o.phy=P.hy;o.php=P.hp;o.phr=P.hr;
+   const Hd=herd[o.kind],i=Hd.n++;o.mat.toArray(Hd.mesh.instanceMatrix.array,i*16);writePose(Hd.pose,i,P,o);
+   Hd.mesh.setColorAt(i,o.hit>0?FLASH:st==='dead'?DEAD:lit&&!less&&Math.sin(time*9)>0?HL:PLAIN);
+   if(!o.ghost)wolfKinds[o.kind]++;
+   if(st!=='dead'||o.deadAge<.9){const j=shade.n++,fit=SHADE_FIT[o.kind];if(fit){rm.copy(o.mat).scale(fit);rm.toArray(shade.mesh.instanceMatrix.array,j*16)}else o.mat.toArray(shade.mesh.instanceMatrix.array,j*16);writePose(shade.pose,j,P,o)}
   }
-  wolfBody.count=m;wolfLegs.count=m*4;
-  for(const mesh of [wolfBody,wolfLegs]){mesh.instanceMatrix.needsUpdate=true;if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true}
+  let drawn=0;
+  for(const k of KIND_ORDER){const Hd=herd[k];Hd.mesh.count=Hd.n;Hd.mesh.visible=Hd.n>0;drawn+=Hd.n;Hd.mesh.instanceMatrix.needsUpdate=true;for(const p of Hd.pose)p.needsUpdate=true;if(Hd.mesh.instanceColor)Hd.mesh.instanceColor.needsUpdate=true}
+  shade.mesh.count=shade.n;shade.mesh.visible=shade.n>0;shade.mesh.instanceMatrix.needsUpdate=true;for(const p of shade.pose)p.needsUpdate=true;
+  wolvesDrawn=drawn;maxWolvesDrawn=Math.max(maxWolvesDrawn,drawn);
  }
  let hensDrawn=0,hensHidden=0,carriedDrawn=0,peeking=0;
  function animateHens(dt,wdt,less){
@@ -896,7 +1146,7 @@ async function start(){
    if(st==='hidden'){a.hide=true;hensHidden++;continue}
    a.hide=false;hensDrawn++;
    if(st==='carried'){const o=henCarrier.get(c.h.id);
-    if(o){const f=.8*WS;a.x=o.x+Math.sin(o.ry)*f;a.z=o.z+Math.cos(o.ry)*f;a.y=.42;a.ry=o.ry+Math.PI/2}else{a.x=num(c.h.x);a.z=num(c.h.z)}
+    if(o){mouthOf(o,hv);const k=clamp(o.size/1.3,.62,1);a.x=hv.x;a.z=hv.z;a.y=Math.max(0,hv.y-.55*a.s*k);a.ry=o.ry+Math.PI/2;a.sx*=k;a.sy*=k}else{a.x=num(c.h.x);a.z=num(c.h.z)}   // hangs from the mouth, a bit smaller than the wolf's head
     a.tilt+=.55+(less?0:Math.sin(wclock*30+c.phase)*.25);if(!less)a.lift+=Math.abs(Math.sin(wclock*15))*.06;
     c.fx=c.tx=a.x;c.fz=c.tz=a.z;c.lastX=a.x;c.lastZ=a.z;carriedDrawn++;continue}
    const px=a.x,pz=a.z;a.x=c.fx+(c.tx-c.fx)*e;a.z=c.fz+(c.tz-c.fz)*e;c.lastX=a.x;c.lastZ=a.z;
@@ -918,13 +1168,17 @@ async function start(){
  }
  function writeHens(){
   let m=0;
-  for(const a of [...henSlots.map(c=>c.a),...peeks]){if(a.hide)continue;a.obj.updateMatrix();henMesh.setMatrixAt(m,a.obj.matrix);henMesh.setColorAt(m,a.flash>0?FLASH:a.shy?SHY:PLAIN);m++}
-  henMesh.count=m;henMesh.instanceMatrix.needsUpdate=true;if(henMesh.instanceColor)henMesh.instanceColor.needsUpdate=true;
+  for(const a of [...henSlots.map(c=>c.a),...peeks]){if(a.hide)continue;a.obj.updateMatrix();henMesh.setMatrixAt(m,a.obj.matrix);henShade.setMatrixAt(m,a.obj.matrix);henMesh.setColorAt(m,a.flash>0?FLASH:a.shy?SHY:PLAIN);m++}
+  henMesh.count=henShade.count=m;henMesh.instanceMatrix.needsUpdate=henShade.instanceMatrix.needsUpdate=true;if(henMesh.instanceColor)henMesh.instanceColor.needsUpdate=true;
+  // farmers and towers cast their shadows through low-poly stand-ins too
+  let f=0;for(const fm of farmers)if(fm.a.obj.visible)copyShade(farmerShade,f++,fm.a.obj);farmerShade.count=f;farmerShade.instanceMatrix.needsUpdate=true;
+  const tn=[0,0];for(const t of towers)if(t.on){const k=t.art;copyShade(towerShade[k],tn[k]++,t.a.obj)}towerShade.forEach((m,k)=>{m.count=tn[k];m.instanceMatrix.needsUpdate=true});
  }
- let arrowsDrawn=0;
- const aq=new THREE.Quaternion(),Zf=new V3(0,0,1),tan=new V3(),ap=new V3(),as=new V3();
+ let arrowsDrawn=0,fireDrawn=0;
+ const aq=new THREE.Quaternion(),Zf=new V3(0,0,1),tan=new V3(),ap=new V3(),as=new V3(),WARM=new THREE.Color(1.25,.82,.55);
+ for(let i=0;i<arrowMesh.instanceMatrix.count;i++)arrowMesh.setColorAt(i,PLAIN);
  function animateArrows(less){
-  const frac=less?1:clamp(sinceTick/.1,0,1),sc=clamp(camHalf/7,1.1,2.2);let n=0;const max=arrowMesh.instanceMatrix.count;
+  const frac=less?1:clamp(sinceTick/.1,0,1),sc=clamp(camHalf/7,1.1,2.2);let n=0,hot=0,embers=less?0:8;const max=arrowMesh.instanceMatrix.count;
   for(const [id,o] of arrowVis){
    const target=wolfVis.get(o.a.wolf);if(target&&target.state!=='dead'){o.ex=target.x;o.ez=target.z}
    if(o.fin>=0){const k=less?1:clamp((time-o.fin)/.08,0,1);o.u=o.u0+(1-o.u0)*k;if(k>=1){arrowVis.delete(id);continue}}
@@ -933,11 +1187,20 @@ async function start(){
    if(n>=max)continue;
    const u=o.u,dx=o.ex-o.sx,dy=o.ey-o.sy,dz=o.ez-o.sz,dist=Math.hypot(dx,dz),arc=.3+.12*dist;
    ap.set(o.sx+dx*u,o.sy+dy*u+arc*4*u*(1-u),o.sz+dz*u);tan.set(dx,dy+arc*4*(1-2*u),dz).normalize();aq.setFromUnitVectors(Zf,tan);
-   pm.compose(ap,aq,as.set(sc,sc,sc));arrowMesh.setMatrixAt(n++,pm);
+   const fire=num(o.a.splash)>0;
+   pm.compose(ap,aq,as.set(sc,sc,sc));arrowMesh.setColorAt(n,fire?WARM:PLAIN);arrowMesh.setMatrixAt(n++,pm);
+   if(fire){   // 펑 화살: a burning head with a flame tongue trailing back, a red-orange streak and falling embers
+    hot++;const hx=ap.x+tan.x*.55*sc,hy=ap.y+tan.y*.55*sc,hz=ap.z+tan.z*.55*sc;
+    sprite(CELL.glow,hx,hy,hz,1.0*sc,1.0*sc,ORANGE,.8,1);
+    if(!less&&u<.999){const ang=Math.atan2(tan.dot(camUp),tan.dot(camRight))+Math.PI/2,fl=.9+.15*Math.sin(time*31+o.id);
+     sprite(CELL.flame,hx-tan.x*.3*sc,hy-tan.y*.3*sc,hz-tan.z*.3*sc,.55*sc,.8*sc*fl,WHITE,.95,.85,ang);
+     for(let k=1;k<5;k++){const b=k*.34*sc,f=1-k*.2;sprite(CELL.glow,ap.x-tan.x*b,ap.y-tan.y*b,ap.z-tan.z*b,.58*sc*f,.58*sc*f,k<2?EMBER:FIRE,.55*f,.95)}
+     if(embers>0&&rnd()<.3){embers--;emit({cell:CELL.dot,x:ap.x,y:ap.y,z:ap.z,vx:span(-.4,.4),vy:span(-.2,.6),vz:span(-.4,.4),gravity:3,drag:1,life:span(.3,.5),size:.08,end:.02,color:EMBER,add:.9,fade:.5,pop:0})}}
+   }
    // a short bright streak behind the head keeps the arrow readable at phone size
-   if(!less&&u<.999)for(let k=0;k<4;k++){const b=k*.32*sc,f=1-k*.22;sprite(CELL.glow,ap.x-tan.x*b,ap.y-tan.y*b,ap.z-tan.z*b,.62*sc*f,.62*sc*f,k?CREAM:WHITE,(k?.4:.6)*f,.95)}
+   else if(!less&&u<.999)for(let k=0;k<4;k++){const b=k*.32*sc,f=1-k*.22;sprite(CELL.glow,ap.x-tan.x*b,ap.y-tan.y*b,ap.z-tan.z*b,.62*sc*f,.62*sc*f,k?CREAM:WHITE,(k?.4:.6)*f,.95)}
   }
-  arrowsDrawn=n;arrowMesh.count=n;arrowMesh.instanceMatrix.needsUpdate=true;
+  arrowsDrawn=n;fireDrawn=hot;arrowMesh.count=n;arrowMesh.instanceMatrix.needsUpdate=true;if(arrowMesh.instanceColor)arrowMesh.instanceColor.needsUpdate=true;
  }
 
  /* ----- daily life (farmers keep their own clock: they are decor, not part of the world simulation) ----- */
@@ -973,6 +1236,7 @@ async function start(){
  /* ----- always-on sprites: pads, wolf glow, health bars, cracks, smoke, warnings, ripples (not counted as effects) ----- */
  function bar(x,y,z,f,width,color){const w=width*fxScale*.8,h=.13*fxScale*.8;sprite(CELL.solid,x,y,z,w+.08*fxScale,h+.07*fxScale,HPBG,.72);const off=-(1-f)*w/2;sprite(CELL.solid,x+camRight.x*off,y,z+camRight.z*off,Math.max(.02,w*f),h,color)}
  const hpColor=f=>f>.6?LEAF:f>.3?GOLD:RED;
+ const KING_FLAMES=[[0,1.2,.06,.6],[-.24,1.06,.12,.45],[.24,1.06,.12,.45],[0,1.55,.3,.42],[0,1.28,-.92,.62],[-.12,1.12,-.86,.42],[.12,1.12,-.86,.42]];   // ember king flame points (unit model)
  function ambient(less){
   const t=less?0:time;
   if(home.on&&home.b&&!home.b.broken&&!less)for(let i=0;i<3;i++){const cycle=(t*.22+i/3)%1;sprite(CELL.glow,home.a.x-.55+Math.sin(t+i)*.13,2.75*home.a.s+cycle*1.3,home.a.z-.3,.45+cycle*.7,.45+cycle*.7,WHITE,(1-cycle)*.5)}
@@ -986,11 +1250,27 @@ async function start(){
     for(let i=0;i<cracks;i++){const off=(i-(cracks-1)/2)*r*.7,y=H*(.28+.17*((i*7)%3));sprite(CELL.impact,a.x-fwdXZ.x*r+camRight.x*off,y,a.z-fwdXZ.z*r+camRight.z*off,.55,.55,CRACK,.8,0,i*1.3)}}
   }
   for(const sd of sides)if(sd.on&&sd.b&&!sd.b.broken&&num(sd.b.hp)<num(sd.b.max)){const {x,z}=sideMid(sd.side),f=clamp(num(sd.b.hp)/num(sd.b.max),0,1);bar(x,1.35,z,f,1,hpColor(f))}
+  for(let i=scorches.length-1;i>=0;i--){const sc=scorches[i],age=time-sc.t0;if(age>4.5){scorches.splice(i,1);continue}   // fire-arrow scorch marks fade out
+   const k=age<.12?age/.12:age>2.5?1-(age-2.5)/2:1;flatPool.push(lying,sc.x,.045,sc.z,sc.r*1.35,sc.r*1.35,sc.rot,CELL.scorch,CRACK[0],CRACK[1],CRACK[2],.34*k,0)}
+  if(less)for(const b of booms)if(time-b.t0<.6)decal(CELL.ring,b.x,b.z,b.r*2.5,ORANGE,.85,.5,.08);   // reduced motion: a still ring instead of the fireball
   for(const o of wolfVis.values()){
-   if(o.state==='dead')continue;
-   decal(CELL.glow,o.x,o.z,1.5*WS,RED,.3);
-   if(o.hp<.999)bar(o.x,1.85*WS,o.z,o.hp,.9,hpColor(o.hp));
+   if(o.state==='dead')continue;const s=o.size;
+   if(o.K.boss){const p=less?1:.85+.15*Math.sin(time*4);decal(CELL.glow,o.x,o.z,2.7*s*p,ORANGE,.45,.7);
+    for(let i=0;i<KING_FLAMES.length;i++){const [x,y,z,f]=KING_FLAMES[i],fl=less?1:.82+.18*Math.sin(time*(13+i*2.3)+i*1.7);tv.set(x,y,z).applyMatrix4(o.mat);   // living fire on the mane, crest and tail
+     sprite(CELL.flame,tv.x,tv.y+.2*f*s*fl,tv.z,.48*f*s,.9*f*s*fl,FLAME_TINT,.95,.8,less?0:Math.sin(time*7+i)*.15)}
+    const age=time-o.bossAt;if(age<3.2){const k=Math.min(1,age/.3)*(age>2.4?1-(age-2.4)/.8:1),q=less?1:.7+.3*Math.sin(age*9);decal(CELL.glow,o.x,o.z,6*s*q,FIRE,.55*k,.9);decal(CELL.halo,o.x,o.z,(3.4+(less?0:age%1*2))*s,ORANGE,.7*k*(less?1:1-age%1),.7)}}
+   else decal(CELL.glow,o.x,o.z,1.45*s,RED,.3);
+   if(o.hp<.999)bar(o.x,RIG[o.kind].top[1]*.95*s+.18,o.z,o.hp,.9*Math.min(1.4,s),hpColor(o.hp));
+   const end=hl.get(o.id);
+   if(end!==undefined&&time<end){const k=Math.min(1,(end-time)/.4),p=less?1:.5+.5*Math.sin(time*9);   // new monster: gold ring + "!" bubble
+    decal(CELL.halo,o.x,o.z,2.3*s*(1+.15*p),GOLD,.95*k,.6);decal(CELL.glow,o.x,o.z,2.6*s,GOLD,.35*k,.8);
+    topOf(o,tv);const b=.75*Math.max(1,fxScale*.85);sprite(CELL.bang,tv.x,tv.y+.35+(less?0:.12*Math.abs(Math.sin(time*6))),tv.z,b,b,WHITE,k)}
   }
+  for(const tw of towers)if(tw.on&&tw.stunned){const H=TOWER_H*tw.a.s+.5,f=Math.max(1,fxScale*.8);   // stunned by the roar: stars and a swirl circle the top
+   sprite(CELL.swirl,tw.a.x,H+.1,tw.a.z,.95*f,.75*f,WHITE,.75,.2,less?0:-time*5);
+   for(let i=0;i<3;i++){const a=(less?0:time*4.2)+i*2.094;sprite(CELL.star,tw.a.x+Math.cos(a)*.55,H+.12+Math.sin(a)*.18,tw.a.z+Math.sin(a)*.35,.42*f,.42*f,GOLD,.95,.3,a)}}
+  if(powerShown>=1)for(const tw of towers)if(tw.on&&tw.b&&!tw.b.broken){const p=brazierWorld(tw),big=powerShown>=2?1.35:1,fl=less?1:.85+.12*Math.sin(time*17+tw.slot)+.08*Math.sin(time*31+tw.slot*2),f=Math.max(1,fxScale*.7);   // brazier fire on the crossbow
+   sprite(CELL.glow,p.x,p.y+.12,p.z,.95*big*f,.95*big*f,ORANGE,.5,1);sprite(CELL.flame,p.x,p.y+.2*big*f*fl,p.z,.42*big*f,.58*big*f*fl,WHITE,.95,.85,less?0:Math.sin(time*9+tw.slot)*.12)}
   for(let i=warns.length-1;i>=0;i--){const wn=warns[i],age=time-wn.t0;if(age>wn.life){warns.splice(i,1);continue}
    const p=onScreen(wn.x,wn.z,.86),k=1-age/wn.life,pulse=less?.8:.55+.45*Math.sin(age*11),s=1.5*fxScale;
    sprite(CELL.halo,p.x,.6,p.z,s*(1+.25*pulse),s*(1+.25*pulse),wn.color,k*pulse,.6);sprite(CELL.glow,p.x,.6,p.z,s*1.3,s*1.3,wn.color,k*.5,.9)}
@@ -1000,31 +1280,48 @@ async function start(){
  }
 
  /* ----- frame loop: 30fps cap, dt-driven, frozen while paused or hidden; the world clock only runs in listen/ask/learn ----- */
+ // names only label the debug({tris}) breakdown
+ Object.entries({meadow:land,yard,decor,forest,grove,shrubs,stones,fences,hens:henMesh,arrows:arrowMesh,fxFlat:flatPool.mesh,fxAir:airPool.mesh,shadowStandIn:shade.mesh,'garden-bush':garden[0],'garden-rock':garden[1],hay:hay.obj,pond:pond.obj,
+  'shade-fence':fenceShade,'shade-hen':henShade,'shade-farmer':farmerShade,'shade-tower-a':towerShade[0],'shade-tower-b':towerShade[1],'shade-bush':garden[2]})
+  .forEach(([n,m])=>{m.name=n});
+ for(const k of KIND_ORDER)herd[k].mesh.name='monster-'+k;for(const sl of BUILDINGS)sl.a.obj.name=sl.kind;for(const t of towers)t.bow.name='crossbow';
+ for(const f of farmers)f.a.obj.traverse(o=>{o.name='farmer'});garlands.forEach(g=>{g.obj.name='garland'});
  let last=0,wasLess=reduced();
- {const s=read();syncEconomy(s,true);syncRecords(s);Rd=Rgoal;resize();const less=reduced();
+ const SUN_COLOR=sun.color.clone(),RED_LIGHT=new THREE.Color(0xff4a2a);
+ {const s=read();syncEconomy(s,true);syncPower(s,false);syncRecords(s);Rd=Rgoal;resize();const less=reduced();
   animateBuildings(0,0,less);updateFences(less);animateWolves(0,0,less);animateHens(0,0,less);animateArrows(less);for(const a of actors)pose(a,0);writeHens()}
  host.classList.add('is3d');host.dataset.renderer='three';
- function frame(now){
-  if(last&&now-last<1000/30)return;
-  const dt=Math.min(.05,last?(now-last)/1000:0);last=now;frames++;
-  const s=read(),still=!!s.paused||document.hidden,less=reduced(),running=!still&&RUNNING.has(s.phase);
-  const fdt=still?0:dt,wdt=running?dt:0;
+ // One step of the view: dt-driven; `still` freezes everything (paused, hidden tab), the world clock only runs in listen/ask/learn.
+ function step(dt,still,less,running){
+  const fdt=still?0:dt,wdt=running&&!still?dt:0;
   if(!still){time+=dt;wclock+=wdt;blendT+=dt;sinceTick+=dt}
-  host.classList.toggle('village-paused',still);host.dataset.phase=s.phase||'';
-  if(less&&!wasLess){clearEffects();dirty=true}wasLess=less;
-  if(syncEconomy(s))dirty=true;
-  syncRecords(s);
   if(!still||dirty){
    updateView(fdt,less);
    animateBuildings(fdt,wdt,less);updateFences(less);animateWolves(fdt,wdt,less);animateHens(fdt,wdt,less);
    farmersLife(fdt,less);
    if(!less&&!still)stepEffects(fdt);
-   // the light dims while wolves are inside the village
+   // the light dims while wolves are inside the village, and flushes red when the ember king arrives or roars
    sunDim+=((insideWolves>0?1:0)-sunDim)*(less?1:Math.min(1,fdt*2));sun.intensity=2.8-.7*sunDim;
+   redPulse=Math.max(0,redPulse-fdt*.8);sun.color.copy(SUN_COLOR).lerp(RED_LIGHT,redPulse*.6);
+   RIG_TIME.value=time;
    for(const a of actors)pose(a,fdt);writeHens();dirty=false;
   }
+ }
+ function frame(now){
+  if(last&&now-last<1000/30)return;
+  const dt=Math.min(.05,last?(now-last)/1000:0);last=now;frames++;
+  const s=read(),still=!!s.paused||document.hidden,less=reduced(),running=!still&&RUNNING.has(s.phase);
+  host.classList.toggle('village-paused',still);host.dataset.phase=s.phase||'';
+  if(less&&!wasLess){clearEffects();dirty=true}wasLess=less;
+  if(syncEconomy(s))dirty=true;
+  if(syncPower(s,false))dirty=true;
+  syncRecords(s);
+  if(hold){let n=0;while(advance>1e-6&&n<300){const h=Math.min(1/30,advance);advance-=h;n++;step(h,still,less,running)}if(!n&&dirty)step(0,true,less,false)}   // test-only frozen view
+  else step(dt,still,less,running);
   flatPool.begin();airPool.begin();animateArrows(less);ambient(less);drawParticles();flatPool.end();airPool.end();
+  if(traceNext){traceNext=false;tracing=true;traced=[]}
   if(!document.hidden)renderer.render(world,camera);
+  tracing=false;
  }
  let broken=false;
  renderer.setAnimationLoop(now=>{if(broken)return;try{frame(now)}catch(error){broken=true;renderer.setAnimationLoop(null);useFallback();console.warn('Village renderer stopped:',error.message)}});

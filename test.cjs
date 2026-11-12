@@ -2,7 +2,7 @@ const {chromium,webkit}=require('playwright');
 const assert=require('node:assert/strict'),http=require('node:http'),fs=require('node:fs'),path=require('node:path');
 const Questions=require('./questions.js'),Combat=require('./combat.js');
 const INTERIM=process.env.INTERIM_NO_3D_BUILD==='1',FULL_SHOTS=process.env.FULL_SHOTS==='1';
-const ONLY=process.env.ONLY||'',run=part=>!ONLY||ONLY.split(',').includes(part);/* ONLY=matrix,clock,feel,fallback 중 일부만 돌릴 때(개발용). CI는 전부 돌린다. */
+const ONLY=process.env.ONLY||'',run=part=>!ONLY||ONLY.split(',').includes(part);/* ONLY=matrix,clock,feel,fallback,demo,flow 중 일부만 돌릴 때(개발용). CI는 전부 돌린다. */
 const KEY='hangul-defense-v1',SWIFT=['--enable-webgl','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader'];
 /* 검사 기본: 시계를 세우고(__HOLD_CLOCK) 틱을 직접 돌린다. CI의 SwiftShader는 프레임 간격이 200ms를 넘기도 해서 벽시계 대기는 쓰지 않는다.
    음성은 가짜(바로 읽기 시작·끝)로 바꾼다. 실제 음성은 실기기에서 따로 확인해야 한다. */
@@ -113,6 +113,7 @@ const FAKE_TTS=()=>{const S={speak(u){setTimeout(()=>{u.onstart&&u.onstart();u.o
 
  /* 한 번에 정답 → 늑대·시계 멈춤 → 카드 3장 → 고르면 다음 문제 */
  g=await game(page);const fresh=JSON.parse(JSON.stringify(g.state));
+ await tick(page,Math.ceil(Combat.FAST_MIN*Combat.needSeconds(Questions.get(8,'sound',0))/Combat.TICK));/* 번개는 최소 읽기 시간이 지나야 */
  await answer(page,true,touch);const expGold=Combat.income(fresh,Questions.get(8,'sound',0),true).gold;
  eq((await game(page)).phase,'pick','first-try correct opens the cards');eq(await gold(page),'🪙 '+(20+expGold),'gold from eggs (+⚡)');
  ok((await fxLog(page)).some(x=>x.c==='sale'&&x.t.includes('🧑‍🌾')),'egg → farmer → market strip');
@@ -158,8 +159,10 @@ const FAKE_TTS=()=>{const S={speak(u){setTimeout(()=>{u.onstart&&u.onstart();u.o
  /* 늑대 무리가 가장자리에서 나타나 마을로 걸어온다(세계 시뮬레이션 + 3D) */
  {const until=await page.evaluate(()=>{const g=window.__game();return g.world.wave.arrive-g.world.t});await tick(page,Math.max(1,until-60));}
  g=await game(page);ok(g.world.wolves>=1,'a wolf pack is on the map before it arrives: '+JSON.stringify(g.world));
- const d1=await page.evaluate(()=>Math.min(...world.wolves.filter(v=>v.state==='walk').map(v=>Math.hypot(v.x,v.z))));await tick(page,20);const d2=await page.evaluate(()=>Math.min(...world.wolves.filter(v=>v.state!=='dead').map(v=>Math.hypot(v.x,v.z))));
- ok(d2<d1,'wolves walk toward the village: '+[d1,d2]);
+ /* 0.8: 늑대가 쉬지 않고 오고 쓰러지므로 '가장 가까운 늑대'가 바뀔 수 있다. 같은 늑대(id)를 따라가 걷는 늑대가 모두 마을 쪽으로 왔는지 본다. */
+ const walk0=await page.evaluate(()=>world.wolves.filter(v=>v.state==='walk').map(v=>[v.id,Math.hypot(v.x,v.z)]));await tick(page,20);
+ const walk1=await page.evaluate(ids=>world.wolves.filter(v=>v.state==='walk'&&ids.includes(v.id)).map(v=>[v.id,Math.hypot(v.x,v.z)]),walk0.map(x=>x[0]));
+ ok(walk1.length>0&&walk1.every(([id,d])=>d<walk0.find(x=>x[0]===id)[1]),'wolves walk toward the village: '+JSON.stringify([walk0.slice(0,4),walk1.slice(0,4)]));
  if(three&&!INTERIM){await frames(page,3);const i=await page.evaluate(()=>window.VillageView.inspect());ok(i.wolvesVisible>=1,'3D wolves visible: '+i.wolvesVisible);eq(i.wolvesVisible,await notGone(page),'3D wolf count = simulated wolves (incl. falling ones)')}
  if(name==='chromium'&&(width===390||width===1366))await shot(page.locator('.scene'),'pack-'+width);
  ok(await noOverflow(page),'no overflow after a few rounds');
@@ -284,6 +287,88 @@ const FAKE_TTS=()=>{const S={speak(u){setTimeout(()=>{u.onstart&&u.onstart();u.o
   eq(await page.evaluate(()=>localStorage.getItem('hangul-defense-v1')),null,'demo never touches the real save');ok(await page.evaluate(()=>!!localStorage.getItem('hangul-defense-demo3')),'demo has its own save');
   eq(errors,[],'demo page errors');await ctx.close();
  }}finally{await demoBrowser.close()}
+ /* ===== 6. 흐름 가장자리(0.8): 카드 여러 장 고르는 중 쉬기·새로고침·나이 바꾸기, 상식 문제에서 음성 실패, 움직임 줄이기의 알림 띠, 우두머리 보상, 체험 초기화.
+    3D와 무관한 흐름이라 GLB를 막아 그림 화면으로 돌린다. ===== */
+ const flowBrowser=await chromium.launch({headless:true,args:SWIFT});
+ try{if(run('flow')){
+  const BANNERS=()=>{window.__banners=[];document.addEventListener('DOMContentLoaded',()=>{new MutationObserver(m=>m.forEach(r=>r.addedNodes.forEach(n=>{if(n.classList&&n.classList.contains('banner'))window.__banners.push(n.textContent)}))).observe(document.getElementById('effects'),{childList:true})})};
+  const BROKEN_TTS=()=>{const S={speak(u){setTimeout(()=>{u.onerror&&u.onerror({error:'synthesis-failed'})},0)},cancel(){},getVoices(){return [{lang:'ko-KR',name:'test'}]}};
+   Object.defineProperty(window,'speechSynthesis',{value:S,configurable:true});Object.defineProperty(window,'SpeechSynthesisUtterance',{value:function(t){this.text=t},configurable:true,writable:true})};
+  const SILENT_TTS=()=>{const S={speak(){},cancel(){},getVoices(){return [{lang:'ko-KR',name:'test'}]}};
+   Object.defineProperty(window,'speechSynthesis',{value:S,configurable:true});Object.defineProperty(window,'SpeechSynthesisUtterance',{value:function(t){this.text=t},configurable:true,writable:true})};
+  const open=async(o={})=>{const ctx=await flowBrowser.newContext({viewport:{width:390,height:844},hasTouch:true,reducedMotion:'reduce'});await ctx.addInitScript(HOLD);await ctx.addInitScript(o.tts||FAKE_TTS);await ctx.addInitScript(BANNERS);
+   const page=await ctx.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.route('**/environment-pack.glb',r=>r.abort());await page.goto(url+(o.query||''));await ready(page);return {ctx,page,errors}};
+  const bannerBoxes=page=>page.evaluate(()=>{const s=document.getElementById('scene').getBoundingClientRect(),t=document.getElementById('timebar').getBoundingClientRect();
+   return [...document.querySelectorAll('#effects .banner')].map(b=>{const r=b.getBoundingClientRect(),cs=getComputedStyle(b);return {text:b.textContent,shown:cs.display!=='none',opacity:cs.opacity,anim:cs.animationName,inside:r.left>=s.left-.5&&r.right<=s.right+.5&&r.top>=s.top-.5&&r.bottom<=s.bottom+.5,belowBar:r.top>=t.bottom,w:Math.round(r.width),sceneW:Math.round(s.width)}})});
+  const enabledCard=page=>page.locator('#cards .choice:not([disabled])').first().getAttribute('data-kind');
+
+  /* 10세 읽기(카드 3장): 쉬기 → 새로고침 → 고르는 중 나이·모드 바꾸기 */
+  {const {ctx,page,errors}=await open();
+   await seed(page,{age:10,mode:'story',index:0,gold:3000,hall:1,level:1,chickens:3});await begin(page,{age:10,mode:'story'},true);
+   const q=await expectQuestion(page,10,'story',0,'flow: long passage');eq(Combat.picks(q),3,'flow: a long passage gives three cards');
+   await answer(page,true,true);await phaseIs(page,'pick');const paid=(await game(page)).state.gold;
+   await page.locator('#pause').tap();await tick(page,30);let g=await game(page);eq([g.phase,g.paused,g.round.pickLock],['pick',true,7],'paused before the cards come out: the card lock waits');ok(await page.locator('#choices').isHidden(),'paused: cards not out yet');
+   await page.locator('#pause').tap();await tick(page,7);ok(await page.locator('#choices').isVisible(),'cards after resuming');
+   const k0=await enabledCard(page);await page.locator('#pause').tap();await page.locator('#cards .choice[data-kind="'+k0+'"]').tap();await page.locator('#skip').tap();
+   g=await game(page);eq([g.phase,g.round.picked,g.state.gold],['pick',0,paid],'paused: tapping a card or skip does nothing');await page.locator('#pause').tap();
+   await page.locator('#cards .choice[data-kind="'+k0+'"]').tap();g=await game(page);eq([g.phase,g.round.picked,g.round.pickLock],['pick',1,9],'first of three cards');
+   await page.locator('#pause').tap();await tick(page,20);eq((await game(page)).round.pickLock,9,'paused during the build: the lock waits');await page.locator('#pause').tap();
+   await tick(page,9);ok(await page.locator('#cards .choice:not([disabled])').count()>=1,'cards come back after the build');eq(await page.locator('#skip').textContent(),'▶ 다음 문제','skip label after a pick');
+   ok((await page.locator('#gainLine').textContent()).endsWith('🃏 2장 더 고를 수 있어요'),'two more cards: '+await page.locator('#gainLine').textContent());
+   /* 새로고침: 남은 2장으로 이어서, 금화는 다시 주지 않는다 */
+   const goldMid=(await game(page)).state.gold;eq((await stored(page)).round.left,2,'saved with two cards left');
+   await page.reload();await ready(page);eq(await page.locator('#go').textContent(),'이어서 하기 ▶','resume offered in the middle of picking');await page.locator('#go').tap();
+   g=await game(page);eq([g.phase,g.round.picks,g.round.picked,g.state.gold],['pick',2,0,goldMid],'reload mid-pick: two cards left, no gold twice');ok(await page.locator('#choices').isVisible(),'cards right away after reload');
+   const gl=await page.locator('#gainLine').textContent();ok(gl.startsWith('🪙 이 문제의 금화는 이미 받았어요')&&gl.endsWith('🃏 2장 더 고를 수 있어요'),'restored gain line: '+gl);
+   /* 고르는 중에 나이·모드를 바꾸면 남은 카드는 그대로, 다음 문제부터 새 나이·모드 */
+   await page.locator('#drawerSummary').tap();await page.locator('#age').selectOption('8');await page.locator('#mode').tap();
+   g=await game(page);eq([g.phase,g.round.picks,g.state.age,g.state.mode],['pick',2,8,'sound'],'switching while picking keeps the cards');ok((await page.locator('#feedback').textContent()).startsWith('다음 문제부터 8세 듣고 고르기'),'next-question notice');ok(await page.locator('#choices').isVisible(),'cards stay after switching');
+   await page.locator('#cards .choice[data-kind="'+(await enabledCard(page))+'"]').tap();await finishPick(page);await tick(page,12);
+   await phaseIs(page,'ask');await expectQuestion(page,8,'sound',1,'flow: next question in the new age and mode');
+   eq(errors,[],'flow pick page errors');await ctx.close()}
+
+  /* 듣고 고르기의 상식·수학·영어 문제에서 음성이 안 되면(오류·무응답): 같은 문제를 읽고 고르기로 */
+  for(const [label,tts] of [['error',BROKEN_TTS],['silent',SILENT_TTS]]){const {ctx,page,errors}=await open({tts});
+   await seed(page,{age:9,mode:'sound',index:3});await page.locator('#ageRow button[data-age="9"]').tap();await page.locator('#startSound').tap();await page.locator('#go').tap();
+   if(label==='silent'){eq((await game(page)).phase,'listen','silent voice: waiting to hear the question');await tick(page,31)}
+   await page.waitForFunction(()=>window.__game().voiceOff&&window.__game().phase==='ask',{},{timeout:20000});
+   const q=await expectQuestion(page,9,'story',3,'flow: voice '+label+' on a quiz item');eq(q.mode,'quiz','voice '+label+': still the quiz item');
+   const g=await game(page);eq(g.state.mode,'story','voice '+label+': switched to reading');ok((await page.locator('#feedback').textContent()).startsWith('🔇'),'voice '+label+' explained');ok(await page.locator('#speak').isHidden(),'voice '+label+': no replay button');
+   await page.evaluate(()=>{const g=window.__game();if(g.round.lock>0)window.__tick(g.round.lock)});ok((await page.locator('#feedback').textContent()).startsWith('🔇'),'voice '+label+': the notice stays after the answers open');
+   await answer(page,true,true);eq((await game(page)).phase,'pick','voice '+label+': the quiz can still be answered');
+   eq(errors,[],'flow voice '+label+' page errors');await ctx.close()}
+
+  /* ?demo=3 첫 무리: 새 몬스터 여러 종류가 한꺼번에 → 알림 띠는 하나씩 차례로(움직임 줄이기에서도 멈춘 채 읽힘), 카드 고르는 동안 숨김, 우두머리 보상 띠는 바로 */
+  {const {ctx,page,errors}=await open({query:'/?demo=3'});await begin(page,{age:8,mode:'sound'},true);
+   let most=0;const seen=[];
+   for(let i=0;i<80&&seen.length<3;i++){await tick(page,5);const b=await bannerBoxes(page);most=Math.max(most,b.length);
+    for(const x of b){if(!seen.includes(x.text)){seen.push(x.text);ok(x.shown&&x.opacity==='1'&&x.anim==='none'&&x.inside&&x.belowBar,'reduced motion: banner still, inside the scene, under the time bar: '+JSON.stringify(x));
+     if(x.text.includes('새 몬스터'))ok(x.w>x.sceneW/2,'banner not squeezed into half the scene: '+JSON.stringify(x))}}}
+   eq(most,1,'one banner at a time');ok(seen.length>=3,'queued banners take turns: '+seen.join(' / '));
+   const gold0=(await game(page)).state.gold;
+   await page.evaluate(()=>{world.wolves=[];world.arrows=[];world.trickle=world.t+9999;const t=world.buildings.find(b=>b.kind==='tower'&&!b.broken);t.cd=0;t.stun=0;
+    world.wolves.push({id:777777,kind:'ember',x:t.x+1.2,z:t.z,sx:t.x+30,sz:t.z,hp:1,max:200,speed:0,state:'walk',target:0,timer:0,inside:0,hen:0,roar:999})});
+   for(let i=0;i<30&&!(await game(page)).world.stats.bossKills;i++)await tick(page,1);
+   let g=await game(page);eq(g.world.stats.bossKills,1,'the boss falls');eq(g.state.gold,gold0+Combat.BOUNTY,'boss bounty gold');
+   let b=await bannerBoxes(page);eq(b.length,1,'bounty banner alone');ok(b[0].text.includes('불씨 왕을 쓰러뜨렸어요!')&&b[0].text.includes('🪙 +'+Combat.BOUNTY),'bounty banner right away (jumps the queue): '+b[0].text);
+   ok((await page.locator('#villageStatus').textContent()).includes('👑'),'bounty in the status line');
+   await answer(page,true,true);await phaseIs(page,'pick');b=await bannerBoxes(page);ok(b.length===1&&!b[0].shown,'banner hidden while picking (no clash with the sale strip)');
+   await finishPick(page);await tick(page,12);await phaseIs(page,'ask');b=await bannerBoxes(page);ok(b.length===1&&b[0].shown&&b[0].text.includes('불씨 왕을 쓰러뜨렸어요'),'banner back after picking');
+   await page.locator('#pause').tap();const left=await page.evaluate(()=>bannerLeft);await tick(page,50);eq(await page.evaluate(()=>bannerLeft),left,'banner waits while paused');await page.locator('#pause').tap();
+   eq(errors,[],'flow demo3 page errors');await ctx.close()}
+
+  /* 체험 초기화: 체험 마을로 돌아가고, 원래 저장은 그대로 */
+  {const {ctx,page,errors}=await open();await seed(page,{gold:777,wins:5,index:9,age:8,mode:'sound'});
+   await page.goto(url+'/?demo=2');await ready(page);const real=await page.evaluate(()=>localStorage.getItem('hangul-defense-v1'));
+   ok((await page.locator('header .demo-tag').textContent())==='체험: 마을회관 2단계','demo 2 label');
+   await begin(page,{age:8,mode:'sound'},true);await answer(page,true,true);await phaseIs(page,'pick');await finishPick(page);await tick(page,12);await phaseIs(page,'ask');
+   let g=await game(page);ok(g.state.wins===1&&g.state.index===1&&g.state.gold!==450,'progress inside the demo');
+   page.once('dialog',d=>d.accept());await page.locator('#drawerSummary').tap();await page.locator('#reset').tap();await phaseIs(page,'ask');
+   g=await game(page);eq([g.state.hall,g.state.level,g.state.fence,g.state.chickens,g.state.farmers,g.state.power,g.state.gold,g.state.wins,g.state.index,g.world.radius],[2,3,4,6,1,1,450,0,0,13],'demo reset brings back the demo village');
+   eq(await page.evaluate(()=>localStorage.getItem('hangul-defense-v1')),real,'demo reset leaves the real save alone');eq((await page.evaluate(()=>JSON.parse(localStorage.getItem('hangul-defense-demo2')))).hall,2,'demo save after reset');
+   await page.goto(url);await ready(page);g=await game(page);eq([g.state.gold,g.state.wins,g.state.index],[777,5,9],'real progress intact outside the demo');eq(await page.locator('header .demo-tag').count(),0,'no demo label without ?demo');
+   eq(errors,[],'flow demo reset page errors');await ctx.close()}
+ }}finally{await flowBrowser.close()}
  console.log((ONLY?'PARTIAL('+ONLY+') ':'')+'PASS '+checks+' browser assertions (Chromium/WebKit, desktop + mobile emulation, held clock + one real-clock run). Physical audio/device validation remains manual.');
  }finally{server.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});

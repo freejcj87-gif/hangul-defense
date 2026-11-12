@@ -29,7 +29,7 @@ function play(age,mode,kind){
     if(kind==='guess'){t=lock+.4;ok1=rnd()<1/n}else{t=Math.max(lock+.3,need(q,RATE[age][kind],kind)*(.75+rnd()*.5));ok1=rnd()<ACC[kind]}
     run(t);
     if(ok1){
-      const fast=t<=C.baseSeconds(q)*(1-C.FAST);s.hidden=0;const res=C.settle(s,q,'first',{fast});earned+=res.gold;correct++;W.volley(w,s,{scale:C.scale(q),fast});
+      const fast=C.isFast(q,Math.round(t/W.TICK));s.hidden=0;const res=C.settle(s,q,'first',{fast});earned+=res.gold;correct++;W.volley(w,s,{scale:C.scale(q),fast});
       /* 카드 고르기(세계 멈춤): 부서진 것이 있으면 고치기, 아니면 지켜요 > 벌어요 > 마을 중 살 수 있는 것 */
       const pri=['repair','tower','power','chicken','fence','hall','farmer','pond','feast'];
       clock+=kind==='guess'?1.5:4;

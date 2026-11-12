@@ -8,7 +8,7 @@ on:
       - combat.js
       - world.js
       - questions.js
-      - src/village.js
+      - src/**
       - art-handoff/coopnight/browser/**
       - art-handoff/coopnight/source-3d/models/environment-pack.glb
       - scripts/build-pages.cjs

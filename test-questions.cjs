@@ -273,6 +273,83 @@ ok(hit(s=>{for(const q of s[7].quiz){const a=q.choices[q.answer];q.choices=[a].c
 ok(hit(s=>{delete s[10].quiz;},'10세 quiz','묶음 없음'),'퀴즈 묶음 누락');
 ok(Q.checkQuiz(8,Q.quiz(9,0)).length>0&&Q.checkQuiz(9,Q.quiz(8,0)).length>0,'checkQuiz: 보기 수가 다른 나이 규칙은 실패');
 
+/* 9-1. 퀴즈 내용 검수 회귀(2026-11-12 적대적 검수) */
+const PIC=/\p{Extended_Pictographic}/u;
+/* 오래된(유니코드 6.0~Emoji 3.0) 그림 문자만. 새 그림을 쓰려면 iOS·Android·Windows에서 작게 봐도 뜻이 하나인지 확인하고 여기에 더한다. 시계(🕐~🕧)는 바늘 모양이 기기마다 달라 금지 */
+const SAFE_PIC=new Set([...'🌙🌞🌈🍎🎈⛄☔🐶🍓⭐✋🐱🐰🐥🐔🐘🐟🍪🥚🐦🐢🐷👂👃👀🐞🦋🐝🚗🚲🚢🔴🐯']);
+const DIGIT='영일이삼사오육칠팔구';
+const sino=n=>{if(n===0)return '영';let s='';for(const [v,w] of [[1000,'천'],[100,'백'],[10,'십']]){const d=Math.floor(n/v)%10;if(d)s+=(d===1?'':DIGIT[d])+w}const d=n%10;return d?s+DIGIT[d]:s};
+const OPW={'+':'더하기','−':'빼기','×':'곱하기','÷':'나누기'};
+/* 그림 식: 같은 그림 덩어리의 개수를 더하고 빼며, 연산자 없는 줄은 더한다('🐥🐥🐥\n🐥🐥🐥' = 6) */
+const picValue=p=>{let t=0,op='+';for(const tok of p.split(/\s+/)){if(tok==='+'||tok==='−'){op=tok;continue}const g=[...tok];if(!g.every(c=>PIC.test(c)))return NaN;t+=op==='+'?g.length:-g.length;op='+'}return t};
+const frac=s=>{const m=s.match(/^(\d+)분의 (\d+)$/);return m?+m[2]/+m[1]:NaN};
+const only=(list,why)=>list.length===1?list[0]:why+' '+list.length+'개';
+const afterMin=(h,m,add)=>{const t=h*60+m+add;return [Math.floor(t/60),t%60]};
+/* 식이 지문에 없는 수학 문항: 문항마다 따로 계산한 정답(문항을 바꾸면 이 표도 함께 고친다) */
+const WORD={
+  'a7-quiz-23':q=>String(Math.max(...q.choices.map(Number))),
+  'a7-quiz-26':()=>String(3+1),
+  'a8-quiz-07':()=>String(15-7),
+  'a8-quiz-10':()=>'3시',
+  'a8-quiz-13':()=>60+'분',
+  'a8-quiz-15':()=>String(34+9),
+  'a8-quiz-18':()=>String(10*4+7),
+  'a8-quiz-21':q=>only(q.choices.filter(c=>+c%2===0),'짝수'),
+  'a8-quiz-29':()=>String(20-6),
+  'a8-quiz-31':()=>String(15+5),
+  'a9-quiz-07':()=>100+' cm',
+  'a9-quiz-10':()=>'4분의 1',
+  'a9-quiz-13':()=>String(6*4),
+  'a9-quiz-18':()=>String(425+138),
+  'a9-quiz-23':()=>(2*100+30)+' cm',
+  'a9-quiz-26':()=>'사각형',
+  'a9-quiz-31':()=>60/2+'분',
+  'a10-quiz-07':()=>String(54/6),
+  'a10-quiz-10':q=>only(q.choices.filter(c=>frac(c)===Math.max(...q.choices.map(frac))),'가장 큰 분수'),
+  'a10-quiz-13':q=>only(q.choices.filter(c=>frac(c)===Math.min(...q.choices.map(frac))),'가장 작은 분수'),
+  'a10-quiz-15':()=>'180도',
+  'a10-quiz-18':()=>{const [h,m]=afterMin(1,40,50);return h+'시 '+m+'분'},
+  'a10-quiz-21':()=>(2*60+15)+'분',
+  'a10-quiz-29':()=>{const [h,m]=afterMin(15,20,60+50);return '오후 '+(h-12)+'시 '+m+'분'},
+  'a10-quiz-31':q=>only(q.choices.filter(c=>{const d=parseInt(c,10);return d>90&&d<180}),'둔각')
+};
+const usedWord=new Set();
+for(const a of Q.AGES)for(const q of quizAll(a)){
+  const id=q.id,ans=q.choices[q.answer];
+  /* speak: 음성이 그대로 읽으므로 숫자·영문·기호·그림 없이 한글 문장으로 */
+  ok(!/[0-9A-Za-z]/.test(q.speak),id+': speak에 숫자·영문 없음(한글로 읽는 소리를 적음) '+q.speak);
+  ok(!PIC.test(q.speak)&&!/[+−×÷=□<>%]/.test(q.speak),id+': speak에 그림·수식 기호 없음');
+  ok(/[?.]$/.test(q.speak),id+': speak는 문장부호로 끝남');
+  ok(!PIC.test(q.prompt),id+': 질문 글에 그림 문자 없음');
+  /* 그림 문자: 검수한 목록 안, 시계 금지, 한 줄 4개 이하(320px 폰·1024px 데스크톱에서 줄이 꺾이지 않음) */
+  for(const s of [q.passage,...q.choices])for(const c of s)if(PIC.test(c))ok(SAFE_PIC.has(c),id+': 검수한 그림 문자 '+c);
+  ok(!/[\u{1F550}-\u{1F567}]/u.test(q.passage+q.choices.join('')),id+': 시계 그림 없음');
+  ok(q.passage.split('\n').every(l=>[...l].filter(c=>PIC.test(c)).length<=4),id+': 그림은 한 줄에 4개 이하');
+  /* 보기 형식이 정답을 드러내지 않음: 끝 문장부호와 영문 첫 글자 대소문자가 보기끼리 같음 */
+  eq(new Set(q.choices.map(c=>/[.?!]$/.test(c)?c.slice(-1):'')).size,1,id+': 보기 끝 문장부호 통일');
+  const latin=q.choices.filter(c=>/[A-Za-z]/.test(c));
+  if(latin.length){eq(latin.length,q.choices.length,id+': 영문 보기는 모두 영문');eq(new Set(latin.map(c=>c[0]===c[0].toUpperCase())).size,1,id+': 영문 보기 대소문자 통일')}
+  if(/가장 (큰|작은)/.test(q.prompt)){const v=q.choices.map(c=>Number.isNaN(Number(c))?frac(c):Number(c)),up=v.every((x,i)=>!i||x>v[i-1]),down=v.every((x,i)=>!i||x<v[i-1]);
+    ok(!up&&!down,id+': 가장 큰·작은 수를 묻는 보기는 크기순으로 늘어놓지 않음(끝자리 찍기 방지)')}
+  if(q.cat!=='math')continue;
+  /* 수학: 모든 문항 정답 재계산 */
+  const ex=q.passage.match(/^(\d+) ([+−×÷]) (\d+)$/);
+  if(ex){
+    const x=+ex[1],y=+ex[3],head=sino(x)+' '+OPW[ex[2]]+' '+sino(y);
+    ok(q.speak.startsWith(head),id+': speak가 식을 한글로 읽음('+head+')');
+    const p=q.speak.charAt(head.length),last=head.slice(-1),batchim=H.hasBatchim(last);
+    ok(p==='의'||(p==='은'&&batchim)||(p==='는'&&!batchim),id+': '+last+' 뒤 조사 '+p);
+  }else if(q.passage&&!Number.isNaN(picValue(q.passage))){
+    eq(ans,String(picValue(q.passage)),id+': 그림 식 정답 재계산');
+  }else{
+    ok(WORD[id],id+': 수학 정답 재계산 표에 있음');
+    if(WORD[id]){eq(ans,WORD[id](q),id+': 정답 재계산');usedWord.add(id)}
+  }
+  const nums=q.choices.map(c=>Number.isNaN(Number(c))?c:Number(c));
+  eq(new Set(nums).size,nums.length,id+': 같은 값을 다르게 쓴 보기 없음');
+}
+eq([...usedWord].sort(),Object.keys(WORD).sort(),'재계산 표의 id가 모두 실제 수학 문항');
+
 /* 8. 파일 조건과 브라우저 전역 */
 const file=path.join(__dirname,'questions.js'),buf=fs.readFileSync(file);
 ok(buf.length<=60*1024,'questions.js 60KB 이하');

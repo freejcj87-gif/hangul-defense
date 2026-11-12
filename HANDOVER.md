@@ -33,6 +33,7 @@
 - `questions.js`: 나이별 문제은행(7~10세 × 소리/읽기 124문항 + 상식·수학·영어 128문항)과 조회·검증. DOM 의존 없음. 게임은 `Questions.at(age,mode,index)`로 내며 4문제마다 마지막 1문제가 상식·수학·영어(`quiz`)입니다. `get`, `count`, `quiz`, `quizCount`, `CATS`, `validate`, `LEVELS`.
 - `world.js`: 늑대 세계 시뮬레이션(순수·결정적, JSON 저장, 0.8에서 `v:2`). 무리와 낙오 늑대 출현, 몬스터 6종(`KINDS`), 닭 사냥·건물 부수기, 화살 타워 자동 사격(위험한 늑대 먼저)과 일제 사격, 타워 강화(펑 화살·세 갈래, `POWER`), 불씨 왕 포효(`ROAR`), 닭 숨기·잃기·구하기, 울타리 6면과 자동 재건, 건물 회복, 고치기, 보이지 않는 완충(`MERCY`). 수치 상수는 파일 맨 위. 0.7 저장(`v:1`)은 이어받습니다.
 - `combat.js`: 화면과 분리된 문제·경제 규칙(순수 함수, 0.6에서 만들고 0.7에서 고치기 카드·닭 0마리 허용, 0.8에서 타워 강화 카드·연속 정답·카드 여러 장 `picks`·상식/수학/영어 풀이 시간·우두머리 보상 추가). 제한시간 `limit`, 글 먼저 읽기 `reveal`, 읽어 줄 글 `lesson`, 수입 `income`, 습격 `raid`, 결말 반영 `settle`, 카드 `offers/price/canBuy/buy`, 늑대 수 `wolves`, 저장 이행 `restore`. 수치 상수는 파일 맨 위에 모여 있습니다(`API: 2`).
+- `src/monsters.js`(0.8): 몬스터 6종 절차 모형과 부위별(몸·머리·턱·꼬리·다리) 셰이더 동작. `village.js`가 import해 번들에 들어갑니다.
 - `src/village.js`: Three.js 3D 장면. 원본 건물·농부·닭 GLB와 잔디 텍스처, 주민 이동, 나무·연기, 진행률로 움직이는 늑대, 타워 발사·기절·습격, 알 → 농부 → 가게 생산 연출, 숨은 닭, 농부·연못·회관·잔치 시설, 짓기 연출 7종. 0.6 동작 메모는 [docs/living-village.md](docs/living-village.md).
 - `window.getVillageState()`: 장면이 매 프레임 읽는 상태(단계, 시설 수, 숨은 닭, 늑대 수, 진행률 = 경과/제한, 결말).
 - `window.VillageView.events/build(kind)/inspect`: 일회성 연출(`shoot`·`produce`·`raid`·`dash`)과 짓기(`tower|fence|chicken|farmer|pond|hall|feast`), 테스트 관측. `inspect()`의 `frames`는 처리한 프레임 수로, 검사가 벽시계 대신 이 값을 기준으로 기다립니다.
@@ -41,6 +42,7 @@
 - `test-questions.cjs`: 문제은행 단독 검사(나이별 수준 규칙, 정답 위치 분포, 중복, 보기 수).
 - `test-dom.cjs`: 규칙 검사(제한시간 전 문항, 카드 즉시 효과, 저장 이행, 찍기 대비 읽기 수입 시뮬레이션) + 가짜 DOM 위에서 실제 게임 스크립트를 틱 단위로 돌리는 흐름 검사(가짜 음성: 즉시·지연·없음·오류).
 - `scripts/sim-balance.cjs`: 0.6 밸런스 시뮬레이터(개발용, CI·배포 제외). 마을 방어(0.7~)는 `scripts/sim-village.cjs [분] [횟수]`. 읽기 속도 가정을 바꾸면 다시 돌려 보세요.
+- 마스터 기획서 [docs/game-plan.md](docs/game-plan.md): 프로듀서 확정 방향(2026-11-12 5가지)과 0.9 설계. **버전마다 갱신하는 기획 정본**입니다. 아이디어 모음은 [docs/next-ideas-20261112.md](docs/next-ideas-20261112.md).
 - 체험 주소 `?demo=1|2|3`: 그 회관 단계까지 자란 마을로 시작(저장 키 `hangul-defense-demo{N}`, 원래 저장은 건드리지 않음).
 - `test.cjs`: Chromium/WebKit 실제 브라우저 검사와 스크린샷. 시계를 세우고 틱을 직접 돌리며, 실제 인터벌 시계는 `clock` 구간 하나에서만 박자 수로 확인합니다. `ONLY=matrix|clock|feel|fallback|demo`로 구간만 돌릴 수 있고(출력에 `PARTIAL` 표시), 전체 통과 수치는 `ONLY` 없이 돌린 것만 인정합니다.
 - `art-handoff/coopnight/`: 기존 인계 원본·사용 지침·manifest. 실제 장면 설명은 [docs/living-village.md](docs/living-village.md).
