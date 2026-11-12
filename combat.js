@@ -20,22 +20,23 @@
   /* 수입 = (기본 + 알 수 × 알값 + 연못 × 물고기값) × 긴 글 배수 (+ 번개 보너스) */
   const PAY={base:8,egg:4,farmer:2,fish:6,feast:5};
   const ITEMS={
-    tower:{slot:0,key:'level',name:'타워 올리기',note:'늑대를 1마리 더 쏴요',prices:[40,150,280,450,650]},
-    fence:{slot:0,key:'fence',name:'울타리 치기',note:'늑대가 느려져요',prices:[20,50,80,110,150,190]},
+    tower:{slot:0,key:'level',name:'타워 세우기',note:'화살 타워 +1',prices:[40,150,280,450,650]},
+    fence:{slot:0,key:'fence',name:'울타리 치기',note:'마을 한 면을 막아요',prices:[20,50,80,110,150,190]},
     chicken:{slot:1,key:'chickens',name:'닭 데려오기',note:'정답마다 알 +1개',prices:[25,60,95,130,170,210,260],base:1},
     farmer:{slot:1,key:'farmers',name:'농부 고용',note:'알 1개당 +2골드',prices:[120,300],need:1},
     pond:{slot:1,key:'pond',name:'연못 파기',note:'정답마다 물고기 +6골드',prices:[180,400,650],need:2},
     hall:{slot:2,key:'hall',name:'마을회관 키우기',note:'새 카드가 생겨요',prices:[150,380,700]},
-    feast:{slot:2,key:'feast',name:'마을 잔치',note:'정답마다 +5골드',need:3}
+    feast:{slot:2,key:'feast',name:'마을 잔치',note:'정답마다 +5골드',need:3},
+    repair:{slot:0,key:'repairs',name:'고치기',note:'부서진 건물을 모두 고쳐요'}
   };
-  const ORDER=['tower','fence','chicken','farmer','pond','hall','feast'];
-  const NUMS=['gold','level','fence','chickens','hidden','farmers','pond','hall','feast','wins','misses','index','help','late'];
+  const ORDER=['tower','fence','chicken','farmer','pond','hall','feast'];/* repair는 부서진 건물이 있을 때만 지켜요 칸에 먼저 나온다 */
+  const NUMS=['gold','level','fence','chickens','hidden','farmers','pond','hall','feast','wins','misses','index','help','late','repairs','broken'];
 
   const syl=s=>{let n=0;for(const ch of String(s||''))if(ch>='가'&&ch<='힣')n++;return n};
   const clamp=(lo,hi,v)=>Math.min(hi,Math.max(lo,v));
 
-  function fresh(age){return {gold:20,level:0,fence:0,chickens:1,hidden:0,farmers:0,pond:0,hall:0,feast:0,wins:0,misses:0,index:0,help:0,late:0,mode:'sound',age:age||8,round:null}}
-  const max=key=>key==='feast'?Infinity:ITEMS[key].prices.length+(ITEMS[key].base||0);
+  function fresh(age){return {gold:20,level:0,fence:0,chickens:1,hidden:0,farmers:0,pond:0,hall:0,feast:0,wins:0,misses:0,index:0,help:0,late:0,repairs:0,broken:0,mode:'sound',age:age||8,round:null}}
+  const max=key=>key==='feast'||key==='repair'?Infinity:ITEMS[key].prices.length+(ITEMS[key].base||0);
 
   /* 보통 아이가 읽고 고르는 데 드는 시간(초, 가정). 소리 모드는 듣는 시간을 뺀다(듣는 동안 시계가 멈춤).
      읽기 모드는 지문 + 질문(8세부터) + 보기를 읽고, 9세부터는 지문을 한 번 더 훑는 시간을 더한다. */
@@ -98,15 +99,16 @@
   function price(s,key){
     const it=ITEMS[key];if(!it)return Infinity;
     if(key==='feast')return 200+60*s.feast;
+    if(key==='repair')return 20+15*Math.max(1,s.broken|0);
     const i=s[it.key]-(it.base||0);return i>=0&&i<it.prices.length?it.prices[i]:Infinity;
   }
-  const open=(s,key)=>!!ITEMS[key]&&(ITEMS[key].need||0)<=s.hall&&s[ITEMS[key].key]<max(key);
+  const open=(s,key)=>key==='repair'?(s.broken|0)>0:!!ITEMS[key]&&(ITEMS[key].need||0)<=s.hall&&s[ITEMS[key].key]<max(key);
 
   /* 카드 3장. 같은 상태면 언제나 같은 3장(새로고침해도 그대로)이고, 그 칸에서 하나를 사면 다음 종류로 바뀐다.
      마을회관으로 새로 열린 카드(아직 하나도 안 산 농부·연못·잔치)는 바로 다음 고르기에 먼저 나온다. */
   function offers(s){
     const pick=(list,turn)=>{const a=list.filter(k=>open(s,k)),fresh=a.find(k=>ITEMS[k].need&&s[ITEMS[k].key]===0);return fresh||(a.length?a[turn%a.length]:null)};
-    const out=[pick(['tower','fence'],s.level+s.fence),pick(['chicken','farmer','pond'],Math.max(0,s.chickens-1)+s.farmers+s.pond),pick(['hall','feast'],0)];
+    const out=[open(s,'repair')?'repair':pick(['tower','fence'],s.level+s.fence),pick(['chicken','farmer','pond'],Math.max(0,s.chickens-1)+s.farmers+s.pond),pick(['hall','feast'],0)];
     for(let i=0;i<3;i++)if(!out[i])out[i]=ORDER.find(k=>open(s,k)&&!out.includes(k))||null;
     return out;
   }
@@ -123,7 +125,7 @@
     for(const k of NUMS)if(Number.isSafeInteger(saved[k])&&saved[k]>=0)s[k]=saved[k];
     s.mode=saved.mode==='story'?'story':'sound';
     s.age=list.includes(saved.age)?saved.age:8;
-    s.chickens=clamp(1,max('chicken'),s.chickens);
+    s.chickens=clamp(0,max('chicken'),s.chickens);if(!('round' in saved)&&s.chickens===0)s.chickens=1;
     for(const k of ['tower','fence','farmer','pond','hall']){const key=ITEMS[k].key;s[key]=Math.min(s[key],max(k))}
     s.hidden=Math.min(s.hidden,s.chickens);s.help=Math.min(MAX_HELP,s.help);s.late=Math.min(1,s.late);
     const r=saved.round;

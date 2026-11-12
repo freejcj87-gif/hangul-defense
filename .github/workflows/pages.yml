@@ -5,6 +5,7 @@ on:
     paths:
       - index.html
       - combat.js
+      - world.js
       - questions.js
       - src/village.js
       - art-handoff/coopnight/source-3d/models/environment-pack.glb
@@ -77,6 +78,8 @@ jobs:
           html = fetch('').decode('utf-8')
           assert '꼬꼬마을: 읽어서 지켜요' in html
           assert 'combat.js' in html
+          assert 'world.js' in html
+          assert len(fetch('world.js')) > 1000
           assert len(fetch('combat.js')) > 1000
           assert 'questions.js' in html
           assert len(fetch('questions.js')) > 10000
