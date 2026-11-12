@@ -871,6 +871,7 @@ eq(a.game().rec.shown,2,'1분에 보통 말풍선 2개까지 '+JSON.stringify(a.
 /* 상황이 바뀌면 반짝임이 꺼짐 */
 let want='chicken';a=seed({age:7,mode:'story',gold:0},{rec:()=>want&&{key:want,line:CHICK,urgent:false,rule:7}});a.go();answerLand(a);ok(a.slot('chicken').classList.contains('rec'),'(반짝)');want=null;a.tick(10);ok(!a.slot('chicken').classList.contains('rec'),'추천이 바뀌면 반짝임 꺼짐');
 /* 실제 규칙: 회관 단계로 새로 열린 상품은 한 번만(rule 4) */
-a=seed({age:7,mode:'story',hall:1,chickens:8,level:4,gold:150},{rec:'real'});a.go();answerLand(a);eq([a.bubble(),a.game().rec.glow,a.game().rec.opened],['펑! 터지는 화살을 쓸 수 있어요!','power',['power']],'회관 1단계: 강화가 열렸다고 한 번');
+/* 늑대가 몰려들면 더 급한 추천(타워)이 먼저라 시드에 따라 흔들린다 → 세계를 조용히 한 뒤 본다 */
+a=seed({age:7,mode:'story',hall:1,chickens:8,level:4,gold:150},{rec:'real'});a.go();calmWorld(a);answerLand(a);eq([a.bubble(),a.game().rec.glow,a.game().rec.opened],['펑! 터지는 화살을 쓸 수 있어요!','power',['power']],'회관 1단계: 강화가 열렸다고 한 번');
 
 console.log('PASS '+checks+' rule + simulated DOM assertions. Not browser/audio/device validation.');

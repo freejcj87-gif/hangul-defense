@@ -1,8 +1,9 @@
 // 0.9 village props, all procedural (no new art files): tower storeys, the farmers' egg basket, fence layers (double rails,
-// stone wall), market tiers (stall -> roofed shop -> tent market -> big market), the egg nests by the hall, and what each
-// hall stage adds to the village (dirt paths, lanterns, hay, feast flags). Everything is vertex-coloured for the shared material.
+// stone wall), the market (stall -> roofed shop -> market street with tents -> longer street with a gate), the egg nests, and
+// what each hall stage adds (dirt roads, lanterns, hay, feast flags). Positions live in layout.js. Everything is vertex-coloured.
 import * as THREE from 'three';
 import { prep, solid, flat, merge } from './geo.js';
+import { MARKET_NEAR, TENTS, STREET_FLAGS, STREET_CRATES, GATE, PATHS, lanterns, LANTERN_BOX, FLAGS3, HAY3, NESTS } from './layout.js';
 
 const V3=THREE.Vector3;
 const rot=(x,y,z)=>[x,y,z];
@@ -50,39 +51,37 @@ export function wallGeometry(w){
  return solid(parts);
 }
 
-/* ---------- market: what each tier adds around the GLB market stall (local: counter faces +z, x to the right) ---------- */
-// One striped tent pavilion: open cone roof in alternating wedges, a valance ring, four poles and a table of goods.
-function tent(x,z,r,colors,goods){
- const list=[],m=new THREE.Matrix4(),q=new THREE.Quaternion(),c=new THREE.Color(),H=2.15,roof=.95;
+/* ---------- market (positions in layout.js): the market actor carries tier 0 stall / tier 1+ roofed shop with a crate and a barrel;
+   from hall 2 the market street (tents along a road out of the market's back) is part of the stage props ---------- */
+// One striped tent pavilion: open cone roof in alternating wedges, a valance ring, four poles and a table of goods facing the street.
+function tent(x,z,r,colors,goods,face){
+ const list=[],m=new THREE.Matrix4(),q=new THREE.Quaternion(),c=new THREE.Color(),H=2.15,roof=.95,fx=Math.cos(face),fz=Math.sin(face);
  for(let i=0;i<8;i++){const g=new THREE.ConeGeometry(1,1,2,1,true,i*Math.PI/4,Math.PI/4);
   list.push(prep(g,m.compose(new V3(x,H+roof/2,z),q.identity(),new V3(r,roof,r)),c.set(colors[i%2])));g.dispose()}
  const parts=[['cyl',colors[1],[x,H-.04,z],[r*1.01,.14,r*1.01]],['sphere',0xffd24a,[x,H+roof+.08,z],.09],['cyl6',0xf4efe4,[x,H+roof+.02,z],[.03,.2,.03]]];
  for(let i=0;i<4;i++){const a=i*Math.PI/2+Math.PI/4;parts.push(['cyl6',0x8a5a2e,[x+Math.cos(a)*r*.86,H/2,z+Math.sin(a)*r*.86],[.05,H,.05]])}
- parts.push(['box',0xa8743a,[x,.42,z+r*.35],[r*1.3,.84,r*.6]],['box',0xc8964f,[x,.86,z+r*.35],[r*1.36,.06,r*.66]]);
- goods(parts,x,.9,z+r*.35,r);
+ const tx=x+fx*r*.35,tz=z+fz*r*.35,ry=-face+Math.PI/2;   // the counter stands on the street side
+ parts.push(['box',0xa8743a,[tx,.42,tz],[r*1.3,.84,r*.6],rot(0,ry,0)],['box',0xc8964f,[tx,.86,tz],[r*1.36,.06,r*.66],rot(0,ry,0)]);
+ GOODS[goods](parts,tx,.9,tz,r,ry);
  list.push(solid(parts));return merge(list);
 }
-const apples=(parts,x,y,z,r)=>{for(let i=0;i<5;i++)parts.push(['ball',i%2?0xe2453a:0xf06a3c,[x-r*.45+i*r*.22,y+.07,z+(i%2?.06:-.06)],.09])};
-const loaves=(parts,x,y,z,r)=>{for(let i=0;i<4;i++)parts.push(['sphere',0xd99a4e,[x-r*.36+i*r*.24,y+.06,z],[.13,.08,.09]])};
-const cabbages=(parts,x,y,z,r)=>{for(let i=0;i<4;i++)parts.push(['ball',i%2?0x8fd060:0x6fb04a,[x-r*.36+i*r*.24,y+.08,z+(i%2?.05:-.05)],.1])};
-function crates(x,z,n=2){const p=[];for(let i=0;i<n;i++)p.push(['box',0xb98a52,[x+i*.48,.2,z],[.42,.4,.42],rot(0,i*.3,0)],['box',0x8a5a2e,[x+i*.48,.41,z],[.44,.03,.44],rot(0,i*.3,0)]);return p}
+const onCounter=(x,z,ry,u,v=0)=>[x+Math.cos(ry)*u+Math.sin(ry)*v,z-Math.sin(ry)*u+Math.cos(ry)*v];   // a point on a counter turned by ry
+const GOODS={
+ apples:(parts,x,y,z,r,ry)=>{for(let i=0;i<5;i++){const [px,pz]=onCounter(x,z,ry,-r*.45+i*r*.22,i%2?.06:-.06);parts.push(['ball',i%2?0xe2453a:0xf06a3c,[px,y+.07,pz],.09])}},
+ loaves:(parts,x,y,z,r,ry)=>{for(let i=0;i<4;i++){const [px,pz]=onCounter(x,z,ry,-r*.36+i*r*.24);parts.push(['sphere',0xd99a4e,[px,y+.06,pz],[.13,.08,.09],rot(0,ry,0)])}},
+ cabbages:(parts,x,y,z,r,ry)=>{for(let i=0;i<4;i++){const [px,pz]=onCounter(x,z,ry,-r*.36+i*r*.24,i%2?.05:-.05);parts.push(['ball',i%2?0x8fd060:0x6fb04a,[px,y+.08,pz],.1])}}};
+function crate(x,z,ry){return [['box',0xb98a52,[x,.2,z],[.42,.4,.42],rot(0,ry,0)],['box',0x8a5a2e,[x,.41,z],[.44,.03,.44],rot(0,ry,0)]]}
 function flagPole(x,z,h,color){return [['cyl6',0xf4efe4,[x,h/2,z],[.04,h,.04]],['sphere',0xffd24a,[x,h+.05,z],.07],['box',color,[x+.24,h-.2,z],[.44,.3,.02]],['cone',color,[x+.5,h-.2,z],[.12,.16,.02],rot(0,0,-Math.PI/2)]]}
-// tier 0 = stall only (the GLB market without its awning), 1 = full GLB market (roofed), 2 = + two tents and bunting, 3 = + a third tent, crates, flags and a sign arch
+// market-local decor by the counter (tier 1+): a crate and a barrel
 export function marketExtras(tier){
- const list=[];
- if(tier>=1)list.push(solid([...crates(-1.55,.35,1),['cyl',0x9c6a34,[1.5,.3,.45],[.24,.6,.24]],['cyl',0x7c5028,[1.5,.6,.45],[.25,.04,.25]]]));
- if(tier>=2){list.push(tent(-2.55,-.55,1.05,[0xe2453a,0xfff4e0],apples),tent(2.55,-.75,1.05,[0x3a8fd6,0xfff4e0],loaves));
-  list.push(solid([...flagPole(-3.55,.4,2.3,0xffd24a),...flagPole(3.55,.25,2.3,0x6fd3ff)]))}
- if(tier>=3){list.push(tent(.2,-2.6,1.15,[0x5aa83a,0xfff4e0],cabbages));
-  list.push(solid([...crates(-3.2,1.1,2),...crates(2.9,1.0,2),...flagPole(-1.6,-2.4,2.9,0xff5a4a),...flagPole(2.1,-2.5,2.9,0xff8fb3),
-   ['box',0x8a5a2e,[-.9,1.45,1.55],[.1,2.9,.1]],['box',0x8a5a2e,[.9,1.45,1.55],[.1,2.9,.1]],['box',0xc8964f,[0,2.85,1.55],[2.1,.36,.1]],['box',0xffd24a,[0,2.85,1.6],[1.6,.22,.04]]]))}
- return list.length?merge(list):null;
+ if(tier<1)return null;const [c,b]=MARKET_NEAR;
+ return solid([...crate(c.x,c.z,0),['cyl',0x9c6a34,[b.x,.3,b.z],[.24,.6,.24]],['cyl',0x7c5028,[b.x,.6,b.z],[.25,.04,.25]]]);
 }
 // GLB market children dropped for the bare stall (tier 0)
 export const STALL_OMIT=['Curved canvas stripe','Scalloped awning valance','Rounded stall pillar'];
 
-/* ---------- egg nests beside the hall door: left-over eggs stay here until the next sale ---------- */
-export const NESTS=[[-1.42,-1.95],[-.86,-2.42]];
+/* ---------- egg nests: left-over eggs stay here until the next sale ---------- */
+export { NESTS };
 export const NEST_MAX=20;
 // egg places: ten per nest (a ring of six, three on top, one crowning)
 export function nestSpots(){const out=[];for(const [x,z] of NESTS){for(let i=0;i<6;i++){const a=i*Math.PI/3+.3;out.push([x+Math.cos(a)*.19,.2,z+Math.sin(a)*.16])}
@@ -93,27 +92,30 @@ function nest(x,z){const parts=[['cyl',0xd9b65a,[x,.07,z],[.36,.14,.32]],['ring'
  for(let i=0;i<8;i++){const a=i*.79;parts.push(['box',i%2?0xe8c86a:0xc8a048,[x+Math.cos(a)*.37,.15,z+Math.sin(a)*.33],[.22,.025,.03],rot(.3,-a+.5,.2)])}
  return parts}
 
-/* ---------- what each hall stage adds to the village (world coordinates, village centre = origin) ---------- */
-const SPOKES=[Math.PI/4,3*Math.PI/4,5*Math.PI/4,7*Math.PI/4];   // toward the first outer tower ring (between the wolf trails)
-export function lanterns(stage){const out=[];if(stage>=2){for(const a of SPOKES)out.push([Math.cos(a)*5.4+Math.sin(a)*.75,Math.sin(a)*5.4-Math.cos(a)*.75]);out.push([2.3,.75],[-.9,-1.0])}
- if(stage>=3)for(const a of SPOKES)out.push([Math.cos(a)*9.6+Math.sin(a)*.75,Math.sin(a)*9.6-Math.cos(a)*.75]);return out}
+/* ---------- what each hall stage adds to the village (world coordinates from layout.js) ---------- */
+export { lanterns };
 export const LANTERN_TOP=1.55;
 export function villageProps(stage){
- const parts=[...NESTS.flatMap(([x,z])=>nest(x,z))];
- if(stage>=1){   // dirt paths: spokes out to the first tower ring, with a trodden edge and a few pebbles
-  const r0=2.6,r1=stage>=3?14:8.2;
-  for(const a of SPOKES){const mid=(r0+r1)/2,len=r1-r0,x=Math.cos(a)*mid,z=Math.sin(a)*mid;
-   parts.push(flat('plane',0xc9a868,x,z,len,1.15,.019,-a),flat('plane',0xdcc08a,x,z,len,.8,.021,-a));
-   for(let i=0;i<Math.round(len/1.3);i++){const r=r0+.8+i*1.3,s=i%2?.5:-.5;parts.push(['sphere',0xb7aa8c,[Math.cos(a)*r-Math.sin(a)*s,.03,Math.sin(a)*r+Math.cos(a)*s],[.12,.05,.09]])}}
-  parts.push(flat('disc',0xdcc08a,.6,-.6,2.2,1.9,.02));   // the trodden plaza where the paths meet
+ const parts=[...NESTS.flatMap(([x,z])=>nest(x,z))],list=[];
+ for(const [x0,z0,x1,z1,w] of PATHS[stage]||[]){   // dirt roads with a trodden edge and a few pebbles
+  const dx=x1-x0,dz=z1-z0,len=Math.hypot(dx,dz),a=Math.atan2(dz,dx),x=(x0+x1)/2,z=(z0+z1)/2;
+  parts.push(flat('plane',0xc9a868,x,z,len,w,.019,-a),flat('plane',0xdcc08a,x,z,len,w*.7,.021,-a));
+  for(let i=0;i<Math.floor(len/1.3);i++){const u=(.6+i*1.3)/len,s=i%2?.3:-.3;parts.push(['sphere',0xb7aa8c,[x0+dx*u-Math.sin(a)*s*w,.03,z0+dz*u+Math.cos(a)*s*w],[.12,.05,.09]])}
  }
  for(const [x,z] of lanterns(stage))parts.push(['cyl6',0x6b4a2e,[x,.7,z],[.05,1.4,.05]],['box',0x6b4a2e,[x+.12,1.36,z],[.28,.04,.04]],
-  ['box',0x3a2c22,[x+.24,1.46,z],[.17,.2,.17]],['box',0xffd66a,[x+.24,1.46,z],[.13,.16,.19]],['cone',0x3a2c22,[x+.24,1.62,z],[.14,.12,.14]],['cyl6',0x8a6a42,[x,.04,z],[.14,.08,.14]]);
- if(stage>=3){   // feast flags around the plaza and hay stacked by the barn
-  const F=[0xff5a4a,0xffd24a,0x6fd3ff,0x9be05c];[[1.9,3.0],[-3.4,3.2],[-1.6,-4.6],[7.2,-3.8]].forEach(([x,z],i)=>parts.push(...flagPole(x,z,2.6,F[i])));
-  for(const [x,z,s] of [[-8.1,-2.6,1],[-7.4,-2.1,.85],[-7.8,-1.6,.9]])parts.push(['cyl',0xe9c75a,[x,.3*s,z],[.3*s,.62*s,.3*s],rot(Math.PI/2,0,.3)],['cyl',0xc79a3a,[x,.3*s,z],[.31*s,.09*s,.31*s],rot(Math.PI/2,0,.3)]);
+  ['box',0x3a2c22,[x+LANTERN_BOX,1.46,z],[.17,.2,.17]],['box',0xffd66a,[x+LANTERN_BOX,1.46,z],[.13,.16,.19]],['cone',0x3a2c22,[x+LANTERN_BOX,1.62,z],[.14,.12,.14]],['cyl6',0x8a6a42,[x,.04,z],[.14,.08,.14]]);
+ // the market street: tents facing the road, flag poles at its entrance (stage 3: a sign board between them), crates
+ const sa=-Math.PI/4,road=(px,pz)=>{const u=px*Math.cos(sa)+pz*Math.sin(sa);return [Math.cos(sa)*u,Math.sin(sa)*u]};
+ for(const t of TENTS)if(stage>=t.stage){const [rx,rz]=road(...t.at);list.push(tent(t.at[0],t.at[1],t.r,t.colors,t.goods,Math.atan2(rz-t.at[1],rx-t.at[0])))}
+ for(const f of STREET_FLAGS)if(stage>=f.stage)parts.push(...flagPole(f.at[0],f.at[1],f.h,f.color));
+ if(stage>=GATE.stage){const [ax,az]=GATE.a,[bx,bz]=GATE.b,len=Math.hypot(bx-ax,bz-az),ry=-Math.atan2(bz-az,bx-ax),mx=(ax+bx)/2,mz=(az+bz)/2;
+  parts.push(['box',0x8a5a2e,[mx,1.95,mz],[len+.12,.42,.1],rot(0,ry,0)],['box',0xffd24a,[mx,1.95,mz],[len*.78,.26,.13],rot(0,ry,0)],['box',0xe2453a,[mx,1.95,mz],[len*.5,.08,.15],rot(0,ry,0)])}
+ for(const c of STREET_CRATES)if(stage>=c.stage)for(let i=0;i<c.n;i++)parts.push(...crate(c.at[0]+Math.cos(sa)*i*.5,c.at[1]+Math.sin(sa)*i*.5,i*.3-sa));
+ if(stage>=3){   // feast flags around the village and hay stacked by the barn
+  const F=[0xff5a4a,0xffd24a,0x6fd3ff,0x9be05c];FLAGS3.forEach(([x,z],i)=>parts.push(...flagPole(x,z,2.6,F[i%F.length])));
+  for(const [x,z,s] of HAY3)parts.push(['cyl',0xe9c75a,[x,.3*s,z],[.3*s,.62*s,.3*s],rot(Math.PI/2,0,.3)],['cyl',0xc79a3a,[x,.3*s,z],[.31*s,.09*s,.31*s],rot(Math.PI/2,0,.3)]);
  }
- return solid(parts);
+ list.push(solid(parts));return merge(list);
 }
 
 /* ---------- atlas icon: a hammer in a white speech bubble (the repair hint over a broken building) ---------- */

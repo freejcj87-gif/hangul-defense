@@ -4,6 +4,7 @@ import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { SimplifyModifier } from 'three/addons/modifiers/SimplifyModifier.js';
 import { KIND_ORDER, RIG, GAIT, RIG_TIME, monsterGeometry, shadowGeometry, rigMaterial, rigDepthMaterial, rigMaterialAt, gaitPose } from './monsters.js';
 import { prep, fuse, solid, flat, merge } from './geo.js';
+import { POND, POND_R, HAY, GARDEN, ZONE, FARM_ZONE, FARM_HOME, PICK, DROP, MARKET_FRONT, MARKET_GATE, TENTS } from './layout.js';
 import { STOREY_H, storeyGeometry, basketGeometry, basketEggs, railGeometry, wallGeometry, marketExtras, STALL_OMIT, NESTS, NEST_MAX, nestSpots, villageProps, lanterns, LANTERN_TOP, drawHammer } from './props.js';
 
 const host=document.querySelector('.scene');
@@ -45,9 +46,9 @@ function fakeWorld(s){
  add(-1,{kind:'coop',x:P.coop[0],z:P.coop[1]});add(-2,{kind:'market',x:P.market[0],z:P.market[1]});
  if(hall>=1)add(-3,{kind:'nursery',x:P.nursery[0],z:P.nursery[1]});
  if(hall>=3)add(-4,{kind:'barn',x:P.barn[0],z:P.barn[1]});
- // the contract's rule: as many towers as there are places, the rest raise the lowest tower one floor at a time
- const slots=towerSlotsAt(hall),n=1+level,built=Math.min(n,slots.length),tw=slots.slice(0,built).map(([x,z],slot)=>add(-10-slot,{kind:'tower',slot,x,z}));
- for(let k=built;k<n&&tw.length;k++){let low=tw[0];for(const t of tw)if((t.floor|0)<(low.floor|0))low=t;low.floor=(low.floor|0)+1}
+ // world.js's rule: as many towers as there are places, the rest raise the lowest tower one storey at a time (floor = storeys, 1 = plain)
+ const slots=towerSlotsAt(hall),n=1+level,built=Math.min(n,slots.length),tw=slots.slice(0,built).map(([x,z],slot)=>add(-10-slot,{kind:'tower',slot,x,z,floor:1}));
+ for(let k=built;k<n&&tw.length;k++){let low=tw[0];for(const t of tw)if(t.floor<low.floor)low=t;low.floor++}
  // fences: empty sides first (layer 1), then the weakest side gets the next layer
  for(let k=0;k<Math.min(6,fence);k++){const a=(k+.5)*Math.PI/3;add(-40-k,{kind:'fence',side:k,layer:Math.min(3,Math.floor(fence/6)+(k<fence%6?1:0)),x:Math.cos(a)*R,z:Math.sin(a)*R})}
  const list=[];for(let i=0;i<hens;i++){const [x,z]=W('HOME')(i);list.push({id:-100-i,slot:i,x,z,state:'yard'})}
@@ -191,19 +192,8 @@ const springy=t=>1-Math.exp(-7.7*t)*Math.cos(17.5*t);            // 0 -> 1.25 ->
 const settle=(t,freq=19,damp=8)=>Math.exp(-damp*t)*Math.cos(freq*t); // 1 -> 0 with a wobble
 const easeIn=u=>u*u,easeOut=u=>1-(1-u)*(1-u),easeInOut=u=>u<.5?2*u*u:1-2*(1-u)*(1-u);
 
-/* ---------- layout (world units; the village centre is the origin, as in world.js) ---------- */
-// Economy decor sits inside the village, clear of world buildings, tower slots and hen homes.
-const POND={x:3.2,z:2.5},POND_R=[0,.62,.82,1.0];
-const HAY={x:5.6,z:1.8};
-// base farmer + up to nine hired farmers (the coop door stays clear for peeking hens). Each strolls one zone so ten never queue
-// on one line: the coop-market road, the hen yard, the market front, beside the nests. [ax,az, bx,bz, lateral half-width]
-const ZONE={road:[-1.5,-1.15,3.4,.25,.45],yard:[-1.7,.5,1.5,1.5,.6],market:[2.2,1.0,5.2,.55,.4],nests:[-2.3,-1.25,-.2,-.85,.3]};
-const FARM_ZONE=['road','road','market','yard','road','nests','market','yard','road','market'];
-const FARM_HOME=[[-1.0,-1.9],[1.6,-1.0],[3.3,.9],[-.6,1.0],[2.4,-.4],[-1.3,-1.0],[4.6,.7],[.8,1.3],[.2,-.75],[2.6,1.0]];
-// egg pick-up spots (among the hens, near the nests) and market counter spots, one per farmer (two rows in front of the market)
-const PICK=[[-.1,-.3],[-.8,.45],[.6,.55],[-1.3,-.9],[.4,-1.05],[-.45,1.15],[1.15,-.2],[-1.6,.3],[1.0,1.1],[-.9,-1.6]];
-const DROP=[[3.45,.3],[2.55,.45],[4.3,.5],[3.0,1.05],[3.9,1.15],[2.05,.95],[4.75,1.05],[2.5,1.6],[3.45,1.75],[4.4,1.7]];
-const MARKET_FRONT={x:3.9,z:-.1},SALE_END=1.95,BASKET=4;   // a farmer carries four eggs
+/* ---------- layout: prop positions, farmer zones and spots live in layout.js (checked against world.js's fixed places) ---------- */
+const SALE_END=1.95,BASKET=4;   // a farmer carries four eggs
 const TOWER_H=2.3,WS=1.05,FOREST=4.5,FENCE_IN=.4;                                  // tower height, wolf scale, forest edge (radius + 6), fence ring inset
 const EYE_DIR=new V3(-9,14,16).normalize(),EYE_DIST=48;
 const CANNON=['Seed cannon barrel','Cannon brass hoop','Dark muzzle inset'];      // the egg cannon gives way to a crossbow: the towers shoot arrows
@@ -361,7 +351,6 @@ async function start(){
   seed=keep}
  const forest=instanced(G.lowTree,DEC.tree.length,false),groveMax=40,grove=instanced(G.tree,groveMax,true),shrubs=instanced(G.lowBush,DEC.bush.length,false),stones=instanced(G.rock,DEC.rock.length,false);
  // Fixed little garden inside the village (clear of buildings, tower slots, hen homes, pond and paths).
- const GARDEN={bush:[[-5.2,3.1,1.1],[3.6,-4.7,1],[6.3,3.6,1.15],[-1.9,4.6,.9]],rock:[[-4.8,4.2,.9],[2.2,4.4,.8],[6.6,-2.6,1],[-6.8,-.4,.8]]};
  const garden=[instanced(G.lowBush,GARDEN.bush.length,false),instanced(G.rock,GARDEN.rock.length,false),shadowOnly(G.lowBush,GARDEN.bush.length)];   // low-poly bushes (5k -> 0.4k triangles each), like the meadow shrubs
  [GARDEN.bush,GARDEN.rock,GARDEN.bush].forEach((list,k)=>{list.forEach(([x,z,s],i)=>{dummy.position.set(x,0,z);dummy.rotation.set(0,i*1.7,0);dummy.scale.setScalar(s);dummy.updateMatrix();garden[k].setMatrixAt(i,dummy.matrix)});garden[k].count=list.length;garden[k].instanceMatrix.needsUpdate=true});
  let decorR=-1;
@@ -573,7 +562,7 @@ async function start(){
  let powerShown=-1,powerAt=-9;   // tower power tier on the crossbows (0-3) and when it last went up
  const pending={tower:-9,fence:-9,chicken:-9,hall:-9};
  // Market by hall stage: 0 stall · 1 roofed shop · 2 tent market · 3 big market (heights/sizes for effects and the repair hint)
- const MARKET_TIER=[{height:1.7,size:1.4},{height:2.6,size:1.6},{height:3.1,size:2.4},{height:3.2,size:2.8}];
+ const MARKET_TIER=[{height:1.7,size:1.4},{height:2.6,size:1.6},{height:2.6,size:1.6},{height:2.6,size:1.6}];   // the street (hall 2+) is in the stage props
  function setMarketTier(t){t=clamp(t|0,0,3);if(market.mtier===t)return false;market.mtier=t;market.a.obj.geometry=G.market[t];Object.assign(market,MARKET_TIER[t]);return true}
  function setProps(n){n=clamp(n|0,0,3);if(propsStage===n)return false;propsStage=n;props.geometry=G.props[n];return true}
  const APPLY={
@@ -605,12 +594,8 @@ async function start(){
  const sideOf=b=>Number.isInteger(b.side)&&b.side>=0&&b.side<6?sides[b.side]:null;
  const slotOf=b=>b.kind==='coop'?home:b.kind==='market'?market:b.kind==='nursery'?nursery:b.kind==='barn'?barn:b.kind==='tower'?(Number.isInteger(b.slot)&&b.slot>=0?towers[b.slot]:null)||null:b.kind==='fence'?sideOf(b):null;
  const pendKey=k=>k==='tower'?'tower':k==='fence'?'fence':k==='nursery'||k==='barn'?'hall':null;
- // Tower floors. The contract adds `floor` (1 or more) to tower buildings; whether 1 means "the plain tower" or "one extra storey"
- // is read from the numbers: if every tower has floor >= 1 and they add up to the economy's tower count (1 + level), floor counts
- // storeys (plain = 1); otherwise it counts extra storeys (absent = 0). Both give the same picture for a consistent world.
- let floorTotal=false;
- function floorMode(w,s){const ts=w.buildings.filter(b=>b&&b.kind==='tower');let sum=0,all=ts.length>0;for(const b of ts){const f=Number(b.floor);if(Number.isInteger(f)&&f>=1)sum+=f;else all=false}floorTotal=all&&sum===1+count(s&&s.level,99)}
- const extraFloors=b=>clamp((Number.isFinite(Number(b.floor))?Math.floor(Number(b.floor)):0)-(floorTotal?1:0),0,MAX_FLOORS);
+ // Tower floors: world.js gives `floor` = storeys (1 = the plain tower); every storey above the first is a stone drum under it.
+ const extraFloors=b=>{const f=Number(b.floor);return Number.isFinite(f)&&f>=1?clamp(Math.floor(f)-1,0,MAX_FLOORS):0};
  const layerOf=b=>clamp(Number.isFinite(Number(b.layer))?Math.floor(Number(b.layer)):1,1,3);
  function syncRecords(s,volley=false){
   const real=s&&s.world&&typeof s.world==='object'&&Array.isArray(s.world.buildings)?s.world:null,w=real||fakeWorld(s);
@@ -619,7 +604,7 @@ async function start(){
   const t=num(w.t);let ticked=false;
   // Ticks that arrive before a frame has drawn (a wrong-answer fast-forward forwarded step by step) add up into one longer bound.
   if(!init&&t!==lastT){let n=t-lastT;lastT=t;sinceTick=0;if(n>0){if(blendT<=1e-4)n+=blendTicks;blendTicks=n;blendDur=n<=2?.1*n:clamp(.12+n*.012,.3,.5);blendEase=n>2;blendT=0;ticked=true}else{blendDur=.1;blendT=1;blendEase=false;ticked=true}}   // rewound (restored save): snap
-  floorMode(w,s);market.down=!!(s&&Number(s.marketDown)>0);
+  market.down=!!(s&&Number(s.marketDown)>0);
   syncBuildings(w,init||initial);syncWolves(w,ticked);syncHens(w,init||initial,ticked);syncArrows(w,volley);
   Rgoal=radiusOf(s||IDLE,w);initial=false;
   return w;
@@ -821,7 +806,8 @@ async function start(){
  function buildHall(n){             // the coop swells, a new building pops in, the market grows a tier, and the village (and the view) grows outward
   const tier0=market.mtier,stage0=propsStage;APPLY.hall(n);const a=home.a,T=.12;
   if(market.mtier!==tier0&&market.on){const m=market.a;popIn(m,.3,.85);after(.3,()=>{m.flash=.1;dustBurst(m.x,m.z,14,1.3);ringWave(m.x,m.z,5.5,GOLD,.5);starBurst(m.x,market.height,m.z,12,1,[GOLD,WHITE,PINK]);confetti(m.x,market.height*.8,m.z,22,2.2)})}
-  if(propsStage>stage0)lanterns(propsStage).forEach(([x,z],i)=>after(.45+i*.06,()=>{flashAt(x+.24,LANTERN_TOP,z,1.2,GOLD);sparkles(x,1.2,z,4,.4,GOLD,0,.3)}));
+  if(propsStage>stage0){lanterns(propsStage).forEach(([x,z],i)=>after(.45+i*.06,()=>{flashAt(x+.24,LANTERN_TOP,z,1.2,GOLD);sparkles(x,1.2,z,4,.4,GOLD,0,.3)}));
+   TENTS.filter(t=>t.stage===propsStage).forEach((t,i)=>after(.35+i*.12,()=>{const [x,z]=t.at;dustBurst(x,z,10,1);ringWave(x,z,4,GOLD,.45);starBurst(x,2.6,z,10,.9,[GOLD,WHITE,PINK]);confetti(x,2.4,z,14,1.6)}))}   // the market street grows
   telegraph(a.x,a.z,3.8);
   tween(0,T+.75,(u,t)=>{if(t<T){const k=Math.sin(t/T*Math.PI/2);a.sy*=1-.18*k;a.sx*=1+.1*k;return}const w=settle(t-T,15,5.5);a.sy*=1+.28*w;a.sx*=1-.13*w});
   after(T,()=>{a.flash=.1;pillar(a.x,a.z,5.4,2.4);risingRings(a.x,a.z,3.2,2.8);dustBurst(a.x,a.z+1.2,10,1.1);shake(.1);rattle(a.x,a.z,5,.08,a);startle(a.x,a.z,5)});
@@ -909,7 +895,7 @@ async function start(){
   const carriers=Math.min(crewOn.length,Math.ceil(sold/BASKET)),mk=marketShift(),jobs=[];
   for(const f of crewOn)f.job=null;
   for(let k=0;k<carriers;k++){const f=crewOn[k];
-   f.job={fx:f.a.x,fz:f.a.z,px:PICK[k][0],pz:PICK[k][1],mx:DROP[k][0]+mk.x,mz:DROP[k][1]+mk.z,lag:k*.03,eggs:clamp(sold-k*BASKET,1,BASKET)};f.wait=0;jobs.push(f.job)}
+   f.job={fx:f.a.x,fz:f.a.z,px:PICK[k][0],pz:PICK[k][1],gx:MARKET_GATE.x+mk.x,gz:MARKET_GATE.z+mk.z,mx:DROP[k][0]+mk.x,mz:DROP[k][1]+mk.z,lag:k*.03,eggs:clamp(sold-k*BASKET,1,BASKET)};f.wait=0;jobs.push(f.job)}
   const layers=yardHens().map(c=>c.a),pops=Math.min(laid,MAXH),gap=Math.min(.045,.5/Math.max(1,pops)),dr=coopDoor(),toBasket=jobs.length?Math.min(fresh,jobs.length*BASKET):0;
   const fly=(x,y,z,d,tx,ty,tz,arrive)=>{const T=Math.max(.18,arrive-d),g=9;emit({cell:CELL.egg,x,y,z,vx:(tx-x)/T,vy:(ty-y)/T+.5*g*T,vz:(tz-z)/T,gravity:g,life:T,size:.26,end:.3,aspect:1.15,spin:5,color:WHITE,fade:.97,pop:.15})};
   for(let i=0;i<pops;i++){
@@ -1371,7 +1357,8 @@ async function start(){
     const j=f.job,t=Math.max(0,sale.t-j.lag);let x,z,face=null;
     if(t<.5){const u=easeInOut(t/.5);x=j.fx+(j.px-j.fx)*u;z=j.fz+(j.pz-j.fz)*u;run=moving=Math.hypot(j.px-j.fx,j.pz-j.fz)>.05}
     else if(t<.66){x=j.px;z=j.pz;const k=Math.sin((t-.5)/.16*Math.PI);a.pitch+=.35*k;f.nod=.4*k}   // scoops the eggs into the basket
-    else if(t<1.5){const u=easeInOut((t-.66)/.84);x=j.px+(j.mx-j.px)*u;z=j.pz+(j.mz-j.pz)*u;run=moving=true}
+    else if(t<1.5){const u=easeInOut((t-.66)/.84),l1=Math.hypot(j.gx-j.px,j.gz-j.pz),l2=Math.hypot(j.mx-j.gx,j.mz-j.gz),d=u*(l1+l2);run=moving=true;   // pick-up -> past the market's corner -> counter
+     if(d<l1){const v=l1?d/l1:1;x=j.px+(j.gx-j.px)*v;z=j.pz+(j.gz-j.pz)*v}else{const v=l2?(d-l1)/l2:1;x=j.gx+(j.mx-j.gx)*v;z=j.gz+(j.mz-j.gz)*v}}
     else{x=j.mx;z=j.mz;face=Math.atan2(market.a.x-x,market.a.z-z)}
     if(t>=.6&&sale.t<1.55){f.eggs=j.eggs;up=1}   // a full basket on the head until the coins burst at the market
     const dx=x-a.x,dz=z-a.z;if(Math.hypot(dx,dz)>.004)turnTo(a,Math.atan2(dx,dz),dt*14);else if(face!==null)turnTo(a,face,dt*8);

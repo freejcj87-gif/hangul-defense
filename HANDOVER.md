@@ -1,6 +1,6 @@
 # Claude Code 작업 인계
 
-기준일: 2026-11-12. 0.8(몬스터 러시, 브랜치 `claude/monster-rush`) 기준으로 갱신했습니다. 0.7은 PR #7(main `08e8ec7`)입니다. 0.6은 PR #5(main `d8d95f5`), 0.5는 [PR #3](https://github.com/freejcj87-gif/hangul-defense/pull/3)(main `965ad4e`)입니다. 0.4 인계 시점의 기록은 main `800f3f9` 기준이며 아래 “확인된 검증과 배포”에 그대로 남겼습니다. 문서 커밋 자체는 이후 이력에서 확인하세요.
+기준일: 2026-11-13. 0.9(상점·알 경제, 브랜치 `claude/shop-economy`) 기준으로 갱신했습니다. 0.8은 PR #9(main `4700136`), 0.7은 PR #7(main `08e8ec7`)입니다. 0.6은 PR #5(main `d8d95f5`), 0.5는 [PR #3](https://github.com/freejcj87-gif/hangul-defense/pull/3)(main `965ad4e`)입니다. 0.4 인계 시점의 기록은 main `800f3f9` 기준이며 아래 “확인된 검증과 배포”에 그대로 남겼습니다. 문서 커밋 자체는 이후 이력에서 확인하세요.
 
 ## 먼저 알아야 할 것
 
@@ -55,7 +55,18 @@
 
 ## 실제 규칙과 한계
 
-### 0.8 (현재)
+### 0.9 (현재)
+
+프로듀서 5대 방향(2026-11-12)을 넣은 판입니다. 정본은 [docs/game-plan.md](docs/game-plan.md)(§8에 구현 결과·실제 상수·시뮬레이션), 세 작업(규칙·화면·3D)의 이름·자료 계약은 [docs/v09-contract.md](docs/v09-contract.md)입니다.
+
+- 단계: start → listen → ask → reward(정답 뒤 1.2초 판매·동전 연출, 세계는 흐름) → 다음 문제 / learn. 카드 고르기(`pick`·`build`)와 `picks`는 없어졌고, 0.8의 `pick` 저장은 다음 문제로 이어집니다(`Combat.restore`).
+- 상점: `Combat.SHOP`·`shop(s)`·`price/canBuy/buy`(`API: 3`). 숨은 상한 타워 20·강화 10·울타리 18·닭 20·농부 10·연못 3·회관 3. 언제든 사고 세계는 멈추지 않습니다. 화면 금화 숫자와 상점 켜짐만 동전 도착에 맞춰 늦고, 규칙 금화는 정답 순간 저장합니다.
+- 알 경제: 정답 = 닭마다 알 1개, 판 알 = min(둥지 + 낳은 알, 농부 × 4), 남은 알은 `state.nest`. 알값 2 + 회관 단계, 매대가 부서지면 절반(`marketDown`).
+- 추천: `Combat.recommend(s,ctx)`(순수 함수) + 화면의 빈도 제한(`REC`)·금빛 반짝임·꼬꼬 말풍선.
+- 세계: `World.towerSlots(hall)` 6/10/14/20, 넘치면 타워 `floor`(층 수, 1 = 평범), 닭 자리 20(`HOMES`), 울타리 `side`×`layer`(1~3), 나이 손잡이 `World.AGE`, 느린 독자 완충 `World.SLOW`(`state.pace`).
+- 3D: `src/geo.js`(공용 도형), `src/props.js`(시장 단계·마을 소품), 타워·닭·농부 인스턴스, 둥지 알, 🔨 표시, `VillageView.marketScreen()`.
+
+### 0.8 (참고)
 
 규칙과 밸런스 근거의 정본은 [docs/village-defense-design.md](docs/village-defense-design.md) 0.8 절과 `world.js`·`combat.js` 맨 위 상수입니다.
 
