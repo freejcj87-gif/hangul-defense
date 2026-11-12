@@ -256,7 +256,8 @@ const FAKE_TTS=()=>{const S={speak(u){setTimeout(()=>{u.onstart&&u.onstart();u.o
  await p.route('**/environment-pack.glb',route=>route.abort());
  await p.goto(url);await p.waitForFunction(()=>document.querySelector('.scene').dataset.renderer==='fallback');
  await begin(p,{age:8,mode:'sound'});await expectQuestion(p,8,'sound',0,'fallback default');
- const wolfPos=()=>p.locator('#enemies .enemy:not(.hidden)').first().evaluate(n=>n.style.left+'|'+n.style.bottom);
+ /* 0.8: 첫 늑대가 울타리를 부수며 서 있거나 쓰러져 바뀔 수 있으므로, 보이는 늑대 전체의 위치로 움직임·멈춤을 본다 */
+ const wolfPos=()=>p.locator('#enemies .enemy:not(.hidden)').evaluateAll(a=>a.map(n=>n.style.left+'|'+n.style.bottom).sort().join(';'));
  await tick(p,200);eq(await p.locator('#enemies .enemy:not(.hidden)').count(),await notGone(p),'fallback: wolves drawn where the simulation has them');const l0=await wolfPos();await tick(p,40);ok(await wolfPos()!==l0,'fallback wolf moves');
  await answer(p,true,false);const fz=await wolfPos();await tick(p,30);eq(await wolfPos(),fz,'fallback wolves stop while choosing');
  await tick(p,7);
