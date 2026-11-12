@@ -177,6 +177,102 @@ LEGACY_STORY.forEach((old,i)=>{
   eq([q.prompt,q.choices,q.answer],[old.q,old.a,old.key],`기존 독해 ${i+1}: 질문·보기·정답 유지`);
 });
 
+/* 9. 퀴즈(상식·수학·영어) 묶음 */
+const QKEYS=['id','age','mode','cat','prompt','passage','speak','choices','answer'];
+const QCHOICES={7:3,8:3,9:4,10:4},QMAX={7:10,8:20,9:30,10:40},QMIN={common:12,math:12,english:8};
+const quizAll=a=>Array.from({length:Q.quizCount(a)},(_,i)=>Q.quiz(a,i));
+eq(Q.CATS,{common:'상식',math:'수학',english:'영어'},'CATS');
+eq(Q.MODES,['sound','story'],'MODES에는 quiz가 없음');
+const qids=new Set();
+for(const a of Q.AGES){
+  const list=quizAll(a),cnt=list.length,cats={common:0,math:0,english:0},keys=new Set();
+  ok(cnt>=32,`${a}세 quiz 32문항 이상`);
+  list.forEach((q,i)=>{
+    const tag=`${a}/quiz/${i}`;
+    eq(Object.keys(q),QKEYS,tag+' 키(note 없음)');
+    eq(q.id,`a${a}-quiz-${String(i+1).padStart(2,'0')}`,tag+' id');
+    ok(!qids.has(q.id)&&!ids.has(q.id),tag+' id 유일');qids.add(q.id);
+    eq([q.age,q.mode],[a,'quiz'],tag+' age/mode');
+    ok(Object.keys(QMIN).includes(q.cat),tag+' cat');cats[q.cat]++;
+    ok(typeof q.prompt==='string'&&q.prompt.trim().length>0&&H.syllables(q.prompt)<=QMAX[a],tag+' prompt 길이');
+    ok(typeof q.passage==='string'&&!/\r/.test(q.passage),tag+' passage');
+    ok(typeof q.speak==='string'&&/[가-힣]/.test(q.speak),tag+' speak에 한글');
+    eq(q.choices.length,QCHOICES[a],tag+' 보기 개수');
+    ok(q.choices.every(c=>typeof c==='string'&&c.trim().length>0),tag+' choices');
+    eq(new Set(q.choices).size,q.choices.length,tag+' 보기 중복 없음');
+    ok(Number.isInteger(q.answer)&&q.answer>=0&&q.answer<q.choices.length,tag+' answer 범위');
+    eq(Q.checkQuiz(a,q),[],tag+' checkQuiz');
+    eq(Q.checkCommon(q),[],tag+' checkCommon은 quiz를 퀴즈 규칙으로');
+    eq(Q.checkLevel(a,'sound',q),[],tag+' checkLevel은 quiz를 퀴즈 규칙으로');
+    const k=q.prompt+'\n'+q.passage;ok(!keys.has(k),tag+' 질문·지문 중복 없음');keys.add(k);
+    eq(Q.quiz(a,i+cnt),q,tag+' 순환(+count)');
+    eq(Q.quiz(a,i-cnt*2),q,tag+' 순환(-2count)');
+    const pristine=JSON.stringify(q),victim=Q.quiz(a,i);
+    ok(victim!==Q.quiz(a,i)&&victim.choices!==Q.quiz(a,i).choices,tag+' 매번 새 객체');
+    victim.choices[0]='오염';victim.choices.push('추가');victim.answer=99;victim.cat='x';victim.speak='';victim.prompt='';
+    eq(JSON.stringify(Q.quiz(a,i)),pristine,tag+' 변형해도 은행 오염 없음');
+  });
+  Object.keys(QMIN).forEach(c=>ok(cats[c]>=QMIN[c],`${a}세 ${Q.CATS[c]} ${QMIN[c]}문항 이상(현재 ${cats[c]})`));
+  /* 분류 섞기: 같은 분류 3연속 없음, 영어는 붙지 않고 고르게 */
+  const cs=list.map(q=>q.cat),en=cs.map((c,i)=>c==='english'?i:-1).filter(i=>i>=0);
+  ok(cs.every((c,i)=>i<2||!(c===cs[i-1]&&c===cs[i-2])),`${a}세 quiz 같은 분류 3연속 없음`);
+  ok(en.every((p,j)=>j===0||(p-en[j-1]>=2&&p-en[j-1]<=6))&&en[0]<=5&&cnt-1-en[en.length-1]<=5,`${a}세 영어 문항 고르게 분포`);
+  /* 정답 위치 */
+  const pos=list.map(q=>q.answer),tally={};
+  pos.forEach(p=>{tally[p]=(tally[p]||0)+1;});
+  ok(Object.values(tally).every(c=>c*2<=pos.length),`${a}/quiz 한 위치 50% 이하`);
+  ok(pos.every((p,i)=>i<2||!(p===pos[i-1]&&p===pos[i-2])),`${a}/quiz 3연속 같은 위치 없음`);
+  eq(Object.keys(tally).length,QCHOICES[a],`${a}/quiz 모든 위치가 정답으로 쓰임`);
+  /* 지문이 식인 수학 문항은 다시 계산 */
+  for(const q of list){
+    const m=q.cat==='math'&&q.passage.match(/^(\d+) ([+−×÷]) (\d+)$/);
+    if(!m)continue;
+    const x=+m[1],y=+m[3],ans=q.choices[q.answer];
+    const want=m[2]==='÷'&&/^몫/.test(ans)?`몫 ${Math.floor(x/y)}, 나머지 ${x%y}`:String({'+':x+y,'−':x-y,'×':x*y,'÷':x/y}[m[2]]);
+    eq(ans,want,`${q.id}: ${q.passage} 정답 재계산`);
+  }
+}
+eq(qids.size,Q.AGES.reduce((s,a)=>s+Q.quizCount(a),0),'퀴즈 id 총수');
+/* get에는 퀴즈가 섞이지 않음(섞기는 별도 변경) */
+for(const a of Q.AGES)for(const m of Q.MODES)ok(all(a,m).every(q=>q.mode===m&&!('cat' in q)),`${a}/${m}: get은 퀴즈를 내지 않음`);
+/* 잘못된 입력 */
+for(const bad of [6,11,'8',NaN,undefined,null,8.5]){
+  eq(Q.quiz(bad,3),Q.quiz(8,3),`quiz age ${String(bad)} → 8세`);
+  eq(Q.quizCount(bad),Q.quizCount(8),`quizCount age ${String(bad)} → 8세`);
+}
+for(const a of Q.AGES){
+  eq(Q.quiz(a,-1),Q.quiz(a,Q.quizCount(a)-1),'quiz index -1 → 마지막 문항');
+  eq(Q.quiz(a,1.5),Q.quiz(a,1),'quiz index 1.5 → 1');
+  for(const bad of [NaN,undefined,'2',Infinity])eq(Q.quiz(a,bad),Q.quiz(a,0),`quiz index ${String(bad)} → 0`);
+}
+/* snapshot에 quiz 포함(note까지) */
+const snap=Q.snapshot();
+for(const a of Q.AGES){
+  eq(snap[a].quiz.length,Q.quizCount(a),`snapshot ${a}세 quiz 개수`);
+  ok(snap[a].quiz.every(q=>q.note===''),`snapshot ${a}세 quiz note`);
+  eq(snap[a].quiz.map(q=>{const o=Object.assign({},q);delete o.note;return o;}),quizAll(a),`snapshot ${a}세 quiz 내용`);
+}
+/* validate가 퀴즈 오류를 잡는지 */
+const hit=(fn,id,word)=>broken(fn).some(e=>e.startsWith(id)&&e.includes(word));
+ok(hit(s=>{s[9].quiz[0].choices.pop();},'a9-quiz-01','보기 4개'),'퀴즈 9세 보기 개수');
+ok(hit(s=>{s[7].quiz[1].choices.push('9');},'a7-quiz-02','보기 3개'),'퀴즈 7세 보기 개수');
+ok(hit(s=>{delete s[8].quiz[2].speak;},'a8-quiz-03','speak'),'퀴즈 speak 누락');
+ok(hit(s=>{s[8].quiz[3].speak='dog';},'a8-quiz-04','speak'),'퀴즈 speak에 한글 없음');
+ok(hit(s=>{const t=s[10].quiz[5],o=s[10].quiz[3];t.prompt=o.prompt;t.passage=o.passage;},'a10-quiz-06','a10-quiz-04와 중복'),'퀴즈 질문·지문 중복');
+ok(hit(s=>{s[7].quiz[4].id='a7-quiz-5';},'a7-quiz-5','id'),'퀴즈 id 형식');
+ok(hit(s=>{s[7].quiz[4].id='a7-sound-05';},'a7-sound-05','id'),'퀴즈 id에 다른 모드');
+ok(hit(s=>{s[9].quiz[0].cat='science';},'a9-quiz-01','cat'),'퀴즈 cat 오류');
+ok(hit(s=>{s[7].quiz[0].prompt='밤하늘에 반짝반짝 뜨는 것은 무엇일까요?';},'a7-quiz-01','10음절'),'퀴즈 7세 질문 길이');
+ok(hit(s=>{s[9].quiz[1].passage=null;},'a9-quiz-02','passage'),'퀴즈 passage 문자열');
+ok(hit(s=>{s[10].quiz[0].answer=4;},'a10-quiz-01','answer'),'퀴즈 answer 범위');
+ok(hit(s=>{const c=s[10].quiz[1].choices;c[0]=c[1];},'a10-quiz-02','보기 중복'),'퀴즈 보기 중복');
+ok(hit(s=>{s[8].quiz[0].age=9;},'a8-quiz-01','age/mode'),'퀴즈 age 불일치');
+ok(hit(s=>{s[8].quiz.find(q=>q.cat==='english').cat='common';},'8세 quiz','영어 8문항'),'퀴즈 분류별 최소 문항');
+ok(hit(s=>{for(const q of s[9].quiz.slice(0,3)){const a=q.choices[q.answer];q.choices=[a].concat(q.choices.filter(c=>c!==a));q.answer=0;}},'a9-quiz-03','연속'),'퀴즈 정답 위치 3연속');
+ok(hit(s=>{for(const q of s[7].quiz){const a=q.choices[q.answer];q.choices=[a].concat(q.choices.filter(c=>c!==a));q.answer=0;}},'7세 quiz','50%'),'퀴즈 정답 위치 쏠림');
+ok(hit(s=>{delete s[10].quiz;},'10세 quiz','묶음 없음'),'퀴즈 묶음 누락');
+ok(Q.checkQuiz(8,Q.quiz(9,0)).length>0&&Q.checkQuiz(9,Q.quiz(8,0)).length>0,'checkQuiz: 보기 수가 다른 나이 규칙은 실패');
+
 /* 8. 파일 조건과 브라우저 전역 */
 const file=path.join(__dirname,'questions.js'),buf=fs.readFileSync(file);
 ok(buf.length<=60*1024,'questions.js 60KB 이하');
@@ -187,5 +283,6 @@ vm.runInNewContext(buf.toString('utf8'),{window:win});
 ok(win.Questions&&typeof win.Questions.get==='function','브라우저에서는 window.Questions');
 eq(JSON.stringify(win.Questions.get(9,'story',0)),JSON.stringify(Q.get(9,'story',0)),'브라우저 전역과 node 모듈이 같은 데이터');
 eq(Array.from(win.Questions.validate()),[],'브라우저 전역 validate()');
+eq(JSON.stringify(win.Questions.quiz(10,5)),JSON.stringify(Q.quiz(10,5)),'브라우저 전역 quiz()');
 
 console.log(`PASS ${n} question bank assertions.`);
