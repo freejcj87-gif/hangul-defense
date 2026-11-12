@@ -198,6 +198,17 @@ Playwright 시스템 의존성 설치는 WSL/Ubuntu 환경에 맞춰 수행하�
 - 확인하지 못한 것: 실기기 성능·발열(늑대 90마리), 실제 한국어 음성(섞인 문제 질문 읽기 포함), 효과음 체감, 아이 읽기 속도 가정, 상식·수학·영어 문항의 아동·교사 검수.
 - 다음: 프로듀서 5대 방향을 반영한 0.9(마스터 기획서 [docs/game-plan.md](docs/game-plan.md))를 브랜치 `claude/shop-economy`(규칙·화면)와 `claude/shop-3d`(3D)에서 작업 중.
 
+### 0.9 (2026-11-13)
+
+- [PR #11](https://github.com/freejcj87-gif/hangul-defense/pull/11) main 병합 완료. 병합 커밋 `a25c593451b2ed8cace46c34014a1e5e4ae11be3`, 브랜치 끝 `c6a61e2`. 규칙·화면은 `claude/shop-economy`, 3D는 `claude/shop-3d` 작업 폴더에서 만들어 `src/`만 합쳤습니다.
+- [0.9 CI](https://github.com/freejcj87-gif/hangul-defense/actions/runs/43326973351): 문제은행 6,846 + 규칙/모의 DOM 3,394 + 브라우저 검사 통과(7분 21초). 로컬(Windows) 전체 `node test.cjs` PASS 1,882. `test-dom.cjs`는 추천 말풍선 검사가 시드에 따라 흔들리던 것을 고친 뒤 8회 반복 모두 통과. 첫 로컬 실행 한 번은 스크린샷의 글꼴 대기 30초 시간 초과(일시적, 재실행 통과).
+- [Pages 배포](https://github.com/freejcj87-gif/hangul-defense/actions/runs/43328438293): `a25c593` 배포(빌드·배포 성공). 실제 URL에서 index(0.9, `#shop`·`#bubble`, `#timebar` 없음), combat.js(`API:3`·`SHOP`·`recommend`), world.js(`towerSlots`·`AGE`·`SLOW`), village.js(705KB) 확인. 실제 URL `?demo=3`을 Chromium(390px, SwiftShader)으로 열어 3D, 상점 8칸 상태, 정답 뒤 판매 띠 "🥚×8 → 🐟"·동전 비행, 🐺 수 갱신(39), 페이지 오류 0 확인(`work\verification-20261112\v09-live\`).
+- 3D 관측(SwiftShader, 본 패스): 최악(회관 3, 타워 20, 돌담 6면, 닭 20, 농부 10, 몬스터 90~97) 그리기 호출 35회·삼각형 40~41만. `?demo=3` 33~35회·27~28만. 실기기 성능은 재지 않았습니다.
+- 스크린샷: 화면 `work\verification-20261112\v09-ui\`(29장), 3D `work\verification-20261112\v09-3d\`(70장)·합친 뒤 `v09-3d\merged\`(28장, 소품 여유 검사 결과 `harness\clearance-20261113.txt`).
+- 시뮬레이션과 남은 균형 과제는 [docs/game-plan.md](docs/game-plan.md) §8(보통 아이 10/20/40분 14~27 / 30~44 / 53~72개, 찍는 아이 ≤ 보통의 50% 그리고 느린 아이보다 적음).
+- 확인하지 못한 것: 실기기 성능·발열(타워 20·농부 10·늑대 90), 실제 한국어 음성(말풍선 읽기·섞인 문제), 효과음 체감, 상점 버튼과 보기 버튼 잘못 누름(실기기 손가락), 끝 가격 2,000대의 아이 이해도.
+- 프로듀서 답 대기: 기획서 §7 열린 질문 4개(추천안으로 구현).
+
 ## 자동 배포와 협업
 
 - `.github/workflows/pages.yml`: main의 지정된 게임 경로 변경 → 규칙 검사 → 빌드 → Pages → 실제 URL 검사.
