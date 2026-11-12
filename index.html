@@ -168,7 +168,10 @@ body.paused *,body.paused *:before,body.paused *:after{animation-play-state:paus
 <ul class="rules"><li>🐺 늑대가 쉬지 않고 사방에서 와서 닭을 물어 가고 건물을 부숴요.</li><li>🏹 한 번에 맞히면 타워가 일제히 쏴요. 빨리, 연속으로 맞힐수록 세져요.</li><li>💥 마을이 커지면 터지는 화살과 새 몬스터가 나와요. 문제에는 상식·수학·영어도 섞여 있어요.</li></ul>
 <p class="start-q">몇 살이에요?</p><div class="age-row" id="ageRow"></div><div class="mode-row"><button id="startSound">🔊 듣고 고르기</button><button id="startStory">📖 읽고 고르기</button></div>
 <button id="go">시작하기 ▶</button><small>어려우면 나이를 낮춰도 괜찮아요.</small></div></div>
-<script src="combat.js?v=0.8"></script><script src="world.js?v=0.8"></script><script src="questions.js?v=0.8"></script><script>const KEY='hangul-defense-v1',AGES=Questions.AGES,ART='art-handoff/coopnight/browser/',ITEMS=Combat.ITEMS;
+<script src="combat.js?v=0.8"></script><script src="world.js?v=0.8"></script><script src="questions.js?v=0.8"></script><script>/* 체험 주소 ?demo=1~3: 그 회관 단계까지 자란 마을로 시작해 새 몬스터를 바로 본다(프로듀서·보호자 확인용). 저장은 따로 해서 원래 진행을 건드리지 않는다. */
+const DEMO=(()=>{try{const m=/[?&]demo=([123])\b/.exec(location.search);return m?Number(m[1]):0}catch{return 0}})();
+const KEY=DEMO?'hangul-defense-demo'+DEMO:'hangul-defense-v1',AGES=Questions.AGES,ART='art-handoff/coopnight/browser/',ITEMS=Combat.ITEMS;
+const DEMO_VILLAGE={1:{hall:1,level:2,fence:2,chickens:4,gold:250},2:{hall:2,level:3,fence:4,chickens:6,farmers:1,power:1,gold:450},3:{hall:3,level:5,fence:6,chickens:8,farmers:2,pond:2,power:2,gold:700}};
 /* 규칙은 combat.js(Combat)가 정한다. 이 스크립트는 단계(phase) 진행, 화면, 소리만 맡는다.
    phase: start(시작 화면) → listen(소리 모드: 듣는 동안 시계 멈춤) → ask(시계·늑대 진행)
           → pick(한 번에 정답: 시계·늑대 멈춤, 카드 고르기) → build(지은 것 연출) → 다음 문제
@@ -176,6 +179,7 @@ body.paused *,body.paused *:before,body.paused *:after{animation-play-state:paus
 if(Combat.API!==2)console.warn('combat.js 버전이 index.html과 맞지 않아요. 새로고침해 주세요.');
 let state=Combat.fresh(8);
 try{state=Combat.restore(JSON.parse(localStorage.getItem(KEY)),AGES)}catch{}
+if(DEMO&&!state.wins&&!state.index)Object.assign(state,DEMO_VILLAGE[DEMO]);
 let phase='start',paused=false,round=null,voiceOff=false,speech=null,speechSeq=0,acc=0,last=null,worldNote=null,lastShot=-99;
 /* 늑대 세계(world.js). 무리 간격 = 나이·모드별 문제 하나 기준 시간(중앙값)과 같게, 13~20초(World.intervalFor). 무리 사이에도 낙오 늑대가 계속 온다. */
 function waveInterval(){const t=[];for(let i=0;i<Questions.count(state.age,state.mode);i++)t.push(Combat.baseSeconds(Questions.get(state.age,state.mode,i)));t.sort((a,b)=>a-b);return World.intervalFor(t[t.length>>1])}
@@ -539,8 +543,9 @@ function changeSetting(){
 $('mode').onclick=()=>{if(paused)return;state.mode=state.mode==='sound'?'story':'sound';if(state.mode==='sound'){voiceOff=false;put($('voiceStatus'),'')}changeSetting()};
 $('age').value=String(state.age);$('age').onchange=()=>{const age=Number($('age').value);if(!AGES.includes(age)||paused){$('age').value=String(state.age);return}state.age=age;changeSetting()};
 $('speak').onclick=()=>{if(paused||!round)return;if(phase==='ask'&&state.mode==='sound')speak(round.q.speak);else if(phase==='learn'&&round.ready)speak(Combat.lesson(round.q))};
-$('reset').onclick=()=>{if(!confirm('저장된 금화와 마을을 초기화할까요?'))return;cancelSpeech();const keep={age:state.age,mode:state.mode};state=Object.assign(Combat.fresh(keep.age),{mode:keep.mode});world=freshWorld();state.broken=0;worldNote=null;paused=false;artStamp='';newRound()};
+$('reset').onclick=()=>{if(!confirm('저장된 금화와 마을을 초기화할까요?'))return;cancelSpeech();const keep={age:state.age,mode:state.mode};state=Object.assign(Combat.fresh(keep.age),{mode:keep.mode},DEMO?DEMO_VILLAGE[DEMO]:{});world=freshWorld();state.broken=0;worldNote=null;paused=false;artStamp='';newRound()};
 $('motion').onchange=()=>document.body.classList.toggle('reduced',$('motion').checked);
+if(DEMO){const t=document.querySelector('header small');if(t)t.textContent+=' · 체험: 마을회관 '+DEMO+'단계'}
 /* 시작 화면: 처음 누르는 순간이 소리 재생 허락이 되므로 첫 문제의 소리를 이 클릭 안에서 바로 읽기 시작한다. */
 function drawStart(){
  if(!$('ageRow').children.length)for(const a of AGES){const b=document.createElement('button');b.textContent=a+'살';b.dataset.age=String(a);b.onclick=()=>{state.age=a;drawStart()};$('ageRow').append(b)}

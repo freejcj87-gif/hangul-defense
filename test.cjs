@@ -25,11 +25,15 @@ const FAKE_TTS=()=>{const S={speak(u){setTimeout(()=>{u.onstart&&u.onstart();u.o
 
  /* 화면에 나온 문제를 문제은행(Node 쪽 사본)과 대조한다. */
  async function shown(page){return page.locator('#answers').evaluate(n=>({qid:n.dataset.qid,age:Number(n.dataset.age),mode:n.dataset.mode,labels:[...n.children].map(b=>b.textContent),chip:document.getElementById('levelChip').textContent,prompt:document.getElementById('prompt').textContent,passage:document.getElementById('passage').textContent}))}
+ /* 화면 문제 = 그 나이·모드의 index번째(4문제마다 상식·수학·영어가 섞인 순서, Questions.at). 보기 순서는 바퀴(lap)마다 한 칸씩 돈다. */
  async function expectQuestion(page,age,mode,index,msg){
-  const s=await shown(page),q=Questions.get(age,mode,index);
-  eq(s.qid,q.id,msg+': question id');eq(s.age,age,msg+': age');eq(s.mode,mode,msg+': mode');eq(s.labels,q.choices,msg+': choices');eq(s.prompt,q.prompt,msg+': prompt');eq(s.passage,q.passage||'',msg+': passage');
-  eq(s.chip,age+'세 · '+Questions.LEVELS[age][mode],msg+': level chip');eq(Questions.checkLevel(age,mode,q),[],msg+': level rules');
+  const s=await shown(page),q=Questions.at(age,mode,index),n=q.choices.length,order=q.choices.map((_,k)=>q.choices[(k+(q.lap||0))%n]);
+  eq(s.qid,q.id,msg+': question id');eq(s.age,age,msg+': age');eq(s.mode,q.mode,msg+': mode');eq(s.labels,order,msg+': choices');eq(s.prompt,q.prompt,msg+': prompt');eq(s.passage,q.passage||'',msg+': passage');
+  if(q.mode==='quiz')ok(s.chip.startsWith(age+'세 · ')&&s.chip.endsWith(Questions.CATS[q.cat]),msg+': category chip '+s.chip);else{eq(s.chip,age+'세 · '+Questions.LEVELS[age][mode],msg+': level chip');eq(Questions.checkLevel(age,mode,q),[],msg+': level rules')}
   return q}
+ /* 카드를 여러 장 고르는 문제(긴 글·상식 등)면 남은 카드는 건너뛰고 다음 문제로 */
+ async function finishPick(page){for(let i=0;i<3&&(await game(page)).phase==='pick';i++){await page.evaluate(()=>{const g=window.__game();if(g.round.pickLock>0)window.__tick(g.round.pickLock)});await page.locator('#skip').click()}}
+ const notGone=page=>page.evaluate(()=>world.wolves.filter(v=>v.state!=='gone').length);
  const game=page=>page.evaluate(()=>window.__game());
  const tick=(page,n)=>page.evaluate(n=>window.__tick(n),n);
  const quiet=page=>page.waitForFunction(()=>!window.__game().speaking,{},{timeout:20000});
@@ -78,7 +82,7 @@ const FAKE_TTS=()=>{const S={speak(u){setTimeout(()=>{u.onstart&&u.onstart();u.o
  await begin(page,{age:8,mode:'sound'},touch);ok(await page.locator('#start').isHidden(),'start screen closes');
  eq(await gold(page),'🪙 20','initial gold');ok(await noOverflow(page),'no horizontal overflow');ok(await pillsFit(page),'status pills do not overlap');
  await expectQuestion(page,8,'sound',0,tag+' default');
- let g=await game(page);ok(g.world.interval>=200&&g.world.radius===7,'wave rhythm and starting village radius');
+ let g=await game(page);ok(g.world.interval===130&&g.world.radius===7,'wave rhythm (13 s for 8세 sound) and starting village radius');
  ok(!(await page.locator('#speak').isHidden()),'sound mode: replay button');
  await tick(page,20);g=await game(page);eq(g.round.t,20,'held clock advances only by explicit ticks');
  const bar=await page.locator('#timeFill').evaluate(n=>n.style.width),left=Math.max(0,Math.min(1,(g.world.wave.arrive-g.world.t)/g.world.interval));eq(bar,(Math.round(left*1000)/10)+'%','time bar = time until the next wolf pack');
@@ -142,7 +146,10 @@ const FAKE_TTS=()=>{const S={speak(u){setTimeout(()=>{u.onstart&&u.onstart();u.o
  if(name==='chromium'&&width===390)await shot(page,'raid-390');
  await page.evaluate(()=>{state.gold=500});await answer(page,true,touch);await tick(page,7);ok(await page.locator('#cards .choice[data-kind="repair"]').count()===1,'repair card when something is broken');
  const rp=page.locator('#cards .choice[data-kind="repair"]');if(touch)await rp.tap();else await rp.click();eq((await game(page)).world.broken,0,'repair fixes every broken building');
- await tick(page,12);await phaseIs(page,'ask');
+ await finishPick(page);await tick(page,12);await phaseIs(page,'ask');
+ /* 4번째 문제는 상식·수학·영어(듣고 고르기에서도 질문을 읽어 준 뒤 푼다) */
+ await expectQuestion(page,8,'sound',3,tag+' quiz mixed in');await page.evaluate(()=>{const g=window.__game();if(g.round.lock>0)window.__tick(g.round.lock)});ok(await answersFit(page),tag+' quiz answer buttons fit');
+ if(name==='chromium'&&(width===390||height===568))await shot(page,'quiz-'+width+'x'+height);
 
  /* 쉬기: 문제를 가리고 시계를 멈춘다 */
  await page.locator('#pause').click();ok(await page.locator('body').evaluate(b=>b.classList.contains('covered')),'pause covers the question');
@@ -153,7 +160,7 @@ const FAKE_TTS=()=>{const S={speak(u){setTimeout(()=>{u.onstart&&u.onstart();u.o
  g=await game(page);ok(g.world.wolves>=1,'a wolf pack is on the map before it arrives: '+JSON.stringify(g.world));
  const d1=await page.evaluate(()=>Math.min(...world.wolves.filter(v=>v.state==='walk').map(v=>Math.hypot(v.x,v.z))));await tick(page,20);const d2=await page.evaluate(()=>Math.min(...world.wolves.filter(v=>v.state!=='dead').map(v=>Math.hypot(v.x,v.z))));
  ok(d2<d1,'wolves walk toward the village: '+[d1,d2]);
- if(three&&!INTERIM){await frames(page,3);const i=await page.evaluate(()=>window.VillageView.inspect());ok(i.wolvesVisible>=1,'3D wolves visible: '+i.wolvesVisible);eq(i.wolvesVisible,(await game(page)).world.wolves,'3D wolf count = simulated wolves')}
+ if(three&&!INTERIM){await frames(page,3);const i=await page.evaluate(()=>window.VillageView.inspect());ok(i.wolvesVisible>=1,'3D wolves visible: '+i.wolvesVisible);eq(i.wolvesVisible,await notGone(page),'3D wolf count = simulated wolves (incl. falling ones)')}
  if(name==='chromium'&&(width===390||width===1366))await shot(page.locator('.scene'),'pack-'+width);
  ok(await noOverflow(page),'no overflow after a few rounds');
  await page.screenshot({path:path.join(shots,name+'-'+width+'x'+height+'.png'),fullPage:true});
@@ -211,7 +218,7 @@ const FAKE_TTS=()=>{const S={speak(u){setTimeout(()=>{u.onstart&&u.onstart();u.o
   await seed(page,{gold:6000,hall:0,index:0,mode:'sound',age:8});await page.waitForFunction(()=>window.VillageView?.inspect().ready,{},{timeout:45000});
   eq(await page.locator('.scene').getAttribute('data-renderer'),'three','feel test runs in 3D');
   await begin(page,{age:8,mode:'sound'});
-  const want=['tower','chicken','hall','fence','farmer','hall','pond','hall','feast'],made=[];
+  const want=['tower','chicken','hall','power','farmer','hall','pond','hall','feast'],made=[];
   for(const target of want){
    /* 3D 알 판매 연출은 2초 남짓이라, 누르기 전부터 프레임마다 지켜보다가 한 번이라도 재생되면 기록한다 */
    await page.evaluate(()=>{window.__saleSeen=false;const watch=()=>{try{if(window.VillageView.inspect().sale){window.__saleSeen=true;return}}catch{}requestAnimationFrame(watch)};requestAnimationFrame(watch)});
@@ -227,10 +234,10 @@ const FAKE_TTS=()=>{const S={speak(u){setTimeout(()=>{u.onstart&&u.onstart();u.o
    if(made.filter(x=>x===target).length===1){for(const f of [2,6,12]){await frames(page,f===2?2:f===6?4:6);await shot(page.locator('.scene'),'feel-'+width+'-'+target+'-f'+String(f).padStart(2,'0'))}}
    if(!INTERIM){await page.waitForFunction(([k,v])=>(window.VillageView.inspect().builds||{})[k]>=v,[target,((before.builds||{})[target]||0)+1],{timeout:30000}).catch(()=>{});
     const after=await page.evaluate(()=>window.VillageView.inspect());eq((after.builds||{})[target],((before.builds||{})[target]||0)+1,target+' plays one 3D build effect')}
-   await tick(page,12);await phaseIs(page,'ask');
+   await finishPick(page);await tick(page,12);await phaseIs(page,'ask');
    await page.waitForFunction(()=>!document.querySelector('#effects .fx'),{},{timeout:8000});checks++;
   }
-  const st=(await game(page)).state;eq([st.level,st.chickens,st.hall,st.fence,st.farmers,st.pond,st.feast],[1,2,3,1,1,1,1],'everything built');
+  const st=(await game(page)).state;eq([st.level,st.chickens,st.hall,st.power,st.farmers,st.pond,st.feast],[1,2,3,1,1,1,1],'everything built (incl. tower power)');
   await shot(page,'feel-'+width+'-after');
   eq(errors,[],'feel '+width+' page errors');await ctx.close();
  }}finally{await feel.close()}
@@ -244,7 +251,7 @@ const FAKE_TTS=()=>{const S={speak(u){setTimeout(()=>{u.onstart&&u.onstart();u.o
  await p.goto(url);await p.waitForFunction(()=>document.querySelector('.scene').dataset.renderer==='fallback');
  await begin(p,{age:8,mode:'sound'});await expectQuestion(p,8,'sound',0,'fallback default');
  const wolfPos=()=>p.locator('#enemies .enemy:not(.hidden)').first().evaluate(n=>n.style.left+'|'+n.style.bottom);
- await tick(p,200);eq(await p.locator('#enemies .enemy:not(.hidden)').count(),(await game(p)).world.wolves,'fallback: wolves drawn where the simulation has them');const l0=await wolfPos();await tick(p,40);ok(await wolfPos()!==l0,'fallback wolf moves');
+ await tick(p,200);eq(await p.locator('#enemies .enemy:not(.hidden)').count(),await notGone(p),'fallback: wolves drawn where the simulation has them');const l0=await wolfPos();await tick(p,40);ok(await wolfPos()!==l0,'fallback wolf moves');
  await answer(p,true,false);const fz=await wolfPos();await tick(p,30);eq(await wolfPos(),fz,'fallback wolves stop while choosing');
  await tick(p,7);
  const still=await p.locator('#cards .choice[data-kind="chicken"]').evaluate(async b=>{const a=b.getBoundingClientRect();await new Promise(r=>setTimeout(r,330));const c=b.getBoundingClientRect();return [getComputedStyle(b).animationName,getComputedStyle(b.querySelector('.icon')).animationName,Math.abs(a.top-c.top)<.01]});
@@ -252,13 +259,31 @@ const FAKE_TTS=()=>{const S={speak(u){setTimeout(()=>{u.onstart&&u.onstart();u.o
  await p.locator('#cards .choice[data-kind="chicken"]').click();eq(await p.locator('#flock img').count(),2,'fallback chicken appears');ok(await p.locator('#flock img').last().evaluate(e=>e.classList.contains('spawn')),'fallback chicken pops in');
  await tick(p,12);await p.evaluate(()=>{state.gold=3000;render()});
  const inScene=sel=>p.locator(sel).evaluateAll(a=>{const s=document.getElementById('scene').getBoundingClientRect();return a.length>0&&a.every(e=>{const r=e.getBoundingClientRect();return r.width>20&&r.left>=s.left-1&&r.right<=s.right+1&&r.top>=s.top-1&&r.bottom<=s.bottom+1})});
- for(const target of ['tower','hall','fence','hall','farmer','pond']){await answer(p,true,false);await tick(p,7);await p.locator('#cards .choice[data-kind="'+target+'"]').click();await tick(p,12)}
+ for(const target of ['tower','fence','hall','power','hall','farmer','pond']){await answer(p,true,false);await tick(p,7);await p.locator('#cards .choice[data-kind="'+target+'"]').click();await finishPick(p);await tick(p,12)}
  await p.evaluate(()=>Promise.all(document.getAnimations().filter(a=>a.animationName==='spawnPop').map(a=>a.finished.catch(()=>{}))));
  ok((await p.locator('#houseArt').getAttribute('src')).endsWith('home-03.png'),'fallback hall grows');ok(await inScene('#pond'),'fallback pond inside the scene');ok(await inScene('#fenceRow img'),'fallback fence inside the scene');ok(await inScene('#flock img'),'fallback hens inside the scene');
  ok(await p.locator('#villageCanvas').isHidden(),'canvas hidden in fallback');
  await shot(p.locator('.scene'),'fallback-390-built');await shot(p,'fallback-390');
  eq(errors,[],'fallback page errors');await ctx.close();
  }}finally{await fallbackBrowser.close()}
+ /* ===== 5. 체험 주소(?demo=3): 다 자란 마을에서 몬스터 5종·우두머리·터지는 화살이 실제 화면에 나오고, 원래 저장은 그대로 ===== */
+ const demoBrowser=await chromium.launch({headless:true,args:SWIFT});
+ try{if(run('demo')){
+  const ctx=await demoBrowser.newContext({viewport:{width:390,height:844},hasTouch:true,reducedMotion:'no-preference'});await ctx.addInitScript(HOLD);await ctx.addInitScript(FAKE_TTS);
+  const page=await ctx.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(url+'/?demo=3');await ready(page);
+  ok((await page.locator('header small').textContent()).includes('체험: 마을회관 3단계'),'demo label');
+  const is3d=await page.locator('.scene').getAttribute('data-renderer')==='three';ok(is3d,'demo runs in 3D');
+  await begin(page,{age:8,mode:'sound'},true);let g=await game(page);eq([g.state.hall,g.state.level,g.state.power,g.world.radius],[3,5,2,16],'demo starts with a grown village');
+  /* 우두머리는 네 번째 무리마다: 무리 5번 + 걸어오는 시간만큼 흘린다(100틱씩, 3D가 따라오게) */
+  const goal=g.world.interval*5+80;for(let t=0;t<goal;t+=100){await tick(page,100);if(is3d)await frames(page,1)}
+  g=await game(page);const seen=Object.keys(g.world.seen);
+  for(const k of ['wolf','bramble','boar','granite','frost','ember'])ok(seen.includes(k),'demo: '+k+' appeared ('+seen+')');ok(g.world.stats.bosses>=1&&g.world.stats.splash>0,'demo: boss arrived and splash arrows hit: '+JSON.stringify(g.world.stats));
+  ok(g.world.wolves>=10,'demo: many wolves at once: '+g.world.wolves);
+  if(is3d&&!INTERIM){await frames(page,3);const i=await page.evaluate(()=>window.VillageView.inspect());eq(i.wolvesVisible,await notGone(page),'demo: 3D draws every wolf');ok(i.drawCalls>0,'demo scene metrics');console.log('DEMO_METRICS:'+JSON.stringify({wolves:i.wolvesVisible,drawCalls:i.drawCalls,triangles:i.triangles,kinds:i.wolfKinds}))}
+  await shot(page.locator('.scene'),'demo3-390');
+  eq(await page.evaluate(()=>localStorage.getItem('hangul-defense-v1')),null,'demo never touches the real save');ok(await page.evaluate(()=>!!localStorage.getItem('hangul-defense-demo3')),'demo has its own save');
+  eq(errors,[],'demo page errors');await ctx.close();
+ }}finally{await demoBrowser.close()}
  console.log((ONLY?'PARTIAL('+ONLY+') ':'')+'PASS '+checks+' browser assertions (Chromium/WebKit, desktop + mobile emulation, held clock + one real-clock run). Physical audio/device validation remains manual.');
  }finally{server.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});
