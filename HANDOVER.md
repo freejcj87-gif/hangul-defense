@@ -152,6 +152,15 @@ Playwright 시스템 의존성 설치는 WSL/Ubuntu 환경에 맞춰 수행하�
 - 통합 화면 스크린샷 70장 + 실제 URL 2장: `work\verification-20261111\integrated-0.6\`. 3D 연출 점검 스크린샷: `work\verification-20261111\v06-village\`.
 - 0.6에서도 실기기(iPhone/Android), 실제 한국어 음성, 효과음 체감, 아이 읽기 속도 가정, 사용자 체감은 확인하지 않았습니다.
 
+### 0.7 (2026-11-12)
+
+- [PR #7](https://github.com/freejcj87-gif/hangul-defense/pull/7) main 병합 완료. 병합 커밋 `08e8ec754ee065436f082461c56b105171029136`, 브랜치 끝 `b81265d`.
+- [0.7 CI](https://github.com/freejcj87-gif/hangul-defense/actions/runs/43148414220): 문제은행 3,016 + 규칙/모의 DOM 1,540 + 브라우저 1,541개 검사 통과. 로컬(Windows)에서는 구간별로 실행해 모두 통과(화면 매트릭스·실제 시계, 손맛·그림 화면 152).
+- [Pages 배포](https://github.com/freejcj87-gif/hangul-defense/actions/runs/43149257558): `08e8ec7` 배포, 실제 URL 검사 통과(world.js 포함). 실제 URL을 Chromium(390px)으로 열어 3D 장면, 숲길에서 다가오는 늑대, 정답 → 일제 사격 → 알 판매 → 카드 3장, 페이지 오류 0건을 직접 확인.
+- 3D 관측(SwiftShader): 회관 0단계 드로우콜 22~25, 회관 3단계·늑대 49마리 52~53(약 41만 삼각형). 실기기 성능은 재지 않았습니다.
+- 스크린샷: 통합 화면 `workerification-20261112\integrated-0.7\`, 3D 연출 점검 70장 `workerification-2026111207-village\`.
+- 확인하지 못한 것: 실기기 성능·발열, 실제 한국어 음성, 효과음 체감, 건물 부서짐 빈도의 체감, 아이 읽기 속도 가정.
+
 ## 자동 배포와 협업
 
 - `.github/workflows/pages.yml`: main의 지정된 게임 경로 변경 → 규칙 검사 → 빌드 → Pages → 실제 URL 검사.
