@@ -44,6 +44,8 @@ const CHICK=Combat.LINES.moreHens;
   await tap(page.locator('#ageRow button[data-age="'+age+'"]'));await tap(page.locator(mode==='sound'?'#startSound':'#startStory'));await tap(page.locator('#go'));await phaseIs(page,'ask')}
  /* right=true면 정답, false면 첫 번째 오답. 보기 잠금(0.3초·글 먼저 읽기)은 틱으로 넘긴다. */
  async function answer(page,right,touch,k=0){await phaseIs(page,'ask');await page.evaluate(()=>{const g=window.__game();if(g.phase==='ask'&&g.round.lock>0)window.__tick(g.round.lock)});
+  /* 0.10: 첫 시도 정답은 글을 읽을 만한 시간(번개 시작 = 찍기 막기 기준)까지 기다렸다 누른다(바로 누르면 금화 75%) */
+  if(right)await page.evaluate(()=>{if(phase==='ask'&&round&&round.tries===0){const k=Math.ceil(Combat.FAST_MIN*Combat.needSeconds(round.q)/Combat.TICK)-round.t;if(k>0)window.__tick(k)}});
   const g=await game(page),wrongs=g.round.choices.map((_,i)=>i).filter(i=>i!==g.round.answer),i=right?g.round.answer:wrongs[k];
   const b=page.locator('#answers button[data-i="'+i+'"]');if(touch)await b.tap();else await b.click();return g}
  /* 가게 칸 누르기(두 번 눌림 방지 0.4초를 넘기려고 먼저 4틱) */
