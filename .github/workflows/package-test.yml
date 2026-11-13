@@ -8,6 +8,7 @@ on:
       - combat.js
       - world.js
       - questions.js
+      - questions-gen.js
       - src/**
       - art-handoff/coopnight/browser/**
       - art-handoff/coopnight/source-3d/models/environment-pack.glb
