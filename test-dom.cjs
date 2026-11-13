@@ -807,7 +807,7 @@ a=fresh();a.go();a.tick(300);ok(a.n.enemies.children.filter(x=>!x.classList.cont
   if(a.api.phase==='reward')shopNow();
   if(a.api.phase==='learn'){shopNow();a.tick(200);a.right()}
  }
- ok(a.api.state.index>=118||endings>0,'120문제 진행(늑대 왕을 물리쳐 새 마을로 간 판은 번호가 처음부터) 엔딩 '+endings+'번');ok(a.api.world.stats.waves>5,'늑대 무리가 여러 번 옴');ok(a.api.world.stats.kills>0,'타워가 늑대를 쓰러뜨림');ok(bought>=20,'아무 때나 산 횟수 '+bought+' '+JSON.stringify(byPhase));ok(byPhase.ask&&byPhase.reward,'풀이·연출 중에 삼 '+JSON.stringify(byPhase));
+ ok(a.api.state.index>=118||endings>0,'120문제 진행(늑대 왕을 물리쳐 새 마을로 간 판은 번호가 처음부터) 엔딩 '+endings+'번');ok(a.api.world.stats.waves>5||endings>0,'늑대 무리가 여러 번 옴');ok(a.api.world.stats.kills>0,'타워가 늑대를 쓰러뜨림');ok(bought>=20,'아무 때나 산 횟수 '+bought+' '+JSON.stringify(byPhase));ok(byPhase.ask&&byPhase.reward,'풀이·연출 중에 삼 '+JSON.stringify(byPhase));
  a.land();eq(a.game().gold.shown,a.api.state.gold,'긴 판 뒤 화면 금화 = 규칙 금화');}
 
 /* 2-12 0.8 기능 유지: 섞인 상식·수학·영어 · 연속 정답 · 빠른 정답 일제 사격 · 타워 강화 · 새 몬스터 알림 · 우두머리 보상 · 0.7 저장 이어받기 */
@@ -1004,6 +1004,278 @@ a=fresh();a.go();a.unlock();a.tick(40);{const q=a.api.round.q,t=a.api.round.t,s=
 /* (손잡이: 회관을 사는 방식) '모아서 회관을 키워 봐요'는 회관 값의 절반을 모은 뒤에만. 0.12 기본(자동 승급)에서는 회관 말풍선이 아예 없다 */
 withFlags(BUY_MODE,()=>{a=seed({age:7,mode:'story',level:5,fence:4,chickens:4,gold:0},{rec:'real'});a.go();calmWorld(a);eq(answerLand(a),0,'회관 값의 절반 전에는 모으자 말풍선 없음');
 a.tick(250);a.api.state.gold=62;eq(answerLand(a),1,'절반을 넘으면 띄움');eq(a.bubble(),C.LINES.hallSave,'(모으자 말풍선)')});
+
+/* ======================= 3. 0.12 엔딩 · 경제 개편 ======================= */
+/* 3-1 추천 기본값(결정 A~F)과 새 판 */
+{const f=C.fresh(8);
+ eq([f.level,f.gold,f.chickens,C.built(f),f.run.bell,f.run.no,f.run.village,f.run.wolfMul,f.meta.stamps.length],[1,20,1,1,0,1,'meadow',100,0],'새 판: 타워 2개(level 1, 지은 수에 1로 셈), 초원 마을');
+ eq(W.towerUnits(W.sync(W.create({seed:1}),f)),2,'세계의 타워 2개');
+ eq([C.FLAGS.GOLD_SCALE,C.FLAGS.HALL_MODE,C.FLAGS.HALL_AUTO,C.FLAGS.BELL_BUILT,C.FLAGS.BELL_PROMPTS,C.FLAGS.BELL_COUNTS_PACK,C.FLAGS.FEAST_AFTER_END,C.FLAGS.FEAST_MAX,C.FLAGS.START_TOWERS],['flat','auto',[10,32,54],66,3,false,true,20,2],'손잡이 기본값(경제·회관·종·잔치)');
+ eq([C.FINALE.shields,C.FINALE.ok,C.FINALE.review,C.FINALE.steps,C.FINALE.noStepAge,C.FOX.at,C.FOX.needHall,C.FOX.f,C.FOX.second,C.FOX.scareOnlyAge],[6,4,2,3,7,[20,40,55],1,1.3,true,7],'결전·여우 기본값');
+ eq([C.START_PACK,C.WOLF_MUL.step,C.WOLF_MUL.max,C.WOLF_MUL.raiseAcc,C.MIGRATE.goldRate,C.MIGRATE.feastMax,C.SAVE_VERSION],[{perStamp:{towers:1,hens:1},max:3},5,120,80,.25,10,3],'다회차·이행 기본값');
+ eq([1,2,3,4,5,6].map(C.villageOf).map(v=>C.VILLAGE_NAME[v]),['초원','채석장','서리 과수원','불씨 숲','초원','채석장'],'마을 이름 순서(4개 뒤 반복)');}
+
+/* 3-2 경제 불변식: 정답 금화는 글 길이·나이와 무관(같은 상태면 같은 금액), 긴 글은 동전 수 연출에만. 느리게 푼다고 더 받지 않음 */
+{const golds=new Set(),coins=[];
+ for(const a of Q.AGES){for(const q of bank(a,'story')){const r=C.income(S({age:a}),q,false);golds.add(r.gold);coins.push(r.coin);ok(r.m===1&&r.coin===C.scale(q),q.id+' 금화 배수 1 · 동전 배수 = 긴 글 배수')}
+  for(let i=0;i<Q.quizCount(a);i++)golds.add(C.income(S({age:a}),Q.quiz(a,i),false).gold)}
+ eq([...golds],[C.PAY.base+C.PAY.egg],'모든 나이·모든 문항: 첫 정답 금화가 같다('+(C.PAY.base+C.PAY.egg)+')');ok(Math.max(...coins)>3&&Math.min(...coins)===1,'동전 배수는 1~5로 다름');
+ const q=Q.get(10,'story',0),need=Math.ceil(C.needSeconds(q)*10);eq(C.income(S(),q,false,need).gold,C.income(S(),q,false,need*3).gold,'오래 걸려도 금화는 같음');ok(C.income(S(),q,false,1).gold<C.income(S(),q,false,need).gold,'보자마자 찍으면 깎임(찍기 막기는 그대로)');
+ /* 가격: 가장 싼 66개 값이 다 사는 값의 절반 남짓(설계 검토 13번의 계산 4,695 / 8,940) */
+ const all=[];for(const k of ['tower','power','fence','chicken','farmer','pond'])all.push(...C.ITEMS[k].prices);all.sort((x,y)=>x-y);
+ ok(all[all.length-1]===350&&all[0]===15,'가격 범위 15~350');}
+
+/* 3-3 회관 자동 승급(결정 C): 회관을 뺀 지은 수 10·32·54에서 저절로, 살 수 없음, 내려가지 않음 */
+{const s=C.fresh(8);s.gold=1e9;const at=[],bellAt=[];let h=0;
+ for(let i=0;i<300;i++){const k=['fence','chicken','tower','farmer','power','pond'].find(x=>C.canBuy(s,x));if(!k)break;const b0=s.run.bell;C.buy(s,k);
+  if(s.hall>h){at.push(C.built(s)-s.hall);h=s.hall}if(!b0&&s.run.bell)bellAt.push(C.built(s))}
+ eq(at,[10,32,54],'회관은 회관을 뺀 지은 수 10 · 32 · 54에서 저절로 오름');eq([C.built(s),s.hall],[81,3],'다 지으면 81개(회관 3 포함)');
+ ok(bellAt.length===1&&bellAt[0]>=66&&bellAt[0]<=67,'종은 지은 수 66에서 한 번 열림('+bellAt+')');
+ eq([C.canBuy(S({gold:1e9}),'hall'),C.open(S(),'hall'),C.buy(S({gold:1e9}),'hall')],[false,false,0],'회관은 살 수 없음');
+ eq(C.shop(S())[7],{key:'hall',state:'auto',price:0,need:0},'회관 칸 = 그림 칸(auto, 값 없음)');
+ eq([C.autoHall(S({fence:9})),C.autoHall(S({fence:10})),C.autoHall(S({fence:10,hall:3})),C.autoHall(S({fence:18,chickens:15})),C.autoHall(S({fence:18,chickens:20,level:17}))],[0,1,3,2,3],'autoHall: 문턱·내려가지 않음');
+ withFlags({HALL_AUTO_BY_AGE:{9:[8,26,44]}},()=>eq([C.autoHall(S({age:9,fence:8})),C.autoHall(S({age:8,fence:8}))],[1,0],'(손잡이) 9세만 8/26/44'));
+ /* 회관 모으기 말풍선은 없다 */
+ eq(C.recommend(S({fence:18,chickens:6,level:6,gold:0}),{}),null,'자동 승급: 회관을 위해 모으자는 말 없음');
+ let hallLines=0;for(let g=0;g<400;g+=20){const r=C.recommend(S({fence:6,chickens:6,level:3,gold:g}),{});if(r&&r.key==='hall')hallLines++}eq(hallLines,0,'어떤 금화에서도 회관 추천 없음');
+ eq([C.canBuy(S({hall:3,gold:1e6}),'feast'),C.shopKeys(S({hall:3}))[7]],[false,'hall'],'잔치는 엔딩 전에는 닫힘');}
+
+/* 3-4 종(결정 A·B): 이번 판에 지은 66에서 열리고(값 없음), 한 번 열리면 닫히지 않음(래치). 권유는 3번, 문장은 서로 다름 */
+{const s=S({level:19,fence:18,chickens:20,farmers:6,gold:1e6});
+ eq([C.grow(s),s.hall,C.built(s),s.run.bell,C.shopKeys(s)[7]],[{hall:3,bell:false},3,65,0,'hall'],'65개: 종 닫힘');
+ C.buy(s,'farmer');eq([C.built(s),s.run.bell,s.run.bellQ,C.shop(s)[7]],[66,1,0,{key:'bell',state:'buy',price:0,need:0}],'66개: 종이 열림(누르는 칸, 값 0)');
+ eq([C.canBuy(s,'bell'),C.buy(s,'bell'),s.gold>0],[false,0,true],'종은 사는 것이 아님(금화가 들지 않음)');
+ for(let i=0;i<12;i++)C.lostHen(s);C.grow(s);eq([C.built(s)<66,s.run.bell,C.shopKeys(s)[7],s.run.lost],[true,1,'bell',12],'닭을 잃어 66 아래로 내려가도 닫히지 않음(래치)');
+ eq(C.restore(JSON.parse(JSON.stringify({...s,version:3}))).run.bell,1,'이어하기에도 열려 있음');
+ s.gold=0;const rc=c=>C.recommend(s,c||{});
+ eq([rc().key,rc().line,rc().rule,rc().urgent],['bell',C.LINES.bell1,9,false],'종 권유 1');eq(rc({bellQuiet:true}),null,'앞 권유 뒤 60초 안에는 쉼(bellQuiet)');
+ C.bellPrompted(s);eq(rc().line,C.LINES.bell2,'종 권유 2');C.bellPrompted(s);eq(rc().line,C.LINES.bell3,'종 권유 3');C.bellPrompted(s);eq([rc(),C.bellPrompted(s),s.run.prompts],[null,3,3],'3번 뒤에는 말풍선 없음');
+ eq(new Set([C.LINES.bell1,C.LINES.bell2,C.LINES.bell3]).size,3,'권유 문장 3개는 서로 다름');ok([C.LINES.bell1,C.LINES.bell2,C.LINES.bell3].every(l=>l.length<=26),'7세가 읽을 만큼 짧음');
+ {const u=S({level:19,fence:18,chickens:20,farmers:7,hall:3,gold:500,broken:1});u.run.bell=1;eq(C.recommend(u,{brokenKinds:['coop']}).key,'repair','급한 고치기가 종 권유보다 먼저')}
+ /* 시작 꾸러미는 문턱에 세지 않는다(이번 판에 새로 지은 66) */
+ {const p=S({level:19,fence:18,chickens:20,farmers:9,hall:3});p.run.built0=6;p.run.pack={towers:3,hens:3};eq([C.built(p),C.builtNew(p),C.grow(p).bell],[68,62,false],'꾸러미 6개는 빼고 셈: 68개여도 닫힘');
+  withFlags({BELL_COUNTS_PACK:true},()=>eq([C.builtNew(p),C.bellDue(p)],[68,true],'(손잡이) 꾸러미도 세면 열림'))}
+ withFlags({BELL_BUILT_BY_AGE:{9:54}},()=>eq([C.bellBuilt(S({age:9})),C.bellBuilt(S({age:8})),C.bellDue(S({age:9,level:19,fence:18,chickens:15,hall:3})),C.bellDue(S({age:8,level:19,fence:18,chickens:15,hall:3}))],[54,66,true,false],'(손잡이, 결정 B ②) 9세만 54'));
+ withFlags({BELL_WINS_CAP:3},()=>{const w=S();for(let i=0;i<3;i++)C.settle(w,Q.get(8,'story',0),'first');eq(w.run.bell,1,'(손잡이) 한 번에 맞힌 수 상한으로도 열림')});}
+
+/* 3-5 결전: 문제 6개 = 이번 판에 맞힌 것 4 + 틀린 것 2(최근 10문제 제외, 마지막 방패는 맞힌 문제), 한 번에 맞혀야 방패가 깨짐, 지는 경우 없음 */
+{let sr=3;const rnd=()=>{sr=(sr*1103515245+12345)%2147483648;return sr/2147483648};
+ const mk=age=>{const s=S({age,index:60,chickens:5});s.run.bell=1;s.run.ok=Array.from({length:57},(_,i)=>i);s.run.miss=[57,58,59];return s};
+ eq(C.ringBell(S()),false,'닫힌 종은 울리지 못함');
+ const s=mk(8);ok(C.ringBell(s,{rnd}),'종을 울림');const p=s.run.fpick.slice(),isMiss=i=>i>=57;
+ eq([s.run.bell,p.length,new Set(p).size,s.run.shields,s.run.fq,s.run.steps],[2,6,6,0,0,0],'결전 시작: 문제 6개, 방패 0개 깸');
+ eq(p.map(isMiss),[false,false,true,false,true,false],'순서: 맞힌 것 2 → 복습 → 맞힌 것 → 복습 → 맞힌 것(마지막은 맞힌 문제)');
+ ok(p.filter(i=>!isMiss(i)).every(i=>i<50),'맞힌 문제는 최근 10문제를 뺀 것에서');eq(C.ringBell(s,{rnd}),false,'두 번 울리지 못함');
+ eq(C.shop(s)[7],{key:'bell',state:'fight',price:0,need:0},'종 칸: 결전 중');eq(C.finaleNow(s),{index:p[0],normal:false},'지금 낼 결전 문제');eq(C.finaleNow(S()),null,'결전이 아니면 null');
+ let r=C.finaleSettle(s,'first');eq([r.shield,r.shields,r.won,s.run.fpick,s.run.fq],[true,1,false,p.slice(1),1],'한 번에 맞힘: 방패 1개');
+ r=C.finaleSettle(s,'second');eq([r.shield,r.shields,r.stepped,s.run.fpick],[false,1,false,p.slice(2).concat(p[1])],'두 번째 정답: 방패 그대로(반짝임만), 그 문제는 맨 뒤로');
+ r=C.finaleSettle(s,'miss');eq([r.shield,r.stepped,s.run.steps,s.run.fpick.length],[false,true,1,5],'두 번 틀림(8세): 왕이 한 걸음, 방패 그대로');
+ for(let i=0;i<40;i++)r=C.finaleSettle(s,i%2?'miss':'second');eq([s.run.bell,s.run.shields,s.run.fpick.length,s.run.steps,r.won,s.chickens,s.gold],[2,1,5,3,false,5,20],'아무리 틀려도 지지 않음: 걸음은 3까지, 방패·닭·금화 그대로');
+ ok([...s.run.fpick].sort().join()===p.slice(1).sort().join(),'틀린 문제는 다시 나옴(남은 문제 묶음은 그대로)');
+ const s7=mk(7);C.ringBell(s7,{rnd});r=C.finaleSettle(s7,'miss');eq([r.stepped,s7.run.steps],[false,0],'7세: 두 번 틀려도 왕이 다가오지 않음(결정 E)');
+ for(let i=0;i<4;i++)r=C.finaleSettle(s,'first');eq([r.won,s.run.bell,s.run.shields],[false,2,5],'5개까지');
+ r=C.finaleSettle(s,'first',{now:1e12});eq([r.won,r.shields,s.run.bell,s.run.fpick,s.run.steps,C.finaleNow(s),C.shop(s)[7].state],[true,6,3,[],0,null,'done'],'6개를 다 깨면 승리');
+ eq(C.finaleSettle(s,'first'),null,'끝난 뒤에는 결전 결말 없음');
+ /* 기록이 모자라면(예전 저장) 평소 순서의 다음 문제 */
+ const e=S({index:5});e.run.bell=1;C.ringBell(e,{rnd});eq([e.run.fpick,C.finaleNow(e)],[[-1,-1,-1,-1,-1,-1],{index:5,normal:true}],'기록 없음 → 평소 순서(−1)');
+ r=C.finaleSettle(e,'miss');eq([r.normal,e.run.fpick.length],[true,6],'평소 순서 문제도 틀리면 방패 그대로');
+ const few=S({index:30});few.run.bell=1;few.run.ok=[1,2];few.run.miss=[3];C.ringBell(few,{rnd});eq([few.run.fpick.filter(i=>i>=0).sort(),few.run.fpick.filter(i=>i<0).length],[[1,2,3],3],'기록이 적으면 있는 만큼 + 평소 순서');
+ /* 같은 문항을 두 번 고르지 않음(idOf) */
+ const d=S({index:90});d.run.bell=1;d.run.ok=Array.from({length:60},(_,i)=>i);C.ringBell(d,{rnd,idOf:i=>i%4});const real=d.run.fpick.filter(i=>i>=0);eq([real.length,new Set(real.map(i=>i%4)).size],[4,4],'같은 문항(id)은 한 번만');
+ /* 판 기록: 결전 문제는 목록에 넣지 않음 */
+ const t=S({index:9}),q=Q.get(8,'story',0);C.settle(t,q,'first');t.index=10;C.settle(t,q,'second');t.index=11;C.track(t,q,'miss');t.index=12;C.settle(t,q,'first',{finale:true});C.settle(t,q,'miss',{finale:true});
+ eq([t.run.ok,t.run.miss,t.run.asked,t.run.first,t.run.newOk,t.meta.seenOk],[[9],[10,11],5,2,1,[q.id]],'판 기록: 맞힌 번호·틀린 번호·푼 수·처음 맞힌 문항');}
+
+/* 3-6 엔딩 기록 · 다음 마을(결정 D): 도장·지도, 시작 꾸러미(도장 1개마다 타워·닭 1씩, 최대 3+3), 늑대 세기는 정답률로 */
+{const done=(acc,lost,mul)=>{const s=S({level:19,fence:18,chickens:20,farmers:9,hall:3,gold:777,index:80,age:9,pace:140,paced:9});s.run.bell=2;s.run.fpick=[-1];s.run.shields=5;s.run.asked=100;s.run.first=acc;s.run.lost=lost;s.run.wolfMul=mul||100;s.run.t0=1e12;return s};
+ eq(C.nextRun(S()),null,'끝내지 않은 판은 떠나지 못함');
+ const s=done(90,0);s.run.fox=3;s.run.foxSaved=3;s.run.newOk=7;C.finaleSettle(s,'first',{now:1e12+25*60000});
+ eq(s.meta.stamps,[{no:1,village:'meadow',age:9,stars:[1,1,1],q:100,acc:90,lost:0,min:25,date:1e12+25*60000}],'도장: 마을·별 3개·읽은 문제 수·정답률·분');
+ eq([s.meta.villages,s.meta.acc],[[{no:1,village:'meadow',snap:{level:19,fence:18,chickens:20,farmers:9,pond:0,hall:3,power:0}}],[90]],'끝낸 마을은 지도 목록에 남음(스냅숏)');
+ eq([C.stars(Object.assign(done(50,0),{})),(()=>{const x=done(50,0);x.run.fox=2;x.run.foxSaved=1;x.run.foxLost=1;x.run.newOk=5;return C.stars(x)})()],[[0,1,0],[0,1,1]],'별: 여우를 놓치면 ① 없음, 새 글 5개면 ③');
+ withFlags({},()=>{const keep=C.FOX.on;C.FOX.on=false;try{const x=done(50,0);eq([C.stars(x)[0],C.foxDue(Object.assign(S({hall:1,fence:18,chickens:9}),{}))],[1,false],'(손잡이) 여우를 끄면 ①은 닭을 잃지 않음, 여우는 오지 않음')}finally{C.FOX.on=keep}});
+ const n=C.nextRun(s,{seed:77,now:5});
+ eq([n.run.no,n.run.village,n.level,n.chickens,n.run.built0,n.run.pack,n.gold,n.hall,n.fence,n.index,n.wins,n.seed,n.age,n.pace,n.run.bell,n.run.wolfMul,n.run.t0],[2,'quarry',2,2,2,{towers:1,hens:1},20,0,0,0,0,77,9,140,0,105,5],'새 마을: 회관 0부터, 꾸러미 1+1, 나이·읽기 속도는 이어 감, 늑대 +5%');
+ eq([n.meta.stamps.length,n.meta.villages.length,C.built(n),C.builtNew(n),s.run.no],[1,1,3,1,1],'도장·지도는 남고, 꾸러미는 종 문턱에 세지 않음(옛 상태는 그대로)');
+ eq(W.towerUnits(W.sync(W.create({seed:1}),n)),3,'새 마을 세계: 타워 3개(기본 2 + 꾸러미 1)');
+ /* 꾸러미 최대 3+3 */
+ let x=n;for(let k=0;k<4;k++){x.run.bell=3;x=C.nextRun(x,{})}eq([x.run.no,x.run.village,x.run.pack,x.level,x.chickens,x.meta.stamps.length],[6,'quarry',{towers:1,hens:1},2,2,1],'도장이 1개면 꾸러미도 1+1(도장은 늑대 왕을 물리칠 때만)');
+ {const y=done(90,0);y.meta.stamps=Array.from({length:5},(_,i)=>({no:i+1,village:'meadow',age:8,stars:[1,1,1],q:90,acc:90,lost:0,min:1,date:1}));C.finaleSettle(y,'first');const z=C.nextRun(y);eq([z.run.pack,z.level,z.chickens,z.run.built0],[{towers:3,hens:3},4,4,6],'도장이 많아도 꾸러미는 3+3까지')}
+ /* 늑대 세기: 정답률 80% 미만이면 올리지 않음, 닭을 많이 잃으면 내림, 상한 +20% · 하한 −5% */
+ const mul=(acc,lost,m)=>{const y=done(acc,lost,m);C.finaleSettle(y,'first');return C.nextMul(y)};
+ eq([mul(90,0),mul(79,0),mul(85,3),mul(85,4),mul(90,5),mul(90,0,120),mul(60,9,95),mul(80,0,115)],[105,100,105,100,95,120,95,120],'늑대 세기 %');
+ /* 더 놀기: 자유 놀이에서만 잔치(상한 20) */
+ const st=done(90,0);C.finaleSettle(st,'first');eq([C.keepPlaying(S()),C.keepPlaying(st),st.run.bell,C.keepPlaying(st)],[false,true,4,false],'이 마을에서 더 놀기 → 자유 놀이');st.gold=1e6;
+ eq([C.shopKeys(st)[7],C.canBuy(st,'feast'),C.buy(st,'feast'),C.price(st,'feast')],['feast',true,150,190],'자유 놀이: 8번째 칸은 잔치(150 + 40n)');st.feast=20;eq([C.canBuy(st,'feast'),C.shop(st)[7].state],[false,'max'],'잔치 숨은 상한 20');
+ ok(C.nextRun(st)!==null,'자유 놀이에서도 새 마을로 떠날 수 있음');}
+
+/* 3-7 저장 v3(결정 F): version 1·3 수용, 예전 저장 이행, run·meta는 틀린 칸만 기본값으로 */
+{eq([C.restore({version:4,gold:999}).gold,C.restore({version:2,gold:999}).gold,C.restore({version:0,gold:999}).gold,C.restore('x').gold],[20,20,20,20],'모르는 버전·깨진 값은 새 판');
+ const old=C.restore({version:1,gold:4000,level:19,fence:18,chickens:20,farmers:9,pond:1,hall:3,power:4,feast:90,index:300,wins:250,age:9});
+ eq([old.gold,old.feast,old.hall,old.run.bell,old.run.bellQ,old.meta.from,old.run.no,old.index,C.shop(old)[7].state],[1000,10,3,1,300,9,1,300,'buy'],'0.11 다 지은 마을: 금화 × 0.25, 잔치 10까지, 바로 종이 열림');
+ const mid=C.restore({version:1,gold:600,level:6,fence:10,chickens:9,farmers:2,hall:0,index:50});eq([mid.gold,mid.hall,mid.run.bell,C.built(mid)],[150,1,0,27],'중간 저장: 금화 150, 회관은 자동 승급 기준으로 올림(26개 → 1단계)');
+ eq(C.restore({version:1,gold:600,level:6,fence:10,chickens:9,farmers:2,hall:3,index:50}).hall,3,'이미 높은 회관은 내려가지 않음');
+ eq(C.restore({version:1,gold:30}).gold,20,'금화 최소 20');eq(C.restore({version:3,gold:4000,feast:90}).gold,4000,'version 3은 환산하지 않음');eq(C.restore({version:3,gold:1,feast:90}).feast,20,'잔치 상한 20');
+ /* 결전 중 저장 */
+ const f=S({index:70,age:9});f.run.bell=2;f.run.shields=2;f.run.fq=5;f.run.fpick=[11,22,33,44];f.run.steps=3;f.run.ok=[1,2,3];f.run.miss=[4];f.run.prompts=2;f.run.fox=2;f.run.foxSaved=2;
+ const g=C.restore(JSON.parse(JSON.stringify({...f,version:3})));eq([g.run.bell,g.run.shields,g.run.fq,g.run.fpick,g.run.steps,g.run.ok,g.run.miss,g.run.prompts,g.run.fox],[2,2,5,[11,22,33,44],0,[1,2,3],[4],2,2],'결전 중 저장: 깬 방패·남은 문제는 그대로, 왕의 걸음은 0으로');
+ eq(C.finaleNow(g),{index:11,normal:false},'이어하기에도 같은 결전 문제');
+ /* 망가진 run·meta */
+ const bad=C.restore({version:3,gold:50,run:{no:-3,village:'moon',bell:2,shields:99,fpick:'x',ok:[1,'a',-2,1,2.5,7],miss:null,wolfMul:999,prompts:-1,pack:{towers:99,hens:'z'},fox:'a',t0:-5,junk:1},meta:{stamps:[1,null,{no:2,village:'zzz',stars:'x',q:-1}],villages:'x',acc:[50,'a',300],seenOk:[1,'a8-story-01','a8-story-01',''],from:3,junk:2}});
+ eq([bad.gold,bad.run.no,bad.run.village,bad.run.bell,bad.run.shields,bad.run.fpick,bad.run.ok,bad.run.miss,bad.run.wolfMul,bad.run.prompts,bad.run.pack,bad.run.built0,bad.run.fox,bad.run.t0,'junk' in bad.run],[50,1,'meadow',2,0,[-1,-1,-1,-1,-1,-1],[1,7],[],100,0,{towers:0,hens:0},0,0,0,false],'망가진 run: 틀린 칸만 기본값(저장 전체를 버리지 않음)');
+ eq([bad.meta.stamps,bad.meta.villages,bad.meta.acc,bad.meta.seenOk,bad.meta.from,'junk' in bad.meta],[[{no:2,village:'meadow',age:8,stars:[0,0,0],q:0,acc:0,lost:0,min:0,date:0}],[],[50,100],['a8-story-01'],0,false],'망가진 meta');
+ eq(C.restore({version:3,run:{bell:2,shields:4,fpick:[5,6,7,8,9]}}).run.fpick,[5,6],'남은 문제 수 = 방패 6 − 깬 수(넘치면 자름)');
+ eq([C.restore({version:3,run:{bell:3,shields:1}}).run.shields,C.restore({version:3,run:{bell:1,shields:4,fpick:[1]}}).run],[6,{...C.freshRun(),bell:1}],'결전 밖에서는 방패·문제 목록을 정리');
+ const full=S({index:9});full.run.ok=Array.from({length:999},(_,i)=>i);full.meta.seenOk=Array.from({length:2500},(_,i)=>'a8-quiz-g'+i);const cut=C.restore(JSON.parse(JSON.stringify({...full,version:3})));eq([cut.run.ok.length,cut.run.ok[399],cut.meta.seenOk.length],[400,998,2000],'목록 상한(최근 것 남김)');}
+
+/* 3-8 세계: 늑대 왕(늑대 상한과 별개 자리 · 화살 면역 · 공격 없음) · 도둑 여우(자동 사격 제외 · 정답 사격 1순위 · 마지막 닭 보호) · 물러남 · 다회차 세기 */
+{const S0=o=>Object.assign(C.fresh(8),{level:0},o||{}),run=(w,s,n)=>{const out=[];for(let i=0;i<n;i++)out.push(...W.step(w,s));return out};
+ /* 늑대 왕 */
+ let s=S0({chickens:4,level:5,power:3}),w=W.sync(W.create({seed:5,interval:3000}),s);w.trickle=1e9;
+ const k=W.king(w,'wait'),R=W.radius(w);ok(k&&k.state==='wait'&&Math.abs(Math.hypot(k.x,k.z)-(R+W.EDGE+W.KING.far))<.01,'늑대 왕: 숲 속에서 걸어 나옴');eq(w.wolves.length,0,'늑대 목록에는 없음(상한 90과 별개 자리)');
+ run(w,s,60);eq([Math.round(Math.hypot(w.king.x,w.king.z)*10)/10,w.king.state,w.arrows.length,s.chickens,W.wolvesInside(w)],[R+W.EDGE+W.KING.wait,'wait',0,4,0],'숲 가장자리에서 기다림: 화살도 안 맞고 마을 안 늑대로도 세지 않음');
+ const pos=[w.king.x,w.king.z];run(w,s,200);eq([w.king.x,w.king.z],pos,'기다리는 동안 움직이지 않음');
+ for(let i=0;i<W.MAX_WOLVES;i++)w.wolves.push({id:1e4+i,kind:'wolf',x:30,z:30,sx:30,sz:30,hp:9,max:9,speed:0,state:'leave',target:0,timer:0,inside:0,hen:0});ok(W.king(w,'wait')===w.king&&w.king,'늑대가 상한(90)이어도 왕 자리는 따로');w.wolves=[];
+ W.king(w,'fight',0);eq(w.king.state,'come','종 → 다가옴');let ev=run(w,s,120);ok(ev.some(e=>e.type==='kingStand'),'멈춤 지점에 섬(사건)');eq([w.king.state,Math.round(Math.hypot(w.king.x,w.king.z)*10)/10],['stand',R+W.KING.stop],'멈춤 지점 = 울타리 밖(반지름 + '+W.KING.stop+')');
+ W.king(w,'fight',1);run(w,s,30);eq(Math.round(Math.hypot(w.king.x,w.king.z)*10)/10,R+W.KING.stop-W.KING.step,'한 걸음');W.king(w,'fight',9);run(w,s,60);ok(Math.hypot(w.king.x,w.king.z)>R+.5,'세 걸음을 와도 울타리 밖');eq(w.king.steps,3,'걸음은 3까지');
+ run(w,s,300);eq([s.chickens,w.hens.length,W.brokenCount(w),w.stats.henLost,w.arrows.filter(a=>!a.gold).length],[4,4,0,0,0],'왕은 닭도 건물도 건드리지 않고, 타워도 왕을 쏘지 않음');
+ const ar=W.kingHit(w);ok(ar&&ar.gold&&ar.damage===0&&ar.wolf===w.king.id,'황금 화살(피해 없음)');run(w,s,ar.total+1);eq(w.arrows.length,0,'황금 화살은 닿으면 사라짐');
+ /* 이어하기: 왕은 멈춤 지점 처음 자리로(snap) */
+ const back=W.restore(JSON.parse(JSON.stringify(w)));eq([back.king.state,back.king.steps],['stand',3],'세계 저장에는 그대로');W.king(back,'fight',0,true);eq([back.king.state,back.king.steps,Math.round(Math.hypot(back.king.x,back.king.z)*10)/10],['stand',0,R+W.KING.stop],'이어하기 맞춤: 걸음 0, 처음 자리');
+ const fr=W.sync(W.create({seed:1,interval:300}),s);W.king(fr,'fight',0,true);eq(fr.king.state,'stand','왕이 없던 저장도 바로 멈춤 지점에');
+ eq(W.restore({...JSON.parse(JSON.stringify(w)),king:{id:'x'},fox:5,peace:'a'}).king,null,'망가진 왕·여우·물러남은 없는 것으로');
+ /* 물러남 */
+ w.wolves.push({id:901,kind:'wolf',x:2,z:2,sx:15,sz:0,hp:9,max:9,speed:1,state:'hunt',target:0,timer:0,inside:0,hen:0},{id:902,kind:'wolf',x:1,z:1,sx:15,sz:0,hp:9,max:9,speed:1,state:'carry',target:0,timer:0,inside:0,hen:w.hens[0].id});w.hens[0].state='carried';
+ W.king(w,'flee');eq([W.retreat(w,-1),w.wolves.map(v=>v.state),w.hens[0].state,w.peace],[2,['leave','leave'],'flee',-1],'늑대가 모두 물러남: 물던 닭은 놓고 달아남');
+ w.trickle=w.t+1;w.wave.arrive=w.t+W.TRAVEL+5;w.wave.spawned=false;ev=run(w,s,900);ok(ev.some(e=>e.type==='kingGone')&&w.king===null,'왕은 숲으로 달아나 사라짐');eq([w.wolves.length,ev.filter(e=>e.type==='pack'||e.type==='straggler').length,s.chickens],[0,0,4],'물러난 동안 새 늑대가 오지 않음');
+ W.peaceOff(w);w.trickle=w.t+1;ev=run(w,s,50);ok(ev.some(e=>e.type==='straggler'),'물러남이 끝나면 다시 옴');
+ {const t=W.sync(W.create({seed:2,interval:300}),s);W.retreat(t,40);t.trickle=t.t+1;eq([run(t,s,39).some(e=>e.type==='straggler'),t.peace>0,run(t,s,200).some(e=>e.type==='straggler'),t.peace],[false,true,true,0],'물러남 40틱: 그동안만 조용')}
+ /* 도둑 여우 */
+ s=S0({chickens:4,level:3,power:2,age:8});w=W.sync(W.create({seed:5,interval:3000}),s);w.trickle=1e9;
+ let f=W.fox(w,s,50,{});ok(f&&f.state==='come'&&Math.abs(Math.hypot(f.x,f.z)-(W.radius(w)+W.EDGE))<.01,'여우: 숲 가장자리에서');eq([W.fox(w,s,50,{}),w.wolves.length],[null,0],'한 번에 한 마리, 늑대 목록과 별개');
+ ev=run(w,s,49);eq([w.arrows.length,ev.some(e=>/fox/.test(e.type)),w.hens.length],[0,false,4],'타워는 여우를 저절로 쏘지 않음(자동 사격 대상 제외)');
+ ev=run(w,s,1);eq(ev.filter(e=>e.type==='foxLost'||e.type==='henLost').map(e=>[e.type,!!e.fox]),[['foxLost',true],['henLost',true]],'정해진 틱(50)에 닭에 닿아 한 마리를 데려감');eq([w.hens.length,w.stats.henLost,w.stats.foxLost,w.fox.state],[3,1,1,'flee'],'닭 3마리 남음');
+ ok(run(w,s,150).some(e=>e.type==='foxGone')&&w.fox===null,'여우는 숲으로 돌아감');
+ f=W.fox(w,s,50,{});run(w,s,20);for(const b of w.buildings)if(b.kind==='tower')b.broken=true;
+ eq([W.foxShoo(w),w.fox.state,w.arrows.filter(a=>a.gold).length,w.stats.foxSaved,W.foxShoo(w)],[true,'flee',1,1,false],'정답 사격: 타워가 다 부서져도 회관에서 황금 화살 → 여우가 달아남(구출)');
+ ev=run(w,s,200);eq([w.hens.length,ev.some(e=>e.type==='foxLost'||e.type==='henLost'),w.fox],[3,false,null],'쫓겨난 여우는 닭을 못 데려감');
+ f=W.fox(w,s,30,{});run(w,s,31);eq(W.foxShoo(w),false,'이미 닭에 닿은 뒤에는 늦음');run(w,s,200);
+ f=W.fox(w,s,30,{scare:true});ev=run(w,s,30);eq([ev.some(e=>e.type==='foxScare'),ev.some(e=>e.type==='henLost'),w.hens.length,w.stats.foxScared],[true,false,2,1],'놀래키기 전용(7세): 닭을 데려가지 않음');run(w,s,200);
+ s.chickens=1;w.hens.length=1;f=W.fox(w,s,30,{});ev=run(w,s,30);eq([ev.some(e=>e.type==='foxScare'),w.hens.length],[true,1],'마지막 닭은 데려가지 않음');
+ /* 마지막 닭 보호: 물리지 않은 닭이 1마리면 노리지 않는다(두 마리가 한 틱에 함께 물리지 않음) */
+ {const s2=S0({chickens:2}),w2=W.sync(W.create({seed:3,interval:3000,guard:true}),s2);w2.calm=0;w2.trickle=1e9;for(const b of w2.buildings)if(b.kind==='tower')b.broken=true;
+  w2.hens.forEach((h,i)=>w2.wolves.push({id:700+i,kind:'wolf',x:h.x+.2,z:h.z,sx:17,sz:0,hp:99,max:99,speed:1,state:'hunt',target:0,timer:0,inside:0,hen:0}));
+  let bites=0,min=9;for(let i=0;i<600;i++){for(const e of W.step(w2,s2)){if(e.type==='bite')bites++;if(e.type==='henLost')s2.chickens--}min=Math.min(min,w2.hens.filter(h=>h.state!=='caught'&&h.state!=='carried').length)}
+  eq([bites,min,s2.chickens,w2.keep],[1,1,1,true],'두 늑대가 두 닭 옆에 있어도 한 마리만 물림 → 닭 1마리는 늘 남음')}
+ /* 다회차 세기: 체력·무리 × m, 속도 × (1 + (m−1)/2) */
+ {const a=S0({level:8,fence:6,chickens:8,hall:2}),b=S0({level:8,fence:6,chickens:8,hall:2});b.run.wolfMul=120;const wa=W.sync(W.create({seed:9,interval:300}),a),wb=W.sync(W.create({seed:9,interval:300}),b);
+  eq([W.mulOf(a),W.mulOf(b),W.mulOf({})],[1,1.2,1],'세기 배수');ok(Math.abs(W.packSize(wb,b)/W.packSize(wa,a)-1.2)<.08,'무리 ×1.2');
+  run(wa,a,6);run(wb,b,6);const va=wa.wolves[0],vb=wb.wolves[0];ok(va&&vb&&Math.abs(vb.max/va.max-1.2)<.1&&Math.abs(vb.speed/va.speed-1.1)<.01,'체력 ×1.2 · 속도 ×1.1')}}
+
+/* 3-9 화면: 회관 자동 승급 연출 → 종이 열림(늑대 왕 등장) → 결전 6방패 → 엔딩 카드 → 새 마을 / 더 놀기 */
+{const NEAR=(o,opt)=>{const r=C.freshRun();r.ok=Array.from({length:30},(_,i)=>i);r.miss=[30,31];r.t0=1;return seed({level:19,fence:18,chickens:20,farmers:6,hall:3,gold:900,index:45,seed:4242,run:r,...o},opt)};
+ const qOf=(a,i)=>Q.at(a.api.state.age,'story',i,a.api.state.seed);
+ const solve=a=>{a.untilAsk();a.unlock();a.right()},missTwice=a=>{a.untilAsk();a.unlock();a.wrong(0);a.tick(C.DASH_TICKS);a.wrong(1)},learnOut=a=>{a.tick(C.LEARN.max+2);a.right()};
+ /* 회관 자동 승급: 지은 수 10에서 저절로, 회관 구매 때의 축하 연출을 그대로 */
+ {const a=fresh({view:true});a.go();calmWorld(a);a.api.state.gold=5000;const h0=a.game().sfx.hall|0;
+  for(let i=0;i<8;i++){a.buy('fence');a.tick(5)}eq([a.api.state.fence,a.api.state.hall,a.built.includes('hall')],[8,0,false],'9개: 아직 회관 0');
+  a.buy('fence');eq([a.api.state.hall,a.api.world.hall,a.built.filter(x=>x==='hall').length,(a.game().sfx.hall|0)-h0,a.slot('hall')._pr.textContent],[1,1,1,1,'●○○'],'10개: 회관이 저절로 1단계(3D 연출·종소리·단계 점)');
+  ok(a.fx('fx-label').some(e=>e.textContent==='🏠 회관 1단계!'),'회관 이름표');eq(a.n.shopTip.textContent,'🏠 마을이 넓어졌어요! 새 몬스터도 와요.','회관 한 줄 안내');eq(a.row('power').state,'buy','회관 1단계로 강화가 열림');
+  a.api.state.gold=5000;a.tick(5);a.buy('fence');eq(a.api.state.hall,1,'더 사도 다음 문턱 전에는 그대로')}
+ /* 종이 열림 */
+ const a=NEAR({},{view:true});a.go();calmWorld(a);eq([a.api.state.run.bell,a.slots()[7].dataset.key,a.game().king],[0,'hall',null],'65개: 종 닫힘, 왕 없음');
+ a.buy('farmer');eq([a.api.state.run.bell,a.slots()[7].dataset.key,a.slots()[7].dataset.state,a.slots()[7]._pr.textContent,a.game().king&&a.game().king.state],[1,'bell','buy','울려요','wait'],'66개: 8번째 칸이 종(값 없음), 늑대 왕이 숲 가장자리에');
+ ok(a.slots()[7].classList.contains('rec'),'종 칸은 계속 반짝임');ok(a.events.some(e=>e.type==='king'),'3D에 왕 등장 사건');ok(!/\d/.test(a.slots()[7]._pr.textContent),'종 칸에 숫자(값·시간) 없음');
+ ok(a.n.villageStatus.textContent.includes('늑대 왕'),'상태 문구');
+ /* 닭을 잃어 66 아래로 내려가도 종은 그대로 */
+ for(let i=0;i<3;i++){loseHen(a);a.tick(2)}eq([a.api.state.chickens,C.built(a.api.state)<66,a.api.state.run.bell,a.slots()[7].dataset.key,a.api.state.run.lost],[17,true,1,'bell',3],'닭을 잃어도 종은 닫히지 않음(래치)');calmWorld(a);
+ /* 안 눌러도 판은 계속 */
+ const i0=a.api.state.index;solve(a);a.untilAsk();eq([a.api.state.index,a.api.round.fin,a.api.state.run.bell],[i0+1,null,1],'종을 안 눌러도 평소 문제가 이어짐');
+ /* 종을 울림 */
+ const g0=a.api.state.gold;a.tick(5);a.buy('bell');const pick=a.api.state.run.fpick.slice();
+ eq([a.api.state.run.bell,a.api.state.gold,pick.length,a.game().king.state,a.api.round.fin,a.slots()[7].dataset.state,a.slots()[7]._pr.textContent],[2,g0,6,'come',null,'fight','결전!'],'종을 울림: 금화 그대로, 문제 6개 정함, 왕이 다가옴, 풀던 문제는 그대로');
+ ok(pick.every(i=>i>=0&&i<45)&&new Set(pick.map(i=>qOf(a,i).id)).size===6,'결전 문제는 이번 판에 푼 문제에서, 서로 다른 문항');
+ a.buy('bell');eq(a.n.shopTip.textContent,'👑 한 번에 맞히면 방패가 깨져요','결전 중 종 칸은 안내만');
+ const i1=a.api.state.index;solve(a);a.untilAsk();eq([a.api.state.index,a.api.round.fin,a.api.round.token,a.n.answers.dataset.qid],[i1+1,{normal:false},'8:story:F0-'+pick[0],qOf(a,pick[0]).id],'다음 문제부터 결전 문제(정해 둔 번호의 문항)');
+ ok(!a.n.finale.classList.contains('hidden')&&a.n.finale.children.length===7&&a.n.finale.children.filter(x=>x.classList.contains('off')).length===0,'별 방패 6개 표시');
+ /* 한 번에 맞힘 → 방패 1개 */
+ const gold1=a.api.state.gold;a.unlock();a.right();eq([a.api.state.run.shields,a.api.state.index,a.api.phase,a.api.state.gold>gold1,a.game().goldArrows],[1,i1+1,'reward',true,1],'한 번에 맞힘: 방패 1개, 금화도 받음, 문제 번호는 그대로, 황금 화살');
+ ok(a.events.some(e=>e.type==='shield'&&e.left===5),'3D에 방패 사건');a.tick(1);eq(a.n.finale.children.filter(x=>x.classList.contains('off')).length,1,'깨진 방패는 흐리게');
+ /* 두 번째에 맞힘 → 방패 그대로 */
+ a.untilAsk();a.unlock();a.wrong(0);a.tick(C.DASH_TICKS);a.right();eq([a.api.state.run.shields,a.api.phase,a.api.state.run.fpick[4]],[1,'learn',pick[1]],'두 번째 정답: 방패 그대로, 그 문제는 뒤로');learnOut(a);eq([a.api.phase,a.api.state.index],['ask',i1+1],'결전 문제는 번호를 넘기지 않음');
+ /* 두 번 틀림(8세) → 왕이 한 걸음, 지지 않음 */
+ missTwice(a);eq([a.api.state.run.steps,a.game().king.steps,a.api.state.run.shields,a.api.phase],[1,1,1,'learn'],'두 번 틀림(8세): 왕이 한 걸음');ok(a.n.feedback.textContent.includes('한 걸음'),'안내 문구');learnOut(a);
+ for(let i=0;i<6;i++){missTwice(a);learnOut(a)}eq([a.api.state.run.steps,a.api.state.run.shields,a.api.state.run.bell,a.api.state.chickens,a.api.world.stats.broken,a.api.phase],[3,1,2,17,0,'ask'],'계속 틀려도 지지 않음: 걸음 3까지, 닭·건물 그대로, 결전은 이어짐');
+ /* 결전 중 저장 → 새로고침 → 이어하기 */
+ a.untilAsk();a.tick(7);a.n.pause.click();const mid=a.game(),cur=a.n.answers.dataset.qid;
+ const b=boot({view:true});eq([b.n.go.textContent,b.api.state.run.bell,b.api.state.run.shields,b.api.state.run.steps,b.api.state.run.fpick],['이어서 하기 ▶',2,1,0,mid.state.run.fpick],'새로고침: 결전 진행(방패·남은 문제)은 그대로, 걸음은 0');
+ eq([b.game().king.state,b.game().king.steps],['stand',0],'왕은 멈춤 지점 처음 자리로');b.go();calmWorld(b);eq([b.api.phase,b.n.answers.dataset.qid,b.api.round.t,b.api.round.fin],['ask',cur,mid.round.t,{normal:false}],'같은 결전 문제를 같은 시계로 이어 함');
+ ok(!b.n.finale.classList.contains('hidden'),'이어하기에도 방패 표시');
+ /* 남은 방패 5개 → 승리 */
+ for(let i=0;i<4;i++){solve(b);eq(b.api.state.run.shields,2+i,'방패 '+(2+i)+'개')}
+ b.api.world.wolves.push({id:8001,kind:'wolf',x:2,z:2,sx:15,sz:0,hp:1e7,max:1e7,speed:1,state:'hunt',target:0,timer:0,inside:0,hen:0});
+ b.untilAsk();b.unlock();b.right();eq([b.api.state.run.bell,b.api.state.run.shields,b.api.phase,b.game().king.state,b.game().peace,b.api.world.wolves.map(v=>v.state)],[3,6,'reward','flee',-1,['leave']],'6개를 다 깸: 왕이 달아나고 늑대가 모두 물러남');
+ eq([b.api.state.meta.stamps.length,b.api.state.meta.stamps[0].village,b.api.state.meta.stamps[0].stars[1],b.api.state.meta.villages.length,b.slots()[7].dataset.state],[1,'meadow',1,1,'done'],'도장과 마을이 지도에 남음');ok(b.events.some(e=>e.type==='kingFlee'),'3D에 달아남 사건');
+ b.tick(REWARD+2);eq(b.api.phase,'reward','엔딩 카드 전에 달아나는 장면을 잠깐 봄');b.tick(40);eq([b.api.phase,b.n.ending.hidden,b.api.round],['ending',false,null],'엔딩 카드(전체 화면 레이어)');
+ eq([b.n.endTitle.textContent,b.n.endStars.children.length,b.n.endStars.children[1].textContent,b.n.endMap.children.map(x=>x.textContent)],['🎉 초원 마을을 지켰어요!',3,'⭐ 늑대 왕을 물리쳤어요',['🏅 초원','➡️ 채석장']],'엔딩 카드: 마을 이름·별 3개·지도 줄(도장 + 다음 마을)');
+ ok(/^📖 \d+문제를 읽었어요!$/.test(b.n.endRead.textContent),'읽은 문제 수');
+ const tEnd=b.api.world.t;b.tick(50);eq(b.api.world.t,tEnd,'엔딩 카드 동안 세계는 멈춤');b.n.pause.click();eq(b.api.paused,false,'엔딩 카드에서는 쉬기 버튼이 듣지 않음');b.buy('tower');eq(b.api.phase,'ending','엔딩 카드에서는 가게도 듣지 않음');
+ /* 엔딩 카드에서 새로고침 → 엔딩 카드부터 */
+ const endSave=saved[KEY],c=boot();eq([c.n.go.textContent,c.api.state.run.bell,c.game().king],['이어서 하기 ▶',3,null],'엔딩 카드에서 나갔다 오면 이어서 하기');c.go();eq([c.api.phase,c.n.ending.hidden,c.n.endTitle.textContent],['ending',false,'🎉 초원 마을을 지켰어요!'],'엔딩 카드부터');
+ /* 새 마을로 떠나기: 회관 0부터, 꾸러미(타워·닭 +1), 늑대 세계도 새로 */
+ c.n.endNew.click();const st=c.api.state;
+ eq([c.api.phase,c.n.ending.hidden,st.run.no,st.run.village,st.level,st.chickens,st.hall,st.fence,st.gold,st.index,st.run.built0,st.run.bell,st.meta.stamps.length,c.n.scene.dataset.village],['ask',true,2,'quarry',2,2,0,0,20,0,2,0,1,'quarry'],'새 마을(채석장): 회관 0부터, 타워 3개·닭 2마리로 시작, 도장은 남음');
+ eq([c.api.world.t<3,c.api.world.buildings.filter(x=>x.kind==='tower').length,c.api.world.hens.length,c.game().king,c.game().peace,c.slots()[7].dataset.key,c.api.world.calm>0],[true,3,2,null,0,'hall',true],'늑대 세계도 새로(새 판 보호 포함), 8번째 칸은 다시 회관');
+ ok(st.seed>0&&st.seed!==4242,'문제 순서 씨앗도 새로');ok(st.run.wolfMul>=95&&st.run.wolfMul<=105,'늑대 세기는 지난 판 정답률로('+st.run.wolfMul+'%)');
+ c.unlock();c.right();eq([c.api.phase,c.api.state.index,c.api.state.run.ok],['reward',1,[0]],'새 마을에서 정상 진행(판 기록도 새로)');
+ const c2=boot();eq(c2.n.mapRow.children.map(x=>x.textContent),['🏅 초원','📍 채석장'],'시작 화면 지도 줄: 도장 + 지금 마을');ok(!c2.n.mapRow.classList.contains('hidden'),'도장이 있으면 지도 줄이 보임');
+ {const z=fresh();ok(z.n.mapRow.classList.contains('hidden'),'첫 판 시작 화면에는 지도 줄 없음')}
+ /* 이 마을에서 더 놀기: 자유 놀이(늑대 없음, 잔치가 열림) */
+ saved={[KEY]:endSave};const d=boot();d.go();d.n.endStay.click();
+ eq([d.api.phase,d.api.state.run.bell,d.api.state.run.no,d.api.state.level,d.slots()[7].dataset.key,d.game().peace,d.game().king,d.n.finale.classList.contains('hidden')],['ask',4,1,19,'feast',-1,null,true],'더 놀기: 같은 마을, 8번째 칸은 잔치, 늑대 없음');
+ d.api.state.gold=1000;d.tick(5);d.buy('feast');eq([d.api.state.feast,d.api.state.gold],[1,850],'자유 놀이에서 잔치를 엶');
+ let came=0;for(let i=0;i<8;i++){solve(d);d.tick(REWARD)}d.tick(900);came=d.api.world.wolves.length;eq([came,d.api.state.run.bell,d.api.phase==='ending'],[0,4,false],'자유 놀이: 늑대가 오지 않고 엔딩이 다시 오지 않음');
+ {const e=boot();e.go();eq([e.api.phase,e.api.state.run.bell,e.game().peace,e.slots()[7].dataset.key],['ask',4,-1,'feast'],'자유 놀이도 새로고침 뒤 그대로')}
+ withFlags({FREE_PLAY_WOLVES:true},()=>{saved={[KEY]:endSave};const e=boot();e.go();e.n.endStay.click();eq(e.game().peace,0,'(손잡이) 더 놀기에 늑대가 오게 할 수 있음')});
+ /* 7세(결정 E): 두 번 틀려도 왕이 다가오지 않음 */
+ {const r=C.freshRun();r.bell=2;r.fpick=[1,2,3,4,5,6];r.ok=[1,2,3,4,5,6];const k=seed({age:7,level:19,fence:18,chickens:20,farmers:7,hall:3,index:45,seed:4242,run:r});
+  eq([k.game().king.state,k.game().king.steps],['stand',0],'(7세 결전 저장)');k.go();calmWorld(k);for(let i=0;i<4;i++){missTwice(k);learnOut(k)}
+  eq([k.api.state.run.steps,k.game().king.steps,k.api.state.run.shields,k.api.state.run.bell],[0,0,0,2],'7세: 왕은 움직이지 않음');ok(k.n.feedback.textContent===''||!k.n.feedback.textContent.includes('한 걸음'),'(다가왔다는 말 없음)')}}
+
+/* 3-10 화면: 예전 저장(version 1) 이행 → 이어하기, 66개 넘은 마을은 바로 종 · 종 권유 말풍선은 3번까지 */
+{const REC=600;
+ saved={[KEY]:JSON.stringify({version:1,gold:4000,level:19,fence:18,chickens:20,farmers:9,pond:2,hall:3,power:5,feast:40,index:300,wins:260,age:8,mode:'story',seed:99})};
+ const a=boot({rec:'real'});eq([a.api.state.gold,a.api.state.feast,a.api.state.run.bell,a.api.state.meta.from,a.game().king&&a.game().king.state],[1000,10,1,9,'wait'],'0.11 다 지은 마을: 금화 1000, 잔치 10, 종이 바로 열리고 왕이 기다림');
+ ok(JSON.parse(saved[KEY+'-bak']).gold===4000,'원본은 -bak에 보관');a.go();calmWorld(a);eq([a.api.phase,a.slots()[7].dataset.key,a.slots()[7].dataset.state],['ask','bell','buy'],'이어서 하기: 8번째 칸이 종');
+ eq(JSON.parse(saved[KEY]).version,3,'저장은 version 3으로');const bak=saved[KEY+'-bak'];{const again=boot();again.unload();eq(saved[KEY+'-bak'],bak,'-bak은 한 번만 쓰고 덮어쓰지 않음')}
+ /* 권유 말풍선: 3번까지(서로 다른 문장, 60초 넘게 띄워서), 그 뒤에는 반짝임만 */
+ const lines=[],at=[];let seenN=a.api.state.run.prompts;
+ const T=()=>{a.tick();if(a.api.state.run.prompts>seenN){seenN=a.api.state.run.prompts;lines.push(a.bubble());at.push(a.api.world.t)}};
+ for(let i=0;i<60;i++){for(let t=0;t<200&&a.api.phase!=='ask';t++)T();for(let t=0;t<600&&a.api.round.lock>0;t++)T();for(let t=0;t<60;t++)T();a.right();T()}
+ eq([lines,a.api.state.run.prompts],[[C.LINES.bell1,C.LINES.bell2,C.LINES.bell3],3],'종 권유 말풍선은 3번, 문장은 서로 다름');ok(at[1]-at[0]>=REC&&at[2]-at[1]>=REC,'권유 사이 60초 이상');
+ ok(a.slots()[7].classList.contains('rec')&&a.api.state.run.bell===1,'3번 뒤에도 종 칸은 반짝이고, 판은 계속됨');
+ {const u=boot({rec:'real'});eq(u.api.state.run.prompts,3,'권유 횟수는 저장됨(새로고침해도 다시 3번 하지 않음)')}}
+
+/* 3-11 화면: 도둑 여우(지은 수 20·40·55, 회관 1 뒤). 정답이 황금 화살로 쫓아냄(두 번째 정답도), 놓치면 8세+는 닭 1마리 · 7세는 놀래키기만 */
+{const FOXY=(o,opt)=>seed({level:6,fence:8,chickens:7,hall:1,gold:0,index:20,seed:4242,...o},opt);
+ const a=FOXY({age:8},{view:true});eq(C.builtNew(a.api.state),21,'(전제) 지은 수 21');a.go();a.api.world.wolves=[];a.api.world.trickle=1e9;a.api.world.wave.arrive=1e9;
+ let fx=a.game().fox;eq([!!fx,fx&&fx.state,fx&&fx.scare,a.api.state.run.fox,fx&&fx.total],[true,'come',false,1,C.foxTicks(a.api.state,a.api.round.q)],'새 문제가 시작될 때 여우 등장(닭까지 = 문제 기본 시간 × 1.3)');
+ ok(!a.n.foxIcon.classList.contains('hidden'),'문제 칸에 🦊 표시');ok(!/\d/.test(a.n.foxIcon.textContent),'(시간 표시 없음)');ok(a.events.some(e=>e.type==='fox'),'3D에 여우 사건');
+ a.tick(15);eq(a.api.world.arrows.length,0,'타워는 여우를 저절로 쏘지 않음');
+ a.unlock();a.right();eq([a.api.state.run.foxSaved,a.api.state.run.foxLost,a.game().fox.state,a.game().goldArrows,a.api.state.chickens],[1,0,'flee',1,7],'한 번에 맞힘: 황금 화살이 여우를 쫓아냄(구출)');
+ a.tick(2);ok(a.n.foxIcon.classList.contains('hidden'),'쫓아내면 🦊 표시가 꺼짐');a.tick(REWARD);a.untilAsk();ok(!a.game().fox||a.game().fox.state==='flee','(쫓겨난 여우는 숲으로)');a.tick(80);a.unlock();a.right();a.tick(REWARD);a.untilAsk();eq([a.api.state.run.fox,a.game().fox],[1,null],'다음 여우는 지은 수 40에서(지금은 오지 않음)');
+ /* 두 번째 정답도 인정 */
+ const b=FOXY({age:8});b.go();calmWorld(b);b.unlock();b.wrong(0);b.tick(C.DASH_TICKS);eq(b.game().fox.state,'come','(틀린 뒤에도 여우는 오는 중)');b.right();eq([b.api.state.run.foxSaved,b.game().fox.state,b.api.state.chickens,b.api.phase],[1,'flee',7,'learn'],'두 번째 정답도 여우를 쫓아냄');
+ /* 놓침(8세): 닭 1마리 */
+ const c=FOXY({age:8});c.go();calmWorld(c);c.tick(c.game().fox.total+2);eq([c.api.state.chickens,c.api.state.run.foxLost,c.api.state.run.foxSaved,c.api.state.run.lost,c.api.world.hens.length],[6,1,0,1,6],'못 맞히면(8세) 여우가 닭 1마리를 데려감');ok(c.n.villageStatus.textContent.includes('여우가 꼬꼬를 데려갔어요'),'상태 문구');
+ /* 7세: 놀래키기만 */
+ const d=FOXY({age:7});d.go();calmWorld(d);ok(d.game().fox.scare,'7세 여우는 놀래키기 전용');d.tick(d.game().fox.total+2);eq([d.api.state.chickens,d.api.state.run.foxLost,d.api.state.run.lost,d.api.world.hens.length],[7,1,0,7],'7세: 닭을 잃지 않음(결정 E)');ok(d.n.villageStatus.textContent.includes('꼬꼬가 숨었어요'),'상태 문구');
+ /* 여우가 오는 중 저장 → 이어하기에도 그대로 */
+ const e=FOXY({age:8});e.go();calmWorld(e);e.tick(9);const left=e.game().fox.left;e.n.pause.click();const e2=boot();e2.go();eq([e2.game().fox&&e2.game().fox.left,e2.api.state.run.fox],[left,1],'여우가 오는 중이던 저장: 같은 자리에서 이어짐(다시 세지 않음)');
+ /* 회관 0단계·결전 중에는 오지 않음 */
+ const g=FOXY({hall:0,level:2,fence:5,chickens:3});g.go();eq(g.game().fox,null,'지은 수 20 전에는 오지 않음');
+ {const r=C.freshRun();r.bell=2;r.fpick=[1,2,3,4,5,6];const h=FOXY({run:r});h.go();eq(h.game().fox,null,'결전 중에는 여우가 오지 않음')}
+ withFlags({},()=>{const keep=C.FOX.on;C.FOX.on=false;try{const h=FOXY({});h.go();eq(h.game().fox,null,'(손잡이) 여우를 끌 수 있음')}finally{C.FOX.on=keep}});}
 
 eq(spoken,0,'검사 전체에서 음성 합성(speechSynthesis)을 한 번도 부르지 않음');
 if(fails.length)process.exit(1);
