@@ -427,7 +427,9 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
    let g=await game(page);eq(g.world.stats.bossKills,1,'the boss falls');eq(g.state.gold,gold0+Combat.BOUNTY,'boss bounty gold');eq(g.gold.shown,g.state.gold,'bounty shows at once');
    let b=await bannerBoxes(page);eq(b.length,1,'bounty banner alone');ok(b[0].text.includes('불씨 왕을 쓰러뜨렸어요!')&&b[0].text.includes('🪙 +'+Combat.BOUNTY),'bounty banner right away (jumps the queue): '+b[0].text);
    ok((await page.locator('#villageStatus').textContent()).includes('👑'),'bounty in the status line');
-   await answer(page,true,true);await phaseIs(page,'reward');b=await bannerBoxes(page);ok(b.length===1&&!b[0].shown,'banner hidden during the sale (no clash with the sale strip)');
+   /* 바로 눌러 맞힌다: 읽기 문항은 번개 시간까지 기다리면(약 7초) 알림 띠(3.3초)가 먼저 사라진다 */
+   await page.evaluate(()=>{if(round.lock>0)window.__tick(round.lock);[...document.querySelectorAll('#answers button')].find(x=>Number(x.dataset.i)===round.q.answer).click()});
+   await phaseIs(page,'reward');b=await bannerBoxes(page);ok(b.length===1&&!b[0].shown,'banner hidden during the sale (no clash with the sale strip)');
    await settle(page);b=await bannerBoxes(page);ok(b.length===1&&b[0].shown&&b[0].text.includes('불씨 왕을 쓰러뜨렸어요'),'banner back after the sale');
    await page.locator('#pause').tap();const left=await page.evaluate(()=>bannerLeft);await tick(page,50);eq(await page.evaluate(()=>bannerLeft),left,'banner waits while paused');await page.locator('#pause').tap();
    eq(errors,[],'flow demo3 page errors');await ctx.close()}
