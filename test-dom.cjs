@@ -25,7 +25,7 @@ for(const a of Q.AGES)for(const m of Q.MODES)for(const q of bank(a,m)){
  ok(Number.isInteger(sec)&&sec>=C.MIN_SEC[a]&&sec<=C.MAX_SEC,tag+' 제한시간 범위 '+sec);
  ok(sec>=need,tag+' 보통 아이 필요 시간('+need.toFixed(1)+'초) 이상');
  eq(C.limit(q,S()),sec*10,tag+' 틱 = 초×10');
- if(a===7){ok(sec>=8&&sec<=10,tag+' 짧은 문제 8~10초');shortCount++}else ok(sec>10,tag+' 긴 글은 10초보다 김');
+ if(a===7){ok(sec>=8&&sec<=16,tag+' 7세 문제 8~16초(그림 보고 낱말 고르기는 보기 낱말 셋을 읽는 시간 포함)');shortCount++}else ok(sec>10,tag+' 긴 글은 10초보다 김');
  const lock=C.reveal(q);
  if(m==='story'&&a>=8){ok(lock>3&&lock<C.limit(q,S())*.3,tag+' 글 먼저 읽기 잠금은 제한시간의 30% 미만')}else eq(lock,3,tag+' 보기 잠금 0.3초');
  /* 0.11: 읽어 주는 음성이 없다. 놓친 뒤에는 다시 볼 글의 양만큼(1.5~8초) 기다렸다가 초록 답을 누른다. 9세 이상은 지문을 빼고 짧게 */

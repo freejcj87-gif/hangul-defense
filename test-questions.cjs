@@ -98,7 +98,8 @@ for(const a of Q.AGES)for(const m of Q.MODES){
 }
 eq(ids.size,Q.AGES.reduce((s,a)=>s+Q.count(a,'story'),0),'id 총수');
 ok([...ids].every(id=>/^a(7|8|9|10)-story-/.test(id)),'읽기 문항뿐(sound id 없음)');
-ok(ids.size>=56,'읽기 56문항 이상(0.11: 나이마다 14~16, 확충은 별도 작업)');
+ok(ids.size>=56,'읽기 56문항 이상');
+for(const [a,min] of [[7,150],[8,150],[9,80],[10,60]])ok(GEN[a].story.length>=min,`0.12 읽기 1차 확충: ${a}세 새 문항 ${min}개 이상(현재 ${GEN[a].story.length})`);
 
 /* 4. 나이별 변별(전수) */
 for(const m of Q.MODES){
@@ -109,14 +110,14 @@ for(const m of Q.MODES){
     eq(new Set(qs.map(answerKey)).size,4,`${m} index ${i}: 나이별 정답/지문이 모두 다름`);
     eq(new Set(qs.map(q=>q.choices.join('|'))).size,4,`${m} index ${i}: 나이별 보기가 모두 다름`);
   }
-  /* 지문은 한 나이에만, 같은 나이 안에서도 한 번만 */
+  /* 지문은 한 나이에만. 같은 나이 안에서는 (지문, 질문)이 한 번만(0.12: 한 지문에 질문 여러 개, 7세는 보기까지 같아야 같은 문항) */
   const owner=new Map(),per=new Map();
   Q.AGES.forEach((a,k)=>sets[k].forEach(q=>{
-    const key=answerKey(q);
+    const key=answerKey(q),full=key+'\n'+q.prompt+(a===7?'\n'+q.choices.slice().sort().join('|'):'');
     ok(!owner.has(key)||owner.get(key)===a,`${q.id}: 정답/지문 '${key}'이 다른 나이에도 있음`);
-    owner.set(key,a);per.set(a+'|'+key,(per.get(a+'|'+key)||0)+1);
+    owner.set(key,a);per.set(a+'|'+full,(per.get(a+'|'+full)||0)+1);
   }));
-  for(const [k,c] of per)ok(c===1,`${m} ${k}: 같은 지문 ${c}문항`);
+  for(const [k,c] of per)ok(c===1,`${m} ${k}: 같은 지문·질문 ${c}문항`);
   Q.AGES.forEach((a,k)=>{
     for(const q of sets[k]){
       eq(Q.checkLevel(a,m,q),[],`${q.id}: 자기 수준(${a}세) 규칙 통과`);
@@ -126,9 +127,12 @@ for(const m of Q.MODES){
   });
 }
 const chars=s=>Array.from(s);
+/* 7세: 낱말 → 그림(보기 그림 3개) 또는 그림 → 낱말(보기 낱말 3개). 낱말은 언제나 받침 없는 1~3음절 */
+const word7=w=>H.isWord(w)&&chars(w).length<=3&&!chars(w).some(H.hasBatchim);
+const pic7=c=>!/[ㄱ-ㆎ가-힣A-Za-z0-9]/.test(c)&&chars(c.replace(/\uFE0F/g,'')).length===1;
 for(const q of all(7,'story')){
-  ok(H.isWord(q.passage)&&chars(q.passage).length<=3&&!chars(q.passage).some(H.hasBatchim),q.id+' 7세: 받침 없는 낱말');
-  ok(q.choices.every(c=>!/[ㄱ-ㆎ가-힣A-Za-z0-9]/.test(c)&&chars(c).length===1),q.id+' 7세: 보기는 이모지 1개');
+  if(word7(q.passage))ok(q.choices.every(pic7),q.id+' 7세: 보기는 이모지 1개');
+  else ok(pic7(q.passage)&&q.choices.every(word7),q.id+' 7세: 그림 지문이면 보기는 받침 없는 낱말');
 }
 for(const q of all(8,'story'))ok(H.sentences(q.passage)===1&&H.compactLength(q.passage)>=10&&H.compactLength(q.passage)<=20,q.id+' 8세: 한 문장');
 for(const q of all(9,'story'))ok(H.sentences(q.passage)===2&&q.passage.split('\n').length===2,q.id+' 9세: 두 문장');
@@ -192,7 +196,9 @@ ok(broken(s=>{s[7].story[0].choices[0]='나무';}).length>0,'7세 story 보기�
 ok(broken(s=>{s[8].story[0].speak='다른 말';}).length>0,'story speak≠passage');
 ok(broken(s=>{s[8].story[2].id='a8-story-01';}).length>0,'id 중복·형식');
 ok(broken(s=>{s[8].story.length=11;}).some(e=>e.includes('12문항')),'12문항 미만');
-ok(broken(s=>{s[10].story[3].passage=s[10].story[3].speak=s[10].story[2].passage;}).length>0,'묶음 안 지문 중복');
+ok(broken(s=>{s[10].story[3].passage=s[10].story[3].speak=s[10].story[2].passage;s[10].story[3].prompt=s[10].story[2].prompt;}).some(e=>e.includes('중복')),'묶음 안 지문·질문 중복');
+ok(broken(s=>{s[7].story[0].passage=s[7].story[0].speak='🌳';s[7].story[0].choices=['나무','나비','너구리'];}).length===0,'7세 그림 지문 + 받침 없는 낱말 보기는 통과');
+ok(broken(s=>{s[7].story[0].passage=s[7].story[0].speak='🌳';s[7].story[0].choices=['나무','나비','단풍'];}).length>0,'7세 그림 지문 보기에 받침 낱말');
 ok(broken(s=>{s[10].story[0].passage=s[10].story[0].speak=s[9].story[0].passage;}).some(e=>e.startsWith('a10-story-01')&&e.includes('a9-story-01와 중복')),'나이 간 지문 중복');
 ok(broken(s=>{s[8].story[0].mode='sound';}).some(e=>e.startsWith('a8-story-01')),'mode sound인 문항은 거부');
 ok(broken(s=>{s[8].story[0].id='a8-sound-01';}).some(e=>e.startsWith('a8-sound-01')&&e.includes('id')),'sound id는 거부');
@@ -362,6 +368,11 @@ function genMath(q){
   if((m=s.match(/^(\d+) \+ □ = (\d+)$/)))return String(m[2]-m[1]);
   if((m=s.match(/^(\d+) − □ = (\d+)$/)))return String(m[1]-m[2]);
   if((m=s.match(/^(\d+), (\d+), (\d+), □$/)))return String(2*m[3]-m[2]);
+  /* 0.12 7세: 글 대신 수 줄(앞의 수·사이의 수), 수 묶음(가장 큰·작은 수), 물건 그림(같은 모양) */
+  if((m=s.match(/^□, (\d+), (\d+)$/)))return String(2*m[1]-m[2]);
+  if((m=s.match(/^(\d+), □, (\d+)$/))){eq(m[2]-m[1],2,q.id+': 사이의 수는 하나');return String((+m[1]+ +m[2])/2)}
+  if((m=p.match(/^가장 (큰|작은) 수는\?$/))&&s){const v=nums(s);listIs(q,v.map(String));return String(m[1]==='큰'?Math.max(...v):Math.min(...v))}
+  if(p==='같은 모양은?')return ({'🚪':'⬛','⚽':'🔵','🍕':'🔺'})[s];
   if((m=s.match(/^(\d+)분의 (\d+) \+ \1분의 (\d+)$/)))return m[1]+'분의 '+(+m[2]+ +m[3]);
   if(p==='다음에 올 것은?'){const e=[...s];for(const per of [2,3])if(e.every((x,i)=>i<per||x===e[i-per]))return e[4-per];return '규칙 없음'}
   if((m=p.match(/^(세모|네모|동그라미) 모양은\?$/)))return SHAPE[m[1]];
@@ -421,7 +432,7 @@ for(const a of Q.AGES)for(const q of quizAll(a)){
     eq(ans,want,`${id}: ${q.passage} 정답 재계산`);
   }else if(WORD[id]){
     eq(ans,WORD[id](q),id+': 정답 재계산');usedWord.add(id);
-  }else if(q.passage&&!Number.isNaN(picValue(q.passage))&&q.prompt!=='다음에 올 것은?'){
+  }else if(q.passage&&!Number.isNaN(picValue(q.passage))&&q.prompt!=='다음에 올 것은?'&&q.prompt!=='같은 모양은?'){
     eq(ans,String(picValue(q.passage)),id+': 그림 식 정답 재계산');
   }else{
     const g=genMath(q);
@@ -439,6 +450,67 @@ for(const a of Q.AGES){
   ok(Object.values(tally).every(c=>c<=gm.length/4),`${a}세 생성 수학 틀 쏠림 없음 ${JSON.stringify(tally)}`);
 }
 eq(GEN[8].quiz.filter(q=>/몇 시 몇 분\?$/.test(q.prompt)&&/시 30분$/.test(q.choices[q.answer])).length>=4,true,'8세 몇 시 30분 문항(글 설명형)');
+
+/* 9-2. 0.12 읽기 문항 1차 확충(생성 파일의 story 묶음) 내용 검사. note = 문항 유형 */
+const BAD_SUB=['씨발','시발','시바','개새','새끼','병신','지랄','좆','존나','졸라','썅','염병','니미','엠창','꺼져','닥쳐','죽어','죽여','죽음','죽이','살인','자살','섹스','마약','똥꼬','젖꼭','성기','강간','폭탄','전쟁','총알','귀신','악마',
+  '지옥','변태','멍청','등신','찐따','미친','또라이','개같','개똥','엿먹','보지','자지','애미','애비','조또','씹','쌍놈','빠구리'];
+const BAD_WHOLE=['년','놈','뇬','똥','바보','피','칼','총','술','담배','독','뼈','시체','무덤','도끼','코피','방귀','오줌','거지','고자','사기','뒤지','소피','아비','제모'];
+const isBad=t=>BAD_SUB.some(b=>t.includes(b))||t.split(/[\s,.?!]+/).some(w=>BAD_WHOLE.includes(w));
+for(const a of Q.AGES)for(const q of all(a,'story'))ok(![q.passage,q.prompt,...q.choices].some(isBad),q.id+': 부적절 낱말 없음');
+const soleLong=q=>{const L=q.choices.map(c=>H.compactLength(c)),mx=Math.max(...L);return L[q.answer]===mx&&L.filter(v=>v===mx).length===1};
+const share=(list,f)=>list.filter(f).length/list.length;
+for(const a of Q.AGES){
+  const list=GEN[a].story,n=CHOICES[a].story,tally=Array(n).fill(0);
+  list.forEach(q=>{tally[q.answer]++;ok(typeof q.note==='string'&&q.note.length>0,q.id+': note에 문항 유형')});
+  ok(Math.max(...tally)-Math.min(...tally)<=3,`${a}세 새 읽기: 정답 위치가 고름 ${tally.join('/')}`);
+  if(a>=9)ok(share(list,soleLong)<=1/n,`${a}세 새 읽기: 정답이 혼자 가장 긴 보기인 비율 ${list.filter(soleLong).length}/${list.length} ≤ 1/${n}`);
+}
+/* 7세: 그림 문자는 유니코드 9.0 이하에서 고른 목록 안(실기기 표시는 사람이 확인), 그림 하나 = 낱말 하나, 오답 낱말은 음절 수가 같고 ㅐ/ㅔ만 다른 것 없음 */
+const READ_PIC=new Set(['🐶','🐮','🐦','🦀','🦊','🦆','🐰','🐷','🦁','🐘','🐳','🕷️','🐜','🦋','🐸','🦐','🍎','🍌','🍇','🍅','🥒','🍠','🍒','🥝','🌶️','🍆','🥛','🍕','🧀','🍪','🍰','🍖',
+  '🌳','☀️','🌧️','🌊','🌈','🌍','🎄','🚂','🚌','🚢','🚗','👖','👞','👕','👗','👢','✂️','⏰','🎹','🎸','🎲','📏','📷','🎤','🕯️','🛋️','🗺️','⚾','🎿','🚿','❤️','🔺','⬛','➕','➖','👃','👂','👅','👶']);
+const HAND_PIC=new Set([...'🌳🦋🍄🍌🍎🍇🥕🦆🥒🍓🍉🍑🍋🌽🍠🐝🐞🐻🦊🐰👟👕👖🚂🚌🚲🍞🥛🧀🍰🍪🍕🐔🦉🌈🌊🌙🍒🍅🐜🐌🐛']);
+const merge=w=>chars(w).map(ch=>{const j=H.jung(ch);return H.cho(ch)+'.'+({1:5,3:7,10:15,11:15}[j]||j)}).join('|');/* ㅐ=ㅔ, ㅒ=ㅖ, ㅙ=ㅚ=ㅞ */
+{const picOf=new Map(),wordOf=new Map(),perPic=new Map();
+ for(const q of GEN[7].story){
+   const w=q.choices[q.answer];
+   if(word7(q.passage)){eq(q.note,'낱말→그림',q.id+' 유형');q.choices.forEach(c=>ok(READ_PIC.has(c),q.id+': 검수 목록 안 그림 '+c));ok(!picOf.has(q.passage)||picOf.get(q.passage)===w,q.id+': 낱말의 그림은 하나');picOf.set(q.passage,w)}
+   else{eq(q.note,'그림→낱말',q.id+' 유형');ok(READ_PIC.has(q.passage),q.id+': 검수 목록 안 그림 '+q.passage);
+     ok(!wordOf.has(q.passage)||wordOf.get(q.passage)===w,q.id+': 그림의 낱말은 하나');wordOf.set(q.passage,w);perPic.set(q.passage,(perPic.get(q.passage)||0)+1);
+     q.choices.forEach((c,i)=>{if(i===q.answer)return;eq(chars(c).length,chars(w).length,q.id+': 오답 낱말 음절 수 = 정답 '+c);ok(merge(c)!==merge(w),q.id+': ㅐ/ㅔ만 다른 오답 없음 '+c)})}
+ }
+ for(const [w,p] of picOf)eq(wordOf.get(p),w,'7세 낱말 '+w+': 두 방향의 그림·낱말이 같음');
+ for(const [p,c] of perPic)ok(c<=2,'7세 그림 '+p+': 그림 → 낱말은 2문항까지');
+ eq(new Set(wordOf.values()).size,wordOf.size,'7세 표: 낱말 하나에 그림 하나');
+ for(const q of all(7,'story').filter(q=>!isGen(q)))q.choices.forEach(c=>ok(HAND_PIC.has(c)||READ_PIC.has(c),q.id+': 손 문항 그림 '+c));
+}
+/* 8세: 상식·고정관념만으로 답이 정해지는 짝이 한 문장에 없음(생성 틀 금지 목록과 같게), 유형이 한쪽으로 쏠리지 않음 */
+const BAN8=[['토끼','당근'],['다람쥐','도토리'],['다람쥐','밤'],['다람쥐','호두'],['곰','꿀'],['고양이','생선'],['고양이','우유'],['강아지','공'],['염소','풀'],['병아리','모이'],['개구리','연못'],['오리','연못'],['오리','강가'],
+  ['거북이','바닷가'],['거북이','연못'],['거북이','강가'],['부엉이','밤'],['꼬꼬','아침'],['꼬꼬','달걀'],['참새','쌀'],['엄마','요리'],['엄마','설거지'],['아빠','회사'],['간호사','누나'],['의사','아저씨']];
+{const words=p=>p.split(/[\s,.]+/).map(w=>w.replace(/(에게|에서|으로|보다|이|가|은|는|을|를|와|과|로|에|의)$/,''));
+ for(const q of GEN[8].story){const w=words(q.passage);for(const [x,y] of BAN8)ok(!(w.includes(x)&&w.includes(y)),q.id+': 고정관념 짝 '+x+'-'+y)}
+ const t={};GEN[8].story.forEach(q=>{t[q.note]=(t[q.note]||0)+1});
+ ok(Object.keys(t).length>=10&&Object.values(t).every(c=>c<=GEN[8].story.length*.15),'8세 새 읽기: 틀 10가지 이상, 한 틀 15% 이하 '+JSON.stringify(t));
+ const k={};GEN[8].story.forEach(q=>{const w=(q.prompt.match(/누가|누구|어디|어느|언제|몇|무슨 색|무엇/)||['기타'])[0];k[w]=(k[w]||0)+1});
+ ok(Object.keys(k).length>=6&&!k['기타'],'8세 새 읽기: 질문 낱말 6가지 이상 '+JSON.stringify(k));
+}
+/* 9·10세: 지문 하나에 질문 1~3개, 같은 지문의 질문끼리 답을 알려 주지 않음, 유형·갈래 비율, 문장 길이 */
+for(const a of [9,10]){
+  const list=GEN[a].story,by=new Map();
+  list.forEach(q=>{ok(/^(이야기|설명문)·(사실|순서|까닭|마음|추론|중심)$/.test(q.note),q.id+': note 형식 '+q.note);by.set(q.passage,(by.get(q.passage)||[]).concat(q))});
+  for(const [p,qs] of by){
+    ok(qs.length>=1&&qs.length<=3,qs[0].id+': 지문당 질문 1~3개');
+    eq(new Set(qs.map(q=>q.note.split('·')[0])).size,1,qs[0].id+': 같은 지문은 갈래가 같음');
+    eq(new Set(qs.map(q=>q.prompt)).size,qs.length,qs[0].id+': 같은 지문의 질문이 서로 다름');
+    eq(new Set(qs.map(q=>q.choices[q.answer])).size,qs.length,qs[0].id+': 같은 지문의 정답이 서로 다름');
+    for(const x of qs)for(const y of qs)if(x!==y){const ans=x.choices[x.answer];if(chars(ans).length>=2)ok(!y.prompt.includes(ans),y.id+': 질문이 같은 지문 '+x.id+'의 정답을 드러내지 않음')}
+    const sent=p.split('\n');
+    ok(sent.every(t=>H.compactLength(t)<=(a===9?30:36)),qs[0].id+': 문장 길이 '+sent.map(t=>H.compactLength(t)).join('/'));
+    if(a===10)ok(H.syllables(p)<=90,qs[0].id+': 10세 지문 90음절 이하('+H.syllables(p)+')');
+  }
+  const info=[...by.values()].filter(qs=>qs[0].note.startsWith('설명문')).length/by.size,deep=share(list,q=>/마음|추론|중심/.test(q.note));
+  if(a===9){ok(by.size>=40&&info>=.2&&info<=.35,'9세: 지문 40편 이상, 설명문 20~35% ('+by.size+'편, '+info.toFixed(2)+')');ok(deep>=.2,'9세: 마음·추론·중심 20% 이상 ('+deep.toFixed(2)+')')}
+  else{ok(by.size>=24&&info>=.3&&info<=.5,'10세: 지문 24편 이상, 설명문 30~50% ('+by.size+'편, '+info.toFixed(2)+')');ok(deep>=.4&&deep<=.6,'10세: 마음·추론·중심 40~60% ('+deep.toFixed(2)+')')}
+}
 
 /* 10. 출제 순서: Questions.at(age, mode, index, seed) */
 const EXPECT=(a,i)=>({7:2,8:3,9:i<40?5:i<100?6:7,10:i<40?7:i<80?8:i<120?9:10})[a];
@@ -490,6 +562,15 @@ for(const a of Q.AGES)for(const m of Q.MODES)for(const s of [0,3,77]){
   }
   const G=Math.min(10,cnt>>2);
   ok(seq.every((q,k)=>!seq.slice(Math.max(0,k-G),k).some(p=>p.id===q.id)),`${a}/${m} seed ${s}: ${G}칸 안에 같은 문항 없음`);
+}
+/* 0.12: 같은 지문의 다른 질문(7세는 같은 낱말의 다른 방향)은 10칸 안에 다시 나오지 않고, 한 판 100문제 안에 같은 문항은 없다 */
+const groupOf=q=>q.age===7?(word7(q.passage)?q.passage:q.choices[q.answer]):q.passage;
+for(const a of Q.AGES)for(const s of [0,3,77]){
+  const cnt=Q.count(a,'story'),seq=modeSeq(a,'story',s,cnt*2),last=new Map();let worst=Infinity;
+  seq.forEach((q,k)=>{const g=groupOf(q);if(last.has(g))worst=Math.min(worst,k-last.get(g));last.set(g,k)});
+  ok(worst>=10,`${a}세 seed ${s}: 같은 지문·낱말 사이 간격 ${worst} ≥ 10`);
+  const game=Array.from({length:100},(_,i)=>Q.at(a,'story',i,s)).filter(q=>q.mode!=='quiz').map(q=>q.id);
+  eq(new Set(game).size,game.length,`${a}세 seed ${s}: 한 판 100문제 안에 같은 읽기 문항 없음`);
 }
 for(const a of Q.AGES)for(const s of [0,4]){
   const pools={};for(const c of Object.keys(Q.CATS))pools[c]=quizAll(a).filter(q=>q.cat===c).map(q=>q.id).sort();
