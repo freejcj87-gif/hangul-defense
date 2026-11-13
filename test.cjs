@@ -430,7 +430,9 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
    /* 바로 눌러 맞힌다: 읽기 문항은 번개 시간까지 기다리면(약 7초) 알림 띠(3.3초)가 먼저 사라진다 */
    await page.evaluate(()=>{if(round.lock>0)window.__tick(round.lock);[...document.querySelectorAll('#answers button')].find(x=>Number(x.dataset.i)===round.q.answer).click()});
    await phaseIs(page,'reward');b=await bannerBoxes(page);ok(b.length===1&&!b[0].shown,'banner hidden during the sale (no clash with the sale strip)');
-   await settle(page);b=await bannerBoxes(page);ok(b.length===1&&b[0].shown&&b[0].text.includes('불씨 왕을 쓰러뜨렸어요'),'banner back after the sale');
+   await settle(page);/* 말풍선이 떠 있으면 띠는 그 뒤에 나온다(정상): 말풍선이 사라질 때까지 기다린다 */
+   for(let i=0;i<60;i++){b=await bannerBoxes(page);if(b.length===1&&b[0].shown)break;await tick(page,1)}
+   ok(b.length===1&&b[0].shown&&b[0].text.includes('불씨 왕을 쓰러뜨렸어요'),'banner back after the sale (after any bubble): '+JSON.stringify(b));
    await page.locator('#pause').tap();const left=await page.evaluate(()=>bannerLeft);await tick(page,50);eq(await page.evaluate(()=>bannerLeft),left,'banner waits while paused');await page.locator('#pause').tap();
    eq(errors,[],'flow demo3 page errors');await ctx.close()}
 
