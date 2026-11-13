@@ -17,7 +17,7 @@ for(const a of Q.AGES)for(const m of Q.MODES)for(const q of bank(a,m)){
  ok(Number.isInteger(sec)&&sec>=C.MIN_SEC[a]&&sec<=C.MAX_SEC,tag+' 제한시간 범위 '+sec);
  ok(sec>=need,tag+' 보통 아이 필요 시간('+need.toFixed(1)+'초) 이상');
  eq(C.limit(q,S()),sec*10,tag+' 틱 = 초×10');
- if(a===7){ok(sec>=8&&sec<=10,tag+' 짧은 문제 8~10초');shortCount++}else ok(sec>10,tag+' 긴 글은 10초보다 김');
+ if(a===7){ok(sec>=8&&sec<=16,tag+' 7세 문제 8~16초(그림 보고 낱말 고르기는 보기 낱말 셋을 읽는 시간 포함)');shortCount++}else ok(sec>10,tag+' 긴 글은 10초보다 김');
  const lock=C.reveal(q);
  if(m==='story'&&a>=8){ok(lock>3&&lock<C.limit(q,S())*.3,tag+' 글 먼저 읽기 잠금은 제한시간의 30% 미만')}else eq(lock,3,tag+' 보기 잠금 0.3초');
  /* 0.11: 읽어 주는 음성이 없다. 놓친 뒤에는 다시 볼 글의 양만큼(1.5~8초) 기다렸다가 초록 답을 누른다. 9세 이상은 지문을 빼고 짧게 */
@@ -644,8 +644,8 @@ a.tick(30);eq(a.api.round,null,'시작 화면에서는 문제 없음');eq(a.api.
 for(const id of ['battle','next','shield','combatInfo','buildPrompt','buyChicken','buyFence','timebar','timeFill','wolfHead','timeTag','choices','cards','skip','gainLine','gainParts'])ok(!html.includes('id="'+id+'"'),'없앤 요소: '+id);
 ok(!html.includes('소리 도움말'),'정답을 글자로 보여 주던 소리 도움말 제거');ok(!src.includes('다음 무리')&&!src.includes('barLeft')&&!src.includes('secondsLeft'),'늑대 시간 표시(초·막대) 코드 없음');
 ok(!src.includes('enterPick')&&!src.includes('picks')&&!src.includes('offers('),'카드 고르기 단계 코드 없음');
-ok(html.includes('src="combat.js?v=0.11"')&&html.includes('src="world.js?v=0.11"')&&html.includes('src="questions.js?v=0.11"')&&html.includes('src="village.js?v=0.11"')&&!html.includes('?v=0.10'),'캐시 갱신용 ?v=0.11');
-ok(html.indexOf('src="questions-gen.js?v=0.11"')>0&&html.indexOf('src="questions-gen.js?v=0.11"')<html.indexOf('src="questions.js?v=0.11"'),'생성 문항 파일을 questions.js보다 먼저 불러옴');
+ok(html.includes('src="combat.js?v=0.11.1"')&&html.includes('src="world.js?v=0.11.1"')&&html.includes('src="questions.js?v=0.11.1"')&&html.includes('src="village.js?v=0.11.1"')&&!html.includes('?v=0.10'),'캐시 갱신용 ?v=0.11');
+ok(html.indexOf('src="questions-gen.js?v=0.11.1"')>0&&html.indexOf('src="questions-gen.js?v=0.11.1"')<html.indexOf('src="questions.js?v=0.11.1"'),'생성 문항 파일을 questions.js보다 먼저 불러옴');
 /* 0.11: 듣고 고르기 모드 폐쇄. 시작 화면·설정에 모드 고르기가 없고, 스크립트에 소리 모드 분기가 없다 */
 for(const id of ['startSound','startStory','mode'])ok(!html.includes('id="'+id+'"'),'없앤 모드 버튼: '+id);
 ok(!html.includes('mode-row')&&!html.replace(/<script>[\s\S]*?<\/script>/,'').includes('듣고 고르기'),'화면에 모드 고르기·듣고 고르기 문구 없음');
