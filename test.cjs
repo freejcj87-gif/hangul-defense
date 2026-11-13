@@ -14,7 +14,7 @@ const CHICK=Combat.LINES.moreHens;
  const output=path.join(__dirname,'.pages-build'),shots=path.join(__dirname,'test-results');
  const server=http.createServer((req,res)=>{
  const pathname=new URL(req.url,'http://localhost').pathname;
- const file=pathname==='/'?'index.html':['/combat.js','/world.js','/questions.js','/village.js'].includes(pathname)?pathname.slice(1):pathname==='/art-handoff/coopnight/source-3d/models/environment-pack.glb'?pathname.slice(1):/^\/art-handoff\/coopnight\/browser\/[a-z/-]+[0-9a-z-]*\.png$/.test(pathname)?pathname.slice(1):null;
+ const file=pathname==='/'?'index.html':['/combat.js','/world.js','/questions-gen.js','/questions.js','/village.js'].includes(pathname)?pathname.slice(1):pathname==='/art-handoff/coopnight/source-3d/models/environment-pack.glb'?pathname.slice(1):/^\/art-handoff\/coopnight\/browser\/[a-z/-]+[0-9a-z-]*\.png$/.test(pathname)?pathname.slice(1):null;
  if(!file||!fs.existsSync(path.join(output,file))){res.writeHead(404);return res.end()}
  res.setHeader('Content-Type',file.endsWith('.glb')?'model/gltf-binary':file.endsWith('.png')?'image/png':file.endsWith('.js')?'text/javascript; charset=utf-8':'text/html; charset=utf-8');
  res.end(fs.readFileSync(path.join(output,file)));
@@ -28,7 +28,7 @@ const CHICK=Combat.LINES.moreHens;
  async function shown(page){return page.locator('#answers').evaluate(n=>({qid:n.dataset.qid,age:Number(n.dataset.age),mode:n.dataset.mode,labels:[...n.children].map(b=>b.textContent),chip:document.getElementById('levelChip').textContent,prompt:document.getElementById('prompt').textContent,passage:document.getElementById('passage').textContent}))}
  /* 화면 문제 = 그 나이·모드의 index번째(4문제마다 상식·수학·영어가 섞인 순서, Questions.at). 보기 순서는 바퀴(lap)마다 한 칸씩 돈다. */
  async function expectQuestion(page,age,mode,index,msg){
-  const s=await shown(page),q=Questions.at(age,mode,index),n=q.choices.length,order=q.choices.map((_,k)=>q.choices[(k+(q.lap||0))%n]);
+  const s=await shown(page),seed=await page.evaluate(()=>window.__game().seed),q=Questions.at(age,mode,index,seed),n=q.choices.length,order=q.choices.map((_,k)=>q.choices[(k+(q.lap||0))%n]);
   eq(s.qid,q.id,msg+': question id');eq(s.age,age,msg+': age');eq(s.mode,q.mode,msg+': mode');eq(s.labels,order,msg+': choices');eq(s.prompt,q.prompt,msg+': prompt');eq(s.passage,q.passage||'',msg+': passage');
   if(q.mode==='quiz')ok(s.chip.startsWith(age+'세 · ')&&s.chip.endsWith(Questions.CATS[q.cat]),msg+': category chip '+s.chip);else{eq(s.chip,age+'세 · '+Questions.LEVELS[age][mode],msg+': level chip');eq(Questions.checkLevel(age,mode,q),[],msg+': level rules')}
   return q}
@@ -132,10 +132,10 @@ const CHICK=Combat.LINES.moreHens;
  /* 한 번에 정답 → 판매 연출(세계는 흐름) → 소리 모드: 말풍선을 한 번 읽어 준 뒤 다음 문제 소리.
     앞 구간에서 오래 흐른 세계(늑대가 마을 안·닭 잃음·건물 부서짐)는 급한 말풍선을 먼저 띄우므로, 이 확인 동안만 세계를 조용히 하고 말풍선 간격을 처음으로 돌린다. */
  await page.evaluate(()=>{world.wolves=[];world.arrows=[];world.trickle=world.t+99999;world.wave.arrive=world.t+99999;world.wave.spawned=true;World.repairAll(world);Object.assign(state,{broken:0,chickens:1,hidden:0,nest:0});World.sync(world,state);syncMarket();recReset();render()});
- g=await game(page);const fresh=JSON.parse(JSON.stringify(g.state));
- await tick(page,Math.ceil(Combat.FAST_MIN*Combat.needSeconds(Questions.get(8,'sound',0))/Combat.TICK));/* 번개는 최소 읽기 시간이 지나야 */
+ g=await game(page);const fresh=JSON.parse(JSON.stringify(g.state)),Q0=Questions.at(8,'sound',0,g.state.seed);
+ await tick(page,Math.ceil(Combat.FAST_MIN*Combat.needSeconds(Q0)/Combat.TICK));/* 번개는 최소 읽기 시간이 지나야 */
  eq(await page.locator('#fastIcon').getAttribute('data-state'),'on','⚡ glows in the fast window');
- await answer(page,true,touch);const expGold=Combat.income(fresh,Questions.get(8,'sound',0),true).gold;
+ await answer(page,true,touch);const expGold=Combat.income(fresh,Q0,true).gold;
  g=await game(page);eq(g.phase,'reward','first-try correct: sale, no card picking');eq(await gold(page),'🪙 '+(20+expGold),'reduced motion: gold number jumps at once (+⚡)');eq(g.state.index,1,'question counter moves on at once');
  ok((await fxLog(page)).some(x=>x.c==='sale'&&x.t.includes('🧑‍🌾')),'egg → farmer → market strip');
  ok(await page.locator('#answers button.correct.yay').count()===1,'the answered button celebrates');eq(await page.locator('#fastIcon').getAttribute('data-state'),'won','⚡ flashes after a fast answer');
@@ -143,7 +143,7 @@ const CHICK=Combat.LINES.moreHens;
  await tick(page,7);let bb=await bubbleBox(page);ok(bb&&bb.text===CHICK&&bb.key==='chicken'&&bb.inside&&bb.tailOnSlot&&bb.glow,tag+' chicken bubble above the shop, tail on the chicken slot, slot glows: '+JSON.stringify(bb));
  if(name==='chromium'&&(width===390||height===568))await shot(page,'reward-bubble-'+width+'x'+height);
  await settle(page);await expectQuestion(page,8,'sound',1,'next question by itself');await page.evaluate(()=>{world.trickle=world.t+5;world.wave.arrive=world.t+world.interval;world.wave.spawned=false});
- {const said=await page.evaluate(()=>window.__said.slice(-2));eq(said,[CHICK,Questions.at(8,'sound',1).speak],'the bubble is read before the next question, never over it')}
+ {const said=await page.evaluate(()=>window.__said.slice(-2)),seed=(await game(page)).seed;eq(said,[CHICK,Questions.at(8,'sound',1,seed).speak],'the bubble is read before the next question, never over it')}
  ok(await page.locator('#bubble').isHidden(),'no bubble while listening/answering the next question');
  if(touch){const v=await stickyView(page,'answers');ok(together(v,height>=844),tag+' after the sale: scene + shop + answers: '+JSON.stringify(v))}
 
