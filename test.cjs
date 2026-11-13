@@ -12,7 +12,8 @@ const FAKE_TTS=()=>{window.__said=[];const S={speak(u){window.__said.push('speak
 const CHICK=Combat.LINES.moreHens;
 /* 0.11: 소리 모드도 읽어 주는 음성도 없다. 아이는 글을 읽기만 한다. phase는 start → ask → reward / learn */
 /* 그 나이 읽기 문항 기준 무리 간격(index.html waveInterval과 같은 식) */
-const ivFor=age=>{const t=[];for(let i=0;i<Questions.count(age,'story');i++)t.push(Combat.baseSeconds(Questions.get(age,'story',i)));t.sort((a,b)=>a-b);return World.intervalFor(t[t.length>>1])};
+/* 0.12: 무리 간격 = 그 판(씨앗)에 실제로 나올 다음 120문제의 평균 기본 시간 × 1.3, 13~45초(index.html waveInterval과 같은 식) */
+const ivFor=(age,seed,index=0)=>{let sum=0;for(let i=0;i<120;i++)sum+=Combat.baseSeconds(Questions.at(age,'story',index+i,seed));return World.tempoInterval(sum/120)};
 /* 7세 첫 퀴즈 칸(예전에는 질문을 읽어 주던 문제) */
 const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
 (async()=>{
@@ -98,7 +99,7 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
  await begin(page,{age:8},touch);ok(await page.locator('#start').isHidden(),'start screen closes');
  eq(await gold(page),'🪙 20','initial gold');ok(await noOverflow(page),'no horizontal overflow');ok(await pillsFit(page),'status pills do not overlap');
  await expectQuestion(page,8,'story',0,tag+' default');
- let g=await game(page);eq([g.state.mode,g.world.interval,g.world.radius],['story',ivFor(8),7],'reading mode, wave rhythm for 8세 reading items, starting village radius');
+ let g=await game(page);eq([g.state.mode,g.world.interval,g.world.radius],['story',ivFor(8,g.state.seed,g.state.index),7],'reading mode, wave rhythm = mean base time of the coming items x 1.3, starting village radius');
  eq(await page.locator('#speak, #rate, #voiceStatus').count(),0,'no voice controls (replay button, reading speed, voice notice)');eq(await page.evaluate(()=>window.__said.length),0,'nothing is read aloud');
  eq(await page.locator('#drawerSummary').textContent(),'⚙️ 설정 · 8세','settings summary shows the age only');
  await tick(page,20);g=await game(page);eq(g.round.t,20,'held clock advances only by explicit ticks');
@@ -157,16 +158,19 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
 
  /* 가게: 풀고 있는 문제는 그대로, 세계도 흐르는 채로 바로 산다 */
  await page.evaluate(()=>{state.gold=500;render()});
- const kind=width===1366?'chicken':width===390?'tower':'hall',qBefore=(await game(page)).round.id,wb=(await game(page)).world.t;
+ /* 0.12: 회관은 살 수 없다(지은 수 10·32·54에서 저절로). 세 번째 화면 크기는 울타리를 산다. 새 판은 타워 2개(level 1)로 시작 */
+ const kind=width===1366?'chicken':width===390?'tower':'fence',qBefore=(await game(page)).round.id,wb=(await game(page)).world.t;
  await buy(page,kind,touch);
  g=await game(page);eq([g.phase,g.round.id],['ask',qBefore],'buying keeps the question');eq(g.world.t,wb+4,'the world never stops for the shop');
- const label=(await fxLog(page)).filter(x=>x.c==='fx-label');eq(label.map(x=>x.t),[{chicken:'🐔 꼬꼬 2마리!',tower:'🏹 화살 타워 2개!',hall:'🏠 회관 1단계!'}[kind]],'name tag (reduced motion: label only)');
+ const label=(await fxLog(page)).filter(x=>x.c==='fx-label');eq(label.map(x=>x.t),[{chicken:'🐔 꼬꼬 2마리!',tower:'🏹 화살 타워 3개!',fence:'🪵 울타리 1면!'}[kind]],'name tag (reduced motion: label only)');
  ok(await page.locator('#shopTip').isVisible(),'a short line above the shop');
- const vs=await page.evaluate(()=>getVillageState());eq([vs.chickens,vs.level,vs.fence,vs.hall],{chicken:[2,0,0,0],tower:[1,1,0,0],hall:[1,0,0,1]}[kind],'village state after buying');
+ const vs=await page.evaluate(()=>getVillageState());eq([vs.chickens,vs.level,vs.fence,vs.hall],{chicken:[2,1,0,0],tower:[1,2,0,0],fence:[1,1,1,0]}[kind],'village state after buying');
  if(three&&!INTERIM){await frames(page,2);const i=await page.evaluate(()=>window.VillageView.inspect());eq([i.chickens,i.towers,i.fences],[vs.chickens,1+vs.level,vs.fence],'3D village shows the purchase')}
  /* 금화가 모자란 칸·잠긴 칸은 눌러도 안내만 */
  await page.evaluate(()=>{state.gold=0;render()});await buy(page,'fence',touch);eq((await page.locator('#shopTip').textContent()),'🪙 '+Combat.price((await game(page)).state,'fence')+' 더 모아요','poor slot: how much more');
- if(kind!=='hall'){await buy(page,'power',touch);eq(await page.locator('#shopTip').textContent(),'회관을 키우면 생겨요','locked slot: grow the hall')}
+ await buy(page,'power',touch);eq(await page.locator('#shopTip').textContent(),'회관이 커지면 생겨요','locked slot: opens when the hall grows');
+ /* 회관 칸은 그림 칸: 눌러도 사지 않고 안내만 */
+ {const g0=(await game(page)).state;await buy(page,'hall',touch);const g1=(await game(page)).state;eq([g1.hall,g1.gold,(await slotStates(page))[7]],[g0.hall,g0.gold,'hall:auto'],'the hall slot is a picture (auto upgrade), tapping buys nothing');eq(await page.locator('#shopTip').textContent(),'🏠 마을이 자라면 회관도 커져요','hall slot: a short hint')}
  if(name==='chromium'&&(width===390||height===568))await shot(page,'shop-tip-'+width+'x'+height);
 
  /* 오답 → 늑대 성큼(장면 테두리 붉게) → 두 번째 정답(막기만, 금화 없음) → 초록 답을 눌러 다음 */
@@ -242,7 +246,7 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
   await frames(page,40);
   const grown=await page.evaluate(()=>window.VillageView.inspect());
   if(!INTERIM){eq([grown.towers,grown.chickens,grown.farmers,grown.pond,grown.hall,grown.feast,grown.radius],[5,8,2,2,3,1,16],'3D grown village state');ok(grown.cameraHalf>smallHalf+4,'camera pulls back for a big village: '+[smallHalf,grown.cameraHalf])}
-  eq((await slotStates(page))[7].split(':')[0],'feast','hall 3: the 8th slot becomes the feast');
+  eq((await slotStates(page))[7],'hall:auto','0.12: the 8th slot stays the hall picture (the feast opens only after the ending)');
   await tick(page,40);await frames(page,3);await shot(page.locator('.scene'),'grown-390');console.log('SCENE_METRICS:'+JSON.stringify(await page.evaluate(()=>window.VillageView.inspect())));
  }
  /* 숫자가 가장 길어지는 상태(0.9 숨은 상한 근처)에서도 상단 표시·가게가 겹치지 않아야 한다. */
@@ -289,8 +293,12 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
    /* +N는 1초 남짓 뒤 사라지므로 마지막 틱과 같은 호출 안에서 센다 */
    const [end,plus]=await page.evaluate(()=>{const g=window.__tick(4);return [g,[...document.querySelectorAll('#coinLayer .gold-plus')].map(e=>e.textContent)]});eq([end.gold.shown,end.gold.pending],[end.state.gold,0],'all coins in by 2.4 s');eq(await gold(page),'🪙 '+end.state.gold,'gold pill shows it');
    eq(plus,['+'+(end.state.gold-g0)],'+N pops next to the gold pill');await settle(page);await fxLog(page)}
-  const want=['tower','chicken','hall','power','farmer','hall','pond','hall','feast'],made=[];
+  /* 0.12: 회관은 살 수 없고 지은 수(회관 제외) 10·32·54에서 저절로 오른다. 울타리 차례에는 지은 수를 9로 맞춰 '이번 구매로 회관 1단계'가 되게 하고(구매 연출 + 회관 연출 두 벌),
+     연못 차례 앞에는 회관 2단계 마을로 만들어 둔다. 잔치는 엔딩 뒤에만 열리므로 여기서는 사지 않는다(엔딩 흐름은 flow의 'ending'에서 본다) */
+  const want=['tower','chicken','fence','power','farmer','pond'],made=[];
   for(const target of want){
+   if(target==='fence')await page.evaluate(()=>{state.fence=0;state.fence=Math.max(0,9-(Combat.built(state)-state.hall));World.sync(world,state);render()});
+   if(target==='pond')await page.evaluate(()=>{Object.assign(state,{fence:18,chickens:Math.max(state.chickens,14),gold:Math.max(state.gold,2000)});Combat.grow(state);World.sync(world,state);render()});
    /* 3D 알 판매 연출은 2초 남짓이라, 누르기 전부터 프레임마다 지켜보다가 한 번이라도 재생되면 기록한다 */
    await page.evaluate(()=>{window.__saleSeen=false;const watch=()=>{try{if(window.VillageView.inspect().sale){window.__saleSeen=true;return}}catch{}requestAnimationFrame(watch)};requestAnimationFrame(watch)});
    await answer(page,true,false);await phaseIs(page,'reward');
@@ -301,14 +309,17 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
    const before=await page.evaluate(()=>window.VillageView.inspect());
    await buy(page,target,width<600);made.push(target);
    const fx=await fxLog(page),count=c=>fx.filter(x=>x.c===c).length,tagx=fx.find(x=>x.c==='fx-label');
-   ok(count('fx-flash')===1&&count('fx-ring')===1&&count('fx-star')>=7&&count('fx-label')===1,target+' flash, ring, sparks and name tag: '+names(fx).join(','));ok(tagx.inside,target+' name tag stays inside the scene: '+tagx.box);
+   const sets=target==='fence'?2:1;/* 울타리 차례: 회관이 저절로 1단계가 되어 회관 구매 때의 축하 연출이 한 벌 더 */
+   ok(count('fx-flash')===sets&&count('fx-ring')===sets&&count('fx-star')>=7*sets&&count('fx-label')===sets,target+' flash, ring, sparks and name tag: '+names(fx).join(','));ok(tagx.inside,target+' name tag stays inside the scene: '+tagx.box);
+   if(target==='fence'){ok(fx.some(x=>x.c==='fx-label'&&x.t==='🏠 회관 1단계!'),'auto hall upgrade: the hall name tag');eq((await game(page)).state.hall,1,'auto hall upgrade at 10 built')}
    eq((await game(page)).phase,'ask','still answering after buying '+target);
    if(made.filter(x=>x===target).length===1){for(const f of [2,6,12]){await frames(page,f===2?2:f===6?4:6);await shot(page.locator('.scene'),'feel-'+width+'-'+target+'-f'+String(f).padStart(2,'0'))}}
    if(!INTERIM){await page.waitForFunction(([k,v])=>(window.VillageView.inspect().builds||{})[k]>=v,[target,((before.builds||{})[target]||0)+1],{timeout:30000}).catch(()=>{});
-    const after=await page.evaluate(()=>window.VillageView.inspect());eq((after.builds||{})[target],((before.builds||{})[target]||0)+1,target+' plays one 3D build effect')}
+    const after=await page.evaluate(()=>window.VillageView.inspect());eq((after.builds||{})[target],((before.builds||{})[target]||0)+1,target+' plays one 3D build effect');
+    if(target==='fence')eq((after.builds||{}).hall,((before.builds||{}).hall||0)+1,'auto hall upgrade plays the 3D hall effect')}
    await page.waitForFunction(()=>!document.querySelector('#effects .fx'),{},{timeout:8000});checks++;
   }
-  const st=(await game(page)).state;eq([st.level,st.chickens>=2,st.hall,st.power,st.farmers,st.pond,st.feast],[1,true,3,1,1,1,1],'everything built (incl. tower power)');
+  const st=(await game(page)).state;eq([st.level,st.chickens>=2,st.hall,st.power,st.farmers,st.pond,st.feast],[2,true,2,1,1,1,0],'everything built (incl. tower power; hall grew by itself, no feast before the ending)');
   /* 추천 반짝임(움직임 켬): 금빛 테두리가 숨 쉬듯 빛나고 위에 ⭐ */
   {const r=await page.evaluate(()=>{const s=document.querySelector('#shop .slot');s.classList.add('rec');const cs=getComputedStyle(s),b=getComputedStyle(s,'::before');const out=[cs.animationName,b.content,parseFloat(cs.borderTopWidth)];s.classList.remove('rec');return out});
    ok(r[0].includes('recGlow')&&r[1].includes('⭐')&&r[2]>=3,'recommended slot: breathing gold border + ⭐: '+r)}
@@ -336,7 +347,10 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
  await p.evaluate(()=>{state.gold=60;render()});await buy(p,'chicken',false);eq(await p.locator('#flock img').count(),2,'fallback chicken appears');ok(await p.locator('#flock img').last().evaluate(e=>e.classList.contains('spawn')),'fallback chicken pops in');
  await p.evaluate(()=>{state.gold=3000;render()});
  const inScene=sel=>p.locator(sel).evaluateAll(a=>{const s=document.getElementById('scene').getBoundingClientRect();return a.length>0&&a.every(e=>{const r=e.getBoundingClientRect();return r.width>20&&r.left>=s.left-1&&r.right<=s.right+1&&r.top>=s.top-1&&r.bottom<=s.bottom+1})});
- for(const target of ['tower','fence','hall','power','hall','farmer','pond'])await buy(p,target,false);
+ /* 0.12: 회관은 살 수 없으므로(자동 승급) 2단계 마을로 만들어 두고 강화·농부·연못을 산다 */
+ for(const target of ['tower','fence'])await buy(p,target,false);
+ await p.evaluate(()=>{state.hall=2;World.sync(world,state);render()});
+ for(const target of ['power','farmer','pond'])await buy(p,target,false);
  await p.evaluate(()=>Promise.all(document.getAnimations().filter(a=>a.animationName==='spawnPop').map(a=>a.finished.catch(()=>{}))));
  ok((await p.locator('#houseArt').getAttribute('src')).endsWith('home-03.png'),'fallback hall grows');ok(await inScene('#pond'),'fallback pond inside the scene');ok(await inScene('#fenceRow img'),'fallback fence inside the scene');ok(await inScene('#flock img'),'fallback hens inside the scene');
  ok(await p.locator('#villageCanvas').isHidden(),'canvas hidden in fallback');
@@ -409,7 +423,7 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
    await page.reload();await ready(page);let g=await game(page);eq([g.phase,g.state.mode,g.state.round,g.state.gold,g.state.index],['start','story',null,321,4],'old sound save loads as reading mode, the unfinished sound item is dropped');
    eq(await page.locator('#go').textContent(),'시작하기 ▶','no resume prompt for the dropped sound item');eq(await page.locator('#startSound, #startStory, #mode').count(),0,'no mode buttons');
    await page.locator('#go').tap();await phaseIs(page,'ask');const q=await expectQuestion(page,8,'story',4,'flow: old sound save continues with the reading item of the same number');eq(q.mode,'story','a reading item');
-   g=await game(page);eq([g.round.t,g.round.tries,g.state.gold],[0,0,321],'fresh question, gold kept');eq((await stored(page)).mode,'story','saved again as story');eq((await stored(page)).version,1,'save version stays 1');
+   g=await game(page);eq([g.round.t,g.round.tries,g.state.gold],[0,0,321],'fresh question, gold kept');eq((await stored(page)).mode,'story','saved again as story');eq((await stored(page)).version,3,'saved as version 3');
    await answer(page,true,true);eq((await game(page)).phase,'reward','old sound save: play goes on');eq(await page.evaluate(()=>window.__said),[],'old sound save: nothing is read aloud');
    eq(errors,[],'flow old sound save page errors');await ctx.close()}
 
@@ -435,6 +449,30 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
    ok(b.length===1&&b[0].shown&&b[0].text.includes('불씨 왕을 쓰러뜨렸어요'),'banner back after the sale (after any bubble): '+JSON.stringify(b));
    await page.locator('#pause').tap();const left=await page.evaluate(()=>bannerLeft);await tick(page,50);eq(await page.evaluate(()=>bannerLeft),left,'banner waits while paused');await page.locator('#pause').tap();
    eq(errors,[],'flow demo3 page errors');await ctx.close()}
+
+  /* 0.12 엔딩: 지은 것 66개 → 종이 열림(늑대 왕이 기다림) → 종 → 결전 6방패 → 엔딩 카드 → 새로고침에도 엔딩 카드 → 새 마을(채석장, 꾸러미) */
+  {const {ctx,page,errors}=await open({motion:true});
+   const run0=await page.evaluate(()=>Combat.freshRun());
+   await seed(page,{gold:900,level:19,fence:18,chickens:20,farmers:6,hall:3,index:45,age:7,run:{...run0,ok:Array.from({length:30},(_,i)=>i),miss:[30,31],t0:1}});
+   await begin(page,{age:7},true);const calm=()=>page.evaluate(()=>{world.wolves=[];world.trickle=1e9;world.wave.arrive=1e9;world.wave.spawned=true});await calm();
+   const three=(await page.locator('.scene').getAttribute('data-renderer'))==='three';
+   eq((await slotStates(page))[7],'hall:auto','ending: 65 built, the 8th slot is still the hall picture');
+   await buy(page,'farmer',true);let g=await game(page);eq([g.state.run.bell,(await slotStates(page))[7],g.king&&g.king.state],[1,'bell:buy','wait'],'ending: 66 built opens the free bell and the wolf king waits at the forest edge');
+   eq(await page.locator('#shop .slot[data-key="bell"] .pr').textContent(),'울려요','bell slot: no price');ok(await shopFits(page),'shop fits with the bell slot');
+   if(three){await tick(page,60);await frames(page,6);const i=await page.evaluate(()=>window.VillageView.inspect());ok(i.king&&i.king.size>3,'3D draws the wolf king (grey ember-king model, twice the size): '+JSON.stringify(i.king));await shot(page.locator('.scene'),'ending-king-wait-390')}
+   await buy(page,'bell',true);g=await game(page);eq([g.state.run.bell,g.state.run.fpick.length,(await slotStates(page))[7]],[2,6,'bell:fight'],'ending: ringing the bell starts the finale (six questions fixed)');
+   await answer(page,true,true);await settle(page);/* 풀던 문제는 그대로 끝내고, 다음 문제부터 결전 */
+   for(let k=0;k<6;k++){g=await game(page);ok(g.round.fin&&g.round.token.includes(':F'),'finale question '+(k+1));ok(await page.locator('#finale').isVisible(),'star shields are shown');eq(await page.locator('#finale i.off').count(),k,'broken shields so far: '+k);
+    if(k===2){if(three){await tick(page,40);await frames(page,6);const i=await page.evaluate(()=>window.VillageView.inspect());ok(Math.hypot(i.cameraFocus[0],i.cameraFocus[1])>.5,'finale camera leans toward the king: '+i.cameraFocus)}await shot(page,'ending-finale-390')}
+    await answer(page,true,true);if(k<5)await settle(page)}
+   g=await game(page);eq([g.state.run.bell,g.state.run.shields,g.peace,g.state.meta.stamps.length],[3,6,-1,1],'ending: six shields broken, the wolves retreat, a stamp is kept');
+   await tick(page,60);await phaseIs(page,'ending');ok(await page.locator('#ending').isVisible(),'ending card is shown');eq(await page.locator('#endTitle').textContent(),'🎉 초원 마을을 지켰어요!','ending title');
+   eq(await page.locator('#endStars li').count(),3,'three stars');ok(await noOverflow(page),'ending card: no overflow');await shot(page,'ending-card-390');
+   await page.reload();await ready(page);eq(await page.locator('#go').textContent(),'이어서 하기 ▶','ending: resume after reload');eq(await page.locator('#mapRow span').count(),1,'start screen map row: one stamp');await page.locator('#go').tap();await phaseIs(page,'ending');
+   await page.locator('#endNew').tap();await phaseIs(page,'ask');g=await game(page);eq([g.state.run.no,g.state.run.village,g.state.level,g.state.chickens,g.state.hall,g.state.gold,g.king],[2,'quarry',2,2,0,20,null],'ending: the new village starts with the pack (tower +1, hen +1)');
+   eq(await page.locator('.scene').getAttribute('data-village'),'quarry','new village: ground tint attribute');if(three)await frames(page,6);await shot(page,'ending-new-village-390');
+   await answer(page,true,true);eq((await game(page)).phase,'reward','new village: play goes on');
+   eq(errors,[],'flow ending page errors');await ctx.close()}
 
   /* 체험 초기화: 체험 마을로 돌아가고, 원래 저장은 그대로 */
   {const {ctx,page,errors}=await open();await seed(page,{gold:777,wins:5,index:9,age:8});

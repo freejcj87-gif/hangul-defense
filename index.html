@@ -637,7 +637,7 @@ function tapSlot(i){
  if(r.key==='bell'){if(r.state==='buy')ringBell(i);else tip(i,r.state==='fight'?'👑 한 번에 맞히면 방패가 깨져요':'✓ 늑대 왕을 물리쳤어요',16);return}
  if(r.state==='auto'){tip(i,'🏠 마을이 자라면 회관도 커져요',16);return}
  if(r.state==='buy')buyItem(r.key,i);
- else tip(i,r.state==='poor'?'🪙 '+Math.max(1,r.price-shownGold())+' 더 모아요':r.state==='locked'?'회관을 키우면 생겨요':r.state==='none'?'✓ 부서진 곳이 없어요':'✓ 다 지었어요',16);
+ else tip(i,r.state==='poor'?'🪙 '+Math.max(1,r.price-shownGold())+' 더 모아요':r.state==='locked'?'회관이 커지면 생겨요':r.state==='none'?'✓ 부서진 곳이 없어요':'✓ 다 지었어요',16);
 }
 /* 사기: 확인 창 없이 바로. 두 번 눌림 방지 0.4초(4틱). 세계는 멈추지 않고, 문제는 그대로 남는다. */
 function buyItem(key,i){
