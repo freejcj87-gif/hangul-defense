@@ -36,7 +36,10 @@
   /* 단계별 무리 구성(가중치). 우두머리(불씨 왕)는 3단계부터 네 번째 무리마다 한 마리. */
   const MIX=[{wolf:1},{wolf:3,bramble:2},{wolf:3,bramble:2,boar:1,granite:1},{wolf:3,bramble:2,boar:1,granite:1,frost:2}];
   const BOSS_EVERY=4;
-  const TOWER={range:6.5,damage:10,cooldown:12,arrowSpeed:9,volleyRange:2};
+  /* hallRange(0.12, 프로듀서 플레이 피드백 "회관이 커져 울타리가 넓어지면 타워 사정거리가 닿지 않는다"): 회관 단계마다 사거리 +1.5.
+     마을 반지름은 단계마다 +3(7/10/13/16)인데 사거리는 그대로라, 울타리 줄(반지름 + 0.3)에서 타워 사거리가 닿는 둘레가
+     회관 1·타워 4개 62% · 회관 2·타워 8개 73% · 회관 3·타워 14개 66%(20개여도 85%)까지 떨어졌다. +1.5면 같은 경우 91% · 97% · 100% */
+  const TOWER={range:6.5,damage:10,cooldown:12,arrowSpeed:9,volleyRange:2,hallRange:1.5};
   /* 타워 강화(s.power): 0 화살 · 1 펑 화살(맞은 자리 둘레에 60% 피해) · 2 큰 펑 화살(더 넓게, 75%, 피해 +3) · 3 세 갈래 화살(한 번에 3마리)
      4~10단계: 화살 피해 +POWER_STEP씩(세 갈래 화살 그대로) */
   const POWER=[{splash:0,share:0,plus:0,multi:1},{splash:1.3,share:.6,plus:0,multi:1},{splash:1.9,share:.75,plus:3,multi:1},{splash:1.9,share:.75,plus:3,multi:3}];
@@ -342,7 +345,7 @@
   /* 타워가 먼저 노리는 순서: 닭을 물고 가는 늑대 > 무는 늑대 > 건물을 부수는 늑대 > 나머지(가까운 순) */
   const danger=v=>v.state==='carry'?3:v.state==='bite'?2:v.state==='smash'?1:0;
   const power=s=>POWER[Math.max(0,Math.min(3,s&&s.power|0))];
-  const range=s=>TOWER.range+.4*Math.min(5,s&&s.level|0);
+  const range=s=>TOWER.range+.4*Math.min(5,s&&s.level|0)+TOWER.hallRange*Math.max(0,Math.min(3,s&&s.hall|0));
   const cooldown=s=>Math.max(6,TOWER.cooldown-Math.min(5,s&&s.level|0));
   /* 1층 타워의 화살 피해: 기본 + 타워 수(5까지) + 강화(큰 펑부터 +3, 4~10단계 +1씩) */
   const damage=s=>TOWER.damage+2*Math.min(5,s&&s.level|0)+power(s).plus+POWER_STEP*Math.max(0,Math.min(10,s&&s.power|0)-3);

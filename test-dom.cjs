@@ -666,8 +666,8 @@ a.tick(30);eq(a.api.round,null,'시작 화면에서는 문제 없음');eq(a.api.
 for(const id of ['battle','next','shield','combatInfo','buildPrompt','buyChicken','buyFence','timebar','timeFill','wolfHead','timeTag','choices','cards','skip','gainLine','gainParts'])ok(!html.includes('id="'+id+'"'),'없앤 요소: '+id);
 ok(!html.includes('소리 도움말'),'정답을 글자로 보여 주던 소리 도움말 제거');ok(!src.includes('다음 무리')&&!src.includes('barLeft')&&!src.includes('secondsLeft'),'늑대 시간 표시(초·막대) 코드 없음');
 ok(!src.includes('enterPick')&&!src.includes('picks')&&!src.includes('offers('),'카드 고르기 단계 코드 없음');
-ok(html.includes('src="combat.js?v=0.11"')&&html.includes('src="world.js?v=0.11"')&&html.includes('src="questions.js?v=0.11"')&&html.includes('src="village.js?v=0.11"')&&!html.includes('?v=0.10'),'캐시 갱신용 ?v=0.11');
-ok(html.indexOf('src="questions-gen.js?v=0.11"')>0&&html.indexOf('src="questions-gen.js?v=0.11"')<html.indexOf('src="questions.js?v=0.11"'),'생성 문항 파일을 questions.js보다 먼저 불러옴');
+ok(html.includes('src="combat.js?v=0.12"')&&html.includes('src="world.js?v=0.12"')&&html.includes('src="questions.js?v=0.12"')&&html.includes('src="village.js?v=0.12"')&&!html.includes('?v=0.10'),'캐시 갱신용 ?v=0.12');
+ok(html.indexOf('src="questions-gen.js?v=0.12"')>0&&html.indexOf('src="questions-gen.js?v=0.12"')<html.indexOf('src="questions.js?v=0.12"'),'생성 문항 파일을 questions.js보다 먼저 불러옴');
 /* 0.11: 듣고 고르기 모드 폐쇄. 시작 화면·설정에 모드 고르기가 없고, 스크립트에 소리 모드 분기가 없다 */
 for(const id of ['startSound','startStory','mode'])ok(!html.includes('id="'+id+'"'),'없앤 모드 버튼: '+id);
 ok(!html.includes('mode-row')&&!html.replace(/<script>[\s\S]*?<\/script>/,'').includes('듣고 고르기'),'화면에 모드 고르기·듣고 고르기 문구 없음');
@@ -1276,6 +1276,25 @@ a.tick(250);a.api.state.gold=62;eq(answerLand(a),1,'절반을 넘으면 띄움')
  const g=FOXY({hall:0,level:2,fence:5,chickens:3});g.go();eq(g.game().fox,null,'지은 수 20 전에는 오지 않음');
  {const r=C.freshRun();r.bell=2;r.fpick=[1,2,3,4,5,6];const h=FOXY({run:r});h.go();eq(h.game().fox,null,'결전 중에는 여우가 오지 않음')}
  withFlags({},()=>{const keep=C.FOX.on;C.FOX.on=false;try{const h=FOXY({});h.go();eq(h.game().fox,null,'(손잡이) 여우를 끌 수 있음')}finally{C.FOX.on=keep}});}
+
+/* 3-12 프로듀서 플레이 피드백(2026-11-13) 반영: 회관이 커질 때 무엇이 좋아졌는지 한 줄 · 회관 단계마다 타워 사거리 +1.5 · 연속·번개로 더 받은 금화 표시 · 연못 한 줄 */
+{/* 사거리: 회관 단계를 따라 늘어, 흔한 마을 크기에서 울타리 줄(반지름 + 0.3)의 90% 이상에 닿는다 */
+ const cover=(hall,units)=>{const s=S({level:units-1,hall}),w=W.sync(W.create({seed:1}),s),T=w.buildings.filter(b=>b.kind==='tower'),R=W.radius(w)+.3;let hit=0;
+  for(let i=0;i<360;i++){const a=i*Math.PI/180,x=Math.cos(a)*R,z=Math.sin(a)*R;if(T.some(b=>Math.hypot(b.x-x,b.z-z)<=W.towerRange(s,b)))hit++}return hit/360};
+ eq([0,1,2,3].map(h=>W.range(S({hall:h}))-W.range(S())),[0,1.5,3,4.5],'타워 사거리: 회관 단계마다 +'+W.TOWER.hallRange);
+ const c=[[1,4],[1,6],[2,6],[2,8],[2,10],[3,10],[3,14],[3,20]].map(([h,u])=>cover(h,u));ok(c.every(x=>x>=.9),'회관이 커져도 타워가 울타리 줄에 닿음: '+c.map(x=>Math.round(x*100)+'%').join(' · '));
+ /* 회관이 커지는 순간: 알림 띠와 상태 문구에 좋아진 것 한 줄 */
+ const a=fresh({view:true});a.go();calmWorld(a);a.api.state.gold=5000;for(let i=0;i<9;i++){a.buy('fence');a.tick(5)}
+ const band=a.fx('banner').map(e=>e.textContent).find(t=>t.includes('회관이 커졌어요'))||'';
+ ok(band.includes('알값 +'+C.PAY.hall)&&band.includes('타워 자리 10곳')&&band.includes('화살이 더 멀리')&&band.includes('새 상품: 강화'),'회관 1단계 알림 띠: 알값·타워 자리·사거리·새 상품 — '+band);
+ ok(a.n.villageStatus.textContent.startsWith('🏠 회관 1단계! 알값 +'),'상태 문구에도 같은 한 줄');
+ /* 연속·번개로 더 받은 금화 */
+ const b=seed({age:7,chickens:6,farmers:1,streak:3,index:2});b.go();calmWorld(b);b.unlock();b.right();const g=b.api.round.info,streakGold=g.plain-Math.round(g.plain/g.combo);
+ ok(g.streak===4&&streakGold>0&&g.bonus>0,'(전제) 4연속 번개 정답');ok(b.n.feedback.textContent.includes('🔥4연속 +'+streakGold)&&b.n.feedback.textContent.includes('⚡ 빨라서 +'+g.bonus),'결과 줄에 연속·번개로 더 받은 금화: '+b.n.feedback.textContent);
+ b.tick(LAND);ok(b.n.coinLayer.children.some(x=>x.classList.contains('gold-extra')&&x.textContent==='🔥4연속 +'+streakGold+' · ⚡ 빨라서 +'+g.bonus),'금화 칸 아래에도 따로 띄움');eq(streakGold+g.bonus+Math.round(g.plain/g.combo),g.gold,'(연속 몫 + 번개 몫 + 기본 = 받은 금화)');
+ const p=seed({age:7,index:2});p.go();calmWorld(p);p.unlock();p.tick(Math.ceil(C.baseSeconds(p.api.round.q)*7));p.right();const fb=p.n.feedback.textContent;p.tick(LAND);ok(!fb.includes('🔥')&&!fb.includes('⚡')&&!p.n.feedback.textContent.includes('⚡')&&!p.n.coinLayer.children.some(x=>x.classList.contains('gold-extra')),'연속도 번개도 아니면 덧붙이지 않음');
+ /* 연못 한 줄 */
+ const d=seed({hall:2,gold:900});d.go();d.tick(5);d.buy('pond');eq(d.n.shopTip.textContent,'🐟 정답마다 물고기 금화 +'+C.PAY.fish+'!','연못을 사면 무엇이 좋은지 한 줄');}
 
 eq(spoken,0,'검사 전체에서 음성 합성(speechSynthesis)을 한 번도 부르지 않음');
 if(fails.length)process.exit(1);
