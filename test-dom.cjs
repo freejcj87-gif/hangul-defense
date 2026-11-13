@@ -15,6 +15,8 @@ const S=(o)=>Object.assign(C.fresh(8),{level:0},o||{});
 /* 손잡이(Combat.FLAGS)를 잠깐 바꿔 돌린다: 프로듀서 결정이 바뀌어도 되는지(예: 회관을 사는 방식) 확인하는 검사용 */
 const withFlags=(f,fn)=>{const keep={...C.FLAGS};Object.assign(C.FLAGS,f);try{return fn()}finally{Object.assign(C.FLAGS,keep)}};
 const BUY_MODE={HALL_MODE:'buy',FEAST_AFTER_END:false};
+/* 0.13: 아래 1~N절(0.12까지의 검사)은 흐르는 농장을 끄고 돈다 = FLAGS.FLOW=false면 0.12와 결과가 같다는 회귀 검사. 흐름 검사는 맨 끝 '0.13 흐르는 농장' 절에서 켜고 돈다 */
+C.FLAGS.FLOW=false;
 
 /* ======================= 1. 규칙 모듈 ======================= */
 eq(C.API,4,'규칙 API 버전(0.12 판 진행·저장 v3)');
@@ -1295,6 +1297,128 @@ a.tick(250);a.api.state.gold=62;eq(answerLand(a),1,'절반을 넘으면 띄움')
  const p=seed({age:7,index:2});p.go();calmWorld(p);p.unlock();p.tick(Math.ceil(C.baseSeconds(p.api.round.q)*7));p.right();const fb=p.n.feedback.textContent;p.tick(LAND);ok(!fb.includes('🔥')&&!fb.includes('⚡')&&!p.n.feedback.textContent.includes('⚡')&&!p.n.coinLayer.children.some(x=>x.classList.contains('gold-extra')),'연속도 번개도 아니면 덧붙이지 않음');
  /* 연못 한 줄 */
  const d=seed({hall:2,gold:900});d.go();d.tick(5);d.buy('pond');eq(d.n.shopTip.textContent,'🐟 정답마다 물고기 금화 +'+C.PAY.fish+'!','연못을 사면 무엇이 좋은지 한 줄');}
+
+/* ======================= 0.13 흐르는 농장(FLAGS.FLOW=true) ======================= */
+/* 여기까지(1~2절)는 FLAGS.FLOW=false로 돌았다 = 흐름을 끄면 0.12 검사가 그대로 통과한다. 아래는 흐름을 켜고 돈다. 설계: v013-design.md §6.4, game-plan §13 */
+C.FLAGS.FLOW=true;
+{
+ const q8=Q.at(8,'story',0,1),need=C.needSeconds(q8),okT=Math.ceil(need*10),FS=o=>Object.assign(C.fresh(8),o||{});
+ const badNum=(o,p)=>{if(typeof o==='number')return Number.isFinite(o)?null:p;if(o&&typeof o==='object')for(const k in o){const b=badNum(o[k],p+'.'+k);if(b)return b}return null};
+ const flowWorld=(s,seedN)=>{const w=W.sync(W.create({seed:seedN||7,interval:200}),s);w.peace=-1;W.flowOn(w);return w};
+ /* F-1 손잡이: 끄면 0.12 수입, 켜면 정답 순간에는 기본금(+물고기)만. 연속·번개 금화 배수 없음 */
+ {const s=FS({chickens:6,farmers:1,pond:1,streak:4});
+  const off=withFlags({FLOW:false},()=>C.income(s,q8,true,okT)),on=C.income(s,q8,true,okT);
+  ok(off.sold===6&&off.gold>C.PAY.base+6*C.eggPrice(s)&&!off.flow,'흐름 끔: 0.12처럼 정답 순간 알을 다 팔고 연속·번개 배수');
+  eq([on.gold,on.sold,on.laid,on.bonus,on.combo],[C.PAY.base+C.PAY.fish,0,0,0,1],'흐름 켬: 정답 순간에는 기본금 + 물고기만(배수·번개 금화 없음)');
+  eq(on.flow,{credit:1+C.FLOW.fast+C.FLOW.streak*4,boost:2},'5연속 + 번개: 덤 기운과 신바람 2단');
+  ok(withFlags({FLOW_OFF_AGES:[8]},()=>!C.flowOn(s)&&C.income(s,q8,false,okT).sold===6)&&C.flowOn(s),'나이별 끄기(결정 질문 4 손잡이): 그 나이만 0.12 경제');}
+ /* F-2 기운·신바람 계산 */
+ eq([C.flowGain(1,false,1),C.flowGain(2,false,1).credit,C.flowGain(3,false,1).boost,C.flowGain(1,true,1),C.flowGain(6,false,1).boost,C.flowGain(3,true,1).boost],
+  [{credit:1,boost:0},1+C.FLOW.streak,1,{credit:1+C.FLOW.fast,boost:1},2,2],'한 번에 맞힘 +1, 번개 +0.25, 연속 +0.15씩 / 신바람: 번개·3연속 1단, 6연속·3연속+번개 2단');
+ eq(C.flowGain(99,true,1).credit,1+C.FLOW.fast+C.FLOW.streakMax,'연속 덤은 상한까지만');
+ ok(C.FLOW.fast*3<=C.FLOW.streakMax,'번개 덤은 연속 덤 상한의 1/3 이하(정확도가 주 동력)');
+ ok(C.flowGain(1,false,C.GUARD.floor).credit<1,'찍기 막기 배수가 기운에도 곱해짐');
+ {const s=FS({pace:50}),t=FS({pace:100}),u=FS({pace:200});eq([C.beatTicks(s,q8),C.beatTicks(t,q8),C.beatTicks(u,q8)],[Math.round(need*1.3*.6*10),Math.round(need*1.3*10),Math.round(need*1.3*2*10)],'박 = 필요 시간 × 1.3 × 읽기 속도(바닥 60%: 마구 눌러도 박이 더 짧아지지 않음)')}
+ /* F-3 두 번째 시도 정답: 금화 0, 기운 0 */
+ {const s=FS({chickens:5}),g0=s.gold,r=C.settle(s,q8,'second');eq([s.gold-g0,r.flow,s.streak],[0,undefined,0],'두 번째 시도 정답: 금화도 기운도 없음')}
+ /* F-4 흐름 칸이 없으면 세계는 0.12와 같다(사건·저장에 흐름 흔적 없음) */
+ {const s=FS({chickens:4,farmers:2}),a=W.sync(W.create({seed:11,interval:150,guard:true}),s),b=W.sync(W.create({seed:11,interval:150,guard:true}),s);W.flowOn(b);
+  let same=true,flowEv=0;for(let i=0;i<1500;i++){const ea=W.step(a,s),eb=W.step(b,s).filter(e=>{if(e.type==='sold'||e.type==='laid'){flowEv++;return false}return true});if(JSON.stringify(ea)!==JSON.stringify(eb))same=false}
+  const strip=w=>{const o=JSON.parse(JSON.stringify(w));delete o.flow;return JSON.stringify(o)};
+  ok(same&&strip(a)===strip(b)&&!('flow' in a)&&flowEv===0,'흐름 칸은 늑대·타워·닭 규칙을 바꾸지 않는다(기운이 없으면 낳지도 않는다)');}
+ /* F-5 낳기·나르기: 알 수 = 닭 수 × egg × 기운(내림), sold 사건 수 × 알값 = 금화, 기운 손실 0 */
+ {const s=FS({chickens:6,farmers:1}),w=flowWorld(s),g0=s.gold;let sold=0,laid=0,gold=0;
+  W.flowQuestion(w,200);W.flowCorrect(w,1.4,1,200);eq(W.flowYard(w),1,'정답 순간 첫 알을 바로 낳음');ok(w.flow.credit<1.4,'첫 알만큼 기운을 먼저 씀(공짜 알 아님)');eq(w.flow.boost,{lv:1,left:200},'신바람은 한 박');
+  let fastTrip=0,slowTrip=0;
+  for(let i=0;i<1500;i++)for(const e of W.step(w,s)){if(e.type==='sold'){sold+=e.n;gold+=C.sellEggs(s,e.n);if(i<200)fastTrip++;else slowTrip++}if(e.type==='laid')laid++}
+  eq([sold,laid+1,s.gold-g0,gold],[Math.floor(6*W.FLOW.egg*1.4),Math.floor(6*W.FLOW.egg*1.4),sold*C.eggPrice(s),sold*C.eggPrice(s)],'낳은 알 = 닭 6 × '+W.FLOW.egg+' × 기운 1.4(내림), sold 사건 수 × 알값 = 금화');
+  eq([w.flow.credit,W.flowYard(w),w.flow.slots.every(x=>x.job===0)],[0,0,true],'기운과 마당 알을 다 쓰면 농부는 쉰다');
+  ok(Math.abs(w.flow.lay-(6*W.FLOW.egg*1.4-sold))<1e-6,'남은 알 조각은 버려지지 않고 다음 기운에 이어짐');
+  const g1=s.gold;for(let i=0;i<3000;i++)for(const e of W.step(w,s))if(e.type==='sold')C.sellEggs(s,e.n);eq(s.gold-g1,0,'방치 3,000틱: 금화 증가 0(시간만으로는 낳지 않는다)');}
+ /* 농부 수와 신바람이 나르는 빠르기를 정한다 */
+ {const carry=(farmers,lv)=>{const s=FS({chickens:20,farmers}),w=flowWorld(s);W.flowAdd(w,48);W.flowQuestion(w,200);if(lv)W.flowCorrect(w,0,lv,200);let n=0;for(let i=0;i<200;i++)for(const e of W.step(w,s))if(e.type==='sold')n+=e.n;return n};
+  const a=carry(0,0),b=carry(3,0),c=carry(0,1),d=carry(0,2);
+  ok(a>=W.FLOW.carry-1&&a<=W.FLOW.carry&&b>=4*W.FLOW.carry-4&&b<=4*W.FLOW.carry,'한 박에 농부 한 명 '+W.FLOW.carry+'알(1명 '+a+' · 4명 '+b+')');
+  ok(c>a&&d>c&&d<=Math.ceil(W.FLOW.carry*W.FLOW.boost[2]),'신바람 1·2단이면 더 빨리 나름('+a+' → '+c+' → '+d+')');}
+ /* 마당 상한: 닭 수 × 2 + 8. 꽉 차면 기운을 쓰지 않고 기다린다(손실 0) */
+ {const s=FS({chickens:2,farmers:0}),w=flowWorld(s);W.flowQuestion(w,100);W.flowCorrect(w,30,0,100);const cap=W.flowCap(w);eq(cap,2*W.FLOW.perHen+W.FLOW.nest,'마당 상한');
+  w.flow.slots=[];const s0=FS({chickens:2,farmers:0});let sold=0,maxYard=0;
+  for(let i=0;i<6000;i++){for(const e of W.step(w,s0))if(e.type==='sold')sold+=e.n;maxYard=Math.max(maxYard,W.flowYard(w))}
+  ok(maxYard<=cap,'마당 알은 상한을 넘지 않음(최대 '+maxYard+')');
+  for(let i=0;i<40000&&(w.flow.credit>0||W.flowYard(w)>0||w.flow.slots.some(x=>x.job));i++)for(const e of W.step(w,s0))if(e.type==='sold')sold+=e.n;
+  ok(Math.abs(sold+w.flow.lay-2*W.FLOW.egg*30)<1e-6&&sold>=80,'꽉 차서 기다린 기운도 버려지지 않고 끝내 다 알이 됨(기운 30 × 닭 2 → 알 '+sold+')');}
+ /* 한 번 틀려도 닭이 멈추지 않는다: 남은 기운을 박 spread개에 걸쳐 쓴다 */
+ {const s=FS({chickens:10,farmers:9}),w=flowWorld(s);W.flowQuestion(w,200);W.flowCorrect(w,1.3,0,200);for(let i=0;i<200;i++)W.step(w,s);ok(w.flow.credit>.2,'한 박 뒤에도 기운이 남아 있음('+w.flow.credit.toFixed(2)+')');
+  W.flowQuestion(w,200);ok(w.flow.rate>0,'다음 문제(틀린 뒤)에도 낳는 속도 > 0')}
+ /* 잃은 닭 자리의 알은 둥지로(사라지지 않음) */
+ {const s=FS({chickens:3}),w=flowWorld(s);W.flowAdd(w,6);const y0=W.flowYard(w);w.hens[0].state='gone';W.step(w,FS({chickens:2}));ok(W.flowYard(w)+w.flow.slots.filter(x=>x.job).length===y0,'닭을 잃어도 그 자리의 알은 남음')}
+ /* 매대가 부서지면 알값 절반 */
+ {const s=FS({hall:2}),full=C.eggPrice(s);s.marketDown=1;const g0=s.gold;eq([C.sellEggs(s,3),s.gold-g0],[3*Math.max(1,Math.floor(full/2)),3*Math.max(1,Math.floor(full/2))],'매대가 부서져 있으면 반값')}
+ /* F-6 결정성: 같은 씨앗·같은 입력이면 같은 결과 */
+ {const runIt=()=>{const s=FS({chickens:8,farmers:3,level:3}),w=W.sync(W.create({seed:4242,interval:150,guard:true}),s);W.flowOn(w);let g=0;
+   for(let i=0;i<2400;i++){if(i%160===0){W.flowQuestion(w,150+i%7);if(i%320===0)W.flowCorrect(w,1+(i%3)*.15,i%3,160)}for(const e of W.step(w,s)){if(e.type==='sold')g+=C.sellEggs(s,e.n);if(e.type==='henLost')C.lostHen(s)}}return JSON.stringify(w)+g};
+  const A=runIt();ok(A===runIt()&&A.includes('"flow"'),'같은 씨앗이면 흐름까지 같은 세계');}
+ /* F-7 저장·복원: 멀쩡한 흐름 칸은 그대로, 망가진 슬롯·음수 기운은 고친다 */
+ {const s=FS({chickens:5,farmers:2}),w=flowWorld(s);W.flowQuestion(w,180);W.flowCorrect(w,2.2,2,180);for(let i=0;i<60;i++)W.step(w,s);
+  const raw=JSON.parse(JSON.stringify({...w,events:[]})),back=W.restore(raw);eq(JSON.stringify({...back,events:[]}),JSON.stringify({...w,events:[]}),'멀쩡한 흐름 저장은 한 글자도 바꾸지 않음');
+  const bad=JSON.parse(JSON.stringify(raw));bad.flow.credit=-5;bad.flow.beat='x';bad.flow.lay=NaN;bad.flow.nest=-2;bad.flow.boost={lv:9,left:-1};bad.flow.rate=1e9;bad.flow.pile=-1;
+  bad.flow.slots=[null,{job:7,from:99,left:5,total:1},{job:1,from:0,left:9,total:3},{job:1,from:-1,left:2,total:0},...Array(20).fill({job:0,from:-1,left:0,total:0})];bad.hens[0].egg=-3;bad.hens[1].egg=99;
+  const t=W.restore(bad),f=t.flow;
+  eq([f.credit,f.beat,f.lay,f.nest,f.boost,f.pile,f.slots.length,f.slots.slice(0,4).every(x=>x.job===0&&x.left===0),t.hens[0].egg,t.hens[1].egg,f.rate],[0,100,0,0,{lv:0,left:0},0,W.FLOW.men,true,0,W.FLOW.perHen,0],'tidy: 음수 기운·망가진 슬롯·엉터리 알 수를 고침');
+  for(let i=0;i<300;i++)W.step(t,s);ok(!badNum(t,'w'),'고친 세계는 NaN 없이 돈다');
+  const junk=W.restore({...raw,flow:'zzz'});ok(junk.flow&&junk.flow.credit===0&&Array.isArray(junk.flow.slots),'흐름 칸이 통째로 망가졌으면 새 칸');
+  const none=JSON.parse(JSON.stringify(raw));delete none.flow;ok(!('flow' in W.restore(none)),'흐름 칸이 없는 저장(0.12)은 없는 그대로(화면이 켠다)');}
+ /* F-8 농부 추천: 마당 알이 닭 수 이상인 채로 문제 2개 */
+ {const s=FS({chickens:6,gold:500,level:3,fence:3}),w=flowWorld(s);W.flowAdd(w,7);W.flowQuestion(w,200);ok(!W.flowPile(w),'쌓임 한 문제로는 아직');W.flowQuestion(w,200);ok(W.flowPile(w),'두 문제 이어지면 일손 부족');
+  const r=C.recommend(s,{pile:true,towers:4}),r0=C.recommend(s,{pile:false,towers:4});eq([r.key,r.line,r.rule],['farmer',C.LINES.farmerPile,6],'일손 부족 → 농부 추천');ok(!r0||r0.key!=='farmer','쌓이지 않으면 농부를 권하지 않음');
+  ok(C.LINES.farmerPile.replace(/\s/g,'').length<=16,'일손 부족 말풍선은 짧게');
+  w.flow.nest=0;for(const h of w.hens)h.egg=0;W.flowQuestion(w,200);ok(!W.flowPile(w),'알이 줄면 처음부터 다시 셈');}
+
+ /* ---------- 가짜 DOM 위의 흐름 ---------- */
+ /* D-1 한 번에 맞힘: 기본금만 바로, 알 금화는 농부가 내려놓을 때. 3D에는 produce 대신 cheer */
+ {const a=fresh({view:true});a.go();calmWorld(a);a.unlock();const g0=a.api.state.gold;a.right();
+  eq([a.api.phase,a.api.state.gold-g0],['reward',C.PAY.base],'정답 순간 기본금만');eq(a.game().flow.yard,1,'닭이 첫 알을 바로 낳음');ok(a.game().flow.on&&a.window.getVillageState().flow,'3D에 흐름 켜짐을 알림');
+  ok(a.events.some(e=>e.type==='cheer')&&!a.events.some(e=>e.type==='produce'),'3D에는 cheer(닭 깡충)만, 한꺼번에 파는 produce 없음');
+  ok(!a.fx('sale').length,'알 → 농부 → 매대 글자 띠 없음');eq(a.n.yardEggs.textContent,'🥚 1','마당 알 숫자 표시');eq(a.n.yardEggs.getAttribute('aria-label'),'마당에 알 1개','(읽어 주는 이름)');
+  let sold=0;const seen=a.events.length;for(let i=0;i<500;i++)a.tick();sold=a.events.filter(e=>e.type==='sold').reduce((n,e)=>n+e.n,0);
+  ok(sold>=1&&a.api.state.gold-g0===C.PAY.base+sold*C.eggPrice(a.api.state),'sold 사건 수 × 알값 = 금화 증가(알 '+sold+'개)');ok((a.game().sfx.egg|0)>=1&&!(a.game().sfx.sale|0),'알 팔림은 작은 소리만');
+  eq([a.game().gold.pending,a.game().flow.yard,a.n.yardEggs.textContent],[0,0,'🥚 0'],'다 팔리면 마당 알 0');
+  const g1=a.api.state.gold;a.tick(3000);eq(a.api.state.gold,g1,'읽지 않고 3,000틱: 금화 증가 0');}
+ /* D-2 두 번째 시도 정답: 금화 0, 기운 0 */
+ {const a=fresh();a.go();calmWorld(a);a.unlock();const g0=a.api.state.gold;a.wrong();a.tick(C.DASH_TICKS+2);a.rightNow();a.tick(600);eq([a.api.state.gold-g0,a.game().flow.credit,a.game().flow.yard,a.api.phase],[0,0,0,'learn'],'두 번째 시도 정답: 금화·기운·알 모두 0');}
+ /* D-3 연속 불꽃 3칸과 신바람 문구 */
+ {const a=seed({age:7,chickens:3,seed:5});a.go();calmWorld(a);const one=()=>{a.untilAsk();a.unlock();a.right();return a.n.feedback.textContent};
+  one();eq(a.game().flow.flames,1,'한 번 맞히면 불꽃 1칸');one();const t3=one();eq([a.game().flow.flames,a.api.state.streak],[2,3],'3연속이면 2칸');ok(/신바람/.test(t3)&&a.game().flow.boost.lv>=1,'3연속: 신바람 문구와 농부 가속');
+  ok(!/연속 \+|빨라서 \+/.test(t3),'연속·번개 금화 숫자는 보이지 않음');eq(a.n.stage.textContent.startsWith('⭐'),true,'7세: 연속 숫자 대신 별');
+  one();one();one();eq([a.game().flow.flames,a.game().flow.boost.lv],[3,2],'6연속이면 3칸, 신바람 2단');
+  a.untilAsk();a.unlock();a.wrong();eq(a.game().flow.flames,0,'틀리면 불꽃이 꺼짐');ok(a.game().flow.boost.left>0,'틀려도 달리던 농부는 그 박 동안 그대로(벌 없음)');
+  const b=seed({age:9,chickens:3,streak:4,seed:5});b.go();ok(b.n.stage.textContent.startsWith('🔥'),'9세부터는 연속 숫자도 보임');}
+ /* D-4 말풍선: 읽는 중에는 새로 뜨지 않고, 문제 사이에 뜨며, 누르면 바로 산다 */
+ {const TOWER_LINE=C.LINES.lostHen;
+  const a=seed({age:7,chickens:4,gold:200,seed:5},{rec:'real'});a.go();a.unlock();loseHen(a);a.tick(8);eq(a.bubble(),null,'읽는 중(ask)에는 급한 말풍선도 새로 뜨지 않음');calmWorld(a);
+  a.right();a.tick(3);eq([a.api.phase,a.bubble()],['reward',TOWER_LINE],'정답 직후(문제 사이)에 말풍선');ok(typeof a.n.bubble.onclick==='function'&&!a.n.bubbleTap.classList.contains('hidden'),'말풍선에 누르기 표시');
+  const lv=a.api.state.level,g=a.api.state.gold;a.n.bubble.click();eq([a.api.state.level,a.api.state.gold<g,a.bubble()],[lv+1,true,null],'말풍선을 누르면 그 상품을 바로 삼');
+  a.tick(REWARD+2);eq(a.api.phase,'ask','사도 문제는 그대로 이어짐');
+  /* 살 수 없는 추천(금화 부족)은 눌러도 사지지 않고 안내만 */
+  const b=seed({age:7,chickens:4,gold:0,seed:5},{rec:()=>({key:'tower',line:'타워!',urgent:true,rule:2})});b.go();calmWorld(b);b.unlock();b.right();b.tick(3);eq(b.bubble(),'타워!','(가짜 추천)');ok(b.n.bubbleTap.classList.contains('hidden'),'못 사는 추천에는 누르기 표시 없음');
+  const lv2=b.api.state.level;b.n.bubble.click();eq(b.api.state.level,lv2,'금화가 모자라면 사지지 않음');
+  /* 두 번 틀린 뒤 정답 배우기(learn)도 문제 사이 */
+  const c=seed({age:7,chickens:4,gold:200,seed:5},{rec:()=>({key:'chicken',line:'닭!',urgent:false,rule:7})});c.go();calmWorld(c);c.unlock();c.wrong();c.tick(C.DASH_TICKS+2);c.wrong(1);c.tick(3);eq([c.api.phase,c.bubble()],['learn','닭!'],'정답 배우기 중에도 말풍선');
+  withFlags({BUBBLE_BUY:false},()=>{const d=seed({age:7,chickens:4,gold:200,seed:5},{rec:'real'});ok(!d.n.bubble.onclick,'손잡이 BUBBLE_BUY를 끄면 말풍선은 글만')});}
+ /* D-5 0.12 저장 이어하기: 남은 알(nest)은 마당 알로 한 번만 옮긴다(복제 없음) */
+ {const a=seed({chickens:4,nest:3});eq([a.api.state.nest,a.game().flow.yard],[0,3],'0.12 저장의 남은 알 3개 → 마당 알 3개, nest 0');
+  a.unload();const again=boot();eq([again.api.state.nest,again.game().flow.yard],[0,3],'다시 불러와도 알이 늘지 않음');
+  again.go();calmWorld(again);const g0=again.api.state.gold;again.tick(400);eq(again.api.state.gold-g0,3*C.eggPrice(again.api.state),'옮긴 알은 농부가 날라 한 번씩만 팔림');
+  again.unload();const third=boot();eq([third.game().flow.yard,third.api.state.gold],[0,again.api.state.gold],'판 뒤 다시 불러와도 되살아나지 않음');
+  /* 흐름을 끄고 불러오면 nest는 그대로(0.12) */
+  withFlags({FLOW:false},()=>{const z=seed({chickens:4,nest:3});eq([z.api.state.nest,z.game().flow],[3,null],'흐름 끔: 남은 알 그대로, 흐름 칸 없음')});}
+ /* D-6 이어하기: 풀던 문제로 돌아와도 박·쌓임 칸을 다시 세지 않는다. 엔딩 뒤에도 남은 알은 팔린다 */
+ {const a=seed({age:7,chickens:6,farmers:0,seed:5});a.go();calmWorld(a);a.unlock();a.right();a.tick(REWARD+3);const f0=a.game().flow;a.unload();const b=boot();b.go();eq([b.game().flow.beat,b.game().flow.pile,b.game().flow.credit],[f0.beat,f0.pile,f0.credit],'이어하기: 흐름 칸 그대로');}
+ /* D-7 움직임 줄이기: 동전이 날지 않아도 금화와 마당 알 숫자는 맞다 */
+ {const a=fresh({reduced:true});a.go();calmWorld(a);a.unlock();const g0=a.api.state.gold;a.right();a.tick(500);ok(a.api.state.gold>g0+C.PAY.base&&a.game().gold.pending===0&&a.n.yardEggs.textContent==='🥚 0','움직임 줄이기에서도 알이 팔려 금화가 오름');}
+ /* D-8 농부를 사면 안내 한 줄이 흐름에 맞게 */
+ {const a=seed({gold:900,chickens:3});a.go();a.tick(5);a.buy('farmer');eq(a.n.shopTip.textContent,'🧑‍🌾 농부가 알을 하나씩 날라요!','농부를 사면 무엇이 좋은지 한 줄(흐름)');eq(a.game().flow.slots.length<=2,true,'(일손 슬롯은 세계 틱에 맞춰 늘어남)');a.tick(2);eq(a.game().flow.slots.length,2,'일손 = 1 + 산 농부');}
+}
 
 eq(spoken,0,'검사 전체에서 음성 합성(speechSynthesis)을 한 번도 부르지 않음');
 if(fails.length)process.exit(1);

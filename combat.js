@@ -44,8 +44,29 @@
     FEAST_AFTER_END:true,     /* 잔치는 엔딩 뒤 자유 놀이에서만 */
     FEAST_MAX:20,             /* 잔치 숨은 상한 */
     STAR_NEW:5,               /* 별 3(새 글): 이번 판에 처음으로 한 번에 맞힌 문항 수. 문항 확충 뒤 10 */
-    FREE_PLAY_WOLVES:false    /* 엔딩 뒤 '이 마을에서 더 놀기'에 늑대가 오는가(false = 늑대 없는 잔치 마을) */
+    FREE_PLAY_WOLVES:false,   /* 엔딩 뒤 '이 마을에서 더 놀기'에 늑대가 오는가(false = 늑대 없는 잔치 마을) */
+    /* ---------- 0.13 흐르는 농장(설계: v013-design.md, game-plan §13) ---------- */
+    FLOW:true,                /* true = 정답이 닭에게 기운을 주고, 닭·농부가 그 기운을 실제 시간에 걸쳐 쓴다(금화는 알이 매대에 닿을 때). false = 0.12 그대로(정답 순간 한꺼번에 판다) */
+    FLOW_OFF_AGES:[],         /* 결정 질문 4: 이 나이는 흐름을 끄고 0.12 경제로 둔다(예: [7]). 7세가 길어지는 원인을 찾아(봇이 정답마다 하나만 삼) 기본은 전 나이 켬 */
+    BUBBLE_BUY:true,          /* 결정 질문 5: 추천 말풍선을 누르면 그 상품을 바로 산다 */
+    REPAIR_ACT:true           /* 결정 질문 3: 부서진 울타리로 쉬는 농부가 가서 망치질하는 연출(규칙은 0.12 자동 복구 그대로) */
   };
+  /* 흐르는 농장의 경제 쪽 상수(세계 쪽 상수는 world.js FLOW). 값은 scripts/sim-flow.cjs로 맞춤(2026-11-14, game-plan §13.2)
+     beat: 박(틱) = 그 문제 필요 시간 × beat × max(paceFloor, pace)/100. 박 하나에 농부 한 명이 World.FLOW.carry알을 나른다
+     paceFloor: 박 계산에 쓰는 읽기 속도의 바닥(%). 마구 누르면 pace가 50까지 내려가 박이 짧아지는 것을 막는다(설계 초안 100은 빠른 아이가 손해라 60)
+     credit: 한 번에 맞힌 기운(× 찍기 막기 배수^guardPow) · fast: 번개 덤 · streak: 연속 n번의 덤 = streak × (n−1), 최대 streakMax
+     boost: 신바람 단계 = 2(6연속 이상, 또는 3연속 + 번개) · 1(번개 또는 3연속 이상) · 0 */
+  const FLOW={beat:1.3,paceFloor:60,credit:1,fast:.25,streak:.15,streakMax:.75,guardPow:1,boost1:3,boost2:6};
+  const flowOn=s=>!!FLAGS.FLOW&&!(Array.isArray(FLAGS.FLOW_OFF_AGES)&&FLAGS.FLOW_OFF_AGES.includes(s&&s.age));
+  /* 그 문제의 박(틱) */
+  const beatTicks=(s,q)=>Math.max(10,Math.round(needSeconds(q)*FLOW.beat*Math.max(FLOW.paceFloor,Number(s&&s.pace)||100)/100/TICK));
+  /* 한 번에 맞힌 정답이 주는 기운과 신바람 단계(streak = 이 정답까지의 연속 수, g = 찍기 막기 배수) */
+  function flowGain(streak,fast,g){
+    const n=streak|0,gg=Number.isFinite(g)?g:1;
+    return {credit:FLOW.credit*Math.pow(gg,FLOW.guardPow)*(1+(fast?FLOW.fast:0)+Math.min(FLOW.streakMax,FLOW.streak*Math.max(0,n-1))),boost:n>=FLOW.boost2||n>=FLOW.boost1&&fast?2:fast||n>=FLOW.boost1?1:0};
+  }
+  /* 농부가 알 n개를 매대에 내려놓음(World 'sold' 사건): 금화는 이때 생긴다. 매대가 부서져 있으면 반값(eggPrice) → 받은 금화 */
+  function sellEggs(s,n){const g=Math.max(0,n|0)*eggPrice(s);s.gold+=g;return g}
   /* 결전: 별 방패 shields개, 문제는 이번 판에 맞힌 것 ok + 틀린 것 review, 최근 recent문제는 뺀다.
      8세부터 두 번 틀리면 왕이 한 걸음(최대 steps), noStepAge 이하는 다가오지 않음(결정 E). 지는 경우는 없다 */
   const FINALE={shields:6,ok:4,review:2,steps:3,noStepAge:7,recent:10};
@@ -177,6 +198,8 @@
     const hens=Math.max(0,s.chickens|0),laid=Math.max(0,hens-(s.hidden|0)),nest=Math.max(0,s.nest|0),cap=basket(s);
     const sold=Math.min(nest+laid,cap),left=Math.min(hens,nest+laid-sold),eggValue=eggPrice(s);
     const fish=PAY.fish*(s.pond|0),base=PAY.base+PAY.feast*(s.feast|0),m=goldScale(q),streak=(s.streak|0)+1,c=combo(streak),g=guard(q,ticks);
+    /* 0.13 흐르는 농장: 정답 순간에는 기본금과 물고기만(연속·번개 금화 배수 없음). 알은 기운(flow.credit)이 되어 세계가 시간에 걸쳐 낳고 판다. 둥지 알(nest)은 건드리지 않는다 */
+    if(flowOn(s)){const pl=Math.round((base+fish)*m*g);return {laid:0,sold:0,left:nest,eggValue,fish,base,m,coin:FLAGS.COIN_SCALE?scale(q):1,streak,combo:1,guard:g,plain:pl,bonus:0,gold:pl,basket:cap,eggs:0,value:eggValue,flow:flowGain(streak,fast,g)}}
     const plain=Math.round((base+sold*eggValue+fish)*m*c*g),bonus=fast?Math.ceil(plain*FAST_BONUS):0;
     return {laid,sold,left,eggValue,fish,base,m,coin:FLAGS.COIN_SCALE?scale(q):1,streak,combo:c,guard:g,plain,bonus,gold:plain+bonus,basket:cap,eggs:sold,value:eggValue};
   }
@@ -260,6 +283,7 @@
      ctx = {wolvesInside, towers, lostHenRecently, brokenKinds:[...], opened:[...]}
        wolvesInside: 마을 안 늑대 수 · towers: 타워 수(없으면 1 + level) · lostHenRecently: 30초 안에 닭을 잃음
        brokenKinds: 부서진 진짜 건물 종류(coop·market·tower·nursery·barn) · opened: 이미 '새 상품' 말풍선(rule 4)을 띄운 key 목록
+       pile(0.13 흐르는 농장): 마당 알이 닭 수 이상인 채로 문제 2개가 이어짐(World.flowPile) → 규칙 6·8의 농부 추천 조건(0.12의 '둥지에 알이 남음' 대신)
      규칙 순서: 1 고치기 → 2 위험(타워, 못 사면 울타리) → 3 닭 0~1 → 4 회관으로 열린 새 상품(1회) → 5 회관 → 6 둥지에 알이 남음(농부)
                → 보너스(회관 목표: 회관 값의 70%를 모았거나 이 단계에서 지은 것이 REC.hallGoal에 이름 → 모으자는 말, 살 수 없는 key 'hall', urgent false, rule 0)
                → 7 닭 < 6 또는 닭 < 타워 × 2 → 8 덜 산 쪽(지켜요/벌어요)
@@ -273,7 +297,7 @@
     noHen:'꼬꼬가 한 마리도 없어요. 꼬꼬를 데려와요!',moreHens:'닭이 많으면 알을 많이 낳아서 골드를 빨리 모을 수 있어요!',
     openPower:'펑! 터지는 화살을 쓸 수 있어요!',openPond:'연못을 파면 물고기도 팔 수 있어요!',openFeast:'마을 잔치를 열면 금화가 더 생겨요!',
     hall:'회관을 키우면 마을이 더 커져요!',hallSoon:'조금만 더 모으면 회관을 키울 수 있어요!',hallSave:'금화를 모아서 회관을 키워 봐요!',
-    farmer:'알이 남았어요! 농부가 더 있으면 다 팔 수 있어요.',
+    farmer:'알이 남았어요! 농부가 더 있으면 다 팔 수 있어요.',farmerPile:'알이 쌓였어요! 농부를 부를까요?',
     tower:'타워가 많으면 늑대를 빨리 쓰러뜨려요!',power:'타워를 강화하면 화살이 더 세져요!',pond:'연못을 파면 물고기도 팔 수 있어요!',feast:'마을 잔치를 열면 금화가 더 생겨요!',
     boar:'멧돼지는 건물로 돌진해요. 타워가 막아 줘요!',
     bell1:'늑대 왕이 왔어요! 준비되면 종을 울려요.',bell2:'종을 울리면 황금 화살이 날아가요!',bell3:'언제든 종을 누르면 늑대 왕과 겨뤄요.'
@@ -306,7 +330,7 @@
     /* 5 회관 값만큼 있음 */
     if(ok('hall'))return say('hall','hall',5);
     /* 6 둥지에 알이 남음 */
-    if((s.nest|0)>0&&ok('farmer'))return say('farmer','farmer',6);
+    if((flowOn(s)?!!c.pile:(s.nest|0)>0)&&ok('farmer'))return say('farmer',flowOn(s)?'farmerPile':'farmer',6);
     /* 보너스(회관 목표): 회관 값의 70% 이상 모음, 또는 이 단계에서 충분히 지음 → 회관을 위해 모으자(살 수 없는 key, urgent 아님) */
     const H=s.hall|0;
     if(H<max('hall')&&FLAGS.HALL_MODE!=='auto'){if(s.gold>=REC.hallSoon*price(s,'hall'))return say('hall','hallSoon',0);if(built(s)>=REC.hallGoal[H])return say('hall','hallSave',0)}
@@ -315,10 +339,10 @@
     /* 8 덜 산 쪽(지켜요 = 타워·강화·울타리 / 벌어요 = 닭·농부·연못)에서 살 수 있는 가장 싼 것, 없으면 다른 쪽, 그다음 잔치.
        농부는 닭이 바구니보다 많을 때만(남는 바구니는 쓸모가 없다) */
     const defend=(s.level|0)+(s.power|0)+(s.fence|0),earn=Math.max(0,hens-1)+(s.farmers|0)+(s.pond|0);
-    const useful=k=>k!=='farmer'||hens>basket(s);
+    const useful=k=>k!=='farmer'||(flowOn(s)?!!c.pile:hens>basket(s));
     for(const side of defend<=earn?[DEFEND,EARN,['feast']]:[EARN,DEFEND,['feast']]){
       let best=null;for(const k of side)if(useful(k)&&ok(k)&&(!best||price(s,k)<price(s,best)))best=k;
-      if(best)return say(best,best==='chicken'?'moreHens':best==='fence'?((s.fence|0)<6?'fenceGap':'fenceThick'):best==='farmer'?'farmer':best,8);
+      if(best)return say(best,best==='chicken'?'moreHens':best==='fence'?((s.fence|0)<6?'fenceGap':'fenceThick'):best==='farmer'?(flowOn(s)?'farmerPile':'farmer'):best,8);
     }
     return null;
   }
@@ -465,7 +489,7 @@
     return s;
   }
 
-  const api={API:4,SAVE_VERSION:3,FLAGS,FINALE,FOX,MIGRATE,START_PACK,WOLF_MUL,VILLAGES,VILLAGE_NAME,villageOf,CAPS,FEAST,freshRun,freshMeta,builtNew,autoHall,bellBuilt,bellDue,grow,goldScale,track,lostHen,
+  const api={API:4,SAVE_VERSION:3,FLAGS,FLOW,flowOn,beatTicks,flowGain,sellEggs,FINALE,FOX,MIGRATE,START_PACK,WOLF_MUL,VILLAGES,VILLAGE_NAME,villageOf,CAPS,FEAST,freshRun,freshMeta,builtNew,autoHall,bellBuilt,bellDue,grow,goldScale,track,lostHen,
     bellPrompted,ringBell,finaleNow,finaleSettle,stars,finish,keepPlaying,nextMul,nextRun,foxDue,foxTicks,foxScareOnly,foxCame,foxEnded,restoreRun,restoreMeta,TICK,SPEED,MIN_SEC,MAX_SEC,SLACK,FENCE,HELP,FAST,FAST_BONUS,FAST_MIN,isFast,STREAK,BOUNTY,combo,DASH,DASH_TICKS,MAX_WOLVES,PACE,PAY,REPAIR,CURVE,ITEMS,SHOP,ORDER,POWER_NOTE,THINK,LINES,REC,units,
     HENS_MAX,TOWERS_MAX,FARMERS_MAX,syl,fresh,max,count,needSeconds,baseSeconds,limit,reveal,LEARN,learnTicks,scale,picks,built,wolves,basket,eggPrice,income,raid,settle,price,open,canBuy,buy,shopKeys,shop,recommend,offers,restore,
     GUARD,guard,trackPace};
