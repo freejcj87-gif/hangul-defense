@@ -192,7 +192,8 @@ const CHICK=Combat.LINES.moreHens;
 
  /* 늑대 무리가 가장자리에서 나타나 마을로 걸어온다(세계 시뮬레이션 + 3D). 나오는 쪽 가장자리에 붉은 발자국 */
  /* 발자국은 1.5초 뒤 사라지므로 틱과 같은 호출 안에서 위치를 잰다 */
- {const pw=await page.evaluate(()=>{world.wave.arrive=world.t+World.TRAVEL+10;world.wave.spawned=false;window.__tick(12);const s=document.getElementById('scene').getBoundingClientRect(),prints=[...document.querySelectorAll('#effects .paws i')];
+ /* 앞 구간에서 남은 급한 문구가 무리 직전에 만료되면 문구가 비어 흔들렸다(0.10): 무리를 부르기 전에 문구를 비운다 */
+ {const pw=await page.evaluate(()=>{worldNote=null;world.wave.arrive=world.t+World.TRAVEL+10;world.wave.spawned=false;window.__tick(12);const s=document.getElementById('scene').getBoundingClientRect(),prints=[...document.querySelectorAll('#effects .paws i')];
    return {n:prints.length,inside:prints.every(p=>{const r=p.getBoundingClientRect(),x=(r.left+r.right)/2,y=(r.top+r.bottom)/2;return x>=s.left+8&&x<=s.right-8&&y>=s.top+8&&y<=s.bottom-8}),
     edge:prints.every(p=>{const r=p.getBoundingClientRect(),x=(r.left+r.right)/2,y=(r.top+r.bottom)/2;return Math.min(x-s.left,s.right-x,y-s.top,s.bottom-y)<=70})}});
   ok(pw.n>=3&&pw.inside&&pw.edge,tag+' red paw prints near the scene edge, inside it: '+JSON.stringify(pw))}
