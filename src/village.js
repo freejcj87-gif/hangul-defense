@@ -526,7 +526,9 @@ async function start(){
  function boom(x,z,r,hits){
   boomTotal++;const lite=booms.filter(b=>time-b.t0<.15).length>=3||booms.filter(b=>time-b.t0<.6).length>=10;
   booms.push({x,z,r,t0:time,lite});if(booms.length>32)booms.shift();
-  if(scorches.length>=28)scorches.shift();scorches.push({x,z,r:Math.max(.9,r),t0:time,rot:span(0,6.283)});
+  // No scorch on the fence line: towers shoot fence-smashing wolves first, so blasts land on the fence and the burn mark read as
+  // "the fire arrow hurt my fence" (it never does, world.js burst only hits wolves). 0.10.1
+  if(Math.abs(Math.hypot(x,z)-Rd)>Math.max(.9,r)+.6){if(scorches.length>=28)scorches.shift();scorches.push({x,z,r:Math.max(.9,r),t0:time,rot:span(0,6.283)})}
   const s=Math.max(.8,r);
   flashAt(x,.55,z,1.2+s*.8,EMBER);ringWave(x,z,r*2.5,ORANGE,.42,0,CELL.ring,.65,.08,true);
   if(lite)return;

@@ -633,8 +633,8 @@ a.tick(30);eq(a.api.round,null,'시작 화면에서는 문제 없음');eq(a.api.
 for(const id of ['battle','next','shield','combatInfo','buildPrompt','buyChicken','buyFence','timebar','timeFill','wolfHead','timeTag','choices','cards','skip','gainLine','gainParts'])ok(!html.includes('id="'+id+'"'),'없앤 요소: '+id);
 ok(!html.includes('소리 도움말'),'정답을 글자로 보여 주던 소리 도움말 제거');ok(!src.includes('다음 무리')&&!src.includes('barLeft')&&!src.includes('secondsLeft'),'늑대 시간 표시(초·막대) 코드 없음');
 ok(!src.includes('enterPick')&&!src.includes('picks')&&!src.includes('offers('),'카드 고르기 단계 코드 없음');
-ok(html.includes('src="combat.js?v=0.10"')&&html.includes('src="world.js?v=0.10"')&&html.includes('src="questions.js?v=0.10"')&&html.includes('src="village.js?v=0.10"'),'캐시 갱신용 ?v=0.10');
-ok(html.indexOf('src="questions-gen.js?v=0.10"')>0&&html.indexOf('src="questions-gen.js?v=0.10"')<html.indexOf('src="questions.js?v=0.10"'),'생성 문항 파일을 questions.js보다 먼저 불러옴');
+ok(html.includes('src="combat.js?v=0.10.1"')&&html.includes('src="world.js?v=0.10.1"')&&html.includes('src="questions.js?v=0.10.1"')&&html.includes('src="village.js?v=0.10.1"'),'캐시 갱신용 ?v=0.10.1');
+ok(html.indexOf('src="questions-gen.js?v=0.10.1"')>0&&html.indexOf('src="questions-gen.js?v=0.10.1"')<html.indexOf('src="questions.js?v=0.10.1"'),'생성 문항 파일을 questions.js보다 먼저 불러옴');
 a.go();ok(a.n.start.hidden,'시작하면 시작 화면 닫힘');eq(a.api.phase,'ask','소리 모드: 다 들은 뒤 풀이 시작');eq(a.speakLog[0],Q.at(8,'sound',0,a.api.state.seed).speak,'문제 소리를 읽어 줌');
 shows(a,8,'sound',0,'시작');
 eq(a.api.world.interval,W.intervalFor(9),'무리 간격 = 8세 소리 문제 기준 시간(13초)');
@@ -926,6 +926,15 @@ a=seed({age:7,mode:'story',hall:1,chickens:8,level:4,gold:150},{rec:'real'});a.g
   const p=S(),tk=Math.round(need*2/C.TICK);C.trackPace(p,q,tk);eq([p.pace,p.paced],[150,1],'읽기 속도: 처음엔 절반씩 따라감');C.trackPace(p,q,tk);C.trackPace(p,q,tk);C.trackPace(p,q,tk);eq(p.paced,4,'갱신 횟수');ok(p.pace>185&&p.pace<200,'넷째부터는 천천히 '+p.pace);
   const r=C.restore(JSON.parse(JSON.stringify({version:1,...S({seed:12345,paced:2})})),Q.AGES);eq([r.seed,r.paced],[12345,2],'씨앗·읽기 속도 갱신 횟수 저장')}
 }
+/* 펑(스플래시)은 늑대만 맞힌다: 울타리·건물 위에서 터져도 체력은 그대로, 울타리를 부수는 늑대를 빨리 쓰러뜨려 오히려 지켜 준다(0.10.1 프로듀서 질문) */
+{const S0=o=>Object.assign(C.fresh(8),o||{});
+ {const s=S0({level:4,fence:6,power:3}),w=W.sync(W.create({seed:5,interval:3000}),s);w.trickle=1e9;w.wave.arrive=1e9;const bs=w.buildings.slice(),hp0=bs.map(b=>b.hp);
+  for(const b of bs)w.arrows.push({id:w.nextId++,tower:0,wolf:-1,fx:0,fz:0,tx:b.x,tz:b.z,t:1,total:1,damage:50,splash:1.9,share:.75});for(let i=0;i<3;i++)W.step(w,s);
+  eq(bs.map(b=>b.hp),hp0,'펑이 울타리·건물 위에서 터져도 체력은 그대로')}
+ const fenceLeft=power=>{const s=S0({level:4,fence:6,chickens:4,power}),w=W.sync(W.create({seed:77,interval:3000}),s);w.trickle=1e9;w.wave.arrive=1e9;const f=w.buildings.find(b=>b.kind==='fence'&&b.side===0);
+  for(let i=0;i<8;i++)w.wolves.push({id:w.nextId++,kind:'wolf',x:f.x+(i%4-1.5)*.5,z:f.z+Math.floor(i/4)*.4,sx:20,sz:0,hp:200,max:200,speed:1,state:'smash',target:f.id,timer:0,inside:0,hen:0});
+  let m=f.hp;for(let t=0;t<120;t++){if(t%20===0)W.volley(w,s,{scale:2});W.step(w,s);m=Math.min(m,f.hp)}return m};
+ ok(fenceLeft(3)>fenceLeft(0),'같은 늑대 무리에도 펑 강화가 있으면 울타리가 덜 상함 '+fenceLeft(0)+' → '+fenceLeft(3))}
 /* 화면: 새 판 보호·씨앗·찍기 막기·틀린 문제 읽기 속도 */
 a=fresh();a.go();eq([a.game().calm,a.game().keep],[W.GUARD.calm,true],'새 판은 보호 3번·마지막 닭 지킴');ok(a.game().seed>0,'판마다 문제 순서 씨앗');
 eq(a.game().round.id,Q.at(8,'sound',0,a.game().seed).id,'화면 문제 = Questions.at(나이, 모드, 번호, 씨앗)');
