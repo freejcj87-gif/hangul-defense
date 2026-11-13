@@ -10,14 +10,14 @@ const S=(o)=>Object.assign(C.fresh(8),o||{});
 
 /* ======================= 1. 규칙 모듈 ======================= */
 eq(C.API,3,'규칙 API 버전(0.9 상점·알 경제·추천)');
-/* 1-1 제한시간: 짧은 문제(7세 전부·8세 소리·9세 소리)는 8~10초, 긴 글은 길이에 비례(최대 50초), 언제나 보통 아이 필요 시간 이상 */
+/* 1-1 제한시간: 짧은 문제(7세 낱말)는 8~10초, 긴 글은 길이에 비례(최대 50초), 언제나 보통 아이 필요 시간 이상. 0.11: 문항은 읽기(story)뿐 */
 let shortCount=0;
 for(const a of Q.AGES)for(const m of Q.MODES)for(const q of bank(a,m)){
  const sec=C.baseSeconds(q),need=C.needSeconds(q),tag=q.id;
  ok(Number.isInteger(sec)&&sec>=C.MIN_SEC[a]&&sec<=C.MAX_SEC,tag+' 제한시간 범위 '+sec);
  ok(sec>=need,tag+' 보통 아이 필요 시간('+need.toFixed(1)+'초) 이상');
  eq(C.limit(q,S()),sec*10,tag+' 틱 = 초×10');
- if(a===7||m==='sound'&&a<=9){ok(sec>=8&&sec<=10,tag+' 짧은 문제 8~10초');shortCount++}else ok(sec>10,tag+' 긴 글은 10초보다 김');
+ if(a===7){ok(sec>=8&&sec<=10,tag+' 짧은 문제 8~10초');shortCount++}else ok(sec>10,tag+' 긴 글은 10초보다 김');
  const lock=C.reveal(q);
  if(m==='story'&&a>=8){ok(lock>3&&lock<C.limit(q,S())*.3,tag+' 글 먼저 읽기 잠금은 제한시간의 30% 미만')}else eq(lock,3,tag+' 보기 잠금 0.3초');
  const lesson=C.lesson(q);ok(lesson.includes(q.choices[q.answer]),tag+' 놓친 뒤 읽어 줄 글에 정답');
@@ -26,8 +26,8 @@ for(const a of Q.AGES)for(const m of Q.MODES)for(const q of bank(a,m)){
   if(a>=9){ok(!lesson.includes(q.passage.split('\n')[0])&&lesson.includes(q.prompt),tag+' 9세 이상 놓친 뒤 글은 질문·정답만');ok(C.syl(lesson)<C.syl(full),tag+' 짧은 해설')}else eq(lesson,full,tag+' 8세 이하는 지문까지 읽음')}
  ok(C.scale(q)>=1&&C.scale(q)<=5,tag+' 긴 글 배수 1~5');
 }
-eq(shortCount,1013,'8~10초 문항 수 1013(0.10 생성 문항 포함)');
-/* 1-1b 상식·수학·영어(4문제마다 1문제, 두 모드 공통): 풀이 시간·읽어 줄 글·섞는 순서 */
+eq(shortCount,Q.count(7,'story'),'8~10초 문항 = 7세 낱말 전부(0.11: 소리 문항 삭제)');eq(Q.MODES,['story'],'모드는 읽고 고르기 하나');
+/* 1-1b 상식·수학·영어: 풀이 시간·읽어 줄 글·섞는 순서 */
 for(const a of Q.AGES)for(let i=0;i<Q.quizCount(a);i++){const q=Q.quiz(a,i),tag=q.id,sec=C.baseSeconds(q);
  ok(sec>=C.needSeconds(q)&&sec<=C.MAX_SEC,tag+' 풀이 시간 '+sec);eq(C.reveal(q),3,tag+' 바로 보임');
  const l=C.lesson(q),ans=q.choices[q.answer];ok(l.includes(q.speak)&&(q.say?l.includes(q.say):C.sayable(ans)?l.includes(ans):l.includes('초록색 보기')&&!l.includes(ans)),tag+' 읽어 줄 글 = 질문 + 정답(say가 있으면 그 말, 그림·영어 정답은 초록 보기로)')}
@@ -39,15 +39,15 @@ for(const a of Q.AGES)for(const m of Q.MODES){const seq=Array.from({length:200},
  eq(seq.map(q=>q.id),Array.from({length:200},(_,i)=>Q.at(a,m,i,4242).id),a+'세 '+m+': 같은 씨앗이면 같은 순서');
  ok(seq.slice(0,40).map(q=>q.id).join()!==Array.from({length:40},(_,i)=>Q.at(a,m,i,99).id).join(),a+'세 '+m+': 씨앗이 다르면 순서가 다름')}
 eq([2,3,5,7].map((n,k)=>Q.quizPer20(Q.AGES[k],0)),[2,3,5,7],'첫 20칸 퀴즈 수: 7세 2 · 8세 3 · 9세 5 · 10세 7');ok(Q.quizPer20(9,200)>Q.quizPer20(9,0)&&Q.quizPer20(10,200)>Q.quizPer20(10,0),'9·10세는 진행할수록 퀴즈가 늘어남');
-{const n=Q.count(8,'sound'),ids=Array.from({length:n*2+40},(_,i)=>Q.at(8,'sound',i,7)).filter(q=>q.mode==='sound');const first=ids.slice(0,n).map(q=>q.id);
+{const n=Q.count(8,'story'),ids=Array.from({length:n*2+40},(_,i)=>Q.at(8,'story',i,7)).filter(q=>q.mode==='story');const first=ids.slice(0,n).map(q=>q.id);
  eq(new Set(first).size,n,'한 바퀴 안에서는 같은 문항이 다시 나오지 않음');ok(ids.find(q=>q.lap===1),'두 바퀴째는 lap 1(보기 순서 돌림)')}
-{const q=Q.get(8,'sound',0),base=C.limit(q,S());
+{const q=Q.get(7,'story',0),base=C.limit(q,S());
  eq(C.limit(q,S({fence:6})),Math.round(base*1.3),'울타리 6칸 = +30%');
  eq(C.limit(q,S({help:2})),Math.round(base*1.4),'도움 2단계 = +40%');
  eq(C.limit(q,S({fence:18})),C.limit(q,S({fence:6})),'(0.6 유산) 울타리 시간은 6칸까지만');}
 
 /* 1-2 수입: 시간을 늦게 쓴다고 늘지 않고(경과 시간은 입력이 아님), 번개면 25% 더 */
-{const q=Q.get(8,'sound',0),s=S(),P=C.PAY,one=P.base+P.egg;
+{const q=Q.get(7,'story',0),s=S(),P=C.PAY,one=P.base+P.egg;
  const a=C.income(s,q,false),b=C.income(s,q,true);
  eq([a.base,a.laid,a.sold,a.left,a.eggValue,a.gold],[P.base,1,1,0,P.egg,one],'처음 수입 = 기본 '+P.base+' + 알 1 × '+P.egg);
  eq([a.eggs,a.value],[a.sold,a.eggValue],'0.8 호환 이름: eggs = sold, value = eggValue');
@@ -62,7 +62,7 @@ eq([2,3,5,7].map((n,k)=>Q.quizPer20(Q.AGES[k],0)),[2,3,5,7],'첫 20칸 퀴즈 �
  C.settle(st,q,'second');eq(st.streak,0,'두 번째에 맞히면 연속 끊김');C.settle(st,q,'first');C.settle(st,q,'miss');eq(st.streak,0,'놓쳐도 끊김');eq(C.combo(1),1,'첫 정답 ×1');}
 
 /* 1-2b 알 경제(game-plan §4.4): 닭마다 알 1개 → 농부 바구니(1 + 농부) × 4만큼 팔고 → 남은 알은 둥지(닭 수까지)에 남아 다음 정답에 먼저 판다 */
-{const q=Q.get(8,'sound',0),P=C.PAY,B=P.basket,egg=h=>P.egg+P.hall*h;
+{const q=Q.get(7,'story',0),P=C.PAY,B=P.basket,egg=h=>P.egg+P.hall*h;
  const s=S({chickens:7});let nest=0;
  for(let i=0;i<4;i++){const r=C.settle(s,q,'first'),tot=nest+7,sold=Math.min(tot,B),left=Math.min(7,tot-sold);
   eq([r.laid,r.sold,r.left,s.nest,r.basket],[7,sold,left,left,B],(i+1)+'번째 정답: 닭 7 · 농부 1명 → 판 알 '+sold+', 둥지 '+left);nest=left}
@@ -79,7 +79,7 @@ eq([2,3,5,7].map((n,k)=>Q.quizPer20(Q.AGES[k],0)),[2,3,5,7],'첫 20칸 퀴즈 �
  ok(C.income(S({chickens:6}),q,false).gold<C.income(S({chickens:6,farmers:1}),q,false).gold,'닭이 바구니보다 많으면 농부가 수입을 늘림');}
 
 /* 1-3 결말 반영 */
-{const q=Q.get(8,'sound',0);
+{const q=Q.get(7,'story',0);
  let s=S({hidden:1,chickens:3,help:2});const r=C.settle(s,q,'first',{fast:true});
  eq([s.gold,s.wins,s.hidden,s.help],[20+r.gold,1,0,1],'한 번에 정답: 금화·정답 수·숨은 닭 1마리 복귀·도움 1단계 감소');
  eq(r.eggs,2,'복귀한 닭은 이번에는 알을 낳지 않음');
@@ -134,7 +134,7 @@ eq([2,3,5,7].map((n,k)=>Q.quizPer20(Q.AGES[k],0)),[2,3,5,7],'첫 20칸 퀴즈 �
  eq([W.power(S({power:10})).multi,W.power(S({power:10})).splash],[3,W.POWER[3].splash],'10단계도 세 갈래 · 큰 펑');eq(C.POWER_NOTE.length,10,'강화 설명 10단계');}
 
 /* 1-5 모든 상품은 산 순간 수입·화살·타워·울타리·상점·알값 가운데 하나가 바로 변한다(명분 있는 선택지) */
-{const q=Q.get(8,'sound',0);
+{const q=Q.get(7,'story',0);
  const sig=s=>{const w=W.sync(W.create({seed:1,interval:300}),s);return JSON.stringify([C.income(s,q,false).gold,W.damage(s),W.power(s),W.towerUnits(w),w.buildings.filter(b=>b.kind==='fence').map(b=>b.layer),C.shop(s).map(x=>x.state==='locked'),C.eggPrice(s)])};
  for(const k of ['tower','power','fence','chicken','farmer','pond','hall','feast']){
   const s=S({gold:1e6,hall:k==='feast'?3:k==='pond'?2:k==='power'?1:0,chickens:k==='farmer'?9:3}),before=sig(s);
@@ -152,9 +152,16 @@ eq([2,3,5,7].map((n,k)=>Q.quizPer20(Q.AGES[k],0)),[2,3,5,7],'첫 20칸 퀴즈 �
  eq([big.level,big.fence,big.chickens,big.farmers,big.pond,big.hall,big.hidden,big.help,big.age,big.gold,big.power,big.nest,big.marketDown],[19,18,20,9,3,3,20,3,8,20,10,20,1],'새 상한으로 자름(둥지 ≤ 닭, 매대 0/1)');
  /* 0.8 저장: 카드 고르기 중이던 문제는 금화를 이미 받았다 → 다음 문제로, 남은 카드 수(left)는 버림 */
  const v8={version:1,gold:57,level:5,fence:6,chickens:8,farmers:2,pond:1,hall:2,power:3,index:12,mode:'sound',age:8,wins:10,streak:3,round:{token:'8:sound:12',phase:'pick',t:41,tries:0,gold:15,left:2}};
- const r8=C.restore(v8);eq([r8.round,r8.index,r8.gold,r8.nest,r8.marketDown,r8.streak],[null,13,57,0,0,3],'0.8 카드 고르기 저장 → 다음 문제(금화 두 번 안 줌)');
+ const r8=C.restore(v8);eq([r8.round,r8.index,r8.gold,r8.nest,r8.marketDown,r8.streak,r8.mode],[null,13,57,0,0,3,'story'],'0.8 카드 고르기 저장 → 다음 문제(금화 두 번 안 줌), 소리 모드 저장은 story로');
  eq([r8.level,r8.fence,r8.chickens,r8.farmers,r8.pond,r8.hall,r8.power],[5,6,8,2,1,2,3],'0.8 마을은 그대로');
- eq(C.restore({version:1,index:3,round:{token:'8:sound:3',phase:'ask',t:41,tries:1,gold:0,left:3}}).round,{token:'8:sound:3',phase:'ask',t:41,tries:1,gold:0},'풀던 문제는 그대로(left 버림)');
+ eq(C.restore({version:1,index:3,mode:'story',round:{token:'8:story:3',phase:'ask',t:41,tries:1,gold:0,left:3}}).round,{token:'8:story:3',phase:'ask',t:41,tries:1,gold:0},'풀던 읽기 문제는 그대로(left 버림)');
+ /* 0.11 듣고 고르기 폐쇄: 예전 mode 'sound'(또는 mode 없는) 저장은 story로, 풀던 소리 문제는 버리고 같은 번호의 읽기 문제로. 마을·금화는 그대로 */
+ eq(C.fresh(8).mode,'story','새 판 기본 모드 = story');
+ for(const phase of ['ask','learn']){const r=C.restore({version:1,gold:88,level:3,chickens:5,wins:6,index:6,seed:5,mode:'sound',age:9,round:{token:'9:sound:6',phase,t:44,tries:1,gold:0}});
+  eq([r.mode,r.round,r.index,r.gold,r.level,r.chickens,r.wins,r.seed,r.age],['story',null,6,88,3,5,6,5,9],'소리 모드 저장('+phase+' 중) → story, 풀던 소리 문제는 버림, 번호·마을 그대로')}
+ eq([C.restore({version:1,index:3,round:{token:'8:sound:3',phase:'ask',t:41,tries:1}}).mode,C.restore({version:1,index:3,round:{token:'8:sound:3',phase:'ask',t:41,tries:1}}).round],['story',null],'mode 없는 옛 저장(기본이 소리였음)도 story, 풀던 문제 버림');
+ eq([C.restore({version:1,mode:'x'}).mode,C.restore({version:1,mode:'story'}).mode],['story','story'],'어떤 mode든 story');
+ {const o=C.restore({version:1,gold:77,index:2,mode:'sound',age:9,claimed:'sound:2'});eq([o.mode,o.index],['story',3],'0.5 소리 저장: 보상받은 문제는 다음으로, 모드는 story')}
  eq(C.restore({version:1,round:{token:'8:story:3',phase:'learn',t:1,tries:1}}).round,{token:'8:story:3',phase:'learn',t:1,tries:1,gold:0},'배우기 단계 복원');
  eq(C.restore({version:1,round:{token:'x',phase:'battle',t:1,tries:0}}).round,null,'모르는 단계는 버림');eq(C.restore({version:1,index:3,round:{phase:'pick'}}).index,3,'모양이 틀린 pick 저장은 넘기지 않음');
  const s9=S({gold:345,level:12,fence:9,chickens:14,farmers:3,pond:1,hall:2,power:4,nest:5,marketDown:1,index:40,wins:33,streak:2,mode:'story',age:10,repairs:2,feast:0});s9.round={token:'10:story:40',phase:'ask',t:12,tries:0,gold:0};
@@ -363,7 +370,7 @@ eq([2,3,5,7].map((n,k)=>Q.quizPer20(Q.AGES[k],0)),[2,3,5,7],'첫 20칸 퀴즈 �
  const RATE={7:120/2,8:120,9:180,10:230};
  const need=(q,r)=>{const rps=r/60,n=q.choices.length,cc=q.choices.reduce((s,c)=>s+C.units(c),0),p=C.syl(q.passage);
   if(q.mode==='quiz')return 1+(C.syl(q.prompt)+C.units(q.passage))/rps+cc/rps+.4*n+((C.THINK[q.cat]||C.THINK.common)[q.age]||2);
-  return q.mode==='sound'?1+cc/rps+.4*n:1.5+p/rps+(q.age===7?0:C.syl(q.prompt)/rps)+cc/rps+.4*n+(q.age>=9?.3*p/rps:0)};
+  return 1.5+p/rps+(q.age===7?0:C.syl(q.prompt)/rps)+cc/rps+.4*n+(q.age>=9?.3*p/rps:0)};
  const interval=(age,mode)=>{const t=Array.from({length:Q.count(age,mode)},(_,i)=>C.baseSeconds(Q.get(age,mode,i))).sort((a,b)=>a-b);return W.intervalFor(t[t.length>>1])};
  function play(age,mode,kind,minutes){
   const s=C.fresh(age);s.mode=mode;const w=W.sync(W.create({seed:Math.floor(rnd()*1e9),interval:interval(age,mode)}),s),opened=[];let lost=-1e9;
@@ -372,14 +379,14 @@ eq([2,3,5,7].map((n,k)=>Q.quizPer20(Q.AGES[k],0)),[2,3,5,7],'첫 20칸 퀴즈 �
    const r=C.recommend(s,{wolvesInside:W.wolvesInside(w),towers:1+s.level,lostHenRecently:w.t-lost<300,brokenKinds:W.brokenKinds(w),opened});if(!r)break;if(r.rule===4)opened.push(r.key);
    if(!C.canBuy(s,r.key))break;C.buy(s,r.key);if(r.key==='repair')W.repairAll(w);W.sync(w,s);go(.8)}};
   while(w.t<minutes*600){
-   const q=Q.at(age,mode,s.index),n=q.choices.length,lock=C.reveal(q)/10;if(mode==='sound')go(1+C.syl(q.speak)/4.5);
+   const q=Q.at(age,mode,s.index),n=q.choices.length,lock=C.reveal(q)/10;
    const t=kind==='guess'?lock+.4:Math.max(lock+.3,need(q,RATE[age])*(.75+rnd()*.5)),ok1=kind==='guess'?rnd()<1/n:rnd()<.85;go(t);
    if(ok1){const fast=C.isFast(q,Math.round(t/W.TICK));s.marketDown=W.marketDown(w);C.settle(s,q,'first',{fast,ticks:Math.round(t/W.TICK)});W.volley(w,s,{scale:C.scale(q),fast});go(1.2);shop()}
    else{go(W.dashTicks(w)*W.TICK);go(kind==='guess'?.4:need(q,RATE[age])*.35);if(kind==='guess'?rnd()<1/(n-1):rnd()<.8)C.settle(s,q,'second');else{s.misses++;s.streak=0}go(C.syl(C.lesson(q))/4.5+1.2+(kind==='guess'?.4:1));shop()}
    s.index++}
   return C.built(s)}
  const avg=(a,m,k)=>{let t=0;for(let i=0;i<6;i++)t+=play(a,m,k,10);return t/6};
- for(const [a,m] of [[7,'sound'],[8,'sound'],[9,'story'],[10,'story']]){const typ=avg(a,m,'typ'),g=avg(a,m,'guess');ok(typ>g*2,`${a}세 ${m}: 보통 아이 지은 것 ${typ.toFixed(1)} > 찍기 ${g.toFixed(1)}×2 (10분)`)}
+ for(const [a,m] of [[7,'story'],[8,'story'],[9,'story'],[10,'story']]){const typ=avg(a,m,'typ'),g=avg(a,m,'guess');ok(typ>g*2,`${a}세 ${m}: 보통 아이 지은 것 ${typ.toFixed(1)} > 찍기 ${g.toFixed(1)}×2 (10분)`)}
 }
 
 /* 1-9 세계 무작위 시험(fuzz)·회귀 검사(world.js). 회관 0~3·타워 0~19(층)·강화 0~10·울타리 0~18(겹, 일부 부서짐)·닭 0~20·나이 7~10에서 온갖 종류·상태의 늑대를 끼워 넣고,
@@ -584,6 +591,8 @@ function boot(opts={}){
   go(){n.go.click()},
   btn:i=>kids().find(b=>Number(b.dataset.i)===i),
   /* 0.10: 첫 시도는 글을 읽을 만한 시간(번개를 받을 수 있는 때 = 찍기 막기 기준)까지 기다렸다 누른다. 즉시 누르기는 rightNow */
+  /* 보기가 열리고 번개를 받을 수 있는 때까지 기다림(누르지는 않음) */
+  ready(){h.unlock();const r=api.round,k=fastAt(r.q)-r.t;if(k>0)h.tick(k)},
   right(){const r=api.round;if(r&&api.phase==='ask'&&r.tries===0&&r.lock<=0&&r.dash<=0){const k=fastAt(r.q)-r.t;if(k>0)h.tick(k)}h.btn(api.round.q.answer).click()},
   rightNow(){h.btn(api.round.q.answer).click()},
   wrongIndex(k=0){return api.round.q.choices.map((_,i)=>i).filter(i=>i!==api.round.q.answer)[k]},
@@ -606,7 +615,11 @@ function boot(opts={}){
 const fresh=o=>{saved={};return boot(o)};
 const seed=(s,o)=>{saved={[KEY]:JSON.stringify({version:1,...C.fresh(8),...s})};return boot(o)};
 const REWARD=12,LAND=24;/* 한 번에 맞힌 뒤: 1.2초 뒤 다음 문제, 2.4초 안에 동전이 다 닿음 */
-/* 화면에 나온 문제 = 그 나이·모드의 index번째 문제(4문제마다 상식·수학·영어가 섞인 순서, Questions.at) */
+/* 화면에 나온 문제 = 그 나이의 index번째 문제(상식·수학·영어가 섞인 순서, Questions.at) */
+/* 그 나이 읽기 문항 기준 무리 간격(index.html waveInterval과 같은 식) */
+const ivFor=age=>{const t=[];for(let i=0;i<Q.count(age,'story');i++)t.push(C.baseSeconds(Q.get(age,'story',i)));t.sort((x,y)=>x-y);return W.intervalFor(t[t.length>>1])};
+/* 듣기(listen) 단계는 7세 상식·수학·영어 질문에만 남았다: 그 칸에서 시작하는 저장 */
+const SEED7=777,I7=Array.from({length:60},(_,k)=>k).find(k=>Q.at(7,'story',k,SEED7).mode==='quiz'),L7={age:7,index:I7,seed:SEED7};
 const fastAt=q=>Math.ceil(C.FAST_MIN*C.needSeconds(q)/C.TICK);/* 번개를 받을 수 있는 가장 이른 틱 */
 const live=w=>w.wolves.filter(v=>v.state!=='dead'&&v.state!=='gone').length;
 function shows(a,age,mode,index,msg){
@@ -633,11 +646,15 @@ a.tick(30);eq(a.api.round,null,'시작 화면에서는 문제 없음');eq(a.api.
 for(const id of ['battle','next','shield','combatInfo','buildPrompt','buyChicken','buyFence','timebar','timeFill','wolfHead','timeTag','choices','cards','skip','gainLine','gainParts'])ok(!html.includes('id="'+id+'"'),'없앤 요소: '+id);
 ok(!html.includes('소리 도움말'),'정답을 글자로 보여 주던 소리 도움말 제거');ok(!src.includes('다음 무리')&&!src.includes('barLeft')&&!src.includes('secondsLeft'),'늑대 시간 표시(초·막대) 코드 없음');
 ok(!src.includes('enterPick')&&!src.includes('picks')&&!src.includes('offers('),'카드 고르기 단계 코드 없음');
-ok(html.includes('src="combat.js?v=0.10.1"')&&html.includes('src="world.js?v=0.10.1"')&&html.includes('src="questions.js?v=0.10.1"')&&html.includes('src="village.js?v=0.10.1"'),'캐시 갱신용 ?v=0.10.1');
-ok(html.indexOf('src="questions-gen.js?v=0.10.1"')>0&&html.indexOf('src="questions-gen.js?v=0.10.1"')<html.indexOf('src="questions.js?v=0.10.1"'),'생성 문항 파일을 questions.js보다 먼저 불러옴');
-a.go();ok(a.n.start.hidden,'시작하면 시작 화면 닫힘');eq(a.api.phase,'ask','소리 모드: 다 들은 뒤 풀이 시작');eq(a.speakLog[0],Q.at(8,'sound',0,a.api.state.seed).speak,'문제 소리를 읽어 줌');
-shows(a,8,'sound',0,'시작');
-eq(a.api.world.interval,W.intervalFor(9),'무리 간격 = 8세 소리 문제 기준 시간(13초)');
+ok(html.includes('src="combat.js?v=0.11"')&&html.includes('src="world.js?v=0.11"')&&html.includes('src="questions.js?v=0.11"')&&html.includes('src="village.js?v=0.11"')&&!html.includes('?v=0.10'),'캐시 갱신용 ?v=0.11');
+ok(html.indexOf('src="questions-gen.js?v=0.11"')>0&&html.indexOf('src="questions-gen.js?v=0.11"')<html.indexOf('src="questions.js?v=0.11"'),'생성 문항 파일을 questions.js보다 먼저 불러옴');
+/* 0.11: 듣고 고르기 모드 폐쇄. 시작 화면·설정에 모드 고르기가 없고, 스크립트에 소리 모드 분기가 없다 */
+for(const id of ['startSound','startStory','mode'])ok(!html.includes('id="'+id+'"'),'없앤 모드 버튼: '+id);
+ok(!html.includes('mode-row')&&!html.replace(/<script>[\s\S]*?<\/script>/,'').includes('듣고 고르기'),'화면에 모드 고르기·듣고 고르기 문구 없음');
+ok(!src.includes("'sound'")&&!src.includes('startSound')&&!src.includes("$('mode')")&&!src.includes('round.reading'),'스크립트에 소리 모드 분기 없음');
+a.go();ok(a.n.start.hidden,'시작하면 시작 화면 닫힘');eq([a.api.phase,a.api.state.mode],['ask','story'],'언제나 읽고 고르기: 바로 풀이');eq(a.speakLog.length,0,'읽기 문제는 읽어 주지 않음');eq(a.n.drawerSummary.textContent,'⚙️ 설정 · 8세','설정 요약에 모드 없음');
+shows(a,8,'story',0,'시작');
+eq(a.api.world.interval,ivFor(8),'무리 간격 = 8세 읽기 문항 기준 시간');
 let w0=a.api.world.t;a.tick(10);eq(a.api.round.t,10,'풀이 시간 10틱');eq(a.api.world.t,w0+10,'늑대 세계도 10틱');
 ok(a.window.getVillageState().world===a.api.world,'3D 마을이 같은 늑대 세계를 읽음');eq(a.window.getVillageState().radius,7,'처음 마을 반지름 7');
 eq(a.api.world.buildings.filter(b=>b.kind==='tower').length,1,'처음 화살 타워 1개');
@@ -645,34 +662,38 @@ eq(a.api.world.buildings.filter(b=>b.kind==='tower').length,1,'처음 화살 타
 {let miss=0,seen=new Set(),secs=0;for(let i=0;i<500;i++){a.tick(1);const n=live(a.api.world);seen.add(n);if(!a.n.level.textContent.endsWith('🐺'+n))miss++;if(/\d+ *초/.test(a.n.villageStatus.textContent))secs++}
  eq(miss,0,'🐺 알약 = 지금 늑대 수(틱마다)');ok(seen.size>=3,'늑대 수가 바뀌는 동안 확인: '+[...seen]);eq(secs,0,'상태 문구에 초 표시 없음');eq(a.n.level.getAttribute('aria-label').endsWith('늑대 '+live(a.api.world)+'마리'),true,'읽어 주는 이름표도 같은 수')}
 
-/* 2-2 듣기·음성 실패 */
-a=fresh({tts:'manual'});a.go();eq(a.api.phase,'listen','듣는 중');const lw=a.api.world.t;a.tick(40);eq(a.api.round.t,0,'듣는 동안 풀이 시간은 시작 전');eq(a.api.world.t,lw+40,'늑대는 듣는 동안에도 옴');ok(a.n.answers.classList.contains('veiled'),'듣는 동안 보기 가림');
-a.speechEnd();eq(a.api.phase,'ask','다 들으면 시작');ok(!a.n.answers.classList.contains('veiled'),'보기 보임');ok(!a.n.speak.classList.contains('hidden'),'소리 모드: 다시 듣기 버튼');
-a.n.speak.click();a.tick(5);ok(a.api.round.t>=5,'다시 듣는 동안에도 시계가 흐름');
-a=fresh({tts:'none'});a.go();eq([a.api.voiceOff,a.api.state.mode,a.api.phase],[true,'story','ask'],'음성 없음 → 읽고 고르기로 전환');ok(a.n.feedback.textContent.includes('소리'),'전환 안내');
-a=fresh({tts:'never'});a.go();eq(a.api.phase,'listen','음성이 시작 안 됨');a.tick(31);eq([a.api.voiceOff,a.api.state.mode],[true,'story'],'3초 안에 시작 안 하면 음성 실패 처리');
-a=fresh({tts:'error'});a.go();eq(a.api.state.mode,'story','음성 오류 → 읽고 고르기');
+/* 2-2 듣기(7세 상식·수학·영어 질문 읽어 주기)·음성 실패 */
+a=seed(L7,{tts:'manual'});a.go();eq([a.api.phase,a.speakLog.at(-1)],['listen',Q.at(7,'story',I7,SEED7).speak],'7세 퀴즈: 질문을 듣는 중');const lw=a.api.world.t;a.tick(40);eq(a.api.round.t,0,'듣는 동안 풀이 시간은 시작 전');eq(a.api.world.t,lw+40,'늑대는 듣는 동안에도 옴');ok(a.n.answers.classList.contains('veiled'),'듣는 동안 보기 가림');
+a.speechEnd();eq(a.api.phase,'ask','다 들으면 시작');ok(!a.n.answers.classList.contains('veiled'),'보기 보임');ok(!a.n.speak.classList.contains('hidden'),'7세 퀴즈 풀이 중: 🔊 다시 듣기 버튼');
+a.n.speak.click();eq([a.speakLog.length,a.speakLog.at(-1)],[2,Q.at(7,'story',I7,SEED7).speak],'다시 듣기는 질문을 다시 읽음');a.tick(5);ok(a.api.round.t>=5,'다시 듣는 동안에도 시계가 흐름');
+/* 소리가 안 나오는 기기: 읽어 주기만 꺼지고 같은 문제로 그대로 진행(모드 전환·경고 문구 없음) */
+a=seed(L7,{tts:'none'});a.go();eq([a.api.voiceOff,a.api.phase],[true,'ask'],'음성 없음 → 바로 풀이');shows(a,7,'story',I7,'음성 없음: 같은 문제');ok(!a.n.feedback.classList.contains('warn')&&!a.n.feedback.textContent.includes('바꿨'),'모드 전환 문구 없음');ok(a.n.voiceStatus.textContent.includes('소리가 나오지 않아요'),'설정에 한 줄 안내');ok(a.n.speak.classList.contains('hidden'),'소리 없는 기기: 다시 듣기 버튼 없음');
+a.unlock();a.right();eq(a.api.phase,'reward','소리 없이도 맞히면 판매 연출');a.tick(REWARD);eq(a.api.phase,'ask','소리 없이도 다음 문제');a.unlock();a.wrong(0);a.tick(C.DASH_TICKS);a.wrong(1);eq(a.api.phase,'learn','소리 없이도 배우기');a.tick(151);ok(a.api.round.ready,'읽어 주지 못하면 시간으로 넘어감');a.right();eq(a.api.phase,'ask','소리 없이도 계속');
+a=seed(L7,{tts:'never'});a.go();eq(a.api.phase,'listen','음성이 시작 안 됨');a.tick(31);eq([a.api.voiceOff,a.api.phase],[true,'ask'],'3초 안에 시작 안 하면 음성 실패 처리 → 풀이');
+a=seed(L7,{tts:'error'});a.go();eq([a.api.voiceOff,a.api.phase],[true,'ask'],'음성 오류 → 그대로 풀이');
+a=fresh({tts:'none'});a.go();eq([a.api.voiceOff,a.api.phase],[false,'ask'],'읽어 줄 것이 없는 문제는 음성이 없어도 그대로');
 
-/* 2-3 읽기 모드 '글 먼저 읽기'와 읽기 중 듣기 금지 */
+/* 2-3 '글 먼저 읽기'(8세 이상)와 읽기 중 듣기 금지 */
 a=seed({age:9,mode:'story'});a.go();shows(a,9,'story',0,'9세 읽기');
-ok(a.api.round.lock>3,'글 먼저 읽기 잠금');ok(a.n.answers.classList.contains('veiled'),'잠금 중 보기 가림');ok(a.n.speak.classList.contains('hidden'),'읽기 모드 풀이 중 듣기 버튼 없음');
-eq(a.speakLog.length,0,'읽기 모드는 문제를 읽어 주지 않음');
+ok(a.api.round.lock>3,'글 먼저 읽기 잠금');ok(a.n.answers.classList.contains('veiled'),'잠금 중 보기 가림');ok(a.n.speak.classList.contains('hidden'),'읽기 문제 풀이 중 듣기 버튼 없음');
+eq(a.speakLog.length,0,'읽기 문제는 읽어 주지 않음');
 a.right();eq(a.api.phase,'ask','잠금 중에는 눌러도 무시');const lock=a.api.round.lock;a.unlock();eq(a.api.round.t,lock,'잠금 동안에도 시계는 흐름');ok(!a.n.answers.classList.contains('veiled'),'잠금 끝나면 보기');
 
 /* 2-4 한 번에 정답 → 일제 사격 → 판매 연출(세계는 흐름) → 동전이 금화 칸에 닿으며 숫자가 오름 → 1.2초 뒤 다음 문제 */
 a=fresh({view:true});a.go();
 /* ⚡: 최소 읽기 시간 전에는 꺼진 채 기다리고, 번개 시간 동안 빛나다가, 지나면 조용히 꺼진다 */
 {const q=a.api.round.q;let end=fastAt(q);while(C.isFast(q,end))end++;eq(a.n.fastIcon.dataset.state,'wait','⚡ 처음엔 대기');a.tick(fastAt(q));eq(a.n.fastIcon.dataset.state,'on','⚡ 번개 시간에 빛남');
- const b=fresh();b.go();b.tick(end-1);eq(b.n.fastIcon.dataset.state,'on','⚡ 번개 마지막 틱까지 빛남');b.tick(1);eq(b.n.fastIcon.dataset.state,'off','⚡ 번개 시간이 지나면 꺼짐');ok(!/\d/.test(b.n.fastIcon.textContent),'⚡에는 숫자 없음')}
-let q0=a.api.round.q,g0=a.api.state.gold,inc=C.income(a.api.state,q0,true),exp=inc.gold,u0=a.api.uiT;a.right();
+ /* 판마다 문제가 다르므로(씨앗) 그 판의 문제로 번개 끝을 다시 센다 */
+ const b=fresh();b.go();const qb=b.api.round.q;end=fastAt(qb);while(C.isFast(qb,end))end++;b.tick(end-1);eq(b.n.fastIcon.dataset.state,'on','⚡ 번개 마지막 틱까지 빛남');b.tick(1);eq(b.n.fastIcon.dataset.state,'off','⚡ 번개 시간이 지나면 꺼짐');ok(!/\d/.test(b.n.fastIcon.textContent),'⚡에는 숫자 없음')}
+a.unlock();let q0=a.api.round.q,t0=a.api.round.t,g0=a.api.state.gold,inc=C.income(a.api.state,q0,true),exp=inc.gold,u0=a.api.uiT;a.right();
 eq(a.api.phase,'reward','한 번에 정답 → 판매 연출(카드 고르기 없음)');eq(a.api.state.gold,g0+exp,'규칙은 정답 순간 금화를 더함(저장 안전)');eq(a.api.state.index,1,'문제 번호는 바로 다음으로(이중 지급 방지)');
-eq(a.api.state.pace,C.fresh(8).pace===undefined?undefined:(()=>{const s=C.fresh(8);C.settle(s,q0,'first',{fast:true,ticks:fastAt(q0)});return s.pace})(),'정답까지 걸린 틱을 규칙에 넘겨 읽기 속도(pace)가 바뀜');
+eq(a.api.state.pace,C.fresh(8).pace===undefined?undefined:(()=>{const s=C.fresh(8);C.settle(s,q0,'first',{fast:true,ticks:t0});return s.pace})(),'정답까지 걸린 틱을 규칙에 넘겨 읽기 속도(pace)가 바뀜');
 eq(a.game().gold.shown,g0,'화면 숫자는 아직 그대로(동전이 날아오는 중)');eq(a.n.gold.textContent,'🪙 '+g0,'금화 칸도 그대로');ok(a.n.feedback.textContent.includes('🪙 +'+exp),'받은 금화 안내 '+a.n.feedback.textContent);
 ok(a.events.some(e=>e.type==='volley'),'3D: 일제 사격');{const pe=a.events.find(e=>e.type==='produce');eq([pe.laid,pe.sold,pe.left,pe.eggs,pe.gold],[inc.laid,inc.sold,inc.left,inc.sold,exp],'3D: 알 낳기·팔기·남김(eggs = sold)')}
 ok(a.fx('sale').length===1&&a.fx('sale')[0].textContent.includes('🪙+'+exp),'알 → 농부 → 매대 → 금화 글자 띠');eq(a.n.fastIcon.dataset.state,'won','번개로 맞히면 ⚡ 반짝');
 ok(a.btn(q0.answer).classList.contains('yay')&&a.btn(q0.answer).children.filter(x=>x.classList.contains('btn-star')).length===12,'맞힌 보기에 초록 고리와 별 12개');ok(a.btn(q0.answer).children.some(x=>x.classList.contains('btn-yay')&&x.textContent==='⚡ 번개!'),'번개로 맞히면 보기 위에 ⚡ 번개!');
 {const wt=a.api.world.t;a.tick(5);eq(a.api.world.t,wt+5,'판매 연출 동안에도 늑대 세계는 흐름');a.right();eq(a.api.state.gold,g0+exp,'연출 중에 다시 눌러도 금화 그대로')}
-a.tick(REWARD-6);eq(a.api.phase,'reward','1.1초까지는 판매 연출');a.tick(1);eq(a.api.phase,'ask','1.2초 뒤 저절로 다음 문제');shows(a,8,'sound',1,'다음 문제');eq(a.api.round.t,0,'새 문제 풀이 시간');
+a.tick(REWARD-6);eq(a.api.phase,'reward','1.1초까지는 판매 연출');a.tick(1);eq(a.api.phase,'ask','1.2초 뒤 저절로 다음 문제');shows(a,8,'story',1,'다음 문제');eq(a.api.round.t,0,'새 문제 풀이 시간');
 eq(a.game().gold.flying,0,'동전은 아직 매대에');a.tick(14-REWARD);ok(a.game().gold.flying>=1&&a.n.coinLayer.children.some(x=>x.classList.contains('coin-fly')),'1.4초: 동전이 매대에서 날아오름');eq(a.game().gold.shown,g0,'닿기 전 숫자 그대로');
 a.tick(20-14);{const s=a.game().gold.shown;ok(s>g0&&s<g0+exp,'동전이 닿을 때마다 숫자가 오름: '+s)}
 a.tick(LAND-20);eq([a.game().gold.shown,a.game().gold.pending,a.game().gold.coins],[g0+exp,0,0],'2.4초 안에 숫자 = 규칙 금화');eq(a.n.gold.textContent,'🪙 '+(g0+exp),'금화 칸 숫자');
@@ -687,7 +708,7 @@ a=fresh();a.n.scene.dataset.renderer='fallback';a.go();a.unlock();a.right();eq(a
 a=fresh();a.go();a.tick(Math.ceil(C.baseSeconds(a.api.round.q)*10*.7));exp=C.income(a.api.state,a.api.round.q,false).gold;g0=a.api.state.gold;a.right();eq(a.api.state.gold,g0+exp,'늦게 맞히면 번개 없음');eq(a.n.fastIcon.dataset.state,'off','⚡ 꺼진 채');
 
 /* 2-5 틀림 → 늑대 성큼(세계 빨리 감기, 장면 테두리 붉게) → 두 번째 정답(금화 없음) → 정답 누르고 다음 */
-a=fresh({view:true});a.go();a.tick(5);a.wrong(0);
+a=fresh({view:true});a.go();a.unlock();a.wrong(0);
 eq(a.api.round.tries,1,'한 번 틀림');ok(a.btn(a.wrongIndex(0)).classList.contains('wrong'),'틀린 보기 표시');ok(a.events.some(e=>e.type==='dash'),'3D: 늑대 성큼');ok(a.n.scene.classList.contains('dash'),'장면 테두리가 붉게 번쩍');eq(a.n.fastIcon.dataset.state,'off','틀리면 ⚡ 꺼짐');
 ok(a.n.villageStatus.textContent.includes('성큼'),'성큼 안내');
 a.right();eq(a.api.phase,'ask','성큼 다가오는 동안은 못 누름');const wb=a.api.world.t;a.tick(C.DASH_TICKS);
@@ -714,34 +735,40 @@ a=fresh({view:true});a.go();a.unlock();
 a=fresh();a.go();a.tick(4);a.n.pause.click();ok(a.api.paused&&a.document.body.classList.contains('paused'),'쉬기');ok(a.document.body.classList.contains('covered'),'쉬는 동안 문제를 가림(공짜 읽기 시간 방지)');
 const pw=a.api.world.t;a.tick(50);eq(a.api.round.t,4,'쉬는 동안 시계 멈춤');eq(a.api.world.t,pw,'쉬는 동안 늑대 세계도 멈춤');a.right();eq(a.api.phase,'ask','쉬는 동안 못 누름');
 g0=a.api.state.gold;a.buy('fence');eq([a.api.state.fence,a.api.state.gold],[0,g0],'쉬는 동안 가게도 못 삼');a.n.pause.click();a.tick(2);eq(a.api.round.t,6,'다시 흐름');
-a=fresh({tts:'manual'});a.go();a.n.pause.click();eq(a.pending.length,0,'쉬면 읽기 멈춤');a.n.pause.click();eq(a.pending.length,1,'계속하면 다시 읽음');
+a=seed(L7,{tts:'manual'});a.go();a.n.pause.click();eq(a.pending.length,0,'쉬면 읽기 멈춤');a.n.pause.click();eq(a.pending.length,1,'계속하면 다시 읽음');
 a=fresh();a.go();a.hide(true);ok(a.api.paused,'탭이 숨으면 자동으로 쉬기');a.tick(20);eq(a.api.round.t,0,'숨은 동안 시계 멈춤');
 a=fresh();a.go();a.unlock();a.right();a.n.pause.click();ok(!a.document.body.classList.contains('covered'),'판매 연출은 가리지 않음');const pend=a.game().gold.pending;a.tick(40);eq([a.game().gold.pending,a.api.phase],[pend,'reward'],'쉬는 동안 동전·연출도 멈춤');a.n.pause.click();a.land();eq(a.game().gold.shown,a.api.state.gold,'계속하면 동전이 마저 닿음');
 
-/* 2-8 나이·모드 전환: 문제 중이면 바로 그 나이 문제로, 정답 뒤면 다음 문제부터. 늑대 세계는 그대로, 무리 간격만 새 나이에 맞춤 */
+/* 2-8 나이 전환(0.11: 모드 전환 없음): 문제 중이면 바로 그 나이 문제로, 정답 뒤면 다음 문제부터. 늑대 세계는 그대로, 무리 간격만 새 나이에 맞춤 */
 for(const age of Q.AGES)for(const mode of Q.MODES){
  a=seed({age,mode});a.go();shows(a,age,mode,0,`${age}세 ${mode} 시작`);
  for(const to of Q.AGES){if(to===age)continue;a.n.age.value=String(to);a.n.age.onchange();shows(a,to,mode,0,`${age}→${to}세 전환`);eq(a.api.state.age,to,'저장되는 나이')}
 }
-a=seed({index:3});a.go();a.tick(20);const wt7=a.api.world.t,iv7=a.api.world.interval;a.n.age.value='10';a.n.age.onchange();shows(a,10,'sound',3,'문제 중 전환');eq(a.api.world.t,wt7,'전환해도 늑대 세계는 그대로');ok(a.api.world.interval>iv7,'무리 간격은 새 나이·모드에 맞춤');
-a.n.mode.click();shows(a,10,'story',3,'모드 전환');eq(a.n.mode.textContent,'🔊 듣고 고르기로','모드 버튼 문구');
-a=fresh();a.go();a.unlock();a.right();a.n.age.value='7';a.n.age.onchange();shows(a,8,'sound',0,'정답 뒤(판매 연출 중)에는 그대로');ok(a.n.feedback.textContent.includes('다음 문제부터 7세'),'다음부터 적용 안내');a.tick(REWARD);shows(a,7,'sound',1,'다음 문제는 7세');
-{const L1=Array.from({length:2000},(_,k)=>k).find(k=>Q.at(8,'sound',k,1).lap===1);a=seed({index:L1,seed:1});a.go();const q=Q.at(8,'sound',L1,1),lap1=a.n.answers.children.map(b=>b.dataset.i).join();
+a=seed({age:7,index:3});a.go();a.tick(20);const wt7=a.api.world.t,iv7=a.api.world.interval;a.n.age.value='10';a.n.age.onchange();shows(a,10,'story',3,'문제 중 전환');eq(a.api.world.t,wt7,'전환해도 늑대 세계는 그대로');eq([iv7,a.api.world.interval],[ivFor(7),ivFor(10)],'무리 간격은 새 나이에 맞춤');ok(ivFor(10)>ivFor(7),'(10세 간격이 7세보다 김)');
+eq(a.n.feedback.textContent,'10세 문제로 바꿨어요. 늑대는 그대로 와요.','전환 안내에 모드 이름 없음');eq(a.n.drawerSummary.textContent,'⚙️ 설정 · 10세','설정 요약');
+a=fresh();a.go();a.unlock();a.right();a.n.age.value='7';a.n.age.onchange();shows(a,8,'story',0,'정답 뒤(판매 연출 중)에는 그대로');ok(a.n.feedback.textContent.includes('다음 문제부터 7세'),'다음부터 적용 안내');a.tick(REWARD);shows(a,7,'story',1,'다음 문제는 7세');
+{const L1=Array.from({length:2000},(_,k)=>k).find(k=>Q.at(8,'story',k,1).lap===1);a=seed({index:L1,seed:1});a.go();const q=Q.at(8,'story',L1,1),lap1=a.n.answers.children.map(b=>b.dataset.i).join();
  eq(lap1,q.choices.map((_,i)=>String((i+1)%q.choices.length)).join(),'두 바퀴째는 보기를 한 칸 돌림')}
 
 /* 2-9 저장·복원(늑대 세계 포함) */
 a=fresh();a.go();a.unlock();a.right();g0=a.api.state.gold;eq(JSON.parse(saved[KEY]).round,null,'판매 연출 중 저장: 하던 문제 없음(금화는 이미 받음)');
-let b=boot();eq(b.n.go.textContent,'시작하기 ▶','다시 열면 다음 문제부터');b.go();eq([b.api.phase,b.api.state.gold,b.api.state.index],['ask',g0,1],'새로고침해도 금화 이중 지급 없음');shows(b,8,'sound',1,'연출 중 새로고침 → 다음 문제');
+let b=boot();eq(b.n.go.textContent,'시작하기 ▶','다시 열면 다음 문제부터');b.go();eq([b.api.phase,b.api.state.gold,b.api.state.index],['ask',g0,1],'새로고침해도 금화 이중 지급 없음');shows(b,8,'story',1,'연출 중 새로고침 → 다음 문제');
 a=fresh();a.go();a.tick(333);a.n.pause.click();const st9=JSON.stringify({...a.api.world,events:[]});b=boot();eq(b.n.go.textContent,'이어서 하기 ▶','하던 문제가 있으면 이어서 하기');b.go();eq([b.api.phase,b.api.round.t],['ask',333],'문제 중 저장 → 같은 시계로 복원');eq(JSON.stringify({...b.api.world,events:[]}),st9,'늑대 세계(늑대·닭·건물)도 그대로 복원');
 a=fresh();a.go();a.unlock();a.wrong(0);a.tick(C.DASH_TICKS);a.wrong(1);b=boot();b.go();eq(b.api.phase,'learn','놓친 문제는 정답 보기부터');b.tick(10);b.right();eq(b.api.state.index,1,'복원 뒤 다음 문제');
 /* 0.8 저장: 카드 고르기 중(pick)이던 문제는 금화를 이미 받았으므로 다음 문제로 */
-saved={[KEY]:JSON.stringify({version:1,...C.fresh(8),gold:99,wins:4,index:4,round:{token:'8:sound:4',phase:'pick',t:30,tries:0,gold:15,left:2}})};
-b=boot();b.go();eq([b.api.phase,b.api.state.gold,b.api.state.index],['ask',99,5],'0.8 카드 고르기 저장 → 다음 문제, 금화 그대로');shows(b,8,'sound',5,'0.8 pick 저장 다음 문제');
+saved={[KEY]:JSON.stringify({version:1,...C.fresh(8),mode:'sound',gold:99,wins:4,index:4,round:{token:'8:sound:4',phase:'pick',t:30,tries:0,gold:15,left:2}})};
+b=boot();b.go();eq([b.api.phase,b.api.state.gold,b.api.state.index],['ask',99,5],'0.8 카드 고르기 저장 → 다음 문제, 금화 그대로');shows(b,8,'story',5,'0.8 pick 저장 다음 문제');
 saved={[KEY]:JSON.stringify({version:1,gold:77,hp:30,level:1,wins:4,index:2,mode:'sound',age:9,chickens:0,fence:1,claimed:'sound:2',completed:null,combat:{stage:2,done:false}})};
-b=boot();b.go();eq([b.api.state.gold,b.api.state.level,b.api.state.chickens,b.api.state.index,b.api.phase],[77,1,1,3,'ask'],'0.5 저장으로 시작');shows(b,9,'sound',3,'0.5 저장 다음 문제');eq(b.api.world.buildings.filter(x=>x.kind==='tower').length,2,'0.5 저장의 타워 단계 → 화살 타워 2개');
-saved[KEY]='broken';b=boot();b.go();eq(b.api.state.gold,20,'깨진 저장 → 새 판');shows(b,8,'sound',0,'깨진 저장은 8세부터');
+b=boot();b.go();eq([b.api.state.gold,b.api.state.level,b.api.state.chickens,b.api.state.index,b.api.phase],[77,1,1,3,'ask'],'0.5 저장으로 시작');shows(b,9,'story',3,'0.5 저장 다음 문제');eq(b.api.world.buildings.filter(x=>x.kind==='tower').length,2,'0.5 저장의 타워 단계 → 화살 타워 2개');
+saved[KEY]='broken';b=boot();b.go();eq(b.api.state.gold,20,'깨진 저장 → 새 판');shows(b,8,'story',0,'깨진 저장은 8세부터');
 a=fresh();a.go();a.tick(5);b=boot();eq(b.api.phase,'start','다시 열면 시작 화면');const before=JSON.parse(saved[KEY]).round;ok(before&&before.phase==='ask','저장된 하던 문제');
 b.unload();{const r=JSON.parse(saved[KEY]).round;eq(r&&[r.token,r.phase,r.t,r.tries],[before.token,before.phase,before.t,before.tries],'시작 화면에서 떠나도 하던 문제를 지우지 않음')}
+/* 0.11 듣고 고르기 폐쇄: 예전 소리 모드 저장(풀던 소리 문제 포함)은 읽고 고르기로 이어진다. 금화·마을·문제 번호는 그대로, 풀던 소리 문제는 같은 번호의 읽기 문제로 새로 */
+for(const ph of ['ask','learn']){saved={[KEY]:JSON.stringify({version:1,...C.fresh(8),mode:'sound',gold:88,level:2,chickens:3,wins:6,index:6,seed:5,round:{token:'8:sound:6',phase:ph,t:44,tries:1}})};
+ b=boot();eq([b.api.state.mode,b.api.state.round],['story',null],'소리 저장('+ph+') → story, 풀던 소리 문제 버림');eq(b.n.go.textContent,'시작하기 ▶','소리 문제는 이어서 하기가 아님');eq(b.n.drawerSummary.textContent,'⚙️ 설정 · 8세','설정 요약');
+ b.go();eq([b.api.phase,b.api.state.gold,b.api.state.level,b.api.state.chickens,b.api.state.index,b.api.round.t,b.api.round.tries],['ask',88,2,3,6,0,0],'소리 저장 → 같은 번호의 읽기 문제로 새로 시작, 금화·마을 그대로');shows(b,8,'story',6,'소리 저장 뒤 문제');eq(b.api.round.q.mode,'story','읽기 문항');eq(b.speakLog.length,0,'읽어 주지 않음');
+ eq(b.api.world.buildings.filter(x=>x.kind==='tower').length,3,'소리 저장의 마을(타워 3개) 그대로');eq(JSON.parse(saved[KEY]).mode,'story','다시 저장하면 mode story');eq(JSON.parse(saved[KEY]).version,1,'저장 version은 그대로 1');
+ b.unlock();b.right();eq([b.api.phase,b.api.state.index],['reward',7],'이어서 정상 진행')}
 
 /* 2-10 처음부터·움직임 줄이기·3D 상태 */
 a=seed({gold:500,level:3,chickens:5});a.go();a.unlock();a.right();a.tick(400);a.n.reset.click();eq([a.api.state.gold,a.api.state.level,a.api.state.chickens,a.api.state.index],[20,0,1,0],'처음부터');ok(a.api.world.t<5&&a.api.world.wolves.length===0,'처음부터 → 늑대 세계도 새로');eq([a.game().gold.shown,a.game().gold.pending],[20,0],'처음부터 → 날던 동전도 정리');
@@ -769,9 +796,9 @@ a=fresh();a.go();a.tick(300);ok(a.n.enemies.children.filter(x=>!x.classList.cont
 
 /* 2-12 0.8 기능 유지: 섞인 상식·수학·영어 · 연속 정답 · 빠른 정답 일제 사격 · 타워 강화 · 새 몬스터 알림 · 우두머리 보상 · 0.7 저장 이어받기 */
 {const banners=a=>a.fx('banner').map(x=>x.textContent);
- /* 듣고 고르기에서도 퀴즈 칸(0.10: 8세는 20칸마다 3칸, Q.isQuiz)은 상식·수학·영어: 질문을 읽어 주고, 분류를 보여 준다 */
+ /* 퀴즈 칸(0.10: 8세는 20칸마다 3칸, Q.isQuiz)은 상식·수학·영어: 분류를 보여 준다. 질문을 읽어 주는 것은 7세뿐 */
  const QI=Array.from({length:40},(_,k)=>k).filter(k=>Q.isQuiz(8,k));
- a=seed({index:QI[0],seed:3});a.go();let q=Q.at(8,'sound',QI[0],3);shows(a,8,'sound',QI[0],'섞인 문제(듣기)');eq(q.mode,'quiz','퀴즈 칸은 상식·수학·영어');eq(a.speakLog[0],q.speak,'질문을 읽어 줌');ok(a.n.levelChip.textContent.includes(Q.CATS[q.cat]),'분류 표시 '+a.n.levelChip.textContent);
+ a=seed({index:QI[0],seed:3});a.go();let q=Q.at(8,'story',QI[0],3);shows(a,8,'story',QI[0],'섞인 문제');eq(q.mode,'quiz','퀴즈 칸은 상식·수학·영어');eq([a.api.phase,a.speakLog.length],['ask',0],'8세 퀴즈는 읽어 주지 않고 바로 풀이');ok(a.n.speak.classList.contains('hidden'),'8세 퀴즈: 다시 듣기 버튼 없음');ok(a.n.levelChip.textContent.includes(Q.CATS[q.cat]),'분류 표시 '+a.n.levelChip.textContent);
  a.unlock();a.right();eq(a.api.phase,'reward','섞인 문제도 맞히면 판매 연출');
  a=seed({index:QI[1],mode:'story',seed:3});a.go();q=Q.at(8,'story',QI[1],3);shows(a,8,'story',QI[1],'섞인 문제(읽기)');eq(a.speakLog.length,0,'읽기 모드는 읽어 주지 않음');
  a.unlock();a.wrong(0);a.tick(C.DASH_TICKS);a.wrong(1);a.tick(10);eq(a.speakLog.at(-1),C.lesson(q),'놓치면 질문과 정답을 읽어 줌');
@@ -780,7 +807,7 @@ a=fresh();a.go();a.tick(300);ok(a.n.enemies.children.filter(x=>!x.classList.cont
  eq(a.api.state.streak,3,'3연속');ok(a.n.stage.textContent.includes('🔥 3연속'),'연속 표시');a.untilAsk();a.unlock();a.right();ok(a.n.feedback.textContent.includes('🔥4연속'),'금화 줄에 연속 '+a.n.feedback.textContent);
  a.tick(REWARD);a.untilAsk();a.unlock();a.wrong(0);eq(a.api.state.streak,0,'틀리면 연속이 끊김');
  /* 빨리 맞히면 일제 사격이 더 많다 */
- a=fresh({view:true});a.go();a.api.world.wolves.push({id:5e3,kind:'wolf',x:3,z:3,sx:15,sz:15,hp:999,max:999,speed:0,state:'walk',target:0,timer:0,inside:0,hen:0});a.tick(fastAt(a.api.round.q));const ar0=a.api.world.arrows.length,sc=C.scale(a.api.round.q);a.right();
+ a=fresh({view:true});a.go();a.api.world.wolves.push({id:5e3,kind:'wolf',x:3,z:3,sx:15,sz:15,hp:999,max:999,speed:0,state:'walk',target:0,timer:0,inside:0,hen:0});a.ready();const ar0=a.api.world.arrows.length,sc=C.scale(a.api.round.q);a.right();
  ok(a.events.some(e=>e.type==='volley'&&e.fast),'번개 정답 사건');eq(a.api.world.arrows.length-ar0,W.volleyArrows(a.api.state,{scale:sc,fast:true}),'번개 정답: 타워 1개 × 번개 화살 수');
  a=fresh({view:true});a.go();a.api.world.trickle=1e9;a.api.world.wolves.push({id:5e3,kind:'wolf',x:3,z:3,sx:15,sz:15,hp:999,max:999,speed:0,state:'walk',target:0,timer:0,inside:0,hen:0});a.tick(Math.ceil(C.baseSeconds(a.api.round.q)*10*.7));const ar1=a.api.world.arrows.length;a.right();eq(a.api.world.arrows.length-ar1,W.volleyArrows(a.api.state,{scale:C.scale(a.api.round.q),fast:false}),'늦은 정답: 보통 화살 수');ok(W.volleyArrows(a.api.state,{fast:true})>W.volleyArrows(a.api.state,{fast:false}),'번개가 더 많음');
  /* 타워 강화: 회관 1단계부터 윗줄 셋째 칸, 사면 화살이 터진다 */
@@ -793,15 +820,16 @@ a=fresh();a.go();a.tick(300);ok(a.n.enemies.children.filter(x=>!x.classList.cont
  a=fresh();a.go();a.unlock();const tw=a.api.world.buildings.find(b=>b.kind==='tower');a.api.world.wolves.push({id:7e3,kind:'ember',x:tw.x+1,z:tw.z,sx:20,sz:0,hp:1,max:1,speed:0,state:'walk',target:0,timer:0,inside:0,hen:0,roar:99});
  g0=a.api.state.gold;for(let i=0;i<30&&a.api.world.stats.bossKills===0;i++)a.tick(1);eq(a.api.world.stats.bossKills,1,'불씨 왕 쓰러뜨림');eq(a.api.state.gold,g0+C.BOUNTY,'우두머리 보상 금화 +'+C.BOUNTY);eq(a.game().gold.shown,g0+C.BOUNTY,'보상 금화는 화면에도 바로');ok(banners(a).some(t=>t.includes('불씨 왕을 쓰러뜨렸어요')),'보상 알림 띠');
  /* 판매 연출 동안 알림 띠는 숨었다가 끝나면 다시 */
- a.right();eq(a.api.phase,'reward','(연출)');ok(a.fx('banner').every(x=>x.classList.contains('later')),'판매 연출 동안 알림 띠 숨김');a.tick(REWARD);ok(a.fx('banner').some(x=>!x.classList.contains('later')),'연출 뒤 알림 띠 다시');
+ a.rightNow();/* 바로 누름: 읽기 문항은 번개 대기(약 7초)가 띠 3.3초보다 길다 */eq(a.api.phase,'reward','(연출)');ok(a.fx('banner').length>0&&a.fx('banner').every(x=>x.classList.contains('later')),'판매 연출 동안 알림 띠 숨김');a.tick(REWARD);ok(a.fx('banner').some(x=>!x.classList.contains('later')),'연출 뒤 알림 띠 다시');
  /* 울타리만 부서졌으면 고치기 칸은 ✓(농부가 다시 세움) */
  a=seed({fence:2,gold:300});a.go();a.unlock();for(const b of a.api.world.buildings)if(b.kind==='fence'){b.broken=true;b.hp=0}a.tick(1);eq(a.row('repair').state,'none','울타리만 부서지면 고칠 곳 없음');a.buy('repair');eq([a.api.state.repairs,a.n.shopTip.textContent],[0,'✓ 부서진 곳이 없어요'],'누르면 안내만');
  /* 그림 마을 늑대도 종류를 표시 */
- a=seed({hall:2,level:3});a.go();a.tick(900);const liv=a.api.world.wolves.filter(v=>v.state!=='gone'),shown=a.n.enemies.children.filter(x=>!x.classList.contains('hidden'));
+ /* 무리 간격이 읽기 문항 기준(8세 20초)으로 길어져, 한순간에는 새 몬스터가 없을 수 있다 → 나올 때까지 조금 더 흘린다 */
+ a=seed({hall:2,level:3});a.go();a.tick(900);for(let i=0;i<900&&!a.api.world.wolves.some(v=>v.state!=='gone'&&v.kind!=='wolf');i++)a.tick(1);const liv=a.api.world.wolves.filter(v=>v.state!=='gone'),shown=a.n.enemies.children.filter(x=>!x.classList.contains('hidden'));
  eq(shown.map(x=>x.dataset.kind),liv.map(v=>v.kind),'그림 마을 몬스터 종류 = 세계');ok(liv.some(v=>v.kind!=='wolf'),'2단계 마을에 새 몬스터');
  /* 0.7 저장(세계 v1) 이어받기 */
  saved={[KEY]:JSON.stringify({version:1,...C.fresh(8),level:1,world:{v:1,t:900,rng:5,hall:0,interval:270,wave:{n:3,arrive:1110,spawned:false},wolves:[{id:40,x:12,z:0,sx:17,sz:0,hp:20,max:20,speed:.8,state:'walk',target:0,timer:0,inside:0,hen:0}],hens:[],buildings:[],arrows:[],nextId:50,stats:{kills:5,henLost:0,henSaved:0,broken:0,waves:3},events:[]}})};
- const b2=boot();eq([b2.api.world.interval,b2.api.world.wolves[0].kind,b2.api.world.stats.kills],[W.intervalFor(9),'wolf',5],'0.7 세계 저장을 이어받음');ok(b2.api.world.wave.arrive<=b2.api.world.t+b2.api.world.interval,'다음 무리를 새 간격으로 당김');b2.go();b2.tick(50);ok(b2.api.world.t===950,'이어서 진행');
+ const b2=boot();eq([b2.api.world.interval,b2.api.world.wolves[0].kind,b2.api.world.stats.kills],[ivFor(8),'wolf',5],'0.7 세계 저장을 이어받음');ok(b2.api.world.wave.arrive<=b2.api.world.t+b2.api.world.interval,'다음 무리를 새 간격으로 당김');b2.go();b2.tick(50);ok(b2.api.world.t===950,'이어서 진행');
 }
 
 /* 2-13 0.9 가게: 2줄 × 4칸이 늘 열려 있고, 듣기·풀기·연출·배우기 중 언제든 한 번 눌러 바로 산다(세계는 멈추지 않음) */
@@ -813,15 +841,15 @@ a=fresh();a.go();a.tick(300);ok(a.n.enemies.children.filter(x=>!x.classList.cont
  const need=a.row('chicken').price-a.game().gold.shown;a.buy('chicken');eq([a.api.state.chickens,a.n.shopTip.textContent],[1,'🪙 '+need+' 더 모아요'],'금화 부족: 누르면 얼마 더 모을지');a.tick(16);ok(a.n.shopTip.classList.contains('hidden'),'안내는 잠깐 뒤 사라짐');
  /* 회관 3단계부터 8번째 칸은 잔치 */
  const c3=seed({hall:3,gold:900});c3.go();eq(c3.slots()[7].dataset.key,'feast','회관 3단계: 8번째 칸 = 잔치');}
-/* 듣는 중에 사기: 읽던 소리는 그대로, 세계는 흐름 */
-a=fresh({tts:'manual'});a.go();eq(a.api.phase,'listen','(듣기)');a.api.state.gold=200;a.tick(1);let wt=a.api.world.t;a.buy('chicken');
+/* 듣는 중(7세 퀴즈 질문)에 사기: 읽던 소리는 그대로, 세계는 흐름 */
+a=seed(L7,{tts:'manual'});a.go();eq(a.api.phase,'listen','(듣기)');a.api.state.gold=200;a.tick(1);let wt=a.api.world.t;a.buy('chicken');
 eq([a.api.state.chickens,a.api.phase,a.pending.length],[2,'listen',1],'듣는 중에 닭 사기: 읽던 소리 그대로');a.tick(5);eq(a.api.world.t,wt+5,'사는 동안·뒤에도 늑대 세계는 흐름');
 a.speechEnd();a.unlock();let qid=a.n.answers.dataset.qid,rt=a.api.round.t;a.buy('fence');eq([a.api.state.fence,a.api.phase,a.n.answers.dataset.qid],[1,'ask',qid],'푸는 중에 울타리: 문제는 그대로');a.tick(3);eq(a.api.round.t,rt+3,'풀이 시계도 흐름');
 /* 두 번 눌림 방지 0.4초 */
 {const n0=a.api.state.chickens;a.buy('chicken');a.buy('chicken');eq(a.api.state.chickens,n0,'0.4초 안에 또 누르면 무시(앞 구매 직후)');a.tick(4);a.buy('chicken');a.buy('chicken');eq(a.api.state.chickens,n0+1,'0.4초 지나면 한 번만');a.tick(3);a.buy('chicken');eq(a.api.state.chickens,n0+1,'0.3초 뒤에도 무시');a.tick(1);a.buy('chicken');eq(a.api.state.chickens,n0+2,'0.4초 뒤 다시 살 수 있음')}
 /* 판매 연출 중·배우기 중에 사기 */
-a.tick(4);a.right();eq(a.api.phase,'reward','(연출)');a.api.state.gold+=300;a.tick(4);a.buy('tower');eq([a.api.state.level,a.api.phase],[1,'reward'],'판매 연출 중에 타워');a.tick(REWARD-4);eq(a.api.phase,'listen','연출은 늘어나지 않고 다음 문제로');
-a.speechEnd();a.unlock();a.wrong(0);a.tick(C.DASH_TICKS);a.wrong(1);eq(a.api.phase,'learn','(배우기)');a.tick(4);const lv=a.api.state.level;a.buy('tower');eq([a.api.state.level,a.api.phase],[lv+1,'learn'],'배우는 중에도 삼');
+a.tick(4);a.right();eq(a.api.phase,'reward','(연출)');a.api.state.gold+=300;a.tick(4);a.buy('tower');eq([a.api.state.level,a.api.phase],[1,'reward'],'판매 연출 중에 타워');a.tick(REWARD-4);eq(a.api.phase,'ask','연출은 늘어나지 않고 다음 문제로');
+a.unlock();a.wrong(0);a.tick(C.DASH_TICKS);a.wrong(1);eq(a.api.phase,'learn','(배우기)');a.tick(4);const lv=a.api.state.level;a.buy('tower');eq([a.api.state.level,a.api.phase],[lv+1,'learn'],'배우는 중에도 삼');
 /* 화면 금화로 칸이 켜진다: 규칙 금화가 넉넉해도 동전이 닿기 전에는 흐림, 닿으면 '띵' 하고 켜짐 */
 a=fresh();a.go();a.unlock();{const p=a.row('chicken').price,g=a.api.state.gold;ok(g<p,'(처음엔 닭을 못 삼)');a.tick(fastAt(a.api.round.q));a.right();ok(a.api.state.gold>=p,'(규칙 금화는 넉넉)');
  eq(a.row('chicken').state,'poor','동전이 닿기 전에는 흐림');a.tick(1);a.buy('chicken');eq(a.api.state.chickens,1,'흐린 칸은 사지지 않음');ok(a.n.shopTip.textContent.endsWith('더 모아요'),'대신 안내');
@@ -855,20 +883,15 @@ a=seed({age:7,mode:'story'},{rec:'real'});a.go();a.unlock();a.right();
  a.n.bubble.click();eq(a.speakLog.at(-1),CHICK,'말풍선을 누르면 읽어 줌');
  a.tick(40);eq(a.bubble(),null,'말풍선은 3~4초 뒤 사라짐');ok(a.slot('chicken').classList.contains('rec'),'반짝임은 남음');
  a.tick(4);a.buy('chicken');ok(!a.slot('chicken').classList.contains('rec')&&a.window.getVillageState().recommend===null,'사면 반짝임도 끝');}
-/* 듣고 고르기(실제 규칙): 판매 연출 끝에 동전이 닿기를 기다려 말풍선을 한 번 읽어 주고, 그다음에 다음 문제 소리 */
-a=fresh({tts:'manual',rec:'real'});a.go();a.speechEnd();a.unlock();const q1=Q.at(8,'sound',1,a.api.state.seed);a.right();
-a.tick(REWARD);eq([a.api.phase,a.bubble()],['reward',null],'1.2초: 말풍선 차례라 다음 문제를 기다림(동전이 아직)');a.tick(LAND-REWARD+1);
-eq([a.api.phase,a.bubble(),a.speakLog.at(-1),a.pending.length],['reward',CHICK,CHICK,1],'동전이 닿으면 말풍선을 읽어 줌(문제 소리 전)');a.tick(5);eq(a.api.phase,'reward','읽는 동안 다음 문제 소리를 시작하지 않음');a.n.bubble.click();eq(a.pending.length,1,'읽는 중에 말풍선을 눌러도 겹쳐 읽지 않음');
-a.speechEnd();a.tick(1);eq([a.api.phase,a.speakLog.at(-1)],['listen',q1.speak],'다 읽은 뒤 다음 문제 소리');eq(a.bubble(),null,'문제를 듣는 동안 말풍선 없음');
-eq(a.speakLog.slice(0,3),[Q.at(8,'sound',0,a.api.state.seed).speak,CHICK,q1.speak],'소리 순서: 문제 → 말풍선 → 다음 문제(겹침 없음)');
-/* 말풍선 차례가 아니면(20초 안) 소리 모드도 1.2초 뒤 바로 다음 문제 */
-a.speechEnd();a.unlock();a.right();a.tick(REWARD);eq(a.api.phase,'listen','말풍선 차례가 아니면 1.2초 뒤 바로 다음 문제');
+/* 0.11: 판매 연출은 말풍선을 기다리지 않는다(소리 모드 전용 '연출 끝에 말풍선을 읽어 주고 다음 문제' 흐름 삭제). 1.2초 뒤 다음 문제, 말풍선은 동전이 닿은 뒤 글로만(누르면 읽어 줌) */
+a=fresh({tts:'manual',rec:'real'});a.go();a.unlock();a.right();a.tick(REWARD);eq([a.api.phase,a.bubble(),a.api.state.index],['ask',null,1],'말풍선 차례여도 1.2초 뒤 바로 다음 문제');
+a.tick(LAND-REWARD+1);a.unlock();a.tick(1);eq([a.api.phase,a.bubble()],['ask',CHICK],'동전이 닿고 보기가 열리면 말풍선');eq([a.speakLog.length,a.pending.length],[0,0],'말풍선을 저절로 읽어 주지 않음');a.n.bubble.click();eq([a.speakLog.at(-1),a.pending.length],[CHICK,1],'누르면 읽어 줌');
+ok(!('reading' in a.game().round),'round.reading(소리 모드 말풍선 읽기 대기) 없음');
 /* 급한 추천(닭을 잃음): 듣는 동안에는 미뤘다가 듣기가 끝나면 */
 const URG=()=>({key:'tower',line:TOWER_LINE,urgent:true,rule:2});
-a=seed({chickens:4,gold:200},{tts:'manual',rec:URG});a.go();loseHen(a);a.tick(3);eq([a.api.phase,a.bubble()],['listen',null],'듣는 동안에는 말풍선 없음');a.speechEnd();a.tick(4);eq(a.bubble(),TOWER_LINE,'듣기가 끝나면 급한 말풍선');ok(a.slot('tower').classList.contains('rec'),'타워 칸 반짝');
-/* 소리 모드의 판매 연출 중에 생긴 급한 일: 그때 띄우지 않고, 연출 끝에 읽어 준 뒤 다음 문제 소리 */
-a=seed({chickens:4,gold:200},{tts:'manual',rec:URG});a.go();a.speechEnd();calmWorld(a);a.unlock();a.right();loseHen(a);a.tick(3);eq([a.api.phase,a.bubble()],['reward',null],'소리 모드 판매 연출 중에는 급한 말풍선도 미룸');
-a.tick(LAND);eq([a.api.phase,a.bubble(),a.speakLog.at(-1)],['reward',TOWER_LINE,TOWER_LINE],'연출 끝에 급한 말풍선을 읽어 줌');a.speechEnd();a.tick(1);eq([a.api.phase,a.speakLog.at(-1)],['listen',Q.at(8,'sound',1,a.api.state.seed).speak],'그다음 문제 소리');
+a=seed({...L7,chickens:4,gold:200},{tts:'manual',rec:URG});a.go();loseHen(a);a.tick(3);eq([a.api.phase,a.bubble()],['listen',null],'듣는 동안에는 말풍선 없음');a.speechEnd();a.tick(4);eq(a.bubble(),TOWER_LINE,'듣기가 끝나면 급한 말풍선');ok(a.slot('tower').classList.contains('rec'),'타워 칸 반짝');
+/* 판매 연출 중에 생긴 급한 일: 미루지 않고 바로 띄운다(연출은 늘어나지 않음) */
+a=seed({chickens:4,gold:200},{rec:URG});a.go();calmWorld(a);a.unlock();a.right();loseHen(a);a.tick(3);eq([a.api.phase,a.bubble()],['reward',TOWER_LINE],'판매 연출 중에도 급한 말풍선은 바로');a.tick(REWARD-3);eq(a.api.phase,'ask','연출은 1.2초 그대로');
 /* 글 먼저 읽기 동안에도 안 뜸 */
 a=seed({age:9,mode:'story',chickens:4,gold:200},{rec:URG});a.go();calmWorld(a);ok(a.api.round.lock>10,'(글 먼저 읽기)');loseHen(a);a.tick(3);eq(a.bubble(),null,'글 먼저 읽는 동안 말풍선 없음');a.unlock();a.tick(1);eq(a.bubble(),TOWER_LINE,'보기가 열리면 말풍선');
 /* 급한 것은 10초 간격: 9초 뒤 또 잃어도 안 뜨고, 10초가 지나면 뜸. 1분에 3개까지 */
@@ -937,7 +960,7 @@ a=seed({age:7,mode:'story',hall:1,chickens:8,level:4,gold:150},{rec:'real'});a.g
  ok(fenceLeft(3)>fenceLeft(0),'같은 늑대 무리에도 펑 강화가 있으면 울타리가 덜 상함 '+fenceLeft(0)+' → '+fenceLeft(3))}
 /* 화면: 새 판 보호·씨앗·찍기 막기·틀린 문제 읽기 속도 */
 a=fresh();a.go();eq([a.game().calm,a.game().keep],[W.GUARD.calm,true],'새 판은 보호 3번·마지막 닭 지킴');ok(a.game().seed>0,'판마다 문제 순서 씨앗');
-eq(a.game().round.id,Q.at(8,'sound',0,a.game().seed).id,'화면 문제 = Questions.at(나이, 모드, 번호, 씨앗)');
+eq(a.game().round.id,Q.at(8,'story',0,a.game().seed).id,'화면 문제 = Questions.at(나이, 모드, 번호, 씨앗)');
 a.unlock();a.right();eq(a.game().calm,W.GUARD.calm-1,'한 번에 맞히면 보호가 줄어듦');
 a=seed({index:5});a.go();ok(a.game().seed>0,'예전 저장(씨앗 없음)은 이어할 때 씨앗을 받음');
 a=fresh();a.go();a.unlock();{const q=a.api.round.q,g0=a.api.state.gold,exp=C.income(a.api.state,q,false,a.api.round.t).gold,full=C.income(a.api.state,q,false,9999).gold;a.rightNow();
@@ -949,17 +972,17 @@ a=fresh();a.go();a.unlock();a.tick(40);{const q=a.api.round.q,t=a.api.round.t,s=
  put(12);const y0=a.game().sfx.yelp|0,k0=w.stats.kills;W.volley(w,a.api.state,{scale:3});a.tick(8);const kills=w.stats.kills-k0,y=(a.game().sfx.yelp|0)-y0;
  ok(kills>=6,'(일제 사격으로 여럿 쓰러짐 '+kills+')');ok(y>=1&&y<=3,'깨갱은 0.3초 간격: '+kills+'마리에 '+y+'번');
  a.tick(20);put(12);const y1=a.game().sfx.yelp|0,k1=w.stats.kills;a.rightNow();a.tick(9);ok(w.stats.kills-k1>=1,'(정답 일제 사격으로 쓰러짐 '+(w.stats.kills-k1)+')');eq((a.game().sfx.yelp|0)-y1,0,'정답 직후 1초는 깨갱 쉼(정답 소리가 묻히지 않게)')}
-/* 7세는 읽기 모드에서도 상식·수학·영어 질문을 읽어 줌(8세는 아님) */
+/* 7세는 상식·수학·영어 질문을 읽어 줌(8세는 아님) */
 {const SEED=777;let i7=0;while(Q.at(7,'story',i7,SEED).mode!=='quiz')i7++;let i8=0;while(Q.at(8,'story',i8,SEED).mode!=='quiz')i8++;
- let a=seed({age:7,mode:'story',index:i7,seed:SEED},{tts:'manual'});a.go();eq([a.api.phase,a.speakLog.at(-1)],['listen',Q.at(7,'story',i7,SEED).speak],'7세 읽기 모드 퀴즈는 질문을 읽어 줌');a.speechEnd();a.tick(1);eq(a.api.phase,'ask','다 읽으면 풀이');
- a=seed({age:8,mode:'story',index:i8,seed:SEED},{tts:'manual'});a.go();eq([a.api.phase,a.speakLog.length],['ask',0],'8세 읽기 모드 퀴즈는 읽어 주지 않음')}
+ let a=seed({age:7,mode:'story',index:i7,seed:SEED},{tts:'manual'});a.go();eq([a.api.phase,a.speakLog.at(-1)],['listen',Q.at(7,'story',i7,SEED).speak],'7세 퀴즈는 질문을 읽어 줌');a.speechEnd();a.tick(1);eq(a.api.phase,'ask','다 읽으면 풀이');
+ a=seed({age:8,mode:'story',index:i8,seed:SEED},{tts:'manual'});a.go();eq([a.api.phase,a.speakLog.length],['ask',0],'8세 퀴즈는 읽어 주지 않음')}
 /* 9세 이상 읽기: 놓치면 질문·정답만 짧게, 🔊는 지문까지 */
 {const a=seed({age:9,mode:'story'},{tts:'manual'});a.go();a.unlock();a.wrong(0);a.tick(C.DASH_TICKS);a.wrong(1);eq(a.api.phase,'learn','(배우기)');
  eq(a.speakLog.at(-1),C.lesson(a.api.round.q),'두 번 틀리면 짧은 해설(질문·정답)');a.speechEnd();a.tick(12);ok(a.api.round.ready,'(해설 뒤 초록 답)');a.n.speak.click();eq(a.speakLog.at(-1),C.lesson(a.api.round.q,true),'🔊 다시 듣기는 지문까지')}
-/* 시작 화면에서 고른 나이·모드로 무리 간격(전: 페이지를 연 때의 8세 듣기 13초로 고정) */
-{const want=(age,mode)=>{const t=[];for(let i=0;i<Q.count(age,mode);i++)t.push(C.baseSeconds(Q.get(age,mode,i)));t.sort((x,y)=>x-y);return W.intervalFor(t[t.length>>1])};
- const a=fresh();a.n.ageRow.children.find(b=>b.dataset.age==='10').click();a.n.startStory.click();a.go();
- eq([a.api.state.age,a.api.state.mode,a.api.world.interval,a.api.world.wave.arrive],[10,'story',want(10,'story'),want(10,'story')],'새 판은 고른 나이·모드의 무리 간격으로 시작');ok(want(10,'story')>want(8,'sound'),'(10세 읽기 간격이 8세 듣기보다 김)')}
+/* 시작 화면에서 고른 나이로 무리 간격(전: 페이지를 연 때의 8세 값으로 고정) */
+{const a=fresh();a.n.ageRow.children.find(b=>b.dataset.age==='10').click();a.go();
+ eq([a.api.state.age,a.api.state.mode,a.api.world.interval,a.api.world.wave.arrive],[10,'story',ivFor(10),ivFor(10)],'새 판은 고른 나이의 무리 간격으로 시작');
+ const b=fresh();b.n.ageRow.children.find(x=>x.dataset.age==='7').click();b.go();eq(b.api.world.interval,ivFor(7),'7세를 고르면 7세 간격');ok(ivFor(10)>ivFor(7),'(10세 간격이 7세보다 김)')}
 /* '모아서 회관을 키워 봐요'는 회관 값의 절반을 모은 뒤에만 */
 a=seed({age:7,mode:'story',level:5,fence:4,chickens:4,gold:0},{rec:'real'});a.go();calmWorld(a);eq(answerLand(a),0,'회관 값의 절반 전에는 모으자 말풍선 없음');
 a.tick(250);a.api.state.gold=70;eq(answerLand(a),1,'절반을 넘으면 띄움');eq(a.bubble(),C.LINES.hallSave,'(모으자 말풍선)');

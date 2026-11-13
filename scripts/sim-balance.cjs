@@ -7,7 +7,6 @@ const syl=C.syl;
 let seed=1;const rnd=()=>{seed=(seed*1103515245+12345)%2147483648;return seed/2147483648};
 const RATE={7:{fast:100,typ:60,slow:30},8:{fast:180,typ:120,slow:70},9:{fast:250,typ:180,slow:120},10:{fast:300,typ:230,slow:160}};
 function need(q,r){const rps=r/60,n=q.choices.length,Cc=q.choices.reduce((s,c)=>s+syl(c),0),P=syl(q.passage);
-  if(q.mode==='sound')return 1.0+Cc/rps+0.4*n; /* 듣기는 시계 밖 */
   return 1.5+P/rps+(q.age===7?0:syl(q.prompt)/rps)+Cc/rps+0.4*n+(q.age>=9?0.3*P/rps:0)}
 const bank=(a,m)=>Array.from({length:Q.count(a,m)},(_,i)=>Q.get(a,m,i));
 const st=a=>{const s=[...a].sort((x,y)=>x-y);return s[0].toFixed(0)+'/'+s[s.length>>1].toFixed(0)+'/'+s[s.length-1].toFixed(0)};
@@ -26,7 +25,6 @@ function play(age,mode,kind,minutes){
   const prof={read_slow:{r:RATE[age].slow,acc:.75},read_typ:{r:RATE[age].typ,acc:.85},read_fast:{r:RATE[age].fast,acc:.95}}[kind];
   while(clock<minutes*60){
     const q=Q.get(age,mode,s.index),T=C.limit(q,s)/10,n=q.choices.length;qn++;
-    if(mode==='sound')clock+=1.0+syl(q.speak)/TTS;
     const lock=C.reveal(q)/10;
     let t,ok1,outcome,timeout=false;
     if(kind==='guess'){t=lock+.4;ok1=rnd()<1/n}
