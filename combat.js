@@ -12,7 +12,7 @@
   const HELP=.2,MAX_HELP=3; /* 시간 초과가 2번 이어지면 도움 1단계(+20%, 최대 3단계). 번개로 맞히면 1단계씩 내려간다 */
   const FAST=.4;           /* 남은 시간이 40% 이상일 때 맞히면 번개 보너스 */
   const FAST_BONUS=.25;    /* 번개 보너스 = 그 정답 금화의 25% */
-  const FAST_MIN=.3;       /* 번개는 보통 아이 필요 시간의 30%(글을 읽을 만한 최소 시간)가 지나야 받는다. 마구 누르기로는 못 받는다 */
+  const FAST_MIN=.4;       /* 번개는 보통 아이 필요 시간의 40%(글을 읽을 만한 최소 시간)가 지나야 받는다. 마구 누르기로는 못 받는다(0.10: 30%→40%, 찍기 막기와 같은 기준) */
   const BOUNTY=30;          /* 우두머리(불씨 왕)를 쓰러뜨리면 금화 +30 */
   const STREAK={step:.1,max:5}; /* 연속 정답: 한 번에 맞힌 것이 이어질 때마다 금화 +10%(2연속 ×1.1 … 6연속부터 ×1.5). 한 번이라도 틀리면 처음부터 */
   const DASH=.35;          /* 한 번 틀리면 늑대가 제한시간의 35%만큼 성큼 다가온다 */
@@ -20,7 +20,11 @@
   const MAX_WOLVES=5;      /* (0.6 유산) raid 계산의 늑대 수 상한 */
   /* 읽기 속도(s.pace, 100 = 보통 아이 필요 시간): 한 번에 맞힌 문제의 답한 시간 ÷ 보통 아이 필요 시간(%)을 lo~hi로 잘라 ema만큼 섞는다.
      settle(…,'first',{ticks})가 바꾸고, world.js가 천천히 읽는 아이(100 넘음)에게 늑대를 덜 보낸다(보이지 않는 완충). 찍는 아이는 빨라서 100 아래 → 완충 없음 */
-  const PACE={lo:50,hi:300,ema:.25};
+  const PACE={lo:50,hi:300,ema:.25,first:3,firstEma:.5};
+  /* 0.10: 틀린 문제도 첫 고르기까지 걸린 시간으로 읽기 속도를 갱신하고(전에는 한 번에 맞힌 문제만이라 첫 정답 전 완충 0), 처음 first번은 firstEma로 빨리 따라간다 */
+  /* 찍기 막기(0.10, 8세 점검: 읽기 모드에서 보기가 열리자마자 찍어도 금화를 그대로 받음): 한 번에 맞힌 금화 × clamp(floor, 1, 답한 시간 ÷ (필요 시간 × FAST_MIN)).
+     번개를 받을 수 있는 순간(필요 시간의 40%)부터는 언제나 1이라 보통·빠른 아이는 깎이지 않는다. 그보다 빨리 누르면 최소 floor(75%) */
+  const GUARD={floor:.75};
 
   /* ---------- 알 경제 (game-plan §4.4) ----------
      한 번에 맞힌 금화 = (기본 + 판 알 × 알값 + 물고기) × 긴 글 배수 × 연속 배수 (+ 번개)
@@ -51,7 +55,7 @@
   /* 상점 띠 2줄 × 4칸(위치 고정). 회관을 다 키우면(3단계) 8번째 칸은 잔치가 이어받는다 */
   const SHOP=['repair','tower','power','fence','chicken','farmer','pond','hall'];
   const ORDER=['tower','fence','power','chicken','farmer','pond','hall','feast'];/* (0.8 카드 순서, offers 전용) */
-  const NUMS=['gold','level','fence','chickens','hidden','farmers','pond','hall','feast','wins','misses','index','help','late','repairs','broken','power','streak','nest','marketDown','pace'];
+  const NUMS=['gold','level','fence','chickens','hidden','farmers','pond','hall','feast','wins','misses','index','help','late','repairs','broken','power','streak','nest','marketDown','pace','paced','seed'];
   /* 타워 강화 단계별 설명(지금 단계 → 다음 단계). 1~3단계 펑·큰 펑·세 갈래, 4~10단계 화살 피해 +1 */
   const POWER_NOTE=['펑! 터져서 둘레도 맞아요','더 크게 펑!','한 번에 세 마리!'].concat(Array(7).fill('화살이 더 세져요!'));
   /* 상식·수학·영어 문제: 생각하는 시간(초, 수학은 계산 시간 포함) */
@@ -60,7 +64,7 @@
   const syl=s=>{let n=0;for(const ch of String(s||''))if(ch>='가'&&ch<='힣')n++;return n};
   const clamp=(lo,hi,v)=>Math.min(hi,Math.max(lo,v));
 
-  function fresh(age){return {gold:20,level:0,fence:0,chickens:1,hidden:0,farmers:0,pond:0,hall:0,feast:0,wins:0,misses:0,index:0,help:0,late:0,repairs:0,broken:0,power:0,streak:0,nest:0,marketDown:0,pace:100,mode:'sound',age:age||8,round:null}}
+  function fresh(age){return {gold:20,level:0,fence:0,chickens:1,hidden:0,farmers:0,pond:0,hall:0,feast:0,wins:0,misses:0,index:0,help:0,late:0,repairs:0,broken:0,power:0,streak:0,nest:0,marketDown:0,pace:100,paced:0,seed:0,mode:'sound',age:age||8,round:null}}
   /* 숨은 상한(산 횟수). 아이에게 보이지 않는다. 타워 1+19=20 · 닭 1+19=20 · 농부 1+9=10 */
   const max=key=>key==='feast'||key==='repair'?Infinity:ITEMS[key]?ITEMS[key].prices.length:0;
   const HENS_MAX=1+ITEMS.chicken.prices.length,TOWERS_MAX=1+ITEMS.tower.prices.length,FARMERS_MAX=1+ITEMS.farmer.prices.length;
@@ -93,10 +97,13 @@
      상식·수학·영어는 질문을 다시 읽고, 정답이 한국어 음성으로 읽을 수 있는 글(한글·숫자)일 때만 '정답은 …'을 붙인다.
      그림 문자·영어 정답은 기기마다 엉뚱하게 읽히므로 화면의 초록 보기로 보여 준다. */
   const sayable=a=>/[가-힣0-9]/.test(a)&&!/[A-Za-z]/.test(a);
-  function lesson(q){
+  /* full이 아니면 9세 이상 읽기는 질문과 정답만 읽는다(0.10, 10세 점검: 틀린 뒤 지문 전체 해설 약 22초를 다 들어야 다음 문제라 한 번 틀리면 80~95초 수입이 없었다).
+     지문 전체는 🔊 다시 듣기(full)로 들을 수 있다. */
+  function lesson(q,full){
     const answer=q.choices[q.answer];
     if(q.mode==='quiz')return q.speak+(sayable(answer)?' 정답은 '+answer+'.':' 정답은 초록색 보기예요.');
     if(q.mode!=='story')return answer;
+    if(!full&&q.age>=9)return q.prompt+' 정답은 '+answer+'.';
     return q.passage.replace(/\n/g,' ')+' '+(q.age>=8?q.prompt+' ':'')+'정답은 '+answer+'.';
   }
   /* 긴 글은 문제 하나에 시간이 더 드는 만큼 금화도 더 준다(분당 수입이 비슷해지도록). 느리게 푼다고 더 주지는 않는다. */
@@ -116,12 +123,20 @@
   const combo=n=>1+STREAK.step*Math.min(STREAK.max,Math.max(0,(n|0)-1));
   const basket=s=>PAY.basket*(1+(s.farmers|0));
   const eggPrice=s=>{const full=PAY.egg+PAY.hall*clamp(0,3,s.hall|0);return s.marketDown?Math.max(1,Math.floor(full/2)):full};
-  function income(s,q,fast){
+  /* 찍기 막기 배수(ticks = 풀이 시작부터 맞힐 때까지 틱, 없으면 1) */
+  const guard=(q,ticks)=>Number.isFinite(ticks)&&ticks>=0?clamp(GUARD.floor,1,(ticks+1e-6)*TICK/(needSeconds(q)*FAST_MIN)):1;
+  function income(s,q,fast,ticks){
     const hens=Math.max(0,s.chickens|0),laid=Math.max(0,hens-(s.hidden|0)),nest=Math.max(0,s.nest|0),cap=basket(s);
     const sold=Math.min(nest+laid,cap),left=Math.min(hens,nest+laid-sold),eggValue=eggPrice(s);
-    const fish=PAY.fish*(s.pond|0),base=PAY.base+PAY.feast*(s.feast|0),m=scale(q),streak=(s.streak|0)+1,c=combo(streak);
-    const plain=Math.round((base+sold*eggValue+fish)*m*c),bonus=fast?Math.ceil(plain*FAST_BONUS):0;
-    return {laid,sold,left,eggValue,fish,base,m,streak,combo:c,plain,bonus,gold:plain+bonus,basket:cap,eggs:sold,value:eggValue};
+    const fish=PAY.fish*(s.pond|0),base=PAY.base+PAY.feast*(s.feast|0),m=scale(q),streak=(s.streak|0)+1,c=combo(streak),g=guard(q,ticks);
+    const plain=Math.round((base+sold*eggValue+fish)*m*c*g),bonus=fast?Math.ceil(plain*FAST_BONUS):0;
+    return {laid,sold,left,eggValue,fish,base,m,streak,combo:c,guard:g,plain,bonus,gold:plain+bonus,basket:cap,eggs:sold,value:eggValue};
+  }
+  /* 읽기 속도 갱신: 그 문제의 첫 고르기까지 걸린 틱 ÷ 보통 아이 필요 시간(%) */
+  function trackPace(s,q,ticks){
+    if(!Number.isFinite(ticks)||ticks<0)return;
+    const r=clamp(PACE.lo,PACE.hi,Math.round(100*ticks*TICK/needSeconds(q))),p=Number.isFinite(s.pace)?s.pace:100,n=s.paced|0;
+    s.pace=Math.round(p+(r-p)*(n<PACE.first?PACE.firstEma:PACE.ema));s.paced=n+1;
   }
   /* (0.6 유산) 늑대가 마을에 닿았을 때: 타워가 level마리를 쏘고, 나머지가 닭을 놀래켜 숨게 한다. */
   function raid(s){
@@ -135,9 +150,9 @@
   function settle(s,q,result,opt){
     const o=opt||{};
     if(result==='first'){
-      const inc=income(s,q,!!o.fast),back=s.hidden>0?1:0;
+      const inc=income(s,q,!!o.fast,o.ticks),back=s.hidden>0?1:0;
       s.gold+=inc.gold;s.wins++;s.streak=inc.streak;s.hidden-=back;s.late=0;s.nest=inc.left;if(o.fast)s.help=Math.max(0,s.help-1);
-      if(Number.isFinite(o.ticks)&&o.ticks>=0){const r=clamp(PACE.lo,PACE.hi,Math.round(100*o.ticks*TICK/needSeconds(q))),p=Number.isFinite(s.pace)?s.pace:100;s.pace=Math.round(p+(r-p)*PACE.ema)}
+      trackPace(s,q,o.ticks);
       return Object.assign({result,back},inc);
     }
     s.streak=0;
@@ -204,8 +219,9 @@
   function recommend(s,ctx){
     const c=ctx||{},ok=k=>canBuy(s,k),hens=s.chickens|0,towers=Number.isFinite(c.towers)?c.towers:1+(s.level|0);
     const say=(key,line,rule,urgent)=>({key,line:LINES[line],urgent:!!urgent,rule});
-    /* 1 진짜 건물이 부서짐 */
-    if(ok('repair')){const kinds=Array.isArray(c.brokenKinds)?c.brokenKinds:[],hit=REPAIR_LINE.find(([k])=>kinds.includes(k));return say('repair',hit?hit[1]:'repair',1,true)}
+    /* 1 진짜 건물이 부서짐. 단, 닭이 0~1마리이고 부서진 것이 닭장·매대가 아니면 닭을 먼저(0.10, 10세 점검: 첫 금화가 고치기로 나가 닭 0마리가 몇 분씩 이어짐) */
+    const kinds=Array.isArray(c.brokenKinds)?c.brokenKinds:[];
+    if(ok('repair')&&!(hens<=1&&ok('chicken')&&!kinds.includes('coop')&&!kinds.includes('market'))){const hit=REPAIR_LINE.find(([k])=>kinds.includes(k));return say('repair',hit?hit[1]:'repair',1,true)}
     /* 2 방금 닭을 물려 감, 또는 마을 안 늑대 ≥ 타워 수 × 3 */
     const inside=Math.max(0,Number(c.wolvesInside)||0),lost=!!c.lostHenRecently;
     if(lost||inside>0&&inside>=towers*3){
@@ -267,7 +283,8 @@
   }
 
   const api={API:3,TICK,SPEED,MIN_SEC,MAX_SEC,SLACK,FENCE,HELP,FAST,FAST_BONUS,FAST_MIN,isFast,sayable,STREAK,BOUNTY,combo,DASH,DASH_TICKS,MAX_WOLVES,PACE,PAY,REPAIR,CURVE,ITEMS,SHOP,ORDER,POWER_NOTE,THINK,LINES,REC,units,
-    HENS_MAX,TOWERS_MAX,FARMERS_MAX,syl,fresh,max,count,needSeconds,baseSeconds,limit,reveal,lesson,scale,picks,built,wolves,basket,eggPrice,income,raid,settle,price,open,canBuy,buy,shopKeys,shop,recommend,offers,restore};
+    HENS_MAX,TOWERS_MAX,FARMERS_MAX,syl,fresh,max,count,needSeconds,baseSeconds,limit,reveal,lesson,scale,picks,built,wolves,basket,eggPrice,income,raid,settle,price,open,canBuy,buy,shopKeys,shop,recommend,offers,restore,
+    GUARD,guard,trackPace};
   if(typeof module!=='undefined')module.exports=api;
   else root.Combat=api;
 })(typeof window!=='undefined'?window:globalThis);

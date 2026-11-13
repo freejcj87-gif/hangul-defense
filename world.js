@@ -50,7 +50,11 @@
      고치기 카드는 건물에만(고치기는 울타리도 최대 체력으로 채운다) */
   const REBUILD=150;
   const SIZE={coop:1.4,market:1.6,nursery:1,barn:1.6,tower:.9};
-  const HEN={speed:1.6,calm:30};
+  /* alert: 늑대가 이 거리 안에 오면 그 닭만 닭장으로 숨는다(0.10: 마을 둘레에 늑대가 하나만 있어도 닭 전부가 숨어 큰 마을에서 닭이 보이지 않았다) */
+  const HEN={speed:1.6,calm:30,alert:5.5};
+  /* 새 판 보호(index.html이 새 판을 만들 때 guard로 켠다. 0.10 플레이 점검: 느린 7·10세가 첫 몇 분에 닭을 다 잃고 무너짐)
+     calm = 처음 한 번에 맞힐 때까지 남은 수(그동안 늑대는 쫓기만 하고 물지도 부수지도 않는다), keep = 마지막 닭 한 마리는 노리지 않는다 */
+  const GUARD={calm:3};
   const RUSH={frac:.3};             /* 틀리면 무리 간격의 frac만큼 세계를 빨리 감는다(늑대가 성큼). 마구 찍기를 손해로 만든다 */
   const DASH=RUSH.frac;
   const MERCY={per:.1,max:.5,decay:300}; /* 닭을 잃거나 건물이 부서질 때마다 다음 무리 10% 작게·낙오 늑대 뜸하게(최대 50%), 마지막으로 잃은 뒤 30초마다 한 단계 풀림 */
@@ -94,10 +98,14 @@
   /* 무리 간격(틱): index.html이 나이별로 정해 넘긴다(13~18초). 첫 낙오 늑대는 시작하자마자 나온다. */
   function create(opt){
     const o=opt||{},iv=Math.max(80,Math.round(o.interval||150));
-    return {v:2,t:0,rng:(o.seed>>>0)||1,hall:0,interval:iv,
+    const w={v:2,t:0,rng:(o.seed>>>0)||1,hall:0,interval:iv,
       wave:{n:0,arrive:iv,spawned:false},trickle:5,seen:{},mercy:0,mercyT:0,
       wolves:[],hens:[],buildings:[],arrows:[],nextId:1,stats:{kills:0,henLost:0,henSaved:0,broken:0,fenceBroken:0,waves:0,bosses:0,bossKills:0,splash:0},events:[]};
+    if(o.guard){w.calm=GUARD.calm;w.keep=true}
+    return w;
   }
+  /* 처음 한 번에 맞힘(index.html이 부른다): 새 판 보호를 한 칸 줄인다 */
+  function answered(w){if(w&&w.calm>0)w.calm--}
   const id=w=>w.nextId++;
 
   /* ---------- 경제 상태(Combat)와 맞추기 ----------
@@ -201,18 +209,23 @@
     /* 완충은 마지막으로 잃은 뒤 30초마다 한 단계 풀린다(전에는 t%300이라 잃자마자 풀리기도 했다) */
     if(w.mercy>0&&--w.mercyT<=0){w.mercy--;w.mercyT=MERCY.decay}
     /* 어림 상자(|x|,|z|) 먼저: hypot은 언제나 |x|,|z| 이상이라 결과는 같고 hypot 계산만 줄어든다 */
-    const zone=R+1.5,alert=w.wolves.some(v=>v.state!=='leave'&&v.state!=='carry'&&alive(v)&&Math.abs(v.x)<zone&&Math.abs(v.z)<zone&&Math.hypot(v.x,v.z)<zone);
+    const zone=R+1.5,threats=[];
+    for(const v of w.wolves)if(v.state!=='leave'&&v.state!=='carry'&&alive(v)&&Math.abs(v.x)<zone&&Math.abs(v.z)<zone&&Math.hypot(v.x,v.z)<zone)threats.push(v);
+    /* 그 닭 둘레(HEN.alert) 안에 늑대가 있나. 숨은 닭은 닭장 자리에 있으므로 닭장 둘레를 본다 */
+    const A=HEN.alert,scared=h=>{for(const v of threats){const dx=v.x-h.x,dz=v.z-h.z;if(dx<A&&dx>-A&&dz<A&&dz>-A&&dx*dx+dz*dz<A*A)return true}return false};
     const coop=w.buildings.find(b=>b.kind==='coop');
     /* 잡힌 닭인데 무는/물고 가는 늑대가 없으면(망가진 저장 등) 놓여나 도망친다 */
     let held=null;
     for(const h of w.hens)if(h.state==='caught'||h.state==='carried'){
       if(!held){held=new Map();for(const v of w.wolves)if(v.state==='bite')held.set(v.hen,'caught');else if(v.state==='carry')held.set(v.hen,'carried')}
       if(held.get(h.id)!==h.state){h.state='flee';h.calm=0}}
-    /* 닭: 늑대가 마을 가까이 오면 닭장으로 숨고, 조용해지면 3초 뒤 돌아온다. */
+    /* 닭: 늑대가 그 닭 가까이 오면 닭장으로 숨고, 둘레가 조용해지면 3초 뒤 돌아온다. */
+    let free=0;
     for(const h of w.hens){
       if(h.state==='caught'||h.state==='carried'||h.state==='gone')continue;
+      free++;
       const safe=coop&&!coop.broken;
-      if(alert&&safe){h.calm=0;if(h.state!=='hidden'){h.state='flee';if(move(h,coop.x,coop.z,HEN.speed,.8)){h.state='hidden';h.x=coop.x;h.z=coop.z}}}
+      if(safe&&threats.length&&scared(h)){h.calm=0;if(h.state!=='hidden'){h.state='flee';if(move(h,coop.x,coop.z,HEN.speed,.8)){h.state='hidden';h.x=coop.x;h.z=coop.z}}}
       else if(h.state==='hidden'&&!safe){h.state='yard'}
       else if(h.state==='hidden'||h.state==='flee'||h.state==='home'){if(++h.calm>=HEN.calm){h.state='home'}if(h.state==='home'){const [x,z]=HOME(h.slot);if(move(h,x,z,HEN.speed,.1))h.state='yard'}}
     }
@@ -229,8 +242,11 @@
         else move(v,0,0,v.speed);
       }else if(v.state==='hunt'){
         if(++v.inside>WOLF.bored){v.state='leave';continue}
-        const hen=K.prey==='building'?null:nearest(w.hens,v,huntable);
-        if(hen){if(move(v,hen.x,hen.z,v.speed,WOLF.reach*K.size)){v.state='bite';v.timer=WOLF.bite;v.hen=hen.id;hen.state='caught';w.events.push({type:'bite',wolf:v.id,hen:hen.id})}}
+        /* 새 판 보호: 쫓기만 한다(물지도 부수지도 않고, 닭 앞에서 멈춰 겁만 준다) */
+        if(w.calm>0){const h=K.prey==='building'?null:nearest(w.hens,v,huntable);if(h)move(v,h.x,h.z,v.speed*.6,WOLF.reach*K.size+1.2);else move(v,0,0,v.speed*.5,R*.3);continue}
+        /* 마지막 닭 한 마리는 노리지 않는다(keep) */
+        const hen=K.prey==='building'||w.keep&&free<=1?null:nearest(w.hens,v,huntable);
+        if(hen){if(move(v,hen.x,hen.z,v.speed,WOLF.reach*K.size)){v.state='bite';v.timer=WOLF.bite;v.hen=hen.id;hen.state='caught';free--;w.events.push({type:'bite',wolf:v.id,hen:hen.id})}}
         else if(K.prey==='hen'&&w.hens.some(h=>h.state==='hidden'||h.state==='flee')){move(v,0,0,v.speed*.5,R*.3)} /* 숨은 닭 둘레를 어슬렁 */
         else{const b=nearest(w.buildings,v,standing);
           if(!b){v.state='leave'}else if(move(v,b.x,b.z,v.speed,(SIZE[b.kind]||1)+.2*K.size)){v.state='smash';v.target=b.id}}
@@ -393,6 +409,7 @@
     if(!isObj(w.seen))w.seen={};if(!Number.isSafeInteger(w.trickle)||w.trickle>w.t+200)w.trickle=w.t+5;
     if(!int(w.mercy,0,MERCY_CAP))w.mercy=Number.isSafeInteger(w.mercy)&&w.mercy>0?MERCY_CAP:0;
     if(!int(w.mercyT,0,MERCY.decay))w.mercyT=MERCY.decay-w.t%MERCY.decay; /* 0.8 첫 저장: 예전 풀림 시각을 이어 쓴다 */
+    if('calm' in w&&!int(w.calm,0,GUARD.calm))w.calm=0;if('keep' in w&&typeof w.keep!=='boolean')w.keep=!!w.keep;
     const st=w.stats||{};w.stats={kills:0,henLost:0,henSaved:0,broken:0,fenceBroken:0,waves:0,bosses:0,bossKills:0,splash:0};for(const k in w.stats)if(Number.isSafeInteger(st[k]))w.stats[k]=st[k];
     w.wolves=w.wolves.filter(v=>isObj(v)&&Number.isSafeInteger(v.id)&&fin(v.x)&&fin(v.z)&&fin(v.hp)).slice(0,MAX_WOLVES);
     for(const v of w.wolves){
@@ -423,7 +440,7 @@
     if(!(Number.isSafeInteger(w.nextId)&&w.nextId>top))w.nextId=top+1;
   }
 
-  const api={V:2,TICK,RADIUS,EDGE,SPAWNS,WOLF,AGE,THREAT,PACK,TRICKLE,SLOW,slowEase,KINDS,MIX,BOSS_EVERY,TOWER,POWER,POWER_STEP,FLOOR,ROAR,HP,FENCE_HP,MEND,REBUILD,HEN,DASH,RUSH,MERCY,MERCY_CAP,INNER,SIDE_REACH,INTERVAL,MAX_WOLVES,TRAVEL,
+  const api={V:2,TICK,RADIUS,EDGE,SPAWNS,WOLF,AGE,THREAT,PACK,TRICKLE,SLOW,slowEase,KINDS,MIX,BOSS_EVERY,TOWER,POWER,POWER_STEP,FLOOR,ROAR,HP,FENCE_HP,MEND,REBUILD,HEN,DASH,RUSH,MERCY,MERCY_CAP,INNER,SIDE_REACH,INTERVAL,MAX_WOLVES,TRAVEL,GUARD,answered,
     TOWER_SLOTS,RINGS,ALL_SLOTS,SLOT_COUNT,TOWER_UNITS,PLACE,HOMES,HENS_MAX,HOME,towerSlots,fenceLayers,
     intervalFor,create,sync,step,volley,volleyArrows,dashTicks,built,threat,repairAll,brokenCount,brokenKinds,marketDown,wolvesInside,towerUnits,barLeft,secondsLeft,packSize,trickleGap,kindsAt,restore,radius,sectorOf,rand,range,cooldown,damage,towerDamage,towerRange,power,ageOf};
   if(typeof module!=='undefined')module.exports=api;

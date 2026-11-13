@@ -21,7 +21,9 @@ for(const a of Q.AGES)for(const m of Q.MODES)for(const q of bank(a,m)){
  const lock=C.reveal(q);
  if(m==='story'&&a>=8){ok(lock>3&&lock<C.limit(q,S())*.3,tag+' 글 먼저 읽기 잠금은 제한시간의 30% 미만')}else eq(lock,3,tag+' 보기 잠금 0.3초');
  const lesson=C.lesson(q);ok(lesson.includes(q.choices[q.answer]),tag+' 놓친 뒤 읽어 줄 글에 정답');
- if(m==='story')ok(lesson.includes(q.passage.split('\n')[0]),tag+' 읽어 줄 글에 지문');
+ /* 0.10: 9세 이상 읽기는 놓친 뒤 질문·정답만 읽고(짧게), 지문 전체는 다시 듣기(full)에 */
+ if(m==='story'){const full=C.lesson(q,true);ok(full.includes(q.passage.split('\n')[0])&&full.includes(q.choices[q.answer]),tag+' 다시 듣기 글에 지문·정답');
+  if(a>=9){ok(!lesson.includes(q.passage.split('\n')[0])&&lesson.includes(q.prompt),tag+' 9세 이상 놓친 뒤 글은 질문·정답만');ok(C.syl(lesson)<C.syl(full),tag+' 짧은 해설')}else eq(lesson,full,tag+' 8세 이하는 지문까지 읽음')}
  ok(C.scale(q)>=1&&C.scale(q)<=5,tag+' 긴 글 배수 1~5');
 }
 eq(shortCount,66,'8~10초 문항 수 66');
@@ -157,8 +159,14 @@ for(const m of Q.MODES){const seq=Array.from({length:12},(_,i)=>Q.at(8,m,i));
 {const R=(o,c)=>C.recommend(S(o),c||{}),K=r=>r&&[r.key,r.rule,r.urgent],L=C.LINES,P=k=>C.price(S(),k);
  /* 1 고치기(급함) */
  eq(K(R({gold:500,broken:1},{brokenKinds:['coop']})),['repair',1,true],'1 진짜 건물 부서짐 → 고치기(급함)');
- eq([R({gold:500,broken:1},{brokenKinds:['coop']}).line,R({gold:500,broken:2},{brokenKinds:['tower','market']}).line,R({gold:500,broken:1},{brokenKinds:['tower']}).line,R({gold:500,broken:1},{brokenKinds:['barn']}).line,R({gold:500,broken:1}).line],
+ eq([R({gold:500,broken:1,chickens:4},{brokenKinds:['coop']}).line,R({gold:500,broken:2,chickens:4},{brokenKinds:['tower','market']}).line,R({gold:500,broken:1,chickens:4},{brokenKinds:['tower']}).line,R({gold:500,broken:1,chickens:4},{brokenKinds:['barn']}).line,R({gold:500,broken:1,chickens:4}).line],
   [L.repairCoop,L.repairMarket,L.repairTower,L.repairBarn,L.repair],'고치기 문장: 회관 > 매대 > 타워 > …, 모르면 일반 문장');
+ /* 0.10: 닭 0~1마리이면 닭장·매대가 아닌 건물 고치기보다 닭을 먼저 */
+ eq(K(R({gold:500,broken:1,chickens:1},{brokenKinds:['tower']})),['chicken',3,false],'닭 1마리 + 타워 부서짐 → 닭 먼저');
+ eq(K(R({gold:500,broken:1,chickens:0},{brokenKinds:['barn']})),['chicken',3,false],'닭 0마리 + 헛간 부서짐 → 닭 먼저');
+ eq(K(R({gold:500,broken:1,chickens:1},{brokenKinds:['coop']})),['repair',1,true],'닭장이 부서지면 닭이 적어도 고치기 먼저');
+ eq(K(R({gold:500,broken:1,chickens:1},{brokenKinds:['market']})),['repair',1,true],'매대가 부서지면 닭이 적어도 고치기 먼저');
+ eq(K(R({gold:25,broken:1,chickens:1},{brokenKinds:['tower']})),['repair',1,true],'닭을 못 사면 고치기');
  eq(L.repairCoop,'회관을 고쳐야 할 것 같아요!','기획서 문장');
  ok((K(R({gold:10,broken:1}))||[])[1]!==1,'고칠 돈이 없으면 다음 규칙으로');ok((K(R({gold:500},{brokenKinds:['coop']}))||[])[1]!==1,'경제 상태에 부서진 곳이 없으면 고치기 아님');
  /* 2 위험 → 타워, 못 사면 울타리(급함) */
@@ -200,7 +208,8 @@ for(const m of Q.MODES){const seq=Array.from({length:12},(_,i)=>Q.at(8,m,i));
    if(!x){if(C.shop(s).some(e=>e.state==='buy'&&e.key!=='farmer'))bad.nullWithBuy=i;continue}
    if(!lines.has(x.line)||x.line.length>40)bad.line=x.line;
    if(x.rule===0){if(x.key!=='hall'||x.urgent||C.canBuy(s,'hall'))bad.bonus=i}else if(!C.canBuy(s,x.key)||!cell||cell.state!=='buy')bad.unbuyable=x.key;
-   if(x.urgent!==(x.rule===1||x.rule===2))bad.urgent=i;if(C.canBuy(s,'repair')&&x.rule!==1)bad.repairFirst=i;if(x.rule===1&&x.key!=='repair')bad.rule1=i}
+   if(x.urgent!==(x.rule===1||x.rule===2))bad.urgent=i;const henFirst=(s.chickens|0)<=1&&C.canBuy(s,'chicken')&&!c.brokenKinds.includes('coop')&&!c.brokenKinds.includes('market');
+   if(C.canBuy(s,'repair')&&(henFirst?x.rule===1:x.rule!==1))bad.repairFirst=i;if(x.rule===1&&x.key!=='repair')bad.rule1=i}
   eq(bad,{},'추천 무작위 3000: 결정적·순수·살 수 있는 것만·급함 규칙')}}
 
 /* 1-7 늑대 세계(world.js) 규칙 */
@@ -569,7 +578,9 @@ function boot(opts={}){
   tick(c=1){for(let i=0;i<c;i++)intervals[0]()},
   go(){n.go.click()},
   btn:i=>kids().find(b=>Number(b.dataset.i)===i),
-  right(){h.btn(api.round.q.answer).click()},
+  /* 0.10: 첫 시도는 글을 읽을 만한 시간(번개를 받을 수 있는 때 = 찍기 막기 기준)까지 기다렸다 누른다. 즉시 누르기는 rightNow */
+  right(){const r=api.round;if(r&&api.phase==='ask'&&r.tries===0&&r.lock<=0&&r.dash<=0){const k=fastAt(r.q)-r.t;if(k>0)h.tick(k)}h.btn(api.round.q.answer).click()},
+  rightNow(){h.btn(api.round.q.answer).click()},
   wrongIndex(k=0){return api.round.q.choices.map((_,i)=>i).filter(i=>i!==api.round.q.answer)[k]},
   wrong(k=0){h.btn(h.wrongIndex(k)).click()},
   slots:()=>n.shop.children,
@@ -617,7 +628,8 @@ a.tick(30);eq(a.api.round,null,'시작 화면에서는 문제 없음');eq(a.api.
 for(const id of ['battle','next','shield','combatInfo','buildPrompt','buyChicken','buyFence','timebar','timeFill','wolfHead','timeTag','choices','cards','skip','gainLine','gainParts'])ok(!html.includes('id="'+id+'"'),'없앤 요소: '+id);
 ok(!html.includes('소리 도움말'),'정답을 글자로 보여 주던 소리 도움말 제거');ok(!src.includes('다음 무리')&&!src.includes('barLeft')&&!src.includes('secondsLeft'),'늑대 시간 표시(초·막대) 코드 없음');
 ok(!src.includes('enterPick')&&!src.includes('picks')&&!src.includes('offers('),'카드 고르기 단계 코드 없음');
-ok(html.includes('src="combat.js?v=0.9"')&&html.includes('src="world.js?v=0.9"')&&html.includes('src="questions.js?v=0.9"')&&html.includes('src="village.js?v=0.9"'),'캐시 갱신용 ?v=0.9');
+ok(html.includes('src="combat.js?v=0.10"')&&html.includes('src="world.js?v=0.10"')&&html.includes('src="questions.js?v=0.10"')&&html.includes('src="village.js?v=0.10"'),'캐시 갱신용 ?v=0.10');
+ok(html.indexOf('src="questions-gen.js?v=0.10"')>0&&html.indexOf('src="questions-gen.js?v=0.10"')<html.indexOf('src="questions.js?v=0.10"'),'생성 문항 파일을 questions.js보다 먼저 불러옴');
 a.go();ok(a.n.start.hidden,'시작하면 시작 화면 닫힘');eq(a.api.phase,'ask','소리 모드: 다 들은 뒤 풀이 시작');eq(a.speakLog[0],Q.get(8,'sound',0).speak,'문제 소리를 읽어 줌');
 shows(a,8,'sound',0,'시작');
 eq(a.api.world.interval,W.intervalFor(9),'무리 간격 = 8세 소리 문제 기준 시간(13초)');
@@ -804,7 +816,7 @@ a.speechEnd();a.unlock();let qid=a.n.answers.dataset.qid,rt=a.api.round.t;a.buy(
 a.tick(4);a.right();eq(a.api.phase,'reward','(연출)');a.api.state.gold+=300;a.tick(4);a.buy('tower');eq([a.api.state.level,a.api.phase],[1,'reward'],'판매 연출 중에 타워');a.tick(REWARD-4);eq(a.api.phase,'listen','연출은 늘어나지 않고 다음 문제로');
 a.speechEnd();a.unlock();a.wrong(0);a.tick(C.DASH_TICKS);a.wrong(1);eq(a.api.phase,'learn','(배우기)');a.tick(4);const lv=a.api.state.level;a.buy('tower');eq([a.api.state.level,a.api.phase],[lv+1,'learn'],'배우는 중에도 삼');
 /* 화면 금화로 칸이 켜진다: 규칙 금화가 넉넉해도 동전이 닿기 전에는 흐림, 닿으면 '띵' 하고 켜짐 */
-a=fresh();a.go();a.unlock();{const p=a.row('chicken').price,g=a.api.state.gold;ok(g<p,'(처음엔 닭을 못 삼)');a.right();ok(a.api.state.gold>=p,'(규칙 금화는 넉넉)');
+a=fresh();a.go();a.unlock();{const p=a.row('chicken').price,g=a.api.state.gold;ok(g<p,'(처음엔 닭을 못 삼)');a.tick(fastAt(a.api.round.q));a.right();ok(a.api.state.gold>=p,'(규칙 금화는 넉넉)');
  eq(a.row('chicken').state,'poor','동전이 닿기 전에는 흐림');a.tick(1);a.buy('chicken');eq(a.api.state.chickens,1,'흐린 칸은 사지지 않음');ok(a.n.shopTip.textContent.endsWith('더 모아요'),'대신 안내');
  a.land();eq(a.row('chicken').state,'buy','동전이 닿으면 켜짐');ok(a.slot('chicken').classList.contains('lit'),'켜지는 순간 빛이 훑음');a.buy('chicken');eq(a.api.state.chickens,2,'이제 삼')}
 /* 날아오는 중에 사면 화면 숫자도 같이 줄고, 다 닿으면 규칙 금화와 같다 */
@@ -860,7 +872,9 @@ const NORMAL=()=>({key:'chicken',line:CHICK,urgent:false,rule:7});
 a=seed({age:7,mode:'story',gold:0},{rec:NORMAL});a.go();calmWorld(a);eq(answerLand(a),1,'첫 말풍선');const t1=a.game().rec.last;
 eq(answerLand(a),1,'20초 안에는 다음 말풍선 없음');a.tick(REC_WAIT(a,t1+200));eq(answerLand(a),2,'20초 지나면 다시(같은 추천, 안 따름 1번)');const t2=a.game().rec.last;
 a.tick(REC_WAIT(a,t2+200));eq(answerLand(a),2,'같은 추천을 두 번 연달아 안 따르면 쉼');ok(a.game().rec.mute.chicken>a.api.world.t+500,'60초 쉼 '+JSON.stringify(a.game().rec.mute));
-a.tick(REC_WAIT(a,a.game().rec.mute.chicken+1));eq(answerLand(a),3,'60초 뒤 다시');
+/* 0.10: 무시한 같은 문장은 회관 단계마다 2번까지. 60초 쉰 뒤에도 같은 단계에서는 다시 안 뜨고, 회관이 커지면 다시 */
+a.tick(REC_WAIT(a,a.game().rec.mute.chicken+1));eq(answerLand(a),2,'같은 단계에서 무시한 문장은 2번까지(60초 뒤에도 안 뜸)');
+a.api.state.hall=1;a.tick(REC_WAIT(a,a.game().rec.last+201));eq(answerLand(a),3,'회관이 커지면 다시');
 /* 따르면(사면) 쉬지 않는다 */
 a=seed({age:7,mode:'story',gold:0},{rec:NORMAL});a.go();calmWorld(a);answerLand(a);a.api.state.gold+=200;a.tick(4);a.buy('chicken');let tt=a.game().rec.last;
 for(let k=0;k<2;k++){a.tick(REC_WAIT(a,tt+320));answerLand(a);tt=a.game().rec.last;if(k===0){a.api.state.gold+=200;a.tick(4);a.buy('chicken')}}eq(a.game().rec.shown,3,'추천을 따르면 계속 말해 줌(두 번 안 따름 쉼 없음)');
@@ -873,5 +887,61 @@ let want='chicken';a=seed({age:7,mode:'story',gold:0},{rec:()=>want&&{key:want,l
 /* 실제 규칙: 회관 단계로 새로 열린 상품은 한 번만(rule 4) */
 /* 늑대가 몰려들면 더 급한 추천(타워)이 먼저라 시드에 따라 흔들린다 → 세계를 조용히 한 뒤 본다 */
 a=seed({age:7,mode:'story',hall:1,chickens:8,level:4,gold:150},{rec:'real'});a.go();calmWorld(a);answerLand(a);eq([a.bubble(),a.game().rec.glow,a.game().rec.opened],['펑! 터지는 화살을 쓸 수 있어요!','power',['power']],'회관 1단계: 강화가 열렸다고 한 번');
+
+/* ---------- 0.10 플레이 점검 수정 ---------- */
+{const S0=o=>Object.assign(C.fresh(8),o||{});
+ const quiet=(s,seed,o)=>{const w=W.sync(W.create(Object.assign({seed,interval:3000},o)),s);w.trickle=1e9;w.wave.arrive=1e9;return w};
+ const wolf=(w,o)=>{const v=Object.assign({id:w.nextId++,kind:'wolf',x:0,z:0,sx:20,sz:0,hp:9999,max:9999,speed:1,state:'walk',target:0,timer:0,inside:0,hen:0},o);w.wolves.push(v);return v};
+ const exposed=w=>{for(const b of w.buildings)if(b.kind==='tower'||b.kind==='coop')b.broken=true};
+ /* 새 판 보호 */
+ {const w=W.create({seed:1,guard:true}),w2=W.create({seed:1});eq([w.calm,w.keep],[W.GUARD.calm,true],'새 판 보호 켜짐(guard)');eq(['calm' in w2,'keep' in w2],[false,false],'guard 없으면 예전과 같은 세계');
+  W.answered(w);eq(w.calm,W.GUARD.calm-1,'한 번에 맞히면 보호가 한 칸 줄어듦');w.calm=0;W.answered(w);eq(w.calm,0,'0 아래로는 안 내려감')}
+ {const s=S0({chickens:4}),w=quiet(s,51,{guard:true});exposed(w);for(const h of w.hens)wolf(w,{x:h.x+2,z:h.z,state:'hunt'});
+  let bites=0,broke=0;for(let i=0;i<300;i++)for(const e of W.step(w,s)){if(e.type==='bite')bites++;if(e.type==='broken'&&e.kind!=='fence')broke++}
+  eq([bites,broke],[0,0],'보호 동안 늑대는 쫓기만 함(물지도 부수지도 않음)');
+  w.calm=0;w.wolves=[];for(const h of w.hens)wolf(w,{x:h.x+2,z:h.z,state:'hunt'});let after=0;for(let i=0;i<300;i++)for(const e of W.step(w,s))if(e.type==='bite')after++;ok(after>0,'보호가 끝나면 다시 뭄')}
+ {const s=S0({chickens:1}),w=quiet(s,52,{guard:true});w.calm=0;exposed(w);wolf(w,{x:w.hens[0].x+2,z:w.hens[0].z,state:'hunt'});
+  let bites=0;for(let i=0;i<300;i++)for(const e of W.step(w,s))if(e.type==='bite')bites++;eq(bites,0,'마지막 닭 한 마리는 노리지 않음(keep)');
+  const s2=S0({chickens:2}),w2=quiet(s2,53,{guard:true});w2.calm=0;exposed(w2);for(const h of w2.hens)wolf(w2,{x:h.x+1.5,z:h.z,state:'hunt'});
+  let b2=0;for(let i=0;i<600;i++)for(const e of W.step(w2,s2))if(e.type==='bite')b2++;ok(b2>=1,'닭이 둘이면 하나는 물려 갈 수 있음');ok(w2.hens.some(h=>h.state!=='gone'&&h.state!=='carried'&&h.state!=='caught'),'그래도 한 마리는 남음');
+  const s3=S0({chickens:1}),w3=quiet(s3,54);w3.calm=0;exposed(w3);wolf(w3,{x:w3.hens[0].x+2,z:w3.hens[0].z,state:'hunt'});let b3=0;for(let i=0;i<300;i++)for(const e of W.step(w3,s3))if(e.type==='bite')b3++;ok(b3>0,'keep 없는 세계(규칙 검사용)는 예전처럼 마지막 닭도 뭄')}
+ /* 닭은 가까운 늑대에만 숨는다 */
+ {const s=S0({chickens:8,hall:3}),w=quiet(s,55);wolf(w,{x:15,z:0,speed:0,state:'hunt'});for(let i=0;i<40;i++)W.step(w,s);
+  eq(w.hens.filter(h=>h.state==='hidden'||h.state==='flee').length,0,'큰 마을 가장자리 늑대 한 마리로는 닭이 숨지 않음');
+  /* 마당 한쪽 바깥(닭 0번 자리에서 4칸 왼쪽)의 늑대: 그쪽 닭은 숨고, 반대편 닭은 마당에 남는다 */
+  const h0=w.hens.find(h=>h.slot===0);wolf(w,{x:h0.x-4,z:h0.z,speed:0,state:'hunt'});for(let i=0;i<10;i++)W.step(w,s);ok(h0.state==='flee'||h0.state==='hidden','가까운 닭은 숨으러 감 '+h0.state);
+  const farH=w.hens.filter(h=>Math.hypot(h.x-(h0.x-4),h.z-h0.z)>W.HEN.alert+1);ok(farH.length>0&&farH.every(h=>h.state==='yard'),'먼 닭은 마당에 남음 '+farH.map(h=>h.state))}
+ /* 찍기 막기·읽기 속도 */
+ {const q=Q.get(8,'story',0),need=C.needSeconds(q),at=Math.ceil(C.FAST_MIN*need/C.TICK);
+  eq([C.guard(q,0),C.guard(q,at),C.guard(q,undefined)],[C.GUARD.floor,1,1],'찍기 막기: 바로 누르면 75%, 번개를 받을 수 있는 때부터 100%, 시간을 모르면 100%');
+  ok(C.isFast(q,at)===C.isFast(q,at)&&C.guard(q,at)===1,'번개 시작과 찍기 막기 기준이 같음');
+  const s=S({chickens:3}),a=C.income(s,q,false,0).gold,b=C.income(s,q,false,9999).gold;ok(a<b&&a>=Math.floor(b*C.GUARD.floor)-1,'찍기 금화 '+a+' < 읽기 금화 '+b);
+  const p=S(),tk=Math.round(need*2/C.TICK);C.trackPace(p,q,tk);eq([p.pace,p.paced],[150,1],'읽기 속도: 처음엔 절반씩 따라감');C.trackPace(p,q,tk);C.trackPace(p,q,tk);C.trackPace(p,q,tk);eq(p.paced,4,'갱신 횟수');ok(p.pace>185&&p.pace<200,'넷째부터는 천천히 '+p.pace);
+  const r=C.restore(JSON.parse(JSON.stringify({version:1,...S({seed:12345,paced:2})})),Q.AGES);eq([r.seed,r.paced],[12345,2],'씨앗·읽기 속도 갱신 횟수 저장')}
+}
+/* 화면: 새 판 보호·씨앗·찍기 막기·틀린 문제 읽기 속도 */
+a=fresh();a.go();eq([a.game().calm,a.game().keep],[W.GUARD.calm,true],'새 판은 보호 3번·마지막 닭 지킴');ok(a.game().seed>0,'판마다 문제 순서 씨앗');
+eq(a.game().round.id,Q.at(8,'sound',0,a.game().seed).id,'화면 문제 = Questions.at(나이, 모드, 번호, 씨앗)');
+a.unlock();a.right();eq(a.game().calm,W.GUARD.calm-1,'한 번에 맞히면 보호가 줄어듦');
+a=seed({index:5});a.go();ok(a.game().seed>0,'예전 저장(씨앗 없음)은 이어할 때 씨앗을 받음');
+a=fresh();a.go();a.unlock();{const q=a.api.round.q,g0=a.api.state.gold,exp=C.income(a.api.state,q,false,a.api.round.t).gold,full=C.income(a.api.state,q,false,9999).gold;a.rightNow();
+ eq(a.api.state.gold-g0,exp,'바로 찍어 맞히면 찍기 막기 금화');ok(exp<full,'찍기 금화 '+exp+' < 읽고 맞힌 금화 '+full)}
+a=fresh();a.go();a.unlock();a.tick(40);{const q=a.api.round.q,t=a.api.round.t,s=JSON.parse(JSON.stringify(a.api.state));C.trackPace(s,q,t);a.wrong(0);eq([a.api.state.pace,a.api.state.paced],[s.pace,1],'틀려도 첫 고르기까지의 시간으로 읽기 속도 갱신')}
+/* 효과음 예산: 여럿이 한꺼번에 쓰러져도 깨갱은 0.3초 간격, 정답 직후 1초는 쉼 */
+{const a=fresh();a.go();calmWorld(a);a.unlock();const w=a.api.world,t=w.buildings.find(b=>b.kind==='tower');
+ const put=n=>{for(let i=0;i<n;i++)w.wolves.push({id:w.nextId++,kind:'wolf',x:t.x+1+i*.05,z:t.z+.3,sx:20,sz:0,hp:1,max:1,speed:0,state:'hunt',target:0,timer:0,inside:0,hen:0})};
+ put(12);const y0=a.game().sfx.yelp|0,k0=w.stats.kills;W.volley(w,a.api.state,{scale:3});a.tick(8);const kills=w.stats.kills-k0,y=(a.game().sfx.yelp|0)-y0;
+ ok(kills>=6,'(일제 사격으로 여럿 쓰러짐 '+kills+')');ok(y>=1&&y<=3,'깨갱은 0.3초 간격: '+kills+'마리에 '+y+'번');
+ a.tick(20);put(12);const y1=a.game().sfx.yelp|0,k1=w.stats.kills;a.rightNow();a.tick(9);ok(w.stats.kills-k1>=1,'(정답 일제 사격으로 쓰러짐 '+(w.stats.kills-k1)+')');eq((a.game().sfx.yelp|0)-y1,0,'정답 직후 1초는 깨갱 쉼(정답 소리가 묻히지 않게)')}
+/* 7세는 읽기 모드에서도 상식·수학·영어 질문을 읽어 줌(8세는 아님) */
+{const SEED=777;let i7=0;while(Q.at(7,'story',i7,SEED).mode!=='quiz')i7++;let i8=0;while(Q.at(8,'story',i8,SEED).mode!=='quiz')i8++;
+ let a=seed({age:7,mode:'story',index:i7,seed:SEED},{tts:'manual'});a.go();eq([a.api.phase,a.speakLog.at(-1)],['listen',Q.at(7,'story',i7,SEED).speak],'7세 읽기 모드 퀴즈는 질문을 읽어 줌');a.speechEnd();a.tick(1);eq(a.api.phase,'ask','다 읽으면 풀이');
+ a=seed({age:8,mode:'story',index:i8,seed:SEED},{tts:'manual'});a.go();eq([a.api.phase,a.speakLog.length],['ask',0],'8세 읽기 모드 퀴즈는 읽어 주지 않음')}
+/* 9세 이상 읽기: 놓치면 질문·정답만 짧게, 🔊는 지문까지 */
+{const a=seed({age:9,mode:'story'},{tts:'manual'});a.go();a.unlock();a.wrong(0);a.tick(C.DASH_TICKS);a.wrong(1);eq(a.api.phase,'learn','(배우기)');
+ eq(a.speakLog.at(-1),C.lesson(a.api.round.q),'두 번 틀리면 짧은 해설(질문·정답)');a.speechEnd();a.tick(12);ok(a.api.round.ready,'(해설 뒤 초록 답)');a.n.speak.click();eq(a.speakLog.at(-1),C.lesson(a.api.round.q,true),'🔊 다시 듣기는 지문까지')}
+/* '모아서 회관을 키워 봐요'는 회관 값의 절반을 모은 뒤에만 */
+a=seed({age:7,mode:'story',level:5,fence:4,chickens:4,gold:0},{rec:'real'});a.go();calmWorld(a);eq(answerLand(a),0,'회관 값의 절반 전에는 모으자 말풍선 없음');
+a.tick(250);a.api.state.gold=70;eq(answerLand(a),1,'절반을 넘으면 띄움');eq(a.bubble(),C.LINES.hallSave,'(모으자 말풍선)');
 
 console.log('PASS '+checks+' rule + simulated DOM assertions. Not browser/audio/device validation.');

@@ -287,6 +287,10 @@ async function start(){
  let aspect=1,viewW=1,camHalf=-1,fxScale=1,Rd=7,Rgoal=7;
  // Half-height that fits the village plus the last few metres of the approach (wolves become visible before they reach the fence).
  const fitHalf=R=>{const rho=R+4.2;return Math.max(rho*upXZ+.5,R*upXZ+3.2*upY+.4,rho/aspect*1.02,5.6)};
+ // 0.10: the camera pulls back only VIEW_PULL of the way as the village grows, so growth reads on screen (it used to cancel out: the ring went
+ // 2.3x wider but only +27% on a 390px phone). The ring itself plus a thin margin always stays in view; the forest approach may start off-screen.
+ const VIEW_PULL=.7,ringHalf=R=>{const rho=R+1.4;return Math.max(rho*upXZ+.5,R*upXZ+3.2*upY+.4,rho/aspect*1.02,5.6)};
+ const viewHalf=R=>{const base=fitHalf(7);return Math.max(ringHalf(R),base+(fitHalf(R)-base)*VIEW_PULL)};
  const resize=()=>{viewW=host.clientWidth||1;const h=host.clientHeight||1;aspect=viewW/h;camHalf=-1;renderer.setSize(viewW,h,false);applyView()};
  const [grass,pack,atlas]=await Promise.all([new THREE.TextureLoader().loadAsync(ART+'backgrounds/grass.png'),new GLTFLoader().loadAsync('art-handoff/coopnight/source-3d/models/environment-pack.glb'),makeAtlas()]);
 
@@ -1037,7 +1041,7 @@ async function start(){
  const tickBlend=less=>{const u=less?1:clamp(blendT/blendDur,0,1);return blendEase?easeOut(u):u};
  let shadowR=-1;
  function applyView(){
-  const half=focusHalf||fitHalf(Rd);
+  const half=focusHalf||viewHalf(Rd);
   if(Math.abs(half-camHalf)>1e-4){camHalf=half;camera.left=-half*aspect;camera.right=half*aspect;camera.top=half;camera.bottom=-half;camera.updateProjectionMatrix()}
   fxScale=clamp(half/6.4,1,2.2)*clamp(560/viewW,1,1.25);
   yard.scale.set(Rd,1,Rd);layoutDecor(Rd);
