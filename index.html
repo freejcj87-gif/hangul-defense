@@ -401,7 +401,7 @@ function voiceFail(){voiceOff=true;put($('voiceStatus'),'이 기기에서는 읽
 /* ---------- 문제 ---------- */
 function layout(choices){const len=Math.max(...choices.map(c=>[...c].length)),n=choices.length;if(len>6)return ['long','1'];if(len>1)return ['word',n===3&&len<=3?'3':'2'];return ['',n===3?'3':'2']}
 function makeRound(){
- /* 4문제마다 1문제는 상식·수학·영어(Questions.at). 소리 모드에서도 질문을 읽어 준 뒤 푼다. */
+ /* 상식·수학·영어 칸은 나이·문제 번호로 정해진다(0.10: 20칸마다 7세 2·8세 3·9세 5→7·10세 7→10, Questions.at). 순서는 판마다 씨앗으로. 소리 모드에서도 질문을 읽어 준 뒤 푼다. */
  const q=Questions.at(state.age,state.mode,state.index,state.seed);
  /* 긴 글(9세 이상 읽기)을 읽는 동안 작은 폰에서는 장면을 줄여 보기가 한 화면에 들어오게 한다 */
  try{document.body.classList.toggle('long-read',q.mode==='story'&&Combat.syl(q.passage)>=40)}catch{}

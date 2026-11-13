@@ -55,7 +55,17 @@
 
 ## 실제 규칙과 한계
 
-### 0.9 (현재)
+### 0.10 (현재)
+
+0.9를 자동 플레이 봇으로 4개 나이 끝까지 키워 본 점검과 문제은행 조사·검증 결과를 고친 판입니다. 정본은 [docs/game-plan.md](docs/game-plan.md) §9, 점검 원자료는 저장소 밖 `work/verification-20261113/`입니다.
+
+- 세계: 닭은 늑대가 그 닭 `HEN.alert`(3.5) 안에 올 때만 숨음. 새 판 보호 `World.create({guard:true})` → `w.calm`(처음 3문제, 첫 고르기마다 `World.answered`) 동안 늑대는 쫓기만 하고, `w.keep`이면 마지막 닭 한 마리는 노리지 않음(0.9 저장은 불러올 때 `keep`만 켬). 규칙 검사용 `W.create()`는 예전 그대로.
+- 규칙: `Combat.trackPace`(틀린 문제도 첫 고르기 시간으로 읽기 속도, 처음 3번은 ema .5, `state.paced`), `Combat.guard`(번개 시작 `FAST_MIN` .4 전 정답은 금화 최소 75%), 닭 0~1마리면 닭장·매대가 아닌 고치기보다 닭 추천, `Combat.lesson(q,full)`(9세 이상 읽기는 질문·정답만, full은 지문까지).
+- 화면: 효과음 간격 `SFX_GAP`(깨갱 0.3·펑 1·화살 1.5초)과 `hush()`(듣기·음성·정답 뒤 1초), 호출 수 `__game().sfx`. 말풍선 `REC.perStage`(무시한 같은 문장은 회관 단계마다 2번, 따르면 다시 셈)·`saveFrom`(모으자 말은 회관 값 절반부터)·`perMin` 2. 7세 읽기 모드 퀴즈는 질문을 읽어 줌. 작은 폰 `body.long-read` 장면 축소·`answersIntoView`. 시작 화면에서 고른 나이·모드로 무리 간격을 다시 정함(0.9 버그).
+- 출제: `Questions.at(age,mode,index,seed)`, `state.seed`(새 판·이어하기 때 없으면 생성), 생성 문항 `questions-gen.js`(questions.js보다 먼저 불러옴, 배포 빌드 목록에 포함).
+- 3D: 카메라가 마을 성장분의 70%만 물러남(`VIEW_PULL`, 마을 고리는 늘 화면 안).
+
+### 0.9 (참고)
 
 프로듀서 5대 방향(2026-11-12)을 넣은 판입니다. 정본은 [docs/game-plan.md](docs/game-plan.md)(§8에 구현 결과·실제 상수·시뮬레이션), 세 작업(규칙·화면·3D)의 이름·자료 계약은 [docs/v09-contract.md](docs/v09-contract.md)입니다.
 

@@ -101,7 +101,8 @@
      지문 전체는 🔊 다시 듣기(full)로 들을 수 있다. */
   function lesson(q,full){
     const answer=q.choices[q.answer];
-    if(q.mode==='quiz')return q.speak+(sayable(answer)?' 정답은 '+answer+'.':' 정답은 초록색 보기예요.');
+    /* say: 정답을 읽는 말(예: '119' → '일일구'). 있으면 보기 글 대신 그것을 읽는다 */
+    if(q.mode==='quiz')return q.speak+(q.say?' 정답은 '+q.say+'.':sayable(answer)?' 정답은 '+answer+'.':' 정답은 초록색 보기예요.');
     if(q.mode!=='story')return answer;
     if(!full&&q.age>=9)return q.prompt+' 정답은 '+answer+'.';
     return q.passage.replace(/\n/g,' ')+' '+(q.age>=8?q.prompt+' ':'')+'정답은 '+answer+'.';
