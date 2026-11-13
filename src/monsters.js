@@ -6,14 +6,16 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const V3=THREE.Vector3;
-export const KIND_ORDER=['wolf','bramble','boar','granite','frost','ember'];
+// 0.12: 'king'(늑대 왕 = 불씨 왕 모델의 회색 변형, 크기는 화면 쪽에서 2배)과 'fox'(도둑 여우 = 늑대 모델의 주황 변형)는 새 그림 없이 색만 바꾼 종류다.
+// 세계(world.js)에서는 늑대 목록이 아니라 w.king · w.fox 한 자리씩이고, 화면이 이 두 종류로 그린다.
+export const KIND_ORDER=['wolf','bramble','boar','granite','frost','ember','king','fox'];
 
 /* ---------- rig layout (unit monster, faces +z, feet on y=0) ---------- */
 // H head pivot (neck), J jaw hinge, T tail root, L leg pivots (front-left, front-right, back-left, back-right),
 // M mouth (where a carried hen hangs), top (above the head, for markers), rear (hind hips z, pivot for rearing up).
 const WOLF_RIG={H:[0,.9,.28],J:[0,.9,.52],T:[0,.76,-.5],L:[[.15,.52,.3],[-.15,.52,.3],[.15,.52,-.34],[-.15,.52,-.34]],M:[0,.86,.84],top:[0,1.62,.34],hip:.52,rear:-.34,center:.62};
 const BOAR_RIG={H:[0,.62,.32],J:[0,.5,.62],T:[0,.6,-.52],L:[[.17,.38,.26],[-.17,.38,.26],[.17,.38,-.3],[-.17,.38,-.3]],M:[0,.5,.92],top:[0,1.12,.42],hip:.38,rear:-.3,center:.5};
-export const RIG={wolf:WOLF_RIG,bramble:WOLF_RIG,granite:WOLF_RIG,frost:WOLF_RIG,ember:WOLF_RIG,boar:BOAR_RIG};
+export const RIG={wolf:WOLF_RIG,bramble:WOLF_RIG,granite:WOLF_RIG,frost:WOLF_RIG,ember:WOLF_RIG,boar:BOAR_RIG,king:WOLF_RIG,fox:WOLF_RIG};
 
 // Gaits: walk / run gait per kind and the stride frequency (Hz) at the kind's normal speed.
 export const GAIT={
@@ -22,7 +24,9 @@ export const GAIT={
  boar:{walk:'hop',run:'hop',hz:{hop:3.2}},
  granite:{walk:'plod',run:'plod',hz:{plod:1.15}},
  frost:{walk:'gallop',run:'gallop',hz:{gallop:3.2}},
- ember:{walk:'prowl',run:'prowl',hz:{prowl:1.05}}};
+ ember:{walk:'prowl',run:'prowl',hz:{prowl:1.05}},
+ king:{walk:'prowl',run:'prowl',hz:{prowl:.8}},
+ fox:{walk:'gallop',run:'gallop',hz:{gallop:3.2}}};
 
 /* ---------- primitives (kept low-poly: a pack of 90 has to run on phones) ---------- */
 const PRIM={ball:new THREE.SphereGeometry(1,8,6),low:new THREE.SphereGeometry(1,6,4),cone:new THREE.ConeGeometry(1,1,6),spike:new THREE.ConeGeometry(1,1,4),
@@ -175,7 +179,12 @@ function boar(){
  return P;
 }
 function wolf(){return wolfBody({fur:0x66717f,cream:0xf1e4c8,dark:0x4a5360})}
-const BUILD={wolf,bramble,boar,granite,frost,ember};
+// 색만 바꾼 변형: 부품 목록의 색(둘째 칸)을 함수로 바꾼다. 늑대 왕은 밝기만 남긴 차가운 회색(불꽃 갈기는 흰 서리빛으로 빛난다).
+const recolor=(parts,fn)=>parts.map(p=>{const q=p.slice();q[1]=fn(new THREE.Color(p[1]));return q});
+const stone=c=>{const l=.3*c.r+.59*c.g+.11*c.b;return c.setRGB(l*.9+.03,l*.94+.04,l*1.04+.07)};
+function king(){return recolor(ember(),stone)}
+function fox(){return wolfBody({fur:0xd9782b,cream:0xfff1dc,dark:0x8a4316})}
+const BUILD={wolf,bramble,boar,granite,frost,ember,king,fox};
 export function monsterGeometry(kind){return bakeRig(BUILD[kind](),RIG[kind])}
 // Shadow stand-in: a handful of low parts on the wolf rig (every kind uses it, scaled per kind).
 export function shadowGeometry(){const R=WOLF_RIG,P=[['low',0,[0,.64,-.04],[.27,.26,.5]],['low',0,[0,1.0,.45],[.23,.22,.25],[0,0,0],1],['spike',0,[0,.9,-.8],[.1,.4,.1],dirY(0,.6,-.8),3]];

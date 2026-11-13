@@ -1,4 +1,4 @@
-/* 꼬꼬마을 세계 시뮬레이션(0.8, 0.9에서 타워 20자리·층, 닭 20, 울타리 3겹, 나이별 늑대 세기): 늑대·몬스터 무리 · 화살 타워(터지는 화살) · 닭 · 건물 · 울타리.
+/* 꼬꼬마을 세계 시뮬레이션(0.8, 0.9에서 타워 20자리·층, 닭 20, 울타리 3겹, 나이별 늑대 세기, 0.12에서 읽기 박자 무리 간격·늑대 왕·도둑 여우·물러남): 늑대·몬스터 무리 · 화살 타워(터지는 화살) · 닭 · 건물 · 울타리.
    화면과 무관한 순수 규칙이다. 같은 시드와 같은 입력이면 언제나 같은 결과가 나오고(시드 난수), 상태는 그대로 JSON 저장된다.
    시간 단위는 틱(0.1초). 좌표는 3D 장면과 같은 단위이고 마을 중심이 (0,0)이다. 설계: docs/village-defense-design.md, docs/game-plan.md §4 */
 (function(root){
@@ -12,6 +12,8 @@
   const AGE={7:{speed:.925,hp:.85,pack:.85},8:{speed:.975,hp:.95,pack:.95},9:{speed:1.025,hp:1.05,pack:1.05},10:{speed:1.075,hp:1.15,pack:1.15}};
   const AGE_NONE={speed:1,hp:1,pack:1};
   const ageOf=s=>AGE[s&&s.age]||AGE_NONE;
+  /* 다회차 늑대 세기(0.12): 경제 상태의 s.run.wolfMul(%, 95~120, Combat.WOLF_MUL)을 체력·무리에 곱하고 속도에는 절반만(1 + (m−1)/2) */
+  const mulOf=s=>{const m=s&&s.run&&s.run.wolfMul;return Number.isFinite(m)&&m>0?m/100:1};
   /* 늑대를 부르는 정도(threat)의 계수와 무리 크기. 상한 20(타워·닭)에 맞춰 0.8보다 낮췄다: 보통 아이 20분 무리가 0.8과 비슷하고 40분 무렵 상한 */
   const THREAT={tower:.98,power:1.13,other:.38,hall:.75};
   /* 무리 크기 = 1 + min(waveMax, 무리 번호/waveEvery) + 위협 × perThreat + 회관 × perHall (최대 max) */
@@ -19,7 +21,7 @@
   /* 낙오 늑대 간격(틱) = (base + 난수 × spread) × max(floor, 1 − 위협/threat). 두 마리일 확률 = min(.5, 위협/pair) */
   const TRICKLE={base:40,spread:24,floor:.36,threat:38,pair:16};
   /* 천천히 읽는 아이 완충: s.pace(Combat, 100 = 보통 속도)가 100보다 크면 무리 크기 ×, 낙오 늑대 간격 ÷ (100/pace)^pow (최소 min). pow 0이면 끔 */
-  const SLOW={pow:1.35,min:.42};
+  const SLOW={pow:2,min:.3}; /* 0.12: 완충 강화(1.35·.42 → 2·.3, 설계 v2 §5.2) */
   const slowEase=s=>{const p=s&&s.pace;return SLOW.pow>0&&p>100?Math.max(SLOW.min,Math.pow(100/p,SLOW.pow)):1};
   /* 몬스터 종류. 마을회관 단계(unlock)에 이르면 무리에 섞여 나온다. hp·speed·smash는 늑대 대비 배수, size는 몸 크기(3D·맞는 거리).
      prey: any = 닭 먼저 그다음 건물, building = 건물만, hen = 닭만(닭이 없으면 건물). 참고: 꼬꼬마을 보스 4종(덤불·바위·서리·불씨)과 멧돼지. */
@@ -34,7 +36,10 @@
   /* 단계별 무리 구성(가중치). 우두머리(불씨 왕)는 3단계부터 네 번째 무리마다 한 마리. */
   const MIX=[{wolf:1},{wolf:3,bramble:2},{wolf:3,bramble:2,boar:1,granite:1},{wolf:3,bramble:2,boar:1,granite:1,frost:2}];
   const BOSS_EVERY=4;
-  const TOWER={range:6.5,damage:10,cooldown:12,arrowSpeed:9,volleyRange:2};
+  /* hallRange(0.12, 프로듀서 플레이 피드백 "회관이 커져 울타리가 넓어지면 타워 사정거리가 닿지 않는다"): 회관 단계마다 사거리 +1.5.
+     마을 반지름은 단계마다 +3(7/10/13/16)인데 사거리는 그대로라, 울타리 줄(반지름 + 0.3)에서 타워 사거리가 닿는 둘레가
+     회관 1·타워 4개 62% · 회관 2·타워 8개 73% · 회관 3·타워 14개 66%(20개여도 85%)까지 떨어졌다. +1.5면 같은 경우 91% · 97% · 100% */
+  const TOWER={range:6.5,damage:10,cooldown:12,arrowSpeed:9,volleyRange:2,hallRange:1.5};
   /* 타워 강화(s.power): 0 화살 · 1 펑 화살(맞은 자리 둘레에 60% 피해) · 2 큰 펑 화살(더 넓게, 75%, 피해 +3) · 3 세 갈래 화살(한 번에 3마리)
      4~10단계: 화살 피해 +POWER_STEP씩(세 갈래 화살 그대로) */
   const POWER=[{splash:0,share:0,plus:0,multi:1},{splash:1.3,share:.6,plus:0,multi:1},{splash:1.9,share:.75,plus:3,multi:1},{splash:1.9,share:.75,plus:3,multi:3}];
@@ -55,7 +60,7 @@
   const HEN={speed:1.6,calm:30,alert:3.5};
   /* 새 판 보호(index.html이 새 판을 만들 때 guard로 켠다. 0.10 플레이 점검: 느린 7·10세가 첫 몇 분에 닭을 다 잃고 무너짐)
      calm = 처음 몇 문제가 남았는지(맞히든 틀리든 첫 고르기마다 한 칸, 그동안 늑대는 쫓기만 하고 물지도 부수지도 않는다. 맞힌 수로 세면 찍는 아이가 오래 보호받았다),
-     keep = 마지막 닭 한 마리는 노리지 않는다 */
+     keep = 물리지 않은 닭이 1마리면 노리지 않는다(물고 있는·물려 가는 닭은 세지 않으므로, 두 마리가 한꺼번에 물려 0마리가 되는 일이 없다. 0.12에서 검사로 고정) */
   const GUARD={calm:3};
   const RUSH={frac:.3};             /* 틀리면 무리 간격의 frac만큼 세계를 빨리 감는다(늑대가 성큼). 마구 찍기를 손해로 만든다 */
   const DASH=RUSH.frac;
@@ -63,9 +68,17 @@
   const MERCY_CAP=Math.round(MERCY.max/MERCY.per); /* 완충 단계 상한(5). 넘게 쌓이면 최대 효과가 몇 분씩 이어졌다 */
   const INNER=1.5;                 /* 마을이 커져 울타리 줄보다 이만큼 안쪽에 있는 늑대는 울타리를 부수지 않고 바로 사냥 */
   const SIDE_REACH=2.2;            /* 울타리 한 면(그 방향 부채꼴)의 울타리 줄 안팎 이 거리 안에 늑대가 있으면 농부가 다시 세우지 않는다 */
-  /* 무리 간격(틱) = 문제 하나 기준 시간(중앙값, 초)과 같게, 13~20초 사이. 0.7은 3배라 9~10세 읽기는 2분이 넘었다. */
-  const INTERVAL={min:130,max:200};
+  /* 무리 간격(틱), 13~45초. 0.12: 실제로 나올 문제들의 평균 기본 시간 × TEMPO(1.3). 긴 글을 읽는 나이는 그만큼 늑대도 느긋하게 온다(0.11까지는 중앙값, 13~20초).
+     낙오 늑대 간격도 같은 비율(τ = 간격 ÷ 13초)로 늘인다(trickleGap) */
+  const INTERVAL={min:130,max:450},TEMPO=1.3;
   const intervalFor=baseSec=>Math.max(INTERVAL.min,Math.min(INTERVAL.max,Math.round((Number(baseSec)||13)/TICK)));
+  const tempoInterval=meanSec=>intervalFor((Number(meanSec)||10)*TEMPO);
+  /* 늑대 왕(0.12): 늑대 목록(상한 90)과 별개 자리(w.king). 화살에 맞지 않고 포효하지 않으며 공격하지 않는다(지는 경우 없음).
+     마을 정면 쪽 출현 지점(point)의 숲 가장자리에서 기다리다(wait), 종이 울리면 울타리 밖 멈춤 지점(반지름 + stop)까지 걸어오고(come → stand),
+     8세부터 두 번 틀릴 때마다 step만큼 다가선다(최대 3걸음, 그래도 울타리 밖). 방패가 다 깨지면 숲으로 달아난다(flee) */
+  const KING={point:2,far:3,wait:-3,stop:2.4,step:.6,speed:1.2,flee:4,size:3.6};
+  /* 도둑 여우(0.12): 한 번에 한 마리, 늑대 목록과 별개(w.fox)라 타워가 저절로 쏘지 않는다. 정해진 틱(total)에 맞춰 닭까지 온다 */
+  const FOX={flee:3.2,arrow:1.6,size:.7};
   const MAX_WOLVES=90;
   const TRAVEL=Math.ceil(EDGE/WOLF.speed/TICK); /* 출현에서 마을 경계까지 걸리는 틱(약 7초) */
   /* 고정 배치. 0단계 타워 자리 6(0.8과 같음, 중심에서 가까운 순서). */
@@ -102,7 +115,7 @@
     const o=opt||{},iv=Math.max(80,Math.round(o.interval||150));
     const w={v:2,t:0,rng:(o.seed>>>0)||1,hall:0,interval:iv,
       wave:{n:0,arrive:iv,spawned:false},trickle:5,seen:{},mercy:0,mercyT:0,
-      wolves:[],hens:[],buildings:[],arrows:[],nextId:1,stats:{kills:0,henLost:0,henSaved:0,broken:0,fenceBroken:0,waves:0,bosses:0,bossKills:0,splash:0},events:[]};
+      wolves:[],hens:[],buildings:[],arrows:[],nextId:1,stats:{kills:0,henLost:0,henSaved:0,broken:0,fenceBroken:0,waves:0,bosses:0,bossKills:0,splash:0,foxSaved:0,foxLost:0,foxScared:0},events:[]};
     if(o.guard){w.calm=GUARD.calm;w.keep=true}
     return w;
   }
@@ -164,9 +177,10 @@
   /* 무리 크기: 주로 마을 크기를 따른다(마을이 커져야 늑대도 많아진다). 무리 번호는 조금만(최대 +4). 나이 손잡이(pack)를 곱한다 */
   const ease=w=>1-Math.min(MERCY.max,(w.mercy|0)*MERCY.per);
   function mercyUp(w){w.mercy=Math.min(MERCY_CAP,(w.mercy|0)+1);w.mercyT=MERCY.decay}
-  function packSize(w,s){return Math.max(1,Math.round(Math.min(PACK.max,1+Math.min(PACK.waveMax,Math.floor(w.wave.n/PACK.waveEvery))+Math.floor(threat(s)*PACK.perThreat)+(s.hall|0)*PACK.perHall)*ease(w)*ageOf(s).pack*slowEase(s)))}
-  /* 낙오 늑대: 무리 사이에도 한두 마리씩 계속 나온다(마을이 커질수록 자주). 다음 낙오까지의 틱. */
-  const trickleGap=(w,s)=>Math.round((TRICKLE.base+rand(w)*TRICKLE.spread)*Math.max(TRICKLE.floor,1-threat(s)/TRICKLE.threat)/ease(w)/slowEase(s));
+  function packSize(w,s){return Math.max(1,Math.round(Math.min(PACK.max,1+Math.min(PACK.waveMax,Math.floor(w.wave.n/PACK.waveEvery))+Math.floor(threat(s)*PACK.perThreat)+(s.hall|0)*PACK.perHall)*ease(w)*ageOf(s).pack*mulOf(s)*slowEase(s)))}
+  /* 낙오 늑대: 무리 사이에도 한두 마리씩 계속 나온다(마을이 커질수록 자주). 다음 낙오까지의 틱. 무리 간격이 13초보다 길면 같은 비율로 뜸하게(τ) */
+  const tau=w=>Math.max(1,(w.interval||INTERVAL.min)/INTERVAL.min);
+  const trickleGap=(w,s)=>Math.round((TRICKLE.base+rand(w)*TRICKLE.spread)*tau(w)*Math.max(TRICKLE.floor,1-threat(s)/TRICKLE.threat)/ease(w)/slowEase(s));
   const dashTicks=w=>Math.round(RUSH.frac*w.interval);
   function pickKind(w,s,boss){
     if(boss)return 'ember';
@@ -174,8 +188,8 @@
     let r=rand(w)*total;for(const k in mix){r-=mix[k];if(r<0)return k}return 'wolf';
   }
   function addWolf(w,s,kind,x,z){
-    const K=KINDS[kind],A=ageOf(s),hp=Math.max(1,Math.round(Math.min(WOLF.hpMax,WOLF.hp+WOLF.hpPerBuilt*threat(s))*K.hp*A.hp));
-    const v={id:id(w),kind,x,z,sx:x,sz:z,hp,max:hp,speed:WOLF.speed*K.speed*A.speed*(.92+rand(w)*.16),state:'walk',target:0,timer:0,inside:0,hen:0};
+    const K=KINDS[kind],A=ageOf(s),M=mulOf(s),hp=Math.max(1,Math.round(Math.min(WOLF.hpMax,WOLF.hp+WOLF.hpPerBuilt*threat(s))*K.hp*A.hp*M));
+    const v={id:id(w),kind,x,z,sx:x,sz:z,hp,max:hp,speed:WOLF.speed*K.speed*A.speed*(1+(M-1)/2)*(.92+rand(w)*.16),state:'walk',target:0,timer:0,inside:0,hen:0};
     if(K.boss)v.roar=ROAR.every>>1;
     w.wolves.push(v);
     if(!w.seen[kind]){w.seen[kind]=true;w.events.push({type:'newKind',kind,wolf:v.id})}
@@ -205,9 +219,11 @@
     w.events=[];w.t++;
     const R=radius(w);
     /* 무리 일정: 도착 TRAVEL틱 전에 숲 가장자리에 나타나 걸어온다. 무리 사이에는 낙오 늑대가 계속 나온다. */
-    if(!w.wave.spawned&&w.t>=w.wave.arrive-TRAVEL){spawnPack(w,s);w.wave.spawned=true}
-    if(w.t>=w.wave.arrive){w.wave.n++;w.stats.waves++;w.wave.arrive+=w.interval;w.wave.spawned=false;w.events.push({type:'arrive',n:w.wave.n})}
-    if(w.t>=w.trickle){spawnStraggler(w,s);w.trickle=w.t+trickleGap(w,s)}
+    /* 물러남(w.peace, 0.12): 0이 아니면 새 늑대가 나오지 않는다(양수 = 남은 틱, −1 = 계속. 늑대 왕을 물리친 뒤) */
+    const quiet=(w.peace|0)!==0;if(w.peace>0)w.peace--;
+    if(!w.wave.spawned&&w.t>=w.wave.arrive-TRAVEL){if(!quiet)spawnPack(w,s);w.wave.spawned=true}
+    if(w.t>=w.wave.arrive){w.wave.n++;w.stats.waves++;w.wave.arrive+=w.interval;w.wave.spawned=false;if(!quiet)w.events.push({type:'arrive',n:w.wave.n})}
+    if(w.t>=w.trickle){if(!quiet)spawnStraggler(w,s);w.trickle=w.t+trickleGap(w,s)}
     /* 완충은 마지막으로 잃은 뒤 30초마다 한 단계 풀린다(전에는 t%300이라 잃자마자 풀리기도 했다) */
     if(w.mercy>0&&--w.mercyT<=0){w.mercy--;w.mercyT=MERCY.decay}
     /* 어림 상자(|x|,|z|) 먼저: hypot은 언제나 |x|,|z| 이상이라 결과는 같고 hypot 계산만 줄어든다 */
@@ -231,6 +247,21 @@
       else if(h.state==='hidden'&&!safe){h.state='yard'}
       else if(h.state==='hidden'||h.state==='flee'||h.state==='home'){if(++h.calm>=HEN.calm){h.state='home'}if(h.state==='home'){const [x,z]=HOME(h.slot);if(move(h,x,z,HEN.speed,.1))h.state='yard'}}
     }
+    /* 늑대 왕: 목표 거리까지 걷는다(기다림·멈춤 지점·달아남). 닭도 건물도 건드리지 않는다 */
+    if(w.king){const k=w.king,g=kingGoal(w,k),sp=(k.state==='flee'?KING.flee:KING.speed)*TICK;
+      if(Math.abs(g-k.r)<=sp){k.r=g;if(k.state==='come'){k.state='stand';w.events.push({type:'kingStand',id:k.id})}else if(k.state==='flee'){w.king=null;w.events.push({type:'kingGone',id:k.id})}}
+      else k.r+=Math.sign(g-k.r)*sp;
+      if(w.king)kingPut(k)}
+    /* 도둑 여우: 남은 틱에 맞춰 닭(없으면 회관)까지 온다. 닿으면 닭 한 마리를 데려가거나(물리지 않은 닭이 2마리 이상이고 놀래키기 전용이 아닐 때) 놀래키기만 하고 달아난다 */
+    if(w.fox){const f=w.fox;
+      if(f.state==='come'){
+        const hen=nearest(w.hens,f,foxPrey),tx=hen?hen.x:coop?coop.x:0,tz=hen?hen.z:coop?coop.z:0,n=Math.max(1,f.left|0);
+        f.hen=hen?hen.id:0;f.x+=(tx-f.x)/n;f.z+=(tz-f.z)/n;
+        if(--f.left<=0){
+          if(f.scare||!hen||free<=1){for(const h of w.hens)if(huntable(h)){h.state='flee';h.calm=0}w.stats.foxScared++;w.events.push({type:'foxScare',hen:f.hen,fox:f.id})}
+          else{hen.state='gone';free--;f.took=true;w.stats.henLost++;w.stats.foxLost++;mercyUp(w);w.events.push({type:'foxLost',hen:hen.id,fox:f.id},{type:'henLost',hen:hen.id,wolf:0,fox:true})}
+          f.state='flee'}
+      }else if(move(f,f.sx,f.sz,FOX.flee,.3)){w.fox=null;w.events.push({type:'foxGone',fox:f.id})}}
     /* 늑대·몬스터 */
     for(const v of w.wolves){
       if(!alive(v))continue;
@@ -246,7 +277,7 @@
         if(++v.inside>WOLF.bored){v.state='leave';continue}
         /* 새 판 보호: 쫓기만 한다(물지도 부수지도 않고, 닭 앞에서 멈춰 겁만 준다) */
         if(w.calm>0){const h=K.prey==='building'?null:nearest(w.hens,v,huntable);if(h)move(v,h.x,h.z,v.speed*.6,WOLF.reach*K.size+1.2);else move(v,0,0,v.speed*.5,R*.3);continue}
-        /* 마지막 닭 한 마리는 노리지 않는다(keep) */
+        /* 물리지 않은 닭이 1마리면 노리지 않는다(keep). free는 물 때마다 줄어, 같은 틱에 두 늑대가 마지막 두 마리를 다 무는 일이 없다 */
         const hen=K.prey==='building'||w.keep&&free<=1?null:nearest(w.hens,v,huntable);
         if(hen){if(move(v,hen.x,hen.z,v.speed,WOLF.reach*K.size)){v.state='bite';v.timer=WOLF.bite;v.hen=hen.id;hen.state='caught';free--;w.events.push({type:'bite',wolf:v.id,hen:hen.id})}}
         else if(K.prey==='hen'&&w.hens.some(h=>h.state==='hidden'||h.state==='flee')){move(v,0,0,v.speed*.5,R*.3)} /* 숨은 닭 둘레를 어슬렁 */
@@ -285,6 +316,7 @@
     /* 화살: 날아가는 동안 과녁을 따라가고, 닿으면 맞힌다(펑 화살은 둘레도). 과녁이 먼저 쓰러졌으면 그 자리에서 터진다. */
     const byId=new Map();if(w.arrows.length)for(const v of w.wolves)if(!byId.has(v.id))byId.set(v.id,v); /* find(같은 id면 앞의 것)와 같다 */
     for(const a of w.arrows){
+      if(a.gold){const o=w.fox&&w.fox.id===a.wolf?w.fox:w.king&&w.king.id===a.wolf?w.king:null;if(o){a.tx=o.x;a.tz=o.z}} /* 황금 화살(여우·늑대 왕): 과녁을 따라가기만 한다 */
       const v=byId.get(a.wolf),live=v&&alive(v);
       if(live||v&&v.state==='dead'){a.tx=v.x;a.tz=v.z} /* 쓰러진 자리(같은 틱에 먼저 쓰러져도 그 자리)로 */
       if(--a.t>0)continue;
@@ -313,7 +345,7 @@
   /* 타워가 먼저 노리는 순서: 닭을 물고 가는 늑대 > 무는 늑대 > 건물을 부수는 늑대 > 나머지(가까운 순) */
   const danger=v=>v.state==='carry'?3:v.state==='bite'?2:v.state==='smash'?1:0;
   const power=s=>POWER[Math.max(0,Math.min(3,s&&s.power|0))];
-  const range=s=>TOWER.range+.4*Math.min(5,s&&s.level|0);
+  const range=s=>TOWER.range+.4*Math.min(5,s&&s.level|0)+TOWER.hallRange*Math.max(0,Math.min(3,s&&s.hall|0));
   const cooldown=s=>Math.max(6,TOWER.cooldown-Math.min(5,s&&s.level|0));
   /* 1층 타워의 화살 피해: 기본 + 타워 수(5까지) + 강화(큰 펑부터 +3, 4~10단계 +1씩) */
   const damage=s=>TOWER.damage+2*Math.min(5,s&&s.level|0)+power(s).plus+POWER_STEP*Math.max(0,Math.min(10,s&&s.power|0)-3);
@@ -353,6 +385,7 @@
   /* ok를 만족하는 것 가운데 가장 가까운 것(같으면 목록 앞). 걸러 낸 새 배열을 만들지 않는다 */
   function nearest(list,p,ok){let best=null,bd=Infinity;for(const o of list){if(!ok(o))continue;const d=dist(o.x,o.z,p.x,p.z);if(d<bd){bd=d;best=o}}return best}
   const huntable=h=>h.state==='yard'||h.state==='flee'||h.state==='home';
+  const foxPrey=h=>h.state!=='caught'&&h.state!=='carried'&&h.state!=='gone'; /* 여우는 닭장에 숨은 닭도 노린다 */
   const standing=b=>!b.broken&&b.kind!=='fence';
   /* 목표 쪽으로 speed(초당)만큼 움직이고, stop 거리 안이면 true */
   function move(o,tx,tz,speed,stop){const dx=tx-o.x,dz=tz-o.z,d=Math.hypot(dx,dz),s=speed*TICK,lim=stop||0;if(d<=lim+s){if(d>lim){const k=(d-lim)/d;o.x+=dx*k;o.z+=dz*k}return true}o.x+=dx/d*s;o.z+=dz/d*s;return false}
@@ -370,6 +403,47 @@
       for(let i=0;i<per;i++){shoot(w,b,near[i%near.length].v,s);n++}}
     return n;
   }
+  /* ---------- 늑대 왕 · 도둑 여우 · 물러남 (0.12. 화면·시뮬이 부른다) ---------- */
+  const kingGoal=(w,k)=>{const R=radius(w);return k.state==='wait'?R+EDGE+KING.wait:k.state==='flee'?R+EDGE+KING.far:R+KING.stop-KING.step*Math.max(0,Math.min(3,k.steps|0))};
+  const kingPut=k=>{k.x=Math.round(Math.cos(k.a)*k.r*1000)/1000;k.z=Math.round(Math.sin(k.a)*k.r*1000)/1000};
+  /* king(w, mode, steps, snap): mode 'wait'(숲 가장자리에서 기다림) · 'fight'(결전: 멈춤 지점으로, steps = 다가온 걸음) · 'flee'(달아남) · 'none'(없앰).
+     snap이면 걷지 않고 바로 그 자리에 둔다(이어하기: 결전 중이던 왕은 멈춤 지점 처음 자리). 없던 왕은 숲 속(far)에서 걸어 나온다. → 왕 또는 null */
+  function king(w,mode,steps,snap){
+    if(mode==='none'){w.king=null;return null}
+    let k=w.king;
+    if(!k){if(mode==='flee')return null;k=w.king={id:id(w),a:(KING.point+.5)*Math.PI*2/SPAWNS,r:radius(w)+EDGE+KING.far,x:0,z:0,state:'wait',steps:0}}
+    if(mode==='wait'){k.state='wait';k.steps=0}
+    else if(mode==='fight'){if(k.state!=='stand')k.state='come';k.steps=Math.max(0,Math.min(3,steps|0))}
+    else if(mode==='flee')k.state='flee';
+    if(snap&&k.state!=='flee'){if(k.state==='come')k.state='stand';k.r=kingGoal(w,k)}
+    kingPut(k);return k;
+  }
+  /* 황금 화살: 회관(종탑)에서 한 발. 타워가 다 부서져 있어도 나간다. 피해는 없고 과녁(여우·늑대 왕)을 따라가 닿으면 사라진다 */
+  function goldArrow(w,o){
+    const from=w.buildings.find(b=>b.kind==='coop')||{id:0,x:0,z:0},d=dist(from.x,from.z,o.x,o.z),t=Math.max(2,Math.ceil(d/(TOWER.arrowSpeed*FOX.arrow*TICK)));
+    const a={id:id(w),tower:from.id,wolf:o.id,fx:from.x,fz:from.z,tx:o.x,tz:o.z,t,total:t,damage:0,splash:0,share:0,gold:true};w.arrows.push(a);return a;
+  }
+  /* 방패를 깬 황금 화살(연출용, 규칙은 Combat.finaleSettle) */
+  function kingHit(w){return w.king?goldArrow(w,w.king):null}
+  /* 여우 등장: ticks틱 뒤 닭에 닿는다(Combat.foxTicks). opt.scare = 놀래키기만(7세). 이미 여우가 있으면 null */
+  function fox(w,s,ticks,opt){
+    if(w.fox)return null;
+    const o=opt||{},R=radius(w)+EDGE,p=Math.floor(rand(w)*SPAWNS),a=(p+.5)*Math.PI*2/SPAWNS,x=Math.round(Math.cos(a)*R*1000)/1000,z=Math.round(Math.sin(a)*R*1000)/1000,T=Math.max(10,Math.round(ticks)||10);
+    w.fox={id:id(w),x,z,sx:x,sz:z,left:T,total:T,state:'come',scare:!!o.scare,hen:0,point:p};return w.fox;
+  }
+  /* 정답 사격이 여우를 맞힘(일제 사격 1순위. 화면이 한 번에 맞혔을 때, 그리고 FOX.second면 두 번째 정답에도 부른다):
+     아직 닭에 닿기 전이면 황금 화살이 나가고 여우는 그 순간 달아난다(구출). 이미 닿았으면 false */
+  function foxShoo(w){const f=w.fox;if(!f||f.state!=='come')return false;f.state='flee';f.saved=true;w.stats.foxSaved++;goldArrow(w,f);return true}
+  /* 늑대가 모두 물러난다(늑대 왕을 물리침): 물던 닭은 놓고 달아나며, ticks틱 동안(−1 = 계속) 새 늑대가 나오지 않는다. → 물러난 수 */
+  function retreat(w,ticks){
+    let n=0;
+    for(const v of w.wolves){if(!alive(v))continue;
+      if(v.state==='bite'||v.state==='carry'){const hen=w.hens.find(h=>h.id===v.hen);if(hen&&(hen.state==='caught'||hen.state==='carried')){hen.state='flee';hen.calm=0;w.stats.henSaved++}}
+      v.state='leave';v.hen=0;n++}
+    w.peace=ticks<0||w.peace<0?-1:Math.max(w.peace|0,Math.round(ticks)||0);return n;
+  }
+  /* 물러남 끝(새 마을·늑대가 오는 자유 놀이) */
+  function peaceOff(w){w.peace=0}
   /* 고치기 카드가 고칠 건물 수(울타리는 저절로 다시 세워지므로 빼고 센다) */
   const brokenCount=w=>w.buildings.filter(b=>b.broken&&b.kind!=='fence').length;
   /* 부서진 진짜 건물 종류(겹치지 않게, 건물 순서). Combat.recommend의 ctx.brokenKinds */
@@ -405,6 +479,7 @@
   const isObj=o=>!!o&&typeof o==='object'&&!Array.isArray(o);
   const fin=Number.isFinite,int=(x,lo,hi)=>Number.isSafeInteger(x)&&x>=lo&&x<=hi;
   const WOLF_STATES=['walk','smash','hunt','bite','carry','leave','dead','gone'],HEN_STATES=['yard','flee','hidden','home','caught','carried','gone'];
+  const KING_STATES=['wait','come','stand','flee'],FOX_STATES=['come','flee'];
   function tidy(w){
     w.hall=Math.max(0,Math.min(3,w.hall|0));w.interval=Math.max(80,w.interval);
     const wv=w.wave;if(!int(wv.n,0,Number.MAX_SAFE_INTEGER))wv.n=0;if(!Number.isSafeInteger(wv.arrive)||wv.arrive<=w.t)wv.arrive=w.t+w.interval;if(typeof wv.spawned!=='boolean')wv.spawned=false;
@@ -412,7 +487,11 @@
     if(!int(w.mercy,0,MERCY_CAP))w.mercy=Number.isSafeInteger(w.mercy)&&w.mercy>0?MERCY_CAP:0;
     if(!int(w.mercyT,0,MERCY.decay))w.mercyT=MERCY.decay-w.t%MERCY.decay; /* 0.8 첫 저장: 예전 풀림 시각을 이어 쓴다 */
     if('calm' in w&&!int(w.calm,0,GUARD.calm))w.calm=0;if('keep' in w&&typeof w.keep!=='boolean')w.keep=!!w.keep;
-    const st=w.stats||{};w.stats={kills:0,henLost:0,henSaved:0,broken:0,fenceBroken:0,waves:0,bosses:0,bossKills:0,splash:0};for(const k in w.stats)if(Number.isSafeInteger(st[k]))w.stats[k]=st[k];
+    const st=w.stats||{};w.stats={kills:0,henLost:0,henSaved:0,broken:0,fenceBroken:0,waves:0,bosses:0,bossKills:0,splash:0,foxSaved:0,foxLost:0,foxScared:0};for(const k in w.stats)if(Number.isSafeInteger(st[k]))w.stats[k]=st[k];
+    /* 0.12: 물러남·늑대 왕·여우. 모양이 틀리면 없는 것으로(화면이 run.bell을 보고 왕을 다시 세운다) */
+    if('peace' in w&&!(Number.isSafeInteger(w.peace)&&w.peace>=-1&&w.peace<=1e6))w.peace=0;
+    if(w.king!=null){const k=w.king;if(!isObj(k)||!Number.isSafeInteger(k.id)||!fin(k.a)||!fin(k.r)||!KING_STATES.includes(k.state))w.king=null;else{if(!int(k.steps,0,3))k.steps=0;kingPut(k)}}
+    if(w.fox!=null){const f=w.fox;if(!isObj(f)||!Number.isSafeInteger(f.id)||!['x','z','sx','sz'].every(k=>fin(f[k]))||!FOX_STATES.includes(f.state)||!int(f.left,-1,1e6)||!int(f.total,1,1e6))w.fox=null}
     w.wolves=w.wolves.filter(v=>isObj(v)&&Number.isSafeInteger(v.id)&&fin(v.x)&&fin(v.z)&&fin(v.hp)).slice(0,MAX_WOLVES);
     for(const v of w.wolves){
       if(!KINDS[v.kind])v.kind='wolf';const K=KINDS[v.kind];
@@ -439,10 +518,11 @@
     }
     w.arrows=w.arrows.filter(a=>isObj(a)&&Number.isSafeInteger(a.id)&&['fx','fz','tx','tz','t','total','damage','splash','share'].every(k=>fin(a[k])));
     let top=0;for(const list of [w.wolves,w.hens,w.buildings,w.arrows])for(const o of list)top=Math.max(top,o.id);
+    if(w.king)top=Math.max(top,w.king.id);if(w.fox)top=Math.max(top,w.fox.id);
     if(!(Number.isSafeInteger(w.nextId)&&w.nextId>top))w.nextId=top+1;
   }
 
-  const api={V:2,TICK,RADIUS,EDGE,SPAWNS,WOLF,AGE,THREAT,PACK,TRICKLE,SLOW,slowEase,KINDS,MIX,BOSS_EVERY,TOWER,POWER,POWER_STEP,FLOOR,ROAR,HP,FENCE_HP,MEND,REBUILD,HEN,DASH,RUSH,MERCY,MERCY_CAP,INNER,SIDE_REACH,INTERVAL,MAX_WOLVES,TRAVEL,GUARD,answered,
+  const api={V:2,TEMPO,tempoInterval,mulOf,KING,FOX,king,kingHit,fox,foxShoo,retreat,peaceOff,TICK,RADIUS,EDGE,SPAWNS,WOLF,AGE,THREAT,PACK,TRICKLE,SLOW,slowEase,KINDS,MIX,BOSS_EVERY,TOWER,POWER,POWER_STEP,FLOOR,ROAR,HP,FENCE_HP,MEND,REBUILD,HEN,DASH,RUSH,MERCY,MERCY_CAP,INNER,SIDE_REACH,INTERVAL,MAX_WOLVES,TRAVEL,GUARD,answered,
     TOWER_SLOTS,RINGS,ALL_SLOTS,SLOT_COUNT,TOWER_UNITS,PLACE,HOMES,HENS_MAX,HOME,towerSlots,fenceLayers,
     intervalFor,create,sync,step,volley,volleyArrows,dashTicks,built,threat,repairAll,brokenCount,brokenKinds,marketDown,wolvesInside,towerUnits,barLeft,secondsLeft,packSize,trickleGap,kindsAt,restore,radius,sectorOf,rand,range,cooldown,damage,towerDamage,towerRange,power,ageOf};
   if(typeof module!=='undefined')module.exports=api;

@@ -1,4 +1,5 @@
-/* node scripts/sim-village.cjs [분=40] [횟수=16] [거르기] : 0.9 마을 방어 시뮬레이션(개발용, 배포·CI 제외).
+/* node scripts/sim-village.cjs end [판 수=12] [거르기] [도장 수=0] : 0.12 엔딩까지 시뮬레이션(아래 playEnd). 나이 4개 × 아이 유형 4개의 엔딩까지 문제 수·분, 10분 붕괴 수를 설계 v2 표와 견준다.
+   node scripts/sim-village.cjs [분=40] [횟수=16] [거르기] : 0.9 마을 방어 시뮬레이션(개발용, 배포·CI 제외).
    문제 풀이(경제, combat.js)와 늑대 세계(world.js)를 함께 돌려, 같은 벽시계 시간 동안 아이 유형별로 game-plan §4.7 지표를 잰다.
    0.9 방식: 카드 고르기 멈춤이 없다. 상점은 늘 열려 있고 세계는 계속 흐른다. 아이는 꼬꼬 추천(Combat.recommend, 게임과 같은 순수 함수)을
    따라 금화가 되는 대로 산다(한 번 사는 데 0.8초, 그동안에도 늑대는 온다). 추천이 '조금만 더 모으자'면 기다린다.
@@ -22,7 +23,8 @@ const marksFor=min=>{const out=[];for(let m=5;m<=min;m+=5)out.push(m);if(!out.le
 const gapsFor=min=>[10,20,40].filter(m=>m<=min);
 
 const median=a=>{const s=[...a].sort((x,y)=>x-y);return s[s.length>>1]};
-function interval(age,mode){return W.intervalFor(median(Array.from({length:Q.count(age,mode)},(_,i)=>C.baseSeconds(Q.get(age,mode,i)))))}
+/* 0.12 무리 간격: 실제로 나올 다음 120문제의 평균 기본 시간 × 1.3, 13~45초(index.html waveInterval과 같은 식) */
+function interval(age,mode,seed0){let sum=0;for(let i=0;i<120;i++)sum+=C.baseSeconds(Q.at(age,mode,i,seed0|0));return W.tempoInterval(sum/120)}
 function play(age,mode,kind,minutes){
   const MIN_=minutes||MIN,MARKS=marksFor(MIN_),GAPS=gapsFor(MIN_);
   const s=C.fresh(age);s.mode=mode;const w=W.create({seed:Math.floor(rnd()*1e9),interval:interval(age,mode),guard:true});W.sync(w,s);/* 0.10: 게임처럼 새 판 보호 */
@@ -31,7 +33,7 @@ function play(age,mode,kind,minutes){
   const snap=m=>{at[m]={bought,built:C.built(s),earned,hall:s.hall,gold:s.gold,chickens:s.chickens,towers:1+s.level,power:s.power,fence:s.fence,farmers:s.farmers,pond:s.pond,nest:s.nest,henLost:w.stats.henLost,henSaved:w.stats.henSaved,broken:w.stats.broken}};
   const clock=()=>w.t*W.TICK;
   const run=sec=>{for(let i=0,n=Math.round(sec/W.TICK);i<n;i++){const ev=W.step(w,s);ticks++;
-    for(const e of ev){if(e.type==='henLost'){s.chickens=Math.max(0,s.chickens-1);lastLost=w.t}else if(e.type==='pack')maxPack=Math.max(maxPack,e.n);else if(e.type==='kill'&&e.boss){s.gold+=C.BOUNTY;earned+=C.BOUNTY}}
+    for(const e of ev){if(e.type==='henLost'){C.lostHen(s);lastLost=w.t}else if(e.type==='pack')maxPack=Math.max(maxPack,e.n);else if(e.type==='kill'&&e.boss){s.gold+=C.BOUNTY;earned+=C.BOUNTY}}
     let live=0;for(const v of w.wolves)if(v.state!=='dead'&&v.state!=='gone')live++;
     if(live)seen++;if(W.wolvesInside(w))inside++;maxWolves=Math.max(maxWolves,live);
     /* 살 수 있는 상품이 하나도 없던 구간(기획서의 '아무것도 못 산') */
@@ -76,9 +78,109 @@ function play(age,mode,kind,minutes){
   return {qn,correct,earned,bought,repairs,feasts,at,gaps,poor,henLost:w.stats.henLost,henSaved:w.stats.henSaved,broken:w.stats.broken,kills:w.stats.kills,
     seenPct:seen/ticks*100,insidePct:inside/ticks*100,maxPack,maxWolves,bubblesPerMin:bubbles/MIN_,nest:s.nest,line,threat:W.threat(s)};
 }
+/* ---------- 0.12 엔딩까지 한 판(playEnd) ----------
+   게임과 같은 규칙 함수(Combat.ringBell·finaleNow·finaleSettle·foxDue…, World.king·fox·foxShoo·retreat)로 종 → 결전 → 엔딩까지 돌린다.
+   아이 모형은 설계 v2 보정 시뮬(design/sim/sim-v2.cjs의 time 'real' · buyer 'bot' 1개씩)과 같게 했다. 모두 가정값이다:
+   - 첫 고르기 시간 = 보통 아이 필요 시간(Combat.needSeconds) × 속도(느린 1.8 · 보통 1 · 빠른 0.62) × 균등 0.75~1.25, 첫 정답률 75 · 85 · 95%, 두 번째 정답률 80%. 찍기는 보기가 열리고 0.4초 뒤 아무거나
+   - 사는 방식: 꼬꼬 말풍선이 떠서 칸이 반짝일 때만 그 칸을 사고, 아니면 고치기 → 닭 → 타워 → 농부 → 울타리 → 강화 → 연못 순으로 살 수 있는 것 하나(정답 연출 중 1개, 20초 넘는 문제는 절반 확률로 읽는 도중에도)
+   - 종은 열린 다음 문제 경계에서 바로 울린다. 붕괴(10분) = 첫 10분 안에 닭이 0마리가 된 적 있음, 또는 10분에 닭 2마리 이하이면서 산 타워 0 */
+const mulberry=a=>()=>{a=(a+0x6D2B79F5)>>>0;let t=Math.imul(a^a>>>15,a|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296};
+const SPEEDK={slow:1.8,typ:1,fast:.62,guess:1},ACC1={slow:.75,typ:.85,fast:.95};
+const CHEAP=['repair','chicken','tower','farmer','fence','power','pond','feast'];
+function playEnd(age,kind,seed,opt){
+  const o=opt||{},rnd=mulberry(seed>>>0),mode='story',QMAX=o.qmax||600,MINMAX=o.minmax||200;
+  let s=C.fresh(age);
+  /* 도장 n개를 가진 채 시작하는 판(다회차): 끝낸 판을 흉내 내 Combat.nextRun으로 새 마을을 만든다 */
+  for(let k=0;k<(o.stamps|0);k++){s.run.bell=2;s.run.fpick=[-1];s.run.shields=C.FINALE.shields-1;s.run.asked=100;s.run.first=Math.round(100*(ACC1[kind]||.3));C.finaleSettle(s,'first');s=C.nextRun(s,{})}
+  const iv=interval(age,mode,s.seed),w=W.sync(W.create({seed:Math.floor(rnd()*2147483646)+1,interval:iv,guard:true}),s);
+  const clock=()=>w.t*W.TICK;let qn=0,phaseQuiet=false,shopLock=0,minHen10=s.chickens,snap10=null,maxGold=0,ended=null,finale=null;
+  const ms={},mark=k=>{if(!ms[k])ms[k]={q:qn,min:clock()/60}};
+  /* 추천 말풍선·반짝임 흉내(index.html의 빈도 규칙) */
+  const REC={show:35,gap:200,urgentGap:100,window:600,mute:600,stale:150,perMin:2,bellGap:600},rec={glow:null,bubble:null,left:0,last:-1e9,times:[],prev:null,ign:{},mute:{},want:null,opened:[],lostAt:-1e9,uiT:0,bellAt:-1e9};
+  const ctx=()=>({wolvesInside:W.wolvesInside(w),towers:w.buildings.filter(b=>b.kind==='tower'&&!b.broken).length,lostHenRecently:w.t-rec.lostAt<=300,brokenKinds:W.brokenKinds(w),opened:rec.opened.slice(),bellQuiet:w.t-rec.bellAt<REC.bellGap});
+  const recNow=()=>C.recommend(s,ctx())||null;
+  function account(){const p=rec.prev;if(!p||p.done)return;p.done=true;if(p.followed){rec.ign[p.key]=0;return}rec.ign[p.key]=(rec.ign[p.key]||0)+1;if(rec.ign[p.key]>=2){rec.mute[p.key]=w.t+REC.mute;rec.ign[p.key]=0}}
+  function show(){if(rec.bubble)return;account();const r=recNow();if(!r)return;const t=w.t,recent=rec.times.filter(x=>t-x<REC.window).length;
+    if(t-rec.last<(r.urgent?REC.urgentGap:REC.gap)||recent>=REC.perMin||(rec.mute[r.key]||-1)>t)return;
+    if(rec.prev&&rec.prev.key!==r.key)rec.ign[rec.prev.key]=0;if(r.key==='bell'){C.bellPrompted(s);rec.bellAt=t}
+    rec.prev={key:r.key,followed:false,done:false};rec.glow=r.key;rec.bubble=r;rec.left=REC.show;rec.last=t;rec.times=rec.times.filter(x=>t-x<REC.window).concat(t);if(r.rule===4&&!rec.opened.includes(r.key))rec.opened.push(r.key)}
+  const ask=u=>{if(!rec.want||u)rec.want={at:w.t}};
+  function recTick(){rec.uiT++;if(rec.bubble&&--rec.left<=0)rec.bubble=null;
+    if(rec.glow&&rec.uiT%10===0){const r=recNow();if(!r||r.key!==rec.glow)rec.glow=null}
+    if(rec.want){if(w.t-rec.want.at>REC.stale)rec.want=null;else if(!phaseQuiet&&!rec.bubble){rec.want=null;show()}}}
+  function stepOnce(){
+    for(const e of W.step(w,s)){
+      if(e.type==='henLost'){C.lostHen(s);rec.lostAt=w.t;ask(true)}
+      else if(e.type==='foxLost'||e.type==='foxScare')C.foxEnded(s,false);
+      else if(e.type==='kill'&&e.boss)s.gold+=C.BOUNTY;
+      else if(e.type==='broken'&&e.kind!=='fence'){s.broken=W.brokenCount(w);s.marketDown=W.marketDown(w);ask(true)}}
+    if(shopLock>0)shopLock--;recTick();
+    if(clock()<=600&&s.chickens<minHen10)minHen10=s.chickens;
+    if(!snap10&&clock()>=600)snap10={hens:s.chickens,level:s.level,built:C.built(s),hall:s.hall,q:qn};
+    maxGold=Math.max(maxGold,s.gold)}
+  const run=sec=>{for(let i=0,n=Math.round(sec/W.TICK);i<n;i++)stepOnce()};
+  const marks=()=>{for(const x of [1,2,3])if(s.hall>=x)mark('h'+x);if(s.run.bell>=1)mark('bell')};
+  function buyOne(){
+    s.broken=W.brokenCount(w);s.marketDown=W.marketDown(w);if(shopLock>0)return 0;
+    const rows=C.shopKeys(s).filter(x=>C.canBuy(s,x));if(!rows.length)return 0;
+    const key=rec.glow&&rows.includes(rec.glow)?rec.glow:CHEAP.find(c=>rows.includes(c));if(!key)return 0;
+    C.buy(s,key);if(rec.prev&&rec.prev.key===key)rec.prev.followed=true;if(rec.glow===key){rec.glow=null;if(rec.bubble&&rec.bubble.key===key)rec.bubble=null}
+    if(key==='repair')W.repairAll(w);W.sync(w,s);s.broken=W.brokenCount(w);s.marketDown=W.marketDown(w);shopLock=4;run(.5);marks();return 1}
+  const kidTime=(q,first)=>{const lock=Math.max(3,C.reveal(q))/10;if(kind==='guess')return first?lock+.4:.4;const need=C.needSeconds(q)*SPEEDK[kind]*(.75+rnd()*.5);return first?Math.max(lock+.4,need):Math.max(.4,need*.35)};
+  while(qn<QMAX&&clock()<MINMAX*60&&!ended){
+    /* 종: 열려 있으면 문제 경계에서 울린다(가정). 결전 문제는 게임과 같은 규칙으로 고른다 */
+    if(s.run.bell===1){C.ringBell(s,{rnd,idOf:i=>Q.at(age,mode,i,s.seed).id});W.king(w,'fight',0);finale={q0:qn,t0:clock()};mark('ring')}
+    const fin=C.finaleNow(s),q=Q.at(age,mode,fin?fin.index:s.index,s.seed),n=q.choices.length;qn++;
+    if(!fin&&!w.fox&&C.foxDue(s)){W.fox(w,s,C.foxTicks(s,q),{scare:C.foxScareOnly(s)});C.foxCame(s)}
+    const t=kidTime(q,true),lock=Math.max(3,C.reveal(q))/10,ok1=kind==='guess'?rnd()<1/n:rnd()<ACC1[kind];
+    phaseQuiet=true;run(Math.min(t,lock));phaseQuiet=false;
+    if(t>20&&!fin&&rnd()<.5){run((t-lock)/2);buyOne();run((t-lock)/2)}else run(Math.max(0,t-lock));
+    const ticks=Math.round(t/W.TICK);
+    if(ok1){
+      const fast=C.isFast(q,ticks);s.marketDown=W.marketDown(w);C.settle(s,q,'first',{fast,ticks,finale:!!fin});
+      const fz=fin?C.finaleSettle(s,'first',{}):null;if(!fin||fin.normal)s.index++;
+      W.answered(w);W.volley(w,s,{scale:C.scale(q),fast});if(W.foxShoo(w))C.foxEnded(s,true);
+      if(fz){W.kingHit(w);if(fz.won){W.king(w,'flee');W.retreat(w,-1);ended={q:qn,min:clock()/60,finaleQ:qn-finale.q0,finaleMin:(clock()-finale.t0)/60,steps:0}}}
+      ask(false);run(.6);if(!fin)buyOne();run(.6);
+    }else{
+      C.trackPace(s,q,ticks);W.answered(w);run(W.dashTicks(w)*W.TICK+.2);run(kidTime(q,false));
+      const ok2=kind==='guess'?rnd()<1/(n-1):rnd()<.8;
+      if(ok2){C.settle(s,q,'second',{finale:!!fin});if(C.FOX.second&&W.foxShoo(w))C.foxEnded(s,true);if(fin)C.finaleSettle(s,'second')}
+      else{s.misses++;s.streak=0;C.track(s,q,'miss',{finale:!!fin});if(fin){const fz=C.finaleSettle(s,'miss');if(fz&&fz.stepped)W.king(w,'fight',s.run.steps)}}
+      run(C.learnTicks(q)*C.TICK+.2);if(!fin||fin.normal)s.index++;
+    }
+    marks();
+  }
+  /* collapse = 첫 10분 안에 닭이 0마리가 된 적 있음(설계 v2 시뮬과 같은 기준). weak = 10분에 닭 2마리 이하이면서 산 타워 0(무너진 것은 아니고 거의 자라지 못한 판, 찍기 아이에게서 나옴) */
+  const collapse=minHen10===0,weak=!!snap10&&snap10.hens<=2&&snap10.level<=Math.max(0,C.FLAGS.START_TOWERS-1);
+  return {ended,qn,min:clock()/60,ms,collapse,weak,snap10,maxGold,henLost:w.stats.henLost,broken:w.stats.broken,saved:w.stats.henSaved,fox:s.run.fox,foxSaved:s.run.foxSaved,foxLost:s.run.foxLost,
+    stars:ended?s.meta.stamps[s.meta.stamps.length-1].stars:null,built:C.built(s),interval:iv,pace:s.pace,first:s.run.first,asked:s.run.asked};
+}
+/* 설계 v2 표(§2.6, 읽고 고르기, 엔딩까지 문제 수 · 분 중앙값). 9·10세는 지문 묶음(지문 1 + 질문 3)을 가정한 값이고, 괄호 밖 비교용으로 '묶음 없음' 행(§2.4)도 둔다 */
+const DESIGN={typ:{7:[85,12],8:[86,32],9:[86,35],10:[86,40]},slow:{7:[108,25],8:[105,70],9:[98,70],10:[98,81]},fast:{7:[74,7],8:[74,17],9:[74,19],10:[73,21]},guess:{7:[358,35],8:[359,96],9:[459,111],10:[560,161]}};
+const DESIGN_NOBUNDLE={typ:{9:[85,43],10:[84,50]},slow:{9:[105,95],10:[98,102]}};
+function endReport(runs,only,stamps){
+  const med=a=>{const x=a.filter(Number.isFinite).sort((p,q)=>p-q);return x.length?x[x.length>>1]:NaN},pq=(a,p)=>{const x=a.filter(Number.isFinite).sort((u,v)=>u-v);return x.length?x[Math.min(x.length-1,Math.floor(p*x.length))]:NaN};
+  const f=(x,d=0)=>Number.isFinite(x)?x.toFixed(d):'-',pct=(x,y)=>Number.isFinite(x)&&y?(x>=y?'+':'')+Math.round((x/y-1)*100)+'%':'-',within=(x,y)=>Number.isFinite(x)&&Math.abs(x/y-1)<=.2;
+  const NAME={typ:'보통(85%)',slow:'느린(×1.8, 75%)',fast:'빠른(×0.62, 95%)',guess:'찍기'},t0=Date.now();let inQ=0,inM=0,cells=0,collapses=0,total=0;
+  console.log('== 0.12 엔딩까지 시뮬: 나이 × 아이 유형, '+runs+'판씩(씨앗 1000 + 7919i)'+(stamps?', 도장 '+stamps+'개로 시작':'')+'. 아이 읽기 속도·정확도·사는 방식은 모두 가정값');
+  console.log('| 나이 | 아이 | 엔딩까지 문제(p25~p75) | 분 | 설계 v2 | 문제 차 | 분 차 | ±20% | 10분 붕괴 | 회관 1·2·3(문제) | 종(문제) | 결전 문제·분 | 여우 구출 | 잃은 닭 | 무리 간격 |');
+  console.log('|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|');
+  for(const age of Q.AGES)for(const kind of ['typ','slow','fast','guess']){
+    if(only&&!String(age).includes(only)&&only!==kind)continue;
+    const rs=Array.from({length:runs},(_,i)=>playEnd(age,kind,1000+7919*i,{stamps})),done=rs.filter(r=>r.ended),D=DESIGN[kind][age];
+    const q=med(done.map(r=>r.ended.q)),m=med(done.map(r=>r.ended.min)),col=rs.filter(r=>r.collapse).length,okQ=within(q,D[0]),okM=within(m,D[1]);
+    const fox=rs.reduce((a,r)=>a+r.fox,0),saved=rs.reduce((a,r)=>a+r.foxSaved,0);
+    cells++;if(okQ)inQ++;if(okM)inM++;collapses+=col;total+=rs.length;
+    const nb=DESIGN_NOBUNDLE[kind]&&DESIGN_NOBUNDLE[kind][age];
+    console.log(`| ${age}세 | ${NAME[kind]} | ${f(q)} (${f(pq(done.map(r=>r.ended.q),.25))}~${f(pq(done.map(r=>r.ended.q),.75))})${done.length<rs.length?' · 못 감 '+(rs.length-done.length)+'판':''} | ${f(m,1)} | ${D[0]} · ${D[1]}분${nb?' (묶음 없음 '+nb[0]+' · '+nb[1]+'분)':''} | ${pct(q,D[0])} | ${pct(m,D[1])}${nb?' ('+pct(m,nb[1])+')':''} | ${okQ?'○':'✗'}${okM?'○':'✗'} | ${col}/${rs.length}${rs.some(r=>r.weak)?' (거의 못 자람 '+rs.filter(r=>r.weak).length+')':''} | ${['h1','h2','h3'].map(k=>f(med(rs.map(r=>r.ms[k]?r.ms[k].q:NaN)))).join(' · ')} | ${f(med(rs.map(r=>r.ms.bell?r.ms.bell.q:NaN)))} | ${f(med(done.map(r=>r.ended.finaleQ)))} · ${f(med(done.map(r=>r.ended.finaleMin)),1)} | ${fox?Math.round(100*saved/fox)+'% ('+saved+'/'+fox+')':'-'} | ${f(med(rs.map(r=>r.henLost)))} | ${f(rs[0].interval/10,1)}초 |`);
+  }
+  console.log(`설계 v2 표와 ±20% 안: 문제 수 ${inQ}/${cells}칸, 분 ${inM}/${cells}칸 · 10분 붕괴 ${collapses}/${total}판 (${((Date.now()-t0)/1000).toFixed(0)}초)`);
+}
 /* 평균: 숫자는 평균, 객체(at·gaps·line)는 같은 열쇠끼리 평균 */
 const mean=list=>{const add=(acc,o)=>{for(const k in o){if(typeof o[k]==='number')acc[k]=(acc[k]||0)+o[k]/list.length;else if(o[k]&&typeof o[k]==='object')add(acc[k]||(acc[k]={}),o[k])}return acc};return list.reduce((acc,o)=>add(acc,o),{})};
-if(require.main===module){
+if(require.main===module&&process.argv[2]==='end'){endReport(Number(process.argv[3])||12,process.argv[4]&&process.argv[4]!=='-'?process.argv[4]:'',Number(process.argv[5])||0)}
+else if(require.main===module){
 const MARKS=marksFor(MIN),GAPS=gapsFor(MIN);
 const f=(x,d=0)=>x===undefined||Number.isNaN(x)?'-':x.toFixed(d);
 const res={};
@@ -110,4 +212,4 @@ for(const a of Q.AGES)for(const m of Q.MODES){
 }
 console.log(`목표 충족 ${tally.ok}/${tally.n} (${((Date.now()-t0)/1000).toFixed(0)}초)`);
 }
-module.exports={play,mean,reseed:n=>{seed=n},C,W,Q,KIDS};
+module.exports={play,playEnd,endReport,mean,reseed:n=>{seed=n},C,W,Q,KIDS};

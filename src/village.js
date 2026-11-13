@@ -19,7 +19,7 @@ const num=v=>{const n=Number(v);return Number.isFinite(n)?n:0};
 const ART='art-handoff/coopnight/browser/';
 const V3=THREE.Vector3;
 // Until the 3D village is ready (or when it falls back) the page still gets a safe API.
-const stubView=()=>({events(){},reward(){},build(){return null},upgrade(){return null},marketScreen(){return null},inspect(){return {ready:false}}});
+const stubView=()=>({events(){},reward(){},build(){return null},upgrade(){return null},marketScreen(){return null},focus(){return null},inspect(){return {ready:false}}});
 window.VillageView=stubView();
 // Hands the scene back to the DOM picture village (index.html draws it when .is3d is gone).
 function useFallback(){host.classList.remove('is3d');host.dataset.renderer='fallback';window.VillageView=stubView()}
@@ -469,7 +469,8 @@ async function start(){
  function tween(delay,dur,update,done){if(reduced()){done?.();return}anims.push({t:-delay,dur,update,done})}
  const after=(delay,fn)=>tween(delay,0,null,fn);
  function shake(amp){if(reduced())return;if(amp>=shakeNow){shakeAmp=amp;shakeAge=0;shakeNow=amp}}
- const EYE=new V3().copy(EYE_DIR).multiplyScalar(EYE_DIST),FOCUS=new V3();let focusHalf=0;   // FOCUS/focusHalf: test-only close-up (VillageView.debug)
+ const EYE=new V3().copy(EYE_DIR).multiplyScalar(EYE_DIST),FOCUS=new V3();let focusHalf=0;   // FOCUS/focusHalf: close-up (VillageView.focus / debug); focusHalf 0 = normal view
+ const KING_PULL=.28;   // finale: how far the view centre moves toward the wolf king (fraction of his distance)
  function stepEffects(dt){
   for(let i=0;i<anims.length;){const a=anims[i];a.t+=dt;if(a.t<0){i++;continue}
    if(a.update&&a.dur>0)a.update(Math.min(1,a.t/a.dur),Math.min(a.t,a.dur));
@@ -650,7 +651,11 @@ async function start(){
  const isBroken=sl=>!!(sl.b&&sl.b.broken)||sl===market&&market.down&&sl.on;
  let insideWolves=0;
  const hl=new Map();   // wolf id -> time its "new monster!" highlight ends
- const KIND_FALLBACK={wolf:{size:1,speed:1},bramble:{size:.85,speed:1.3},boar:{size:1.1,speed:.85},granite:{size:1.25,speed:.6},frost:{size:.95,speed:1.7},ember:{size:1.8,speed:.7,boss:true}};
+ // king · fox (0.12) are not in World.KINDS: they live in world.king / world.fox, one seat each, and are drawn through the same herd as pseudo-wolves.
+ const KIND_FALLBACK={wolf:{size:1,speed:1},bramble:{size:.85,speed:1.3},boar:{size:1.1,speed:.85},granite:{size:1.25,speed:.6},frost:{size:.95,speed:1.7},ember:{size:1.8,speed:.7,boss:true},
+  king:{size:3.6,speed:.7,boss:true},fox:{size:1.15,speed:1.6}};
+ const kingV={},foxV={},extraWolves=[];
+ const pseudo=(o,src,kind)=>{o.id=src.id;o.kind=kind;o.x=num(src.x);o.z=num(src.z);o.state=src.state==='flee'?'leave':'walk';o.hp=1;o.max=1;o.target=0;o.hen=0;return o};
  const kindInfo=k=>{const K=W('KINDS');return (K&&K[k])||KIND_FALLBACK[k]||KIND_FALLBACK.wolf};
  const deathEnd=o=>o.K.boss?1.75:1.45;   // seconds of world time the fall + poof + sink takes
  function newWolf(v){
@@ -662,7 +667,11 @@ async function start(){
  }
  function syncWolves(w,ticked){
   stamp++;henCarrier.clear();smashOn.clear();insideWolves=0;const R=Rgoal,less=reduced();
-  for(const v of Array.isArray(w.wolves)?w.wolves:[]){
+  extraWolves.length=0;
+  if(w.king&&typeof w.king==='object')extraWolves.push(pseudo(kingV,w.king,'king'));
+  if(w.fox&&typeof w.fox==='object')extraWolves.push(pseudo(foxV,w.fox,'fox'));
+  const pack=Array.isArray(w.wolves)?w.wolves:[];
+  for(const v of extraWolves.length?pack.concat(extraWolves):pack){
    if(!v||typeof v!=='object'||v.state==='gone')continue;
    let o=wolfVis.get(v.id);
    if(!o){if(wolfVis.size>=WCAP){let old=null;for(const g of wolfVis.values())if(g.ghost&&(!old||g.deadAge>old.deadAge))old=g;if(!old)continue;wolfVis.delete(old.id)}
@@ -969,6 +978,15 @@ async function start(){
     case 'pack':{const R=Rgoal+num(W('EDGE'));for(const p of Array.isArray(e.points)?e.points:[]){const a=spawnAngle(num(p)),x=Math.cos(a)*R,z=Math.sin(a)*R;
      warns.push({x,z,t0:time,color:RED,life:2.4});for(let i=0;i<8;i++)emit({cell:CELL.dust,x:x+span(-1.5,1.5),y:span(1,2.6),z:z+span(-1.5,1.5),vx:span(-1,1),vy:span(.5,1.4),vz:span(-1,1),drag:2,life:span(.7,1.1),size:.4,end:.8,color:LEAF,alpha:.8,fade:.4})}break}
     case 'arrive':ringWave(0,0,(Rgoal+.3)*2.5,RED,.8,0,CELL.halo,.4,.08,true);shake(.04);break;
+    // 0.12 finale and fox cues (the king and the fox themselves are drawn from world.king / world.fox)
+    case 'king':{const kg=s.world&&s.world.king;if(kg){const x=num(kg.x),z=num(kg.z);redPulse=Math.max(redPulse,.7);shake(.1);ringWave(x,z,9,WHITE,.8,0,CELL.halo,.6);ringWave(x,z,6,ICE,.6,.15,CELL.ring,.6);warns.push({x,z,t0:time,color:WHITE,life:2.6})}break}
+    case 'bell':ringWave(0,0,(Rgoal+.3)*2.5,GOLD,.9,0,CELL.halo,.5,.08,true);ringWave(0,0,(Rgoal+.3)*1.6,GOLD,.7,.18,CELL.ring,.5,.08,true);sparkles(0,3,0,14,2,GOLD,0,.6);shake(.08);break;
+    case 'shield':{const kg=s.world&&s.world.king,o=kg&&wolfVis.get(kg.id);if(kg){const x=num(kg.x),z=num(kg.z);flashAt(x,3.2,z,5,GOLD,.18);starBurst(x,3.4,z,16,1.3,[GOLD,WHITE],.18);ringWave(x,z,7,GOLD,.5,.18,CELL.halo,.6);shake(.12);if(o){o.hit=.3;o.hitT=time}}break}
+    case 'kingStep':{const kg=s.world&&s.world.king;if(kg){stomp(num(kg.x),num(kg.z),3,true);redPulse=Math.max(redPulse,.5);shake(.09)}break}
+    case 'kingFlee':{const kg=s.world&&s.world.king;if(kg)dustBurst(num(kg.x),num(kg.z),18,1.4);confetti(0,4.5,0,60,Math.max(4,Rgoal*.7));sparkles(0,2.5,0,18,Rgoal*.5,GOLD,0,.9);redPulse=0;break}
+    case 'fox':{const R=Rgoal+num(W('EDGE')),a=spawnAngle(num(e.point)),x=Math.cos(a)*R,z=Math.sin(a)*R;warns.push({x,z,t0:time,color:ORANGE,life:2.4});dustBurst(x,z,6,.7);break}
+    case 'foxSaved':{const fx=s.world&&s.world.fox;if(fx){const x=num(fx.x),z=num(fx.z);flashAt(x,.7,z,2.2,GOLD,.1);starBurst(x,.8,z,10,.9,[GOLD,WHITE],.1)}break}
+    case 'foxScare':featherBurst(0,.6,0,8,.8);break;
     case 'dash':{let k=0;for(const o of wolfVis.values()){if(o.state==='dead'||o.ghost)continue;knock(o,0,0,0,2.2);if(k<24){dustBurst(o.x,o.z,4,.6,k*.02);k++}}shake(.06);break}
     default:break;   // 'broken', 'carry' and the rest are drawn from the pulled state
    }
@@ -1002,12 +1020,16 @@ async function start(){
   if(!market.on||!(viewW>1))return null;const {x,z}=marketFront();mv2.set(x,Math.min(2,market.height*.75)+.2,z).project(camera);
   if(!Number.isFinite(mv2.x)||!Number.isFinite(mv2.y))return null;return {x:clamp((mv2.x+1)/2,0,1),y:clamp((1-mv2.y)/2,0,1)};
  }
- window.VillageView={events,reward(){},build,upgrade:()=>build('tower'),debug,marketScreen,
+ // Public close-up (0.12, the old test-only debug focus made official): focus([x,z,half]) holds the camera on a ground point, focus(null) hands it back.
+ // During the wolf-king finale the view also leans toward the king by itself (KING_PULL, see updateView) unless a manual focus is held.
+ function focus(f){return debug({focus:Array.isArray(f)?f:null}).focus}
+ window.VillageView={events,reward(){},build,upgrade:()=>build('tower'),debug,marketScreen,focus,
   inspect(){
    const states={},kinds={};let onScreenW=0,shownW=0,ghosts=0;
    for(const o of wolfVis.values()){if(o.ghost){ghosts++;continue}shownW++;states[o.state]=(states[o.state]||0)+1;kinds[o.kind]=(kinds[o.kind]||0)+1;ndc.set(o.x,.6,o.z).project(camera);if(Math.abs(ndc.x)<=1&&Math.abs(ndc.y)<=1)onScreenW++}
    const sw=read().world,stunned=sw&&Array.isArray(sw.buildings)?towers.filter(t=>t.on&&t.b&&num(t.b.stun)>0&&!t.b.broken).length:0;
-   return {ready:true,time,frames,phase:read().phase,radius:Rgoal,radiusShown:Rd,cameraHalf:camHalf,aspect,
+   return {ready:true,time,frames,phase:read().phase,radius:Rgoal,radiusShown:Rd,cameraHalf:camHalf,aspect,cameraFocus:[+FOCUS.x.toFixed(2),+FOCUS.z.toFixed(2)],
+    king:(()=>{const kg=sw&&sw.king,o=kg&&wolfVis.get(kg.id);return o?{state:kg.state,size:+o.size.toFixed(2),x:+o.x.toFixed(2),z:+o.z.toFixed(2)}:null})(),fox:(()=>{const fx=sw&&sw.fox,o=fx&&wolfVis.get(fx.id);return o?{state:fx.state,size:+o.size.toFixed(2)}:null})(),
     wolvesVisible:shownW,wolvesOnScreen:onScreenW,wolfStates:states,wolfKinds:kinds,wolfGhosts:ghosts,maxWolvesDrawn,wolfCap:WCAP,highlighted:[...hl.values()].filter(t=>t>time).length,
     power:powerShown,stunnedTowers:stunned,splashFx:{active:booms.filter(b=>time-b.t0<.8).length,total:boomTotal,scorches:scorches.length},
     arrowsVisible:arrowsDrawn,fireArrows:fireDrawn,wolfPos:[...wolfVis.values()].filter(o=>!o.ghost).slice(0,8).map(o=>[Math.round(o.x*100)/100,Math.round(o.z*100)/100]),
@@ -1051,6 +1073,9 @@ async function start(){
  }
  function updateView(dt,less){       // the camera pulls back (and the forest steps back) over about a second when the village grows
   const k=less?1:1-Math.exp(-dt*3.6);Rd+=(Rgoal-Rd)*k;if(Math.abs(Rgoal-Rd)<.004)Rd=Rgoal;
+  // finale camera: while the child is fighting the wolf king (bell 2) the view leans a little toward him; it eases back when he flees
+  if(!focusHalf){const kg=curS&&curS.bell===2&&curS.world&&curS.world.king,gx=kg?num(kg.x)*KING_PULL:0,gz=kg?num(kg.z)*KING_PULL:0,d=Math.abs(gx-FOCUS.x)+Math.abs(gz-FOCUS.z);
+   if(d>1e-4){const kk=less?1:1-Math.exp(-dt*2.2);FOCUS.x+=(gx-FOCUS.x)*kk;FOCUS.z+=(gz-FOCUS.z)*kk;if(Math.abs(gx-FOCUS.x)+Math.abs(gz-FOCUS.z)<.01){FOCUS.x=gx;FOCUS.z=gz}camera.position.copy(EYE).add(FOCUS);dirty=true}}
   applyView();
  }
  const bw=new V3();
