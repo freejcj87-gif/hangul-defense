@@ -1,6 +1,6 @@
 # Claude Code 작업 인계
 
-기준일: 2026-11-13. 0.11(듣고 고르기 폐쇄·읽어 주기 삭제, 브랜치 `claude/no-sound`, worktree `work\claude-v011-nosound`) 기준으로 갱신했습니다. 0.9는 상점·알 경제(브랜치 `claude/shop-economy`)입니다. 0.8은 PR #9(main `4700136`), 0.7은 PR #7(main `08e8ec7`)입니다. 0.6은 PR #5(main `d8d95f5`), 0.5는 [PR #3](https://github.com/freejcj87-gif/hangul-defense/pull/3)(main `965ad4e`)입니다. 0.4 인계 시점의 기록은 main `800f3f9` 기준이며 아래 “확인된 검증과 배포”에 그대로 남겼습니다. 문서 커밋 자체는 이후 이력에서 확인하세요.
+기준일: 2026-11-13. 0.12(엔딩·경제 개편, 브랜치 `claude/ending-economy`, worktree `work\claude-v012-ending`) 기준으로 갱신했습니다. 0.11은 듣고 고르기 폐쇄·읽어 주기 삭제(브랜치 `claude/no-sound`)입니다. 0.9는 상점·알 경제(브랜치 `claude/shop-economy`)입니다. 0.8은 PR #9(main `4700136`), 0.7은 PR #7(main `08e8ec7`)입니다. 0.6은 PR #5(main `d8d95f5`), 0.5는 [PR #3](https://github.com/freejcj87-gif/hangul-defense/pull/3)(main `965ad4e`)입니다. 0.4 인계 시점의 기록은 main `800f3f9` 기준이며 아래 “확인된 검증과 배포”에 그대로 남겼습니다. 문서 커밋 자체는 이후 이력에서 확인하세요.
 
 ## 먼저 알아야 할 것
 
@@ -55,7 +55,19 @@
 
 ## 실제 규칙과 한계
 
-### 0.11 (현재)
+### 0.12 (현재)
+
+엔딩과 경제 개편을 넣은 판입니다(브랜치 `claude/ending-economy`, worktree `work\claude-v012-ending`, 0.11.1 main `427ba73`을 병합함). 정본은 [docs/game-plan.md](docs/game-plan.md) §11, 설계 근거는 저장소 밖 `work\verification-20261113\design\ending-and-progression-v2.md`·`ending-review.md`입니다. 프로듀서 결정 A~F는 추천 기본값이고 `combat.js` 맨 위 `FLAGS`·`FINALE`·`FOX`·`MIGRATE`·`START_PACK`·`WOLF_MUL`로 바꿉니다(§11.2 표).
+
+- 규칙(`combat.js`, API 4): 판 진행은 `state.run`(종 `bell` 0 닫힘 · 1 열림 · 2 결전 · 3 물리침 · 4 자유 놀이, 방패·결전 문제 번호 `fpick`·여우·판 기록)과 `state.meta`(도장·마을 스냅숏·처음 맞힌 문항)에 있습니다. `buy`·`restore`가 `grow`(회관 자동 승급 + 종 래치)를 부르므로 화면은 사기 전후의 `hall`·`run.bell`만 견줍니다. 결전은 `ringBell` → `finaleNow` → `finaleSettle`, 끝나면 `finish`(도장), 다음 마을은 `nextRun`, 더 놀기는 `keepPlaying`. 틀림도 판 기록에 남기려고 화면의 '두 번 틀림'은 `Combat.track(…,'miss')`를 부릅니다.
+- 세계(`world.js`): 늑대 왕(`w.king`)과 도둑 여우(`w.fox`)는 늑대 목록이 아니라 한 자리씩입니다(상한 90과 무관, 타워가 저절로 쏘지 않음). `World.king(w, 'wait'|'fight'|'flee'|'none', 걸음, snap)`, `World.fox`·`foxShoo`, `World.retreat(w, 틱|-1)`(`w.peace`: 새 늑대가 안 나옴), `tempoInterval`(무리 간격), `TOWER.hallRange`.
+- 화면(`index.html`): 단계 `ending`(엔딩 카드, 세계 멈춤)이 생겼습니다. 8번째 칸은 `hall`(상태 `auto`) → `bell`(`buy`·`fight`·`done`) → `feast`. 결전 문제의 표(token)는 `나이:story:F낸 수-문제 번호`. `syncKing(snap)`이 `run.bell`에 왕·물러남을 맞춥니다(이어하기는 왕을 멈춤 지점 처음 자리로). 저장은 언제나 version 3이고, 예전 저장 원본은 `hangul-defense-v1-bak`에 한 번 복사합니다. `__game()`에 `ending`·`finale`·`king`·`fox`·`peace`·`goldArrows`가 더해졌습니다.
+- 3D(`src/village.js`·`src/monsters.js`): 종류 `king`(불씨 왕 부품을 회색으로 다시 칠함, 크기 3.6)·`fox`(늑대 모델 주황, 0.7)를 같은 무리 그리기에 넣었습니다(새 그림 0장). `VillageView.focus([x,z,half]|null)` 공개, 결전 중에는 화면 중심이 왕 쪽으로 28% 기울어집니다. `inspect()`에 `king`·`fox`·`cameraFocus`.
+- 프로듀서 플레이 피드백 반영: 회관 승급 한 줄 설명, 타워 사거리(회관 단계마다 +1.5), 연속·번개로 더 받은 금화 표시(`.gold-extra`), 연못 한 줄.
+- 알려진 한계와 미룬 것은 기획서 §11.6. 가장 큰 것은 **브라우저에서 한 번도 돌리지 않았다**는 점입니다(아래 '확인된 검증과 배포'의 0.12).
+- 캐시 버전 `?v=0.12`.
+
+### 0.11 (참고)
 
 프로듀서 결정(2026-11-13) 두 가지로 듣고 고르기 모드와 그 문항, 그리고 읽어 주는 음성 기능을 모두 지운 판입니다. 정본은 [docs/game-plan.md](docs/game-plan.md) §10. 이 문서의 '현재 구현' 아래쪽과 0.10 이하 절에 남은 듣기·소리 모드·음성·'모드별' 서술은 그때의 기록입니다.
 
@@ -247,6 +259,15 @@ Playwright 시스템 의존성 설치는 WSL/Ubuntu 환경에 맞춰 수행하�
 - 검사: `node test-questions.cjs` PASS 21,216(0.10의 49,883에서 줄어든 것은 듣기 1,013문항의 문항별 검사가 없어져서), `node test-dom.cjs` PASS 3,895(0.10은 11,110, 같은 까닭에 음성 검사 삭제분). 가짜 DOM의 `speechSynthesis`는 부르면 세는 감시용이고 검사 끝에 0번인지 확인합니다. `test-dom.cjs`는 판마다 씨앗이 달라 여러 번 돌려 보았고, 읽기 문항이 기본이 되면서(번개 대기 약 7초, 무리 간격 20초) 흔들리던 검사 3곳(⚡ 꺼지는 틱, 판매 연출 뒤 알림 띠, 2단계 마을 새 몬스터)을 고친 뒤 30번 연속 통과를 확인했습니다.
 - `node test.cjs`(Playwright)는 이 작업에서 **돌리지 않았습니다**(PC 메모리 사정). 코드만 새 동작에 맞게 고쳤고 `node --check test.cjs`만 통과했습니다. 병합 전에 반드시 돌려야 합니다.
 - 확인하지 못한 것: 실제 브라우저에서의 시작 화면 배치(모드 줄이 빠진 뒤 간격), 🔊 버튼이 빠진 문제 칸 머리줄, 설정 서랍(항목 3개), 8세 읽기 문항이 기본이 된 휴대폰 첫 화면(상태 줄·장면·가게·보기 한 화면), 배우기 기다림 길이의 체감.
+
+### 0.12 (2026-11-13)
+
+- 브랜치 `claude/ending-economy`(worktree `work\claude-v012-ending`). 병합·배포 전입니다. origin/main(0.11.1 읽기 문항 확충, `427ba73`)을 병합해 두었습니다(캐시 버전 줄만 충돌, 0.12로 정리).
+- 검사: `node test-dom.cjs` PASS 9,123(0.11.1 문항 기준. 3-1 ~ 3-12가 0.12 엔딩·경제·피드백 검사), `node test-questions.cjs` PASS 44,208(문항 파일은 고치지 않음), `node --check test.cjs` 통과, `node scripts/build-pages.cjs` 성공(31개 파일).
+- 시뮬: `node scripts/sim-village.cjs end 12` — 엔딩까지 문제 수는 16칸 모두 설계 v2 표의 ±20% 안, 분은 11칸(벗어난 5칸은 9·10세, 설계가 가정한 지문 묶음이 아직 없어서), 10분 붕괴 192판 중 0판. 표는 기획서 §11.4.
+- `node test.cjs`(Playwright)는 **돌리지 않았습니다**(PC 메모리 사정). 코드만 새 규칙에 맞게 고쳤고(타워 2개 시작, 회관 자동 승급, 무리 간격 식, 저장 version 3, 느낌 검사의 구매 순서) flow에 엔딩 흐름(종 → 결전 → 엔딩 카드 → 새 마을, 화면 캡처 5장)을 더했습니다. 병합 전에 반드시 돌려야 합니다.
+- 확인하지 못한 것: 3D 늑대 왕·여우의 모습과 크기, 결전 카메라 기울임, 황금 화살이 보이는지, 별 방패 줄(장면 위쪽 가운데)과 알림 띠의 겹침, 엔딩 카드와 지도 줄의 320px 배치, 마을별 땅 색(CSS 필터가 저사양 폰에서 느려지는지), 회관 승급 알림 띠 한 줄의 길이, 금화 칸 아래 `.gold-extra` 위치, 실제 아이의 길이 체감(9·10세 44~50분).
+- `node_modules`: `work\claude-v09\node_modules` 연결은 비어 있어(가리키는 `claude-village-polish\node_modules`가 빈 폴더), `work\art-handoff-20261111\.claude\worktrees\agent-a23f51d934c674b82\node_modules`에 연결해 빌드했습니다(읽기만 함).
 
 ### 0.10.1 (2026-11-13)
 
