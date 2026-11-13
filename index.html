@@ -190,6 +190,7 @@ body.paused *,body.paused *:before,body.paused *:after{animation-play-state:paus
 /* 정답 금화 옆에 '연속·번개로 더 받은 금화'를 따로 띄운다(0.12, 프로듀서 플레이 피드백: 연속·빨리 맞히는 이득이 안 보임) */
 .gold-extra{position:absolute;left:var(--x);top:var(--y);z-index:9;padding:1px 8px;border-radius:99px;background:#fff0d9;border:2px solid #f08a3c;color:#8a3b00;font-size:12.5px;font-weight:900;white-space:nowrap;animation:plusUp 1.4s ease-out forwards}
 /* 0.12 결전(별 방패)·도둑 여우 표시·종 칸·엔딩 카드·지도 줄·마을별 땅 색 */
+.scene.fin .banner{top:50px}/* 결전 중: 알림 띠는 별 방패 줄 아래로 */
 .finale{position:absolute;left:50%;top:8px;translate:-50% 0;z-index:6;display:flex;align-items:center;gap:2px;padding:5px 11px;border-radius:99px;background:#2b1d14e6;border:2px solid #f2b931;font-size:19px;line-height:1;white-space:nowrap;box-shadow:0 3px 0 #0004}
 .finale b{font-size:21px;margin-right:5px}.finale i{font-style:normal;transition:opacity .3s,scale .3s}.finale i.off{opacity:.28;scale:.72;filter:grayscale(1)}.finale.crack{animation:cardPop .45s}
 #foxIcon{display:inline-grid;place-items:center;padding:1px 8px;border-radius:99px;background:#ffe9cf;border:1px solid #e9a55c;font-size:15px;line-height:1.5}
@@ -349,7 +350,7 @@ function frame(){
 /* 결전 표시: 늑대 왕 머리 위 별 방패 6개를 장면 위쪽에 그린다(3D·그림 화면 공통). 깨진 방패는 흐리게. 시간 표시는 없다 */
 function finaleHud(){
  const el=$('finale'),r=state.run,N=Combat.FINALE.shields,on=phase!=='start'&&(r.bell===2||r.bell===3&&phase==='reward');
- el.classList.toggle('hidden',!on);if(!on){if(el.dataset.n)el.dataset.n='';return}
+ el.classList.toggle('hidden',!on);$('scene').classList.toggle('fin',on);if(!on){if(el.dataset.n)el.dataset.n='';return}
  const stamp=String(r.shields);if(el.dataset.n===stamp)return;el.dataset.n=stamp;el.innerHTML='';
  const b=document.createElement('b');b.textContent='👑';el.append(b);
  for(let i=0;i<N;i++){const s=document.createElement('i');s.textContent='⭐';if(i>=N-r.shields)s.className='off';el.append(s)}
@@ -710,7 +711,7 @@ function coinTick(){if(!coins.length)return;
 /* 한 번의 금화가 다 닿음: 금화 칸이 통통, '+58'이 떠오르고, 이때 추천 말풍선 */
 function coinsLanded(total,note){pop($('gold'),'bump');goldPlus(total);if(note)goldExtra(note);pills();renderShop();askBubble(false)}
 function goldExtra(note){const e=document.createElement('span');e.className='gold-extra';e.textContent=note;
- try{const card=$('stageCard').getBoundingClientRect(),p=$('gold').getBoundingClientRect();if(card.width&&p.width){e.style.setProperty('--x',Math.round(p.left-card.left)+'px');e.style.setProperty('--y',Math.round(p.bottom-card.top+4)+'px')}}catch{}
+ try{const card=$('stageCard').getBoundingClientRect(),p=$('gold').getBoundingClientRect();if(card.width&&p.width){e.style.setProperty('--x',Math.round(p.left-card.left)+'px');e.style.setProperty('--y',Math.round(p.bottom-card.top+4+($('scene').classList.contains('fin')?42:0))+'px')}}catch{}/* 결전 중에는 별 방패 줄 아래에 */
  $('coinLayer').append(e);setTimeout(()=>e.remove(),1450)}
 function goldPlus(total){const e=document.createElement('span');e.className='gold-plus';e.textContent='+'+total;
  try{const card=$('stageCard').getBoundingClientRect(),p=$('gold').getBoundingClientRect();if(card.width&&p.width){e.style.setProperty('--x',Math.round(p.right-card.left+4)+'px');e.style.setProperty('--y',Math.round(p.top-card.top-2)+'px')}}catch{}

@@ -653,7 +653,7 @@ async function start(){
  const hl=new Map();   // wolf id -> time its "new monster!" highlight ends
  // king · fox (0.12) are not in World.KINDS: they live in world.king / world.fox, one seat each, and are drawn through the same herd as pseudo-wolves.
  const KIND_FALLBACK={wolf:{size:1,speed:1},bramble:{size:.85,speed:1.3},boar:{size:1.1,speed:.85},granite:{size:1.25,speed:.6},frost:{size:.95,speed:1.7},ember:{size:1.8,speed:.7,boss:true},
-  king:{size:3.6,speed:.7,boss:true},fox:{size:.7,speed:1.6}};
+  king:{size:3.6,speed:.7,boss:true},fox:{size:1.15,speed:1.6}};
  const kingV={},foxV={},extraWolves=[];
  const pseudo=(o,src,kind)=>{o.id=src.id;o.kind=kind;o.x=num(src.x);o.z=num(src.z);o.state=src.state==='flee'?'leave':'walk';o.hp=1;o.max=1;o.target=0;o.hen=0;return o};
  const kindInfo=k=>{const K=W('KINDS');return (K&&K[k])||KIND_FALLBACK[k]||KIND_FALLBACK.wolf};

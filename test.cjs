@@ -337,7 +337,8 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
  await begin(p,{age:8});await expectQuestion(p,8,'story',0,'fallback default');
  /* 늑대마다 부수기·물기로 멈춰 있을 수 있으므로, 보이는 늑대 전체 자리를 본다 */
  const wolfPos=()=>p.locator('#enemies .enemy:not(.hidden)').evaluateAll(a=>a.map(n=>n.style.left+'|'+n.style.bottom).sort().join(';'));
- await tick(p,200);eq(await p.locator('#enemies .enemy:not(.hidden)').count(),await notGone(p),'fallback: wolves drawn where the simulation has them');const l0=await wolfPos();await tick(p,40);ok(await wolfPos()!==l0,'fallback wolf moves');
+ /* 0.12: 무리 간격이 읽기 박자(8세 약 31초)라 첫 무리가 숲에 나타날 때까지(간격 − 이동 시간) 돌린다 */
+ await tick(p,(await game(p)).world.interval);eq(await p.locator('#enemies .enemy:not(.hidden)').count(),await notGone(p),'fallback: wolves drawn where the simulation has them');const l0=await wolfPos();await tick(p,40);ok(await wolfPos()!==l0,'fallback wolf moves');
  ok((await fxLog(p)).some(x=>x.c==='paws'),'fallback: paw prints for the pack');
  {const g0=(await game(p)).state.gold;await answer(p,true,false);const g=await game(p);eq(g.gold.shown,g.state.gold,'fallback: no coin flight, the number jumps');ok(g.state.gold>g0,'gold paid');
   const w=g.world.t;await tick(p,6);eq((await game(p)).world.t,w+6,'fallback: the world keeps running during the sale')}
@@ -369,12 +370,24 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
   await begin(page,{age:8},true);let g=await game(page);eq([g.state.hall,g.state.level,g.state.power,g.world.radius],[3,5,2,16],'demo starts with a grown village');
   eq((await slotStates(page)).map(x=>x.split(':')[0]),Combat.shopKeys(g.state),'demo shop: 8 slots, feast in the 8th');
   /* 우두머리는 네 번째 무리마다: 무리 5번 + 걸어오는 시간만큼 흘린다(100틱씩, 3D가 따라오게) */
-  const goal=g.world.interval*5+80;for(let t=0;t<goal;t+=100){await tick(page,100);if(is3d)await frames(page,1)}
+  /* 0.12: 무리 간격이 길어져(8세 약 31초) 무리와 무리 사이에는 늑대가 적다. '한꺼번에 많이'는 흘리는 동안의 최댓값으로 본다 */
+  let peak=0;const goal=g.world.interval*5+80;for(let t=0;t<goal;t+=50){peak=Math.max(peak,(await tick(page,50)).world.wolves);if(is3d&&t%100===0)await frames(page,1)}
   g=await game(page);const seen=Object.keys(g.world.seen);
   for(const k of ['wolf','bramble','boar','granite','frost','ember'])ok(seen.includes(k),'demo: '+k+' appeared ('+seen+')');ok(g.world.stats.bosses>=1&&g.world.stats.splash>0,'demo: boss arrived and splash arrows hit: '+JSON.stringify(g.world.stats));
-  ok(g.world.wolves>=10,'demo: many wolves at once: '+g.world.wolves);
+  ok(peak>=10,'demo: many wolves at once: '+peak);
   if(is3d&&!INTERIM){await frames(page,3);const i=await page.evaluate(()=>window.VillageView.inspect());eq(i.wolvesVisible,await notGone(page),'demo: 3D draws every wolf');ok(i.drawCalls>0,'demo scene metrics');console.log('DEMO_METRICS:'+JSON.stringify({wolves:i.wolvesVisible,drawCalls:i.drawCalls,triangles:i.triangles,kinds:i.wolfKinds}))}
   await shot(page.locator('.scene'),'demo3-390');
+  /* 0.12: 3D의 늑대 왕(기다림 → 결전 자리, 별 방패 줄, 카메라 기울임)과 도둑 여우. 체험 저장에서만 상태를 만들어 본다 */
+  if(is3d&&!INTERIM){
+   await page.evaluate(()=>{world.wolves=[];world.trickle=1e9;world.wave.arrive=1e9;world.wave.spawned=true;state.run.bell=1;syncKing(true);render()});await tick(page,5);await frames(page,8);
+   let i=await page.evaluate(()=>window.VillageView.inspect());ok(i.king&&i.king.state==='wait'&&i.king.size>3,'3D draws the waiting wolf king: '+JSON.stringify(i.king));
+   await shot(page.locator('.scene'),'king-wait-3d-390');
+   await page.evaluate(()=>{Combat.ringBell(state,{});state.run.shields=2;state.run.fpick=state.run.fpick.slice(2);syncKing(true);render()});await tick(page,30);await frames(page,40);
+   i=await page.evaluate(()=>window.VillageView.inspect());ok(i.king&&i.king.state==='stand','3D: the king stands at the stop point');ok(Math.hypot(i.cameraFocus[0],i.cameraFocus[1])>.5,'3D: finale camera leans toward the king: '+i.cameraFocus);
+   ok(await page.locator('#finale').isVisible(),'3D: star shields shown');await shot(page.locator('.scene'),'king-finale-3d-390');
+   await page.evaluate(()=>{World.fox(world,state,400,{})});await tick(page,300);await frames(page,8);i=await page.evaluate(()=>window.VillageView.inspect());ok(i.fox&&i.fox.state==='come','3D draws the thief fox: '+JSON.stringify(i.fox));await shot(page.locator('.scene'),'fox-3d-390');
+   await page.evaluate(()=>{World.king(world,'none');state.run=Combat.freshRun();world.fox=null;render()});
+  }
   eq(await page.evaluate(()=>localStorage.getItem('hangul-defense-v1')),null,'demo never touches the real save');ok(await page.evaluate(()=>!!localStorage.getItem('hangul-defense-demo3')),'demo has its own save');
   eq(errors,[],'demo page errors');await ctx.close();
  }}finally{await demoBrowser.close()}

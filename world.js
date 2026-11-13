@@ -76,7 +76,7 @@
   /* 늑대 왕(0.12): 늑대 목록(상한 90)과 별개 자리(w.king). 화살에 맞지 않고 포효하지 않으며 공격하지 않는다(지는 경우 없음).
      마을 정면 쪽 출현 지점(point)의 숲 가장자리에서 기다리다(wait), 종이 울리면 울타리 밖 멈춤 지점(반지름 + stop)까지 걸어오고(come → stand),
      8세부터 두 번 틀릴 때마다 step만큼 다가선다(최대 3걸음, 그래도 울타리 밖). 방패가 다 깨지면 숲으로 달아난다(flee) */
-  const KING={point:2,far:3,wait:-1,stop:2.4,step:.6,speed:1.2,flee:4,size:3.6};
+  const KING={point:2,far:3,wait:-3,stop:2.4,step:.6,speed:1.2,flee:4,size:3.6};
   /* 도둑 여우(0.12): 한 번에 한 마리, 늑대 목록과 별개(w.fox)라 타워가 저절로 쏘지 않는다. 정해진 틱(total)에 맞춰 닭까지 온다 */
   const FOX={flee:3.2,arrow:1.6,size:.7};
   const MAX_WOLVES=90;
