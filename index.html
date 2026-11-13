@@ -181,6 +181,9 @@ body.paused.covered #quiz{filter:blur(9px);pointer-events:none}
  .slot[data-state="none"] .pr,.slot[data-state="max"] .pr{background:none}.slot.rec:before{font-size:13px;top:-8px;right:-4px}#fastIcon{width:26px;height:26px;font-size:14px}#speak{padding:6px 9px}.kick-left{gap:5px}#levelChip{padding:3px 8px}}
 @media(max-width:350px){.pill{font-size:10px;letter-spacing:-.5px}.shop-wrap{padding:5px 6px 6px}.shop{gap:4px}}
 @media(max-width:760px) and (max-height:700px){.scene{height:clamp(120px,22svh,200px)}.stage-caption{display:none}.bubble{font-size:13px;min-height:36px;padding:4px 10px 4px 4px;bottom:calc(100% + 10px);line-height:1.3}.bubble img{width:26px;height:26px}#answers button{min-height:56px;font-size:28px}#answers.word button{min-height:52px}#answers.long button{min-height:44px;font-size:15px;line-height:1.4;padding:7px 9px}#answers{gap:8px}}
+/* 0.10: 긴 글(9세 이상 읽기)을 읽는 동안 작은 폰은 장면을 줄여 지문·보기가 한 화면에 들어오게(390px에서 보기 5개가 모두 화면 밖이었음). 320px는 제목을 한 줄로 */
+@media(max-width:430px){body.long-read .scene{height:clamp(120px,19svh,160px)}body.long-read #passage{line-height:1.6}}/* 장면은 120px 아래로 줄이지 않는다(늑대가 보여야 함) */
+@media(max-width:360px){h1{font-size:15px;letter-spacing:-.4px;white-space:nowrap}header small{font-size:9.5px}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
 body.reduced *,body.reduced *:before,body.reduced *:after{animation:none!important;transition:none!important}
 /* 움직임 줄이기: 차례로 나타나는 연출 없이 처음부터 보이게 */
@@ -203,7 +206,7 @@ body.paused *,body.paused *:before,body.paused *:after{animation-play-state:paus
 <ul class="rules"><li>🐺 늑대가 쉬지 않고 사방에서 와서 닭을 물어 가고 건물을 부숴요.</li><li>🏹 한 번에 맞히면 타워가 일제히 쏘고, 닭이 알을 낳아 금화가 생겨요.</li><li>🪙 금화로 언제든 가게에서 타워·닭·농부를 사요.</li><li>💥 문제에는 상식·수학·영어도 섞여 있어요.</li></ul>
 <p class="start-q">몇 살이에요?</p><div class="age-row" id="ageRow"></div><div class="mode-row"><button id="startSound">🔊 듣고 고르기</button><button id="startStory">📖 읽고 고르기</button></div>
 <button id="go">시작하기 ▶</button><small>어려우면 나이를 낮춰도 괜찮아요.</small></div></div>
-<script src="combat.js?v=0.9"></script><script src="world.js?v=0.9"></script><script src="questions.js?v=0.9"></script><script>/* 체험 주소 ?demo=1~3: 그 회관 단계까지 자란 마을로 시작해 새 몬스터를 바로 본다(프로듀서·보호자 확인용). 저장은 따로 해서 원래 진행을 건드리지 않는다. */
+<script src="combat.js?v=0.10"></script><script src="world.js?v=0.10"></script><script src="questions-gen.js?v=0.10"></script><script src="questions.js?v=0.10"></script><script>/* 체험 주소 ?demo=1~3: 그 회관 단계까지 자란 마을로 시작해 새 몬스터를 바로 본다(프로듀서·보호자 확인용). 저장은 따로 해서 원래 진행을 건드리지 않는다. */
 const DEMO=(()=>{try{const m=/[?&]demo=([123])\b/.exec(location.search);return m?Number(m[1]):0}catch{return 0}})();
 const KEY=DEMO?'hangul-defense-demo'+DEMO:'hangul-defense-v1',AGES=Questions.AGES,ART='art-handoff/coopnight/browser/';
 const DEMO_VILLAGE={1:{hall:1,level:2,fence:2,chickens:4,gold:250},2:{hall:2,level:3,fence:4,chickens:6,farmers:1,power:1,gold:450},3:{hall:3,level:5,fence:6,chickens:8,farmers:2,pond:2,power:2,gold:700}};
@@ -216,6 +219,9 @@ if(!(Combat.API>=3)||typeof Combat.shop!=='function')console.warn('combat.js 버
 let state=Combat.fresh(8);
 try{state=Combat.restore(JSON.parse(localStorage.getItem(KEY)),AGES)}catch{}
 if(DEMO&&!state.wins&&!state.index)Object.assign(state,DEMO_VILLAGE[DEMO]);
+/* 문제 순서 씨앗(0.10): 판마다 다른 순서. 예전 저장(씨앗 0)은 이어하는 순간 하나를 받는다 */
+const newSeed=()=>1+Math.floor(Math.random()*2147483646);
+if(!(state.seed>0))state.seed=newSeed();
 let phase='start',paused=false,round=null,voiceOff=false,speech=null,speechSeq=0,acc=0,last=null,worldNote=null,lastShot=-99;
 /* uiT: 화면 시계(틱, 쉬는 동안 멈춤). 동전·말풍선·가게 두 번 누름 방지는 모두 이 시계로 센다(검사는 __tick으로). */
 let uiT=0,coins=[],pendingGold=0,lastLaunch=-1,shopLock=0,tipLeft=0,lastHowl=-999,lastDing=-99,shopPrev=[];
@@ -228,8 +234,10 @@ const Shop={list:s=>Combat.shop(s),buy:(s,k)=>Combat.buy(s,k)|0};
 
 /* 늑대 세계(world.js). 무리 간격 = 나이·모드별 문제 하나 기준 시간(중앙값)과 같게, 13~20초(World.intervalFor). 무리 사이에도 낙오 늑대가 계속 온다. */
 function waveInterval(){const t=[];for(let i=0;i<Questions.count(state.age,state.mode);i++)t.push(Combat.baseSeconds(Questions.get(state.age,state.mode,i)));t.sort((a,b)=>a-b);return World.intervalFor(t[t.length>>1])}
-const freshWorld=()=>World.sync(World.create({seed:(Date.now()%2147483647)||1,interval:waveInterval()}),state);
+/* guard(0.10): 새 판은 처음 한 번에 맞힐 때까지(3번) 늑대가 쫓기만 하고, 마지막 닭 한 마리는 늘 지켜진다 */
+const freshWorld=()=>World.sync(World.create({seed:(Date.now()%2147483647)||1,interval:waveInterval(),guard:true}),state);
 let world=null;try{const raw=JSON.parse(localStorage.getItem(KEY));world=raw&&raw.world?World.restore(raw.world,{interval:waveInterval()}):null}catch{}
+if(world&&world.keep===undefined)world.keep=true;/* 0.9 저장도 마지막 닭은 지킨다 */
 const KIND_ICON={wolf:'🐺',bramble:'🌿',boar:'🐗',granite:'🪨',frost:'❄️',ember:'🔥'};
 const CAT_ICON={common:'🌍',math:'🔢',english:'🔤'};
 if(!world)world=freshWorld();World.sync(world,state);state.broken=World.brokenCount(world);syncMarket();
@@ -374,7 +382,9 @@ const SFX={
  /* 우두머리를 쓰러뜨림: 팡파르 + 금화 */
  bounty(){[[784,0],[988,.1],[1175,.2],[1568,.3]].forEach(([f,a])=>note(f,a,.22,'triangle',.06));note(2093,.45,.4,'sine',.05);noise(.45,.3,.03,7000,9500,1,'highpass')}
 };
-function jingle(name,...args){try{SFX[name]&&SFX[name](...args)}catch{}}
+/* sfxCount: 효과음 이름별 호출 수(검사·플레이 봇이 효과음 밀도를 잰다) */
+const sfxCount={};
+function jingle(name,...args){sfxCount[name]=(sfxCount[name]|0)+1;try{SFX[name]&&SFX[name](...args)}catch{}}
 /* 음성 읽기. done(true)는 다 읽었을 때, done(false)는 이 기기에서 음성이 안 될 때. 다른 말로 끊긴 것(canceled)은 실패가 아니다. */
 function cancelSpeech(){speechSeq++;speech=null;try{window.speechSynthesis&&window.speechSynthesis.cancel()}catch{}}
 function speak(text,done){
@@ -391,8 +401,10 @@ function voiceFail(){voiceOff=true;put($('voiceStatus'),'이 기기에서는 읽
 /* ---------- 문제 ---------- */
 function layout(choices){const len=Math.max(...choices.map(c=>[...c].length)),n=choices.length;if(len>6)return ['long','1'];if(len>1)return ['word',n===3&&len<=3?'3':'2'];return ['',n===3?'3':'2']}
 function makeRound(){
- /* 4문제마다 1문제는 상식·수학·영어(Questions.at). 소리 모드에서도 질문을 읽어 준 뒤 푼다. */
- const q=Questions.at(state.age,state.mode,state.index);
+ /* 상식·수학·영어 칸은 나이·문제 번호로 정해진다(0.10: 20칸마다 7세 2·8세 3·9세 5→7·10세 7→10, Questions.at). 순서는 판마다 씨앗으로. 소리 모드에서도 질문을 읽어 준 뒤 푼다. */
+ const q=Questions.at(state.age,state.mode,state.index,state.seed);
+ /* 긴 글(9세 이상 읽기)을 읽는 동안 작은 폰에서는 장면을 줄여 보기가 한 화면에 들어오게 한다 */
+ try{document.body.classList.toggle('long-read',q.mode==='story'&&Combat.syl(q.passage)>=40)}catch{}
  round={token:token(),q,t:0,tries:0,dash:0,lock:Combat.reveal(q),result:null,info:null,learn:0,ready:false,wait:0,hold:0,reading:false};
  const list=$('answers'),[kind,cols]=layout(q.choices);list.innerHTML='';list.className=kind;list.dataset.cols=cols;list.dataset.qid=q.id;list.dataset.age=String(q.age);list.dataset.mode=q.mode;
  /* 같은 문항이 다시 돌아오면 보기 순서를 한 칸씩 돌려 자리 외우기를 막는다. */
@@ -414,15 +426,19 @@ function newRound(resume){
  makeRound();
  if(resume){round.t=resume.t;round.tries=resume.tries}
  say('');
- if(state.mode==='sound'&&!voiceOff){phase='listen';hideBubble();veil('🔊 잘 들어 보세요');listen()}else startAsk();
+ /* 7세는 읽기 모드에서도 상식·수학·영어 질문을 읽어 준다(0.10, 퀴즈 검증: 7세가 질문 글을 읽지 못해 그림 보기만 보고 찍게 됨) */
+ if((state.mode==='sound'||readsQuiz())&&!voiceOff){phase='listen';hideBubble();veil('🔊 잘 들어 보세요');listen()}else startAsk();
  save();render();
 }
-function listen(){speak(round.q.speak,ok=>{if(phase!=='listen')return;if(ok)startAsk();else voiceFail()})}
+const readsQuiz=()=>!!round&&round.q.mode==='quiz'&&state.age===7&&state.mode==='story';
+function listen(){speak(round.q.speak,ok=>{if(phase!=='listen')return;if(ok)startAsk();else{voiceFail();if(phase==='listen')startAsk()}})}
 function startAsk(){phase='ask';round.lock=Math.max(round.lock,3);
  if(round.lock>3){veil('📖 먼저 글을 읽어요. 곧 질문의 답이 나와요');say('📖 글을 끝까지 읽어 보세요.')}else{veil('');if(round.tries)say('한 번만 더 고를 수 있어요.')}
  render()}
 /* 보기가 열리면 '글을 끝까지 읽어 보세요' 안내는 지우되, 경고(🔇 소리가 안 나와 읽고 고르기로 바꿈)는 그 문제 동안 남긴다. */
-function showAnswers(){veil('');if(round.tries)answerButtons().forEach(b=>{if(b.classList.contains('wrong'))b.disabled=true});if(phase==='ask'&&!round.tries&&!$('feedback').classList.contains('warn'))say('')}
+function showAnswers(){veil('');if(round.tries)answerButtons().forEach(b=>{if(b.classList.contains('wrong'))b.disabled=true});if(phase==='ask'&&!round.tries&&!$('feedback').classList.contains('warn'))say('');if(phase==='ask'&&!round.tries)answersIntoView()}
+/* 보기가 열렸는데 화면 아래로 밀려 있으면 보기까지 내린다(0.10, 320px·긴 글 점검). 장면 카드는 위에 붙어 있어 늑대는 계속 보인다 */
+function answersIntoView(){try{const a=$('answers'),r=a.getBoundingClientRect&&a.getBoundingClientRect(),H=window.innerHeight||0;if(r&&H&&r.bottom>H+2&&a.scrollIntoView)a.scrollIntoView({block:'end',behavior:calm()?'auto':'smooth'})}catch{}}
 
 function choose(i,b){
  if(paused)return;
@@ -435,11 +451,15 @@ function choose(i,b){
   if(round.tries===0){const fast=isFast();round.result='first';syncMarket();round.info=Combat.settle(state,q,'first',{fast,ticks:round.t});/* ticks: 읽기 속도(pace)를 규칙이 기억해 천천히 읽는 아이에게 늑대를 덜 보낸다 */
    /* 금화는 이 순간 규칙이 더하고 저장한다. 문제 번호도 바로 넘겨, 연출 중에 새로고침해도 금화를 두 번 받지 않는다. */
    state.index++;
+   /* 새 판 보호 한 칸 줄이기, 정답 소리가 묻히지 않게 1초 동안 전투음 쉬기 */
+   World.answered(world);hushUntil=world.t+10;
    /* 읽기가 곧 방어: 한 번에 맞히면 모든 타워가 일제 사격(긴 글일수록·빨리 맞힐수록 많이) */
    const n=World.volley(world,state,{scale:Combat.scale(q),fast});view([{type:'volley',n,fast}]);if(n)jingle('shoot',n,.16);enterReward(round.info)}
   else{round.result='second';round.info=Combat.settle(state,q,'second');jingle('second');enterLearn('🛡️ 맞았어요! 금화는 한 번에 맞힐 때만 받아요.')}
   return}
  if(round.tries===0){
+  Combat.trackPace(state,q,round.t);/* 0.10: 틀려도 첫 고르기까지의 시간으로 읽기 속도를 갱신(천천히 읽는 아이 완충이 첫 정답 전부터 켜짐) */
+  World.answered(world);/* 새 판 보호는 처음 몇 문제(맞히든 틀리든) */
   round.tries=1;state.streak=0;b.classList.add('wrong');b.disabled=true;pop(b,'nope');jingle('wrong');jingle('dash');
   round.dash=Combat.DASH_TICKS;/* 그동안 세계를 빨리 감는다(무리 간격의 30%) */
   answerButtons().forEach(x=>x.disabled=true);say('앗! 늑대가 성큼 다가왔어요. 한 번 더 골라 보세요.',true);
@@ -526,7 +546,7 @@ function buyItem(key,i){
  const paid=Shop.buy(state,key);if(!paid)return false;
  shopLock=4;
  if(key==='repair')World.repairAll(world);World.sync(world,state);state.broken=World.brokenCount(world);syncMarket();
- if(rec.prev&&rec.prev.key===key)rec.prev.followed=true;
+ if(rec.prev&&rec.prev.key===key){rec.prev.followed=true;for(const k in rec.said)if(k.endsWith(':'+rec.prev.line))rec.said[k]=0}/* 따른 추천은 다시 말해도 된다(반복 상한은 무시한 말풍선만 센다) */
  if(rec.glow===key){rec.glow=null;if(rec.bubble&&rec.bubble.key===key)hideBubble()}
  save();render();
  const b=$('shop').children[i];if(b)pop(b,'bought');
@@ -575,9 +595,12 @@ function clearCoins(){for(const c of coins)if(c.el)c.el.remove();coins=[];pendin
    무엇을 추천할지는 규칙(Combat.recommend, 순수 함수)이 고르고, 언제·얼마나 자주는 화면이 정한다.
    말풍선은 한 번에 하나, 3.5초. 말풍선 사이 20초(급한 것 10초), 1분에 2개(급한 것 3개)까지. 같은 추천을 두 번 연달아 안 따르면 60초 쉰다.
    문제를 듣는 동안·글 먼저 읽기 동안·음성이 나오는 동안에는 띄우지 않는다. 반짝임은 사거나 상황이 바뀔 때까지 남는다. */
-const REC={show:35,gap:200,urgentGap:100,window:600,mute:600,stale:150};
-const rec={glow:null,bubble:null,left:0,last:-1e9,times:[],prev:null,ign:{},mute:{},want:null,opened:[],lostAt:-1e9,shown:0};
-function recReset(){Object.assign(rec,{glow:null,bubble:null,left:0,last:-1e9,times:[],prev:null,ign:{},mute:{},want:null,opened:[],lostAt:-1e9});hideBubble()}
+/* 0.10(플레이 점검: "금화를 모아서 회관을 키워 봐요!"가 한 판에 30~70번): 급하지 않은 같은 문장은 회관 단계마다 2번까지(perStage),
+   '회관을 위해 모으자'는 회관 값의 절반(saveFrom)을 모으기 전에는 띄우지 않는다, 급한 것도 1분에 2개까지 */
+const REC={show:35,gap:200,urgentGap:100,window:600,mute:600,stale:150,perStage:2,saveFrom:.5,perMin:2};
+const rec={glow:null,bubble:null,left:0,last:-1e9,times:[],prev:null,ign:{},mute:{},want:null,opened:[],lostAt:-1e9,shown:0,said:{}};
+function recReset(){Object.assign(rec,{glow:null,bubble:null,left:0,last:-1e9,times:[],prev:null,ign:{},mute:{},want:null,opened:[],lostAt:-1e9,said:{}});hideBubble()}
+const saidKey=r=>(state.hall|0)+':'+r.line;
 function recCtx(){const kinds=[];for(const b of world.buildings)if(b.broken&&b.kind!=='fence'&&!kinds.includes(b.kind))kinds.push(b.kind);
  return {wolvesInside:wolvesInside(),towers:world.buildings.filter(b=>b.kind==='tower'&&!b.broken).length,lostHenRecently:world.t-rec.lostAt<=300,brokenKinds:kinds,opened:rec.opened.slice()}}
 function recommendNow(real){const s={...state,gold:real?state.gold:shownGold()};try{return Combat.recommend(s,recCtx())||null}catch{return null}}
@@ -592,15 +615,17 @@ function pickBubble(real){
  recAccount();
  const r=recommendNow(real);if(!r||!r.key||!r.line)return null;
  const t=world.t,recent=rec.times.filter(x=>t-x<REC.window).length;
- if(t-rec.last<(r.urgent?REC.urgentGap:REC.gap)||recent>=(r.urgent?3:2))return null;
+ if(t-rec.last<(r.urgent?REC.urgentGap:REC.gap)||recent>=REC.perMin)return null;
  if((rec.mute[r.key]||-1)>t)return null;
+ if(!r.urgent&&(rec.said[saidKey(r)]|0)>=REC.perStage)return null;
+ if(r.rule===0&&r.line===Combat.LINES.hallSave&&(real?state.gold:shownGold())<REC.saveFrom*Combat.price(state,'hall'))return null;
  return r;
 }
 function showBubble(){
  const r=pickBubble(false);if(!r)return false;const t=world.t;
  /* '연달아'만 센다: 다른 추천이 끼면 앞 추천의 무시 횟수는 처음부터 */
  if(rec.prev&&rec.prev.key!==r.key)rec.ign[rec.prev.key]=0;
- rec.prev={key:r.key,followed:false,done:false};rec.glow=r.key;rec.bubble=r;rec.left=REC.show;rec.last=t;rec.times=rec.times.filter(x=>t-x<REC.window).concat(t);rec.shown++;if(r.rule===4&&!rec.opened.includes(r.key))rec.opened.push(r.key);
+ rec.prev={key:r.key,line:r.line,followed:false,done:false};rec.glow=r.key;rec.bubble=r;rec.left=REC.show;rec.last=t;rec.times=rec.times.filter(x=>t-x<REC.window).concat(t);rec.shown++;if(!r.urgent){const k=saidKey(r);rec.said[k]=(rec.said[k]|0)+1}if(r.rule===4&&!rec.opened.includes(r.key))rec.opened.push(r.key);
  const i=Math.max(0,slotOf(r.key)),el=$('bubble');put($('bubbleText'),r.line);el.style.setProperty('--tail',(((i%4)+.5)*25)+'%');el.dataset.key=r.key;el.classList.remove('hidden');attr(el,'aria-label','꼬꼬: '+r.line);
  renderShop();return true;
 }
@@ -682,7 +707,11 @@ function tick(){
  frame();
 }
 /* 세계 한 틱: 사건을 3D 마을에 넘기고, 닭 잃음·건물 부서짐·새 몬스터·무리를 경제 상태와 문구·소리·추천에 반영한다. */
-let lastBoom=-99,lastCrash=-99;
+let lastBoom=-99,lastCrash=-99,lastYelp=-99,hushUntil=-99;
+/* 전투 효과음 예산(0.10, 플레이 점검: 후반 분당 430~690번, 정답 소리가 1.5%로 묻히고 듣기 문제 음성 위로 계속 남):
+   깨갱 0.3초·펑 1초·화살 1.5초 간격, 문제를 듣는 동안·음성이 나오는 동안·정답 직후 1초는 쉰다 */
+const SFX_GAP={yelp:3,boom:10,shoot:15};
+const hush=()=>phase==='listen'||!!speech||world.t<hushUntil;
 /* 알림 띠는 한 번에 하나씩: 새 몬스터 여러 종류가 한 무리로 처음 나와도 같은 자리에 겹치지 않게 줄을 세워 33틱(3.3초)씩 보여 준다.
    시계 틱으로 세므로 쉬는 동안 함께 멈추고, 정답 판매 연출(reward) 동안에는 금화 띠와 겹치지 않게 숨겼다가 끝나면 처음부터 다시 보여 준다.
    now=true(우두머리 보상)는 줄을 건너뛰어 바로 보여 주고, 보던 띠는 그다음에 다시 보여 준다. */
@@ -709,9 +738,9 @@ function worldStep(){
   else if(e.type==='roar'){jingle('roar');worldNote={text:'🔥 불씨 왕의 포효! 타워 '+e.towers.length+'개가 잠깐 멈췄어요',until:world.t+30}}
   else if(e.type==='pack'){packMarks(e.points);if(world.t-lastHowl>=80){lastHowl=world.t;jingle('howl',e.n)}
    if(!worldNote||worldNote.low)worldNote={text:(e.boss?'🔥 우두머리와 ':'🐺 ')+'늑대 무리 '+e.n+'마리가 몰려와요!',until:world.t+25,low:true}}
-  else if(e.type==='splash'){if(world.t-lastBoom>=3){lastBoom=world.t;jingle('boom')}}
-  else if(e.type==='shoot'&&world.t-lastShot>=5){lastShot=world.t;jingle('shoot',1)}
-  else if(e.type==='kill'){if(e.boss){state.gold+=Combat.BOUNTY;jingle('bounty');pop($('gold'),'bump');banner('👑','불씨 왕을 쓰러뜨렸어요!','🪙 +'+Combat.BOUNTY,false,true);worldNote={text:'👑 불씨 왕을 쓰러뜨렸어요! 🪙 +'+Combat.BOUNTY,until:world.t+40}}else jingle('yelp')}
+  else if(e.type==='splash'){if(!hush()&&world.t-lastBoom>=SFX_GAP.boom){lastBoom=world.t;jingle('boom')}}
+  else if(e.type==='shoot'){if(!hush()&&world.t-lastShot>=SFX_GAP.shoot){lastShot=world.t;jingle('shoot',1)}}
+  else if(e.type==='kill'){if(e.boss){state.gold+=Combat.BOUNTY;jingle('bounty');pop($('gold'),'bump');banner('👑','불씨 왕을 쓰러뜨렸어요!','🪙 +'+Combat.BOUNTY,false,true);worldNote={text:'👑 불씨 왕을 쓰러뜨렸어요! 🪙 +'+Combat.BOUNTY,until:world.t+40}}else if(!hush()&&world.t-lastYelp>=SFX_GAP.yelp){lastYelp=world.t;jingle('yelp')}}
  }
 }
 setInterval(()=>{
@@ -728,7 +757,8 @@ window.__game=()=>{const kinds={};for(const v of liveWolves())kinds[v.kind||'wol
  return {phase,paused,voiceOff,speaking:!!speech,uiT,state:JSON.parse(JSON.stringify(state)),world:{t:world.t,wave:{...world.wave},interval:world.interval,trickle:world.trickle,mercy:world.mercy,wolves:liveWolves().length,kinds,seen:{...world.seen},inside:wolvesInside(),arrows:world.arrows.length,splashArrows:world.arrows.filter(a=>a.splash>0).length,stunned:world.buildings.filter(b=>b.stun>0).length,hens:world.hens.map(h=>h.state),broken:World.brokenCount(world),fencesDown:world.buildings.filter(b=>b.kind==='fence'&&b.broken).length,stats:{...world.stats},radius:World.radius(world)},
  round:round&&{token:round.token,id:round.q.id,mode:round.q.mode,cat:round.q.cat||'',t:round.t,tries:round.tries,dash:round.dash,lock:round.lock,result:round.result,ready:round.ready,wait:round.wait,reading:round.reading,answer:round.q.answer,choices:round.q.choices.slice(),gold:round.info&&round.info.gold||0},
  shop:shopRows(),shopLock,gold:{shown:shownGold(),pending:pendingGold,coins:coins.length,flying:coins.filter(c=>c.el).length},fast:$('fastIcon').dataset.state,
- rec:{glow:rec.glow,bubble:rec.bubble&&{...rec.bubble},left:rec.left,last:rec.last,times:rec.times.slice(),shown:rec.shown,want:rec.want&&{...rec.want},mute:{...rec.mute},ign:{...rec.ign},opened:rec.opened.slice()}}};
+ rec:{glow:rec.glow,bubble:rec.bubble&&{...rec.bubble},left:rec.left,last:rec.last,times:rec.times.slice(),shown:rec.shown,want:rec.want&&{...rec.want},mute:{...rec.mute},ign:{...rec.ign},opened:rec.opened.slice(),said:{...rec.said}},
+ sfx:{...sfxCount},calm:world.calm|0,keep:!!world.keep,seed:state.seed}};
 
 /* ---------- 버튼 ---------- */
 $('pause').onclick=()=>{if(phase==='start')return;paused=!paused;if(paused){cancelSpeech();if(phase==='listen')veil('🔊 계속하기를 누르면 다시 읽어 줘요')}else{acc=0;last=null;if(phase==='listen'){veil('🔊 잘 들어 보세요');listen()}else if(phase==='learn'&&!round.ready)round.learn=Math.min(round.learn,5)}save();render()};
@@ -740,8 +770,8 @@ function changeSetting(){
 }
 $('mode').onclick=()=>{if(paused)return;state.mode=state.mode==='sound'?'story':'sound';if(state.mode==='sound'){voiceOff=false;put($('voiceStatus'),'')}changeSetting()};
 $('age').value=String(state.age);$('age').onchange=()=>{const age=Number($('age').value);if(!AGES.includes(age)||paused){$('age').value=String(state.age);return}state.age=age;changeSetting()};
-$('speak').onclick=()=>{if(paused||!round)return;if(phase==='ask'&&state.mode==='sound')speak(round.q.speak);else if(phase==='learn'&&round.ready)speak(Combat.lesson(round.q))};
-$('reset').onclick=()=>{if(!confirm('저장된 금화와 마을을 초기화할까요?'))return;cancelSpeech();const keep={age:state.age,mode:state.mode};state=Object.assign(Combat.fresh(keep.age),{mode:keep.mode},DEMO?DEMO_VILLAGE[DEMO]:{});world=freshWorld();state.broken=0;syncMarket();worldNote=null;paused=false;artStamp='';clearCoins();recReset();shopPrev=[];newRound()};
+$('speak').onclick=()=>{if(paused||!round)return;if(phase==='ask'&&state.mode==='sound')speak(round.q.speak);else if(phase==='learn'&&round.ready)speak(Combat.lesson(round.q,true))};/* 다시 듣기는 지문까지 전부 */
+$('reset').onclick=()=>{if(!confirm('저장된 금화와 마을을 초기화할까요?'))return;cancelSpeech();const keep={age:state.age,mode:state.mode};state=Object.assign(Combat.fresh(keep.age),{mode:keep.mode,seed:newSeed()},DEMO?DEMO_VILLAGE[DEMO]:{});world=freshWorld();lastBoom=lastShot=lastYelp=lastCrash=lastHowl=hushUntil=-99;state.broken=0;syncMarket();worldNote=null;paused=false;artStamp='';clearCoins();recReset();shopPrev=[];newRound()};
 $('motion').onchange=()=>document.body.classList.toggle('reduced',$('motion').checked);
 if(DEMO){const t=document.querySelector('header small');if(t){const d=document.createElement('span');d.className='demo-tag';d.textContent='체험: 마을회관 '+DEMO+'단계';t.append(' · ',d)}}
 /* 시작 화면: 처음 누르는 순간이 소리 재생 허락이 되므로 첫 문제의 소리를 이 클릭 안에서 바로 읽기 시작한다. */
@@ -759,6 +789,8 @@ $('go').onclick=()=>{
   if(r.phase==='pick'){state.round=null;state.index++;newRound();return}
   if(r.phase==='learn'){makeRound();round.t=r.t;round.result='miss';round.info={};enterLearn('지난번에 놓친 문제예요.');return}
   newRound({t:r.t,tries:r.tries});return}
+ /* 0.10: 시작 화면에서 고른 나이·모드로 무리 간격을 다시 정한다(전에는 페이지를 연 때의 기본값 8세 듣기 13초로 돌아 9·10세 읽기에 무리가 1.4~1.5배 잦았다) */
+ world.interval=waveInterval();if(world.t===0){world.wave.arrive=world.interval;world.wave.spawned=false}
  newRound();
 };
 window.addEventListener('beforeunload',save);
@@ -767,4 +799,4 @@ drawStart();
 /* 3D 마을(village.js)은 이 상태(늑대 세계 world 포함)를 매 프레임 읽어 간다. 일회성 연출(세계 사건·volley·produce·dash·build)만 따로 알린다.
    running: 늑대 세계 시계가 흐르는지(시작 화면·쉬기만 멈춤). 0.9에서 reward 단계가 생겨, 3D는 phase 목록 대신 이 값을 보면 된다. */
 window.getVillageState=()=>({phase,paused,running:phase!=='start'&&!paused,level:state.level,power:state.power|0,streak:state.streak|0,chickens:state.chickens,fence:state.fence,farmers:state.farmers,farmersTotal:1+(state.farmers|0),nest:state.nest|0,marketDown:state.marketDown|0,recommend:rec.glow||null,pond:state.pond,hall:state.hall,feast:state.feast,wins:state.wins,world,radius:World.radius(world),tries:round?round.tries:0,dash:!!(round&&round.dash>0),result:round?round.result:null});
-</script><script src="village.js?v=0.9" defer></script></body></html>
+</script><script src="village.js?v=0.10" defer></script></body></html>

@@ -24,7 +24,7 @@ const median=a=>{const s=[...a].sort((x,y)=>x-y);return s[s.length>>1]};
 function interval(age,mode){return W.intervalFor(median(Array.from({length:Q.count(age,mode)},(_,i)=>C.baseSeconds(Q.get(age,mode,i)))))}
 function play(age,mode,kind,minutes){
   const MIN_=minutes||MIN,MARKS=marksFor(MIN_),GAPS=gapsFor(MIN_);
-  const s=C.fresh(age);s.mode=mode;const w=W.create({seed:Math.floor(rnd()*1e9),interval:interval(age,mode)});W.sync(w,s);
+  const s=C.fresh(age);s.mode=mode;const w=W.create({seed:Math.floor(rnd()*1e9),interval:interval(age,mode),guard:true});W.sync(w,s);/* 0.10: 게임처럼 새 판 보호 */
   let correct=0,qn=0,ticks=0,seen=0,inside=0,maxPack=0,maxWolves=0,bought=0,repairs=0,feasts=0,earned=0,lastLost=-1e9,bubbles=0,lastBubble=-1e9,lastBonus=-1e9,mark=0;
   const buyTimes=[],opened=[],line={},at={},keys=()=>C.shopKeys(s);let poorSince=0;const poorMax={};
   const snap=m=>{at[m]={bought,built:C.built(s),earned,hall:s.hall,gold:s.gold,chickens:s.chickens,towers:1+s.level,power:s.power,fence:s.fence,farmers:s.farmers,pond:s.pond,nest:s.nest,henLost:w.stats.henLost,henSaved:w.stats.henSaved,broken:w.stats.broken}};
@@ -59,9 +59,10 @@ function play(age,mode,kind,minutes){
     /* 긴 문제(20초 넘게 읽음)는 읽는 도중에도 한 번 상점을 본다(상점은 늘 열려 있음, 최대 2개) */
     if(t>MID_SEC){run(t/2);shop(false,2);run(t/2)}else run(t);
     if(ok1){
-      const fast=C.isFast(q,Math.round(t/W.TICK));s.marketDown=W.marketDown(w);const res=C.settle(s,q,'first',{fast,ticks:Math.round(t/W.TICK)});earned+=res.gold;correct++;W.volley(w,s,{scale:C.scale(q),fast});
+      const fast=C.isFast(q,Math.round(t/W.TICK));s.marketDown=W.marketDown(w);const res=C.settle(s,q,'first',{fast,ticks:Math.round(t/W.TICK)});earned+=res.gold;correct++;W.answered(w);W.volley(w,s,{scale:C.scale(q),fast});
       run(CHEER_SEC);shop(true);
     }else{
+      C.trackPace(s,q,Math.round(t/W.TICK));W.answered(w);/* 0.10: 틀려도 읽기 속도 갱신, 새 판 보호는 처음 몇 문제 */
       run(W.dashTicks(w)*W.TICK);
       const t2=kind==='guess'?.4:need(q,RATE[age][kind],kind)*.35;run(t2);
       if(kind==='guess'?rnd()<1/(n-1):rnd()<.8)C.settle(s,q,'second');else{s.misses++;s.streak=0}
