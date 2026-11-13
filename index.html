@@ -728,9 +728,9 @@ const REC={show:35,gap:200,urgentGap:100,window:600,mute:600,stale:150,perStage:
 const rec={glow:null,bubble:null,left:0,last:-1e9,times:[],prev:null,ign:{},mute:{},want:null,opened:[],lostAt:-1e9,shown:0,said:{},bellAt:-1e9};
 function recReset(){Object.assign(rec,{glow:null,bubble:null,left:0,last:-1e9,times:[],prev:null,ign:{},mute:{},want:null,opened:[],lostAt:-1e9,said:{},bellAt:-1e9});hideBubble()}
 const saidKey=r=>(state.hall|0)+':'+r.line;
-function recCtx(){const kinds=[];for(const b of world.buildings)if(b.broken&&b.kind!=='fence'&&!kinds.includes(b.kind))kinds.push(b.kind);
- return {wolvesInside:wolvesInside(),towers:world.buildings.filter(b=>b.kind==='tower'&&!b.broken).length,lostHenRecently:world.t-rec.lostAt<=300,brokenKinds:kinds,opened:rec.opened.slice(),bellQuiet:world.t-rec.bellAt<REC.bellGap}}
-function recommendNow(){const s={...state,gold:shownGold()};try{return Combat.recommend(s,recCtx())||null}catch{return null}}
+function recCtx(keep){const kinds=[];for(const b of world.buildings)if(b.broken&&b.kind!=='fence'&&!kinds.includes(b.kind))kinds.push(b.kind);
+ return {wolvesInside:wolvesInside(),towers:world.buildings.filter(b=>b.kind==='tower'&&!b.broken).length,lostHenRecently:world.t-rec.lostAt<=300,brokenKinds:kinds,opened:rec.opened.filter(k=>k!==keep),bellQuiet:world.t-rec.bellAt<REC.bellGap}}
+function recommendNow(keep){const s={...state,gold:shownGold()};try{return Combat.recommend(s,recCtx(keep))||null}catch{return null}}
 /* 새 몬스터 알림 띠가 떠 있는 동안에도 기다린다(작은 화면에서 띠와 말풍선이 겹쳐 마을이 가려지지 않게). */
 const recQuiet=()=>phase==='start'||phase==='ending'||paused||(phase==='ask'&&round&&round.lock>0)||(!!bannerEl&&!bannerEl.classList.contains('later'));
 /* 지난 말풍선을 따랐는지 한 번만 센다(다음에 말풍선을 띄우려 할 때). 같은 추천을 두 번 연달아 안 따르면 60초 쉰다. */
@@ -761,7 +761,8 @@ function hideBubble(){rec.bubble=null;rec.left=0;$('bubble').classList.add('hidd
 function askBubble(urgent){if(!rec.want||urgent)rec.want={at:world.t,urgent:!!urgent}}
 function recTick(){
  if(rec.bubble&&--rec.left<=0)hideBubble();
- if(rec.glow&&uiT%10===0){const r=recommendNow();if(!r||r.key!==rec.glow){rec.glow=null;renderShop()}}
+ /* 새로 열린 상품 추천(한 번만 말함)은 말한 뒤에도 사거나 상황이 바뀔 때까지 반짝임이 남는다(전에는 1초 안에 꺼지기도 했다) */
+ if(rec.glow&&uiT%10===0){const r=recommendNow(rec.glow);if(!r||r.key!==rec.glow){rec.glow=null;renderShop()}}
  if(rec.want){if(world.t-rec.want.at>REC.stale)rec.want=null;else if(!recQuiet()&&!rec.bubble){rec.want=null;showBubble()}}
 }
 
