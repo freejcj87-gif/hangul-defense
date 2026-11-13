@@ -11,16 +11,16 @@ const ok=(v,msg)=>{assert.ok(v,msg);n++;};
 const eq=(a,b,msg)=>{assert.deepStrictEqual(a,b,msg);n++;};
 const H=Q.hangul;
 const KEYS=['id','age','mode','prompt','passage','speak','choices','answer'];
-const CHOICES={7:{sound:3,story:3},8:{sound:3,story:3},9:{sound:4,story:4},10:{sound:4,story:5}};
+const CHOICES={7:{story:3},8:{story:3},9:{story:4},10:{story:5}};
 const answerKey=q=>q.mode==='story'?q.passage:q.choices[q.answer];
 const all=(age,mode)=>Array.from({length:Q.count(age,mode)},(_,i)=>Q.get(age,mode,i));
 const isGen=q=>/-g\d{3,}$/.test(q.id);
 const p2=i=>String(i).padStart(2,'0'),p3=i=>String(i).padStart(3,'0');
-/* 손 문항 a8-sound-01…, 그 뒤 생성 문항 a8-sound-g001… */
+/* 손 문항 a8-story-01…, 그 뒤 생성 문항 a8-quiz-g001… */
 const wantIds=list=>{let h=0,g=0;return list.map(q=>isGen(q)?q.id.replace(/-g\d+$/,'')+'-g'+p3(++g):q.id.replace(/-\d+$/,'')+'-'+p2(++h));};
 const segments=list=>[list.filter(q=>!isGen(q)),list.filter(isGen)];
 const LEVEL=new Map();
-for(const a of Q.AGES)for(const m of ['sound','story','quiz'])for(const g of GEN[a][m])LEVEL.set(g.id,g.level);
+for(const a of Q.AGES)for(const m of ['story','quiz'])for(const g of GEN[a][m])LEVEL.set(g.id,g.level);
 const levelOf=q=>LEVEL.get(q.id)||2;
 
 /* 1. 음절 분해 헬퍼 */
@@ -40,20 +40,22 @@ eq(H.compactLength('우리 같이\n가요.'),7,'공백 제외 글자 수');
 
 /* 2. 상수와 전체 검증 */
 eq(Q.AGES,[7,8,9,10]);
-eq(Q.MODES,['sound','story']);
+eq(Q.MODES,['story'],'0.11: 모드는 읽고 고르기 하나');
 for(const a of Q.AGES)for(const m of Q.MODES){
   const label=Q.LEVELS[a][m];
   ok(typeof label==='string'&&label.length>0&&label.length<=12,`LEVELS[${a}].${m} 라벨`);
   ok(Q.count(a,m)>=12,`${a}세 ${m} 12문항 이상`);
 }
-eq(new Set(Q.AGES.flatMap(a=>Q.MODES.map(m=>Q.LEVELS[a][m]))).size,8,'라벨 8개가 서로 다름');
+eq(new Set(Q.AGES.flatMap(a=>Q.MODES.map(m=>Q.LEVELS[a][m]))).size,4,'라벨 4개가 서로 다름');
+for(const a of Q.AGES)eq(Object.keys(Q.LEVELS[a]),['story'],`LEVELS[${a}]에 sound 없음`);
 eq(Q.validate(),[],'validate()는 빈 배열');
 eq(Q.genRejected,[],'생성 문항이 하나도 거부되지 않음');
 
-/* 2-1. 생성 문항 파일 형태: {나이: {sound, story, quiz}}, 항목은 은행 형식 + level */
+/* 2-1. 생성 문항 파일 형태: {나이: {story, quiz}}, 항목은 은행 형식 + level (0.11: sound 묶음 삭제) */
 for(const a of Q.AGES){
-  ok(GEN[a]&&['sound','story','quiz'].every(m=>Array.isArray(GEN[a][m])),`questions-gen.js ${a}세 묶음 셋`);
-  for(const m of ['sound','story','quiz'])GEN[a][m].forEach((g,i)=>{
+  eq(Object.keys(GEN[a]),['story','quiz'],`questions-gen.js ${a}세 묶음 둘(sound 없음)`);
+  ok(['story','quiz'].every(m=>Array.isArray(GEN[a][m])),`questions-gen.js ${a}세 묶음은 배열`);
+  for(const m of ['story','quiz'])GEN[a][m].forEach((g,i)=>{
     eq(g.id,`a${a}-${m}-g${p3(i+1)}`,g.id+' 생성 id');
     eq([g.age,g.mode],[a,m],g.id+' age/mode');
     ok([1,2,3].includes(g.level),g.id+' level 1~3');
@@ -62,7 +64,6 @@ for(const a of Q.AGES){
   for(const m of Q.MODES)eq(Q.count(a,m),all(a,m).filter(q=>!isGen(q)).length+GEN[a][m].length,`${a}세 ${m}: 생성 문항이 모두 합쳐짐`);
   eq(Q.quizCount(a),Array.from({length:Q.quizCount(a)},(_,i)=>Q.quiz(a,i)).filter(q=>!isGen(q)).length+GEN[a].quiz.length,`${a}세 quiz: 생성 문항이 모두 합쳐짐`);
 }
-ok(GEN[7].sound.length>=200&&GEN[8].sound.length>=300&&GEN[9].sound.length>=200,'7·8·9세 듣기 생성 문항 수');
 for(const a of Q.AGES)ok(GEN[a].quiz.filter(q=>q.cat==='math').length>=45,`${a}세 수학 생성 45개 이상`);
 for(const a of [9,10])ok(GEN[a].quiz.filter(q=>q.cat==='english').length>=45,`${a}세 영어 생성 45개 이상`);
 eq(GEN[7].quiz.filter(q=>q.cat==='english').length+GEN[8].quiz.filter(q=>q.cat==='english').length,0,'7·8세 영어는 생성하지 않음');
@@ -83,8 +84,7 @@ for(const a of Q.AGES)for(const m of Q.MODES){
     eq(q.choices.length,CHOICES[a][m],tag+' 보기 개수');
     eq(new Set(q.choices).size,q.choices.length,tag+' 보기 중복 없음');
     ok(Number.isInteger(q.answer)&&q.answer>=0&&q.answer<q.choices.length,tag+' answer 범위');
-    if(m==='sound'){eq(q.passage,'',tag+' passage 빈 문자열');eq(q.speak,q.choices[q.answer],tag+' speak=정답');}
-    else{ok(q.passage.length>0,tag+' passage');eq(q.speak,q.passage,tag+' speak=passage');ok(!/\r/.test(q.passage),tag+' 줄바꿈은 \\n');}
+    ok(q.passage.length>0,tag+' passage');eq(q.speak,q.passage,tag+' speak=passage');ok(!/\r/.test(q.passage),tag+' 줄바꿈은 \\n');
     eq(Q.checkCommon(q),[],tag+' 공통 규칙');
     eq(Q.get(a,m,i+cnt),q,tag+' 순환(+count)');
     if(i<20){
@@ -96,8 +96,9 @@ for(const a of Q.AGES)for(const m of Q.MODES){
     }
   }
 }
-eq(ids.size,Q.AGES.reduce((s,a)=>s+Q.count(a,'sound')+Q.count(a,'story'),0),'id 총수');
-ok(ids.size>=900,'소리·읽기 900문항 이상');
+eq(ids.size,Q.AGES.reduce((s,a)=>s+Q.count(a,'story'),0),'id 총수');
+ok([...ids].every(id=>/^a(7|8|9|10)-story-/.test(id)),'읽기 문항뿐(sound id 없음)');
+ok(ids.size>=56,'읽기 56문항 이상(0.11: 나이마다 14~16, 확충은 별도 작업)');
 
 /* 4. 나이별 변별(전수) */
 for(const m of Q.MODES){
@@ -108,14 +109,14 @@ for(const m of Q.MODES){
     eq(new Set(qs.map(answerKey)).size,4,`${m} index ${i}: 나이별 정답/지문이 모두 다름`);
     eq(new Set(qs.map(q=>q.choices.join('|'))).size,4,`${m} index ${i}: 나이별 보기가 모두 다름`);
   }
-  /* 정답/지문은 한 나이에만. 같은 나이 안에서 같은 정답은 7·8세 소리만(대비 축이 달라야, validate가 검사) 3문항까지 */
+  /* 지문은 한 나이에만, 같은 나이 안에서도 한 번만 */
   const owner=new Map(),per=new Map();
   Q.AGES.forEach((a,k)=>sets[k].forEach(q=>{
     const key=answerKey(q);
     ok(!owner.has(key)||owner.get(key)===a,`${q.id}: 정답/지문 '${key}'이 다른 나이에도 있음`);
     owner.set(key,a);per.set(a+'|'+key,(per.get(a+'|'+key)||0)+1);
   }));
-  for(const [k,c] of per)ok(c===1||(m==='sound'&&/^[78]\|/.test(k)&&c<=3),`${m} ${k}: 같은 정답·지문 ${c}문항`);
+  for(const [k,c] of per)ok(c===1,`${m} ${k}: 같은 지문 ${c}문항`);
   Q.AGES.forEach((a,k)=>{
     for(const q of sets[k]){
       eq(Q.checkLevel(a,m,q),[],`${q.id}: 자기 수준(${a}세) 규칙 통과`);
@@ -125,16 +126,6 @@ for(const m of Q.MODES){
   });
 }
 const chars=s=>Array.from(s);
-for(const q of all(7,'sound'))ok(q.choices.every(c=>H.isSyllable(c)&&!H.hasBatchim(c)),q.id+' 7세: 전부 받침 없는 한 글자');
-for(const q of all(8,'sound')){
-  const a=chars(q.speak);
-  ok(a.length<=2&&a.some(H.hasBatchim)&&!a.some(H.hasDoubleBatchim),q.id+' 8세: 홑받침 있는 1~2음절');
-}
-for(const q of all(9,'sound'))ok(H.isWord(q.speak)&&[2,3].includes(chars(q.speak).length),q.id+' 9세: 2~3음절 낱말');
-for(const q of all(10,'sound')){
-  ok(q.speak.includes(' ')&&H.compactLength(q.speak)>=8&&H.compactLength(q.speak)<=18,q.id+' 10세: 문장');
-  ok(q.choices.every(c=>c.split(' ').length>=3),q.id+' 10세: 보기도 모두 문장');
-}
 for(const q of all(7,'story')){
   ok(H.isWord(q.passage)&&chars(q.passage).length<=3&&!chars(q.passage).some(H.hasBatchim),q.id+' 7세: 받침 없는 낱말');
   ok(q.choices.every(c=>!/[ㄱ-ㆎ가-힣A-Za-z0-9]/.test(c)&&chars(c).length===1),q.id+' 7세: 보기는 이모지 1개');
@@ -160,16 +151,6 @@ for(const a of [9,10]){
   const list=all(a,'story'),sole=list.filter(q=>{const L=q.choices.map(c=>H.compactLength(c)),mx=Math.max(...L);return L[q.answer]===mx&&L.filter(v=>v===mx).length===1});
   ok(sole.length<=list.length*(1/CHOICES[a].story+.1),`${a}세 읽기: 정답=가장 긴 보기 ${sole.length}/${list.length}`);
 }
-/* 4-3. 9·10세 소리: 보기 공통부(수렴) 단서 없음(9세 음절, 10세 어절 단위, 독립 구현) */
-const clue=(c,ans,unit)=>{const us=c.map(unit),sc=us.map((u,i)=>u.reduce((s,x,p)=>s+us.filter((v,j)=>j!==i&&v[p]===x).length,0)),top=Math.max(...sc);return sc[ans]===top&&sc.filter(v=>v===top).length===1};
-for(const q of all(9,'sound'))ok(!clue(q.choices,q.answer,chars),q.id+': 9세 소리 수렴 단서 없음 '+q.choices.join('/'));
-for(const q of all(10,'sound'))ok(!clue(q.choices,q.answer,s=>s.split(/\s+/)),q.id+': 10세 소리 수렴 단서 없음');
-/* 4-4. 생성 듣기: 기계 음성으로 헷갈리는 초성 대비(ㅅㅆㅈㅉㅊ 둘 이상, ㅇ과 ㅎ)를 넣지 않음 */
-for(const a of [7,8])for(const q of all(a,'sound').filter(isGen)){
-  const ons=new Set(q.choices.map(c=>H.cho(chars(c)[0])));
-  ok([9,10,12,13,14].filter(o=>ons.has(o)).length<=1,q.id+': ㅅ/ㅈ/ㅊ 계열 대비 없음');
-  ok(!(ons.has(11)&&ons.has(18)),q.id+': ㅇ/ㅎ 대비 없음');
-}
 /* 정답 위치 분포: 묶음 전체 50% 이하·모든 위치 사용, 3연속은 손·생성 구간마다 */
 for(const a of Q.AGES)for(const m of Q.MODES){
   const list=all(a,m),pos=list.map(q=>q.answer),tally={};
@@ -186,9 +167,11 @@ for(const m of Q.MODES){
     eq(Q.count(bad,m),Q.count(8,m),`count age ${String(bad)} → 8세`);
   }
 }
-for(const a of Q.AGES)for(const bad of ['x',undefined,null,'SOUND',0]){
-  eq(Q.get(a,bad,2),Q.get(a,'sound',2),`mode ${String(bad)} → sound`);
-  eq(Q.count(a,bad),Q.count(a,'sound'),`count mode ${String(bad)} → sound`);
+/* 0.11: mode는 무엇을 넣어도(예전 'sound' 포함) 읽기 문항 */
+for(const a of Q.AGES)for(const bad of ['x',undefined,null,'SOUND','sound',0]){
+  eq(Q.get(a,bad,2),Q.get(a,'story',2),`mode ${String(bad)} → story`);
+  eq(Q.get(a,bad,2).mode,'story',`mode ${String(bad)}로 불러도 읽기 문항`);
+  eq(Q.count(a,bad),Q.count(a,'story'),`count mode ${String(bad)} → story`);
 }
 for(const a of Q.AGES)for(const m of Q.MODES){
   const cnt=Q.count(a,m);
@@ -196,47 +179,37 @@ for(const a of Q.AGES)for(const m of Q.MODES){
   eq(Q.get(a,m,1.5),Q.get(a,m,1),'index 1.5 → 1');
   for(const bad of [NaN,undefined,'2',Infinity])eq(Q.get(a,m,bad),Q.get(a,m,0),`index ${String(bad)} → 0`);
 }
-eq(Q.get(6,'x',-1),Q.get(8,'sound',Q.count(8,'sound')-1),'전부 잘못된 입력');
+eq(Q.get(6,'x',-1),Q.get(8,'story',Q.count(8,'story')-1),'전부 잘못된 입력');
 
 /* 6. validate가 실제로 오류를 잡는지(스냅숏을 고장 내서 확인) */
 const broken=fn=>{const s=Q.snapshot();fn(s);return Q.validate(s);};
 eq(Q.validate(Q.snapshot()),[],'스냅숏 그대로는 통과');
-ok(broken(s=>{s[7].sound[0].choices[1]='곰';}).length>0,'7세 sound에 받침 글자');
-ok(broken(s=>{const q=s[8].sound[0];q.choices[q.answer]='고';q.speak='고';}).length>0,'8세 sound 정답에 받침 없음');
-ok(broken(s=>{const q=s[8].sound[1];q.choices[q.answer]='닭';q.speak='닭';}).length>0,'8세 sound 정답에 겹받침');
-ok(broken(s=>{s[9].sound[4].note='';}).length>0,'9세 sound 소리≠표기 표시 누락');
 ok(broken(s=>{s[9].story[0].passage=s[9].story[0].speak='한 문장만 있어요.';}).length>0,'9세 story 문장 수');
 ok(broken(s=>{s[10].story[0].choices.pop();}).length>0,'10세 story 보기 4개');
-ok(broken(s=>{s[10].sound[0].choices[1]=s[10].sound[0].choices[2];}).length>0,'보기 중복');
+ok(broken(s=>{s[10].story[0].choices[1]=s[10].story[0].choices[2];}).some(e=>e.includes('보기 중복')),'보기 중복');
 ok(broken(s=>{s[7].story[0].answer=3;}).length>0,'answer 범위');
 ok(broken(s=>{s[7].story[0].choices[0]='나무';}).length>0,'7세 story 보기에 한글');
 ok(broken(s=>{s[8].story[0].speak='다른 말';}).length>0,'story speak≠passage');
-ok(broken(s=>{s[9].sound[0].passage='글';}).length>0,'sound passage 비어 있지 않음');
-ok(broken(s=>{s[9].sound[0].speak='토기';}).length>0,'sound speak≠정답');
 ok(broken(s=>{s[8].story[2].id='a8-story-01';}).length>0,'id 중복·형식');
-ok(broken(s=>{s[8].sound.length=11;}).length>0,'12문항 미만');
+ok(broken(s=>{s[8].story.length=11;}).some(e=>e.includes('12문항')),'12문항 미만');
 ok(broken(s=>{s[10].story[3].passage=s[10].story[3].speak=s[10].story[2].passage;}).length>0,'묶음 안 지문 중복');
-ok(broken(s=>{const q=s[8].sound[0];q.choices=['곰','공','국'];const t=s[7].sound[0];t.choices=['곰','마','다'];t.speak='곰';}).some(e=>e.startsWith('a8-sound-01')&&e.includes('a7-sound-01와 중복')),'나이 간 정답 중복');
+ok(broken(s=>{s[10].story[0].passage=s[10].story[0].speak=s[9].story[0].passage;}).some(e=>e.startsWith('a10-story-01')&&e.includes('a9-story-01와 중복')),'나이 간 지문 중복');
+ok(broken(s=>{s[8].story[0].mode='sound';}).some(e=>e.startsWith('a8-story-01')),'mode sound인 문항은 거부');
+ok(broken(s=>{s[8].story[0].id='a8-sound-01';}).some(e=>e.startsWith('a8-sound-01')&&e.includes('id')),'sound id는 거부');
+ok(Q.checkLevel(8,'sound',Q.get(8,'story',0)).length>0,'checkLevel: sound 수준은 없음');
+ok(!('sound' in Q.snapshot()[8]),'snapshot에 sound 묶음 없음');
 ok(broken(s=>{for(const q of s[9].story.slice(0,3)){const a=q.choices[q.answer];q.choices=[a].concat(q.choices.filter(c=>c!==a));q.answer=0;}}).some(e=>e.includes('연속')),'정답 위치 3연속');
-ok(broken(s=>{for(const q of s[7].sound){const a=q.choices[q.answer];q.choices=[a].concat(q.choices.filter(c=>c!==a));q.answer=0;}}).some(e=>e.includes('50%')),'정답 위치 쏠림');
+ok(broken(s=>{for(const q of s[7].story){const a=q.choices[q.answer];q.choices=[a].concat(q.choices.filter(c=>c!==a));q.answer=0;}}).some(e=>e.includes('50%')),'정답 위치 쏠림');
 ok(broken(s=>{delete s[9].story;}).length>0,'묶음 누락');
 const hitAny=(fn,word)=>broken(fn).some(e=>e.includes(word));
 ok(hitAny(s=>{s[8].story[0].choices=['마당','지붕','연못'];},'지문 속 말'),'8세 읽기 오답이 모두 지문 밖');
 ok(hitAny(s=>{s[10].story[11].choices=['꽃이 피었어요','비가 왔어요','바람이 불었어요','낙엽이 떨어졌어요','눈이 내렸어요'];},'지문 속 말'),'10세 읽기 오답이 모두 지문 밖');
 ok(hitAny(s=>{s[8].story[9].prompt='감나무에 무엇이 열렸나요?';},'질문에 정답'),'8세 질문이 정답을 드러냄');
-ok(hitAny(s=>{const q=s[10].sound[2];q.choices=['구지 서두르지 않아도 돼요.','굳이 서두르지 안아도 돼요.','굳이 서두르지 않아도 돼요.','굳이 서두르지 않아도 되요.'];q.speak=q.choices[q.answer];},'수렴 단서'),'10세 소리 보기마다 오류 하나(수렴 단서)');
-ok(hitAny(s=>{const q=s[9].sound[3];q.choices=['무니','무의','므늬','무늬'];q.speak='무늬';},'수렴 단서'),'9세 소리 수렴 단서');
-ok(hitAny(s=>{const base=s[7].sound[3];for(const c of [['버','보'],['다','버'],['퍼','도']])s[7].sound.push(Object.assign({},base,{id:'a7-sound-g9'+s[7].sound.length,choices:['바'].concat(c),answer:0,speak:'바'}));},'3문항까지'),'7세 같은 정답 4문항');
-ok(hitAny(s=>{const l=s[9].sound;l[l.length-1].id='a9-sound-g999';},'id는'),'생성 문항 id 순번');
-ok(hitAny(s=>{s[9].sound.push(s[9].sound.shift());},'생성 문항 앞에'),'손 문항이 생성 문항 뒤에 있음');
+ok(hitAny(s=>{const l=s[9].quiz;l[l.length-1].id='a9-quiz-g999';},'id는'),'생성 문항 id 순번');
+ok(hitAny(s=>{s[9].quiz.push(s[9].quiz.shift());},'생성 문항 앞에'),'손 문항이 생성 문항 뒤에 있음');
 ok(hitAny(s=>{for(const q of s[9].story)q.choices[q.answer]+=' 그리고 아주 길게 늘인 말';},'가장 긴 보기'),'9세 읽기 정답=가장 긴 보기 과다');
 
 /* 7. 기존 문항 흡수 */
-const LEGACY_BANK=[['나',['나','마','다']],['모',['무','모','마']],['가',['나','다','가']],['바',['바','파','다']],['소',['수','소','서']],['하',['나','아','하']]];
-LEGACY_BANK.forEach(([answer,choices],i)=>{
-  const q=Q.get(7,'sound',i);
-  eq([q.speak,q.choices],[answer,choices],`기존 글자 문항 ${i+1} 유지`);
-});
 const LEGACY_STORY=[
   {text:'밤새 비가 와서 다리가 물에 잠겼어요.\n꼬꼬는 친구를 만나러 언덕길로 돌아갔어요.',q:'꼬꼬는 왜 언덕길로 갔나요?',a:'다리가 물에 잠겨서'},
   {text:'꼬꼬는 꽃에 물을 주었어요.\n다음 날 작은 꽃이 활짝 피었어요.',q:'꼬꼬가 꽃을 위해 한 일은 무엇인가요?',a:'물을 주었어요'}
@@ -252,7 +225,7 @@ const QKEYS=['id','age','mode','cat','prompt','passage','speak','choices','answe
 const QCHOICES={7:3,8:3,9:4,10:4},QMAX={7:10,8:20,9:30,10:40},QMIN={common:12,math:12,english:8};
 const quizAll=a=>Array.from({length:Q.quizCount(a)},(_,i)=>Q.quiz(a,i));
 eq(Q.CATS,{common:'상식',math:'수학',english:'영어'},'CATS');
-eq(Q.MODES,['sound','story'],'MODES에는 quiz가 없음');
+eq(Q.MODES,['story'],'MODES에는 quiz가 없음');
 const qids=new Set();
 for(const a of Q.AGES){
   const list=quizAll(a),cnt=list.length,cats={common:0,math:0,english:0},keys=new Set(),want=wantIds(list);
@@ -273,7 +246,7 @@ for(const a of Q.AGES){
     ok(Number.isInteger(q.answer)&&q.answer>=0&&q.answer<q.choices.length,tag+' answer 범위');
     eq(Q.checkQuiz(a,q),[],tag+' checkQuiz');
     eq(Q.checkCommon(q),[],tag+' checkCommon은 quiz를 퀴즈 규칙으로');
-    eq(Q.checkLevel(a,'sound',q),[],tag+' checkLevel은 quiz를 퀴즈 규칙으로');
+    eq(Q.checkLevel(a,'story',q),[],tag+' checkLevel은 quiz를 퀴즈 규칙으로');
     const k=q.prompt+'\n'+q.passage;ok(!keys.has(k),tag+' 질문·지문 중복 없음');keys.add(k);
     eq(Q.quiz(a,i+cnt),q,tag+' 순환(+count)');
     eq(Q.quiz(a,i-cnt*2),q,tag+' 순환(-2count)');
@@ -325,7 +298,7 @@ ok(hit(s=>{s[8].quiz[3].speak='dog';},'a8-quiz-04','speak'),'퀴즈 speak에 한
 ok(hit(s=>{s[8].quiz[8].say='119';},'a8-quiz-09','say'),'퀴즈 say에 숫자');
 ok(hit(s=>{const t=s[10].quiz[5],o=s[10].quiz[3];t.prompt=o.prompt;t.passage=o.passage;},'a10-quiz-06','a10-quiz-04와 중복'),'퀴즈 질문·지문 중복');
 ok(hit(s=>{s[7].quiz[4].id='a7-quiz-5';},'a7-quiz-5','id'),'퀴즈 id 형식');
-ok(hit(s=>{s[7].quiz[4].id='a7-sound-05';},'a7-sound-05','id'),'퀴즈 id에 다른 모드');
+ok(hit(s=>{s[7].quiz[4].id='a7-story-05';},'a7-story-05','id'),'퀴즈 id에 다른 모드');
 ok(hit(s=>{s[9].quiz[0].cat='science';},'a9-quiz-01','cat'),'퀴즈 cat 오류');
 ok(hit(s=>{s[7].quiz[0].prompt='밤하늘에 반짝반짝 뜨는 것은 무엇일까요?';},'a7-quiz-01','10음절'),'퀴즈 7세 질문 길이');
 ok(hit(s=>{s[9].quiz[1].passage=null;},'a9-quiz-02','passage'),'퀴즈 passage 문자열');
@@ -478,10 +451,9 @@ for(const a of Q.AGES){
   ok(Array.from({length:1000},(_,i)=>i).every(i=>!(Q.isQuiz(a,i)&&Q.isQuiz(a,i+1))),`${a}세 퀴즈가 연달아 나오지 않음(1000문제)`);
   for(const s of [0,5,123456])for(let i=0;i<160;i++){
     const qs=Q.at(a,'sound',i,s),qt=Q.at(a,'story',i,s);
-    eq(qs.mode==='quiz',Q.isQuiz(a,i),`${a}세 ${i}번 칸 종류는 시드·모드와 무관(소리)`);
-    eq(qt.mode==='quiz',Q.isQuiz(a,i),`${a}세 ${i}번 칸 종류는 시드·모드와 무관(읽기)`);
-    if(qs.mode==='quiz')eq(qs,qt,`${a}세 ${i}번 퀴즈는 두 모드 공통`);
-    else{eq(qs.mode,'sound','소리 모드 칸');eq(qt.mode,'story','읽기 모드 칸');}
+    eq(qt.mode==='quiz',Q.isQuiz(a,i),`${a}세 ${i}번 칸 종류는 시드와 무관`);
+    eq(qs,qt,`${a}세 ${i}번: 예전 mode 'sound'로 불러도 같은 읽기·퀴즈 문항`);
+    if(qt.mode!=='quiz')eq(qt.mode,'story','퀴즈가 아닌 칸은 읽기 문항');
   }
 }
 /* 결정성: 같은 입력이면 다른 호출을 섞어도 같은 문항, seed 기본값과 정규화 */
@@ -497,11 +469,11 @@ for(const a of Q.AGES)for(const m of Q.MODES){
   }
   eq(Q.at(a,m,-5,1),Q.at(a,m,0,1),'index 음수 → 0');
 }
-for(const bad of [6,'8',null])eq(Q.at(bad,'sound',5,1),Q.at(8,'sound',5,1),`at age ${String(bad)} → 8세`);
-eq(Q.at(9,'x',4,1),Q.at(9,'sound',4,1),'at mode 이상 → sound');
+for(const bad of [6,'8',null])eq(Q.at(bad,'story',5,1),Q.at(8,'story',5,1),`at age ${String(bad)} → 8세`);
+eq(Q.at(9,'x',4,1),Q.at(9,'story',4,1),'at mode 이상 → story');
 /* 판마다 다른 순서: seed가 다르면 첫 30개 모드 문항 순서가 다름 */
 const modeSeq=(a,m,s,len)=>{const out=[];for(let i=0;out.length<len;i++){const q=Q.at(a,m,i,s);if(q.mode!=='quiz')out.push(q)}return out};
-const quizSeq=(a,s,len)=>{const out=[];for(let i=0;out.length<len;i++){const q=Q.at(a,'sound',i,s);if(q.mode==='quiz')out.push(q)}return out};
+const quizSeq=(a,s,len)=>{const out=[];for(let i=0;out.length<len;i++){const q=Q.at(a,'story',i,s);if(q.mode==='quiz')out.push(q)}return out};
 for(const a of Q.AGES)for(const m of Q.MODES){
   const ids0=modeSeq(a,m,0,30).map(q=>q.id);
   for(const s of [1,2,99])ok(modeSeq(a,m,s,30).map(q=>q.id).join()!==ids0.join(),`${a}/${m}: seed ${s}는 seed 0과 순서가 다름`);
@@ -518,7 +490,6 @@ for(const a of Q.AGES)for(const m of Q.MODES)for(const s of [0,3,77]){
   }
   const G=Math.min(10,cnt>>2);
   ok(seq.every((q,k)=>!seq.slice(Math.max(0,k-G),k).some(p=>p.id===q.id)),`${a}/${m} seed ${s}: ${G}칸 안에 같은 문항 없음`);
-  if(m==='sound'&&cnt>=100)ok(seq.every((q,k)=>!seq.slice(Math.max(0,k-10),k).some(p=>p.speak===q.speak)),`${a}/sound seed ${s}: 정답이 같은 듣기는 10칸 안에 없음`);
 }
 for(const a of Q.AGES)for(const s of [0,4]){
   const pools={};for(const c of Object.keys(Q.CATS))pools[c]=quizAll(a).filter(q=>q.cat===c).map(q=>q.id).sort();
@@ -538,17 +509,13 @@ for(const a of Q.AGES)for(const s of [0,4]){
   }
 }
 eq(Q.QUIZ_MIX,{7:{math:13,common:6,english:1},8:{math:10,common:8,english:2},9:{math:8,common:8,english:4},10:{math:7,common:9,english:4}},'퀴즈 분류 비율(20개 기준)');
-/* 난이도 계단: level이 있는 묶음은 바퀴 앞 1/3의 평균 단계가 뒤 1/3보다 낮음 */
-for(const [a,m] of [[7,'sound'],[8,'sound'],[9,'sound']])for(const s of [0,1,2]){
-  const cnt=Q.count(a,m),lap=modeSeq(a,m,s,cnt).map(levelOf),third=Math.floor(cnt/3),avg=l=>l.reduce((x,y)=>x+y,0)/l.length;
-  ok(avg(lap.slice(0,third))+0.3<avg(lap.slice(-third)),`${a}/${m} seed ${s}: 앞쪽이 더 쉬움(${avg(lap.slice(0,third)).toFixed(2)} < ${avg(lap.slice(-third)).toFixed(2)})`);
-}
 for(const a of Q.AGES)for(const s of [0,1]){
   const math=quizSeq(a,s,400).filter(q=>q.cat==='math'),k=quizAll(a).filter(q=>q.cat==='math').length,lap=math.slice(0,k).map(levelOf),third=Math.floor(k/3),avg=l=>l.reduce((x,y)=>x+y,0)/l.length;
   ok(avg(lap.slice(0,third))<avg(lap.slice(-third)),`${a}세 수학 seed ${s}: 앞쪽이 더 쉬움`);
 }
 /* slot(): 칸 정보 */
-{const t=Q.slot(9,'sound',2,0);ok(!Q.isQuiz(9,2)&&Q.isQuiz(9,3)&&t.kind==='sound'&&t.seq===2&&t.lap===0&&t.pos>=0&&t.size===Q.count(9,'sound'),'slot: 모드 칸(9세는 3번이 첫 퀴즈 칸)');
+{const t=Q.slot(9,'story',2,0);ok(!Q.isQuiz(9,2)&&Q.isQuiz(9,3)&&t.kind==='story'&&t.seq===2&&t.lap===0&&t.pos>=0&&t.size===Q.count(9,'story'),'slot: 읽기 칸(9세는 3번이 첫 퀴즈 칸)');
+ eq(Q.slot(9,'sound',2,0),t,"slot: mode 'sound'도 읽기 칸");
  const v=Q.slot(9,'story',4,0);ok(v.kind==='story'&&v.seq===3,'slot: 퀴즈 칸 다음 모드 칸의 순번');
  const i=Array.from({length:40},(_,k)=>k).find(k=>Q.isQuiz(9,k)),u=Q.slot(9,'story',i,0);ok(u.kind==='quiz'&&Object.keys(Q.CATS).includes(u.cat)&&u.seq===0,'slot: 첫 퀴즈 칸');}
 
@@ -566,12 +533,12 @@ for(const [name,b] of [['questions.js',buf],['questions-gen.js',gbuf]]){
 /* 브라우저: questions-gen.js를 먼저, 그다음 questions.js(같은 window) */
 const win={};
 vm.runInNewContext(gbuf.toString('utf8'),{window:win});
-ok(win.QUESTIONS_GEN&&Array.isArray(win.QUESTIONS_GEN[9].sound),'브라우저에서는 window.QUESTIONS_GEN');
+ok(win.QUESTIONS_GEN&&Array.isArray(win.QUESTIONS_GEN[9].quiz)&&!('sound' in win.QUESTIONS_GEN[9]),'브라우저에서는 window.QUESTIONS_GEN(sound 없음)');
 vm.runInNewContext(buf.toString('utf8'),{window:win});
 ok(win.Questions&&typeof win.Questions.get==='function','브라우저에서는 window.Questions');
 for(const a of Q.AGES){
-  eq([win.Questions.count(a,'sound'),win.Questions.count(a,'story'),win.Questions.quizCount(a)],[Q.count(a,'sound'),Q.count(a,'story'),Q.quizCount(a)],`브라우저 전역 ${a}세 문항 수 = node`);
-  eq(JSON.stringify(Array.from({length:30},(_,i)=>win.Questions.at(a,'sound',i,9))),JSON.stringify(Array.from({length:30},(_,i)=>Q.at(a,'sound',i,9))),`브라우저 전역 ${a}세 at() = node`);
+  eq([win.Questions.count(a,'story'),win.Questions.quizCount(a)],[Q.count(a,'story'),Q.quizCount(a)],`브라우저 전역 ${a}세 문항 수 = node`);
+  eq(JSON.stringify(Array.from({length:30},(_,i)=>win.Questions.at(a,'story',i,9))),JSON.stringify(Array.from({length:30},(_,i)=>Q.at(a,'story',i,9))),`브라우저 전역 ${a}세 at() = node`);
 }
 eq(JSON.stringify(win.Questions.get(9,'story',0)),JSON.stringify(Q.get(9,'story',0)),'브라우저 전역과 node 모듈이 같은 데이터');
 eq(Array.from(win.Questions.validate()),[],'브라우저 전역 validate()');
@@ -581,8 +548,11 @@ const bare={};
 vm.runInNewContext(buf.toString('utf8'),{window:bare});
 eq(Array.from(bare.Questions.validate()),[],'생성 문항 없이도 validate 통과');
 for(const a of Q.AGES){
-  eq(bare.Questions.count(a,'sound'),all(a,'sound').filter(q=>!isGen(q)).length,`생성 문항 없이 ${a}세 소리 = 손 문항`);
+  eq(bare.Questions.count(a,'story'),all(a,'story').filter(q=>!isGen(q)).length,`생성 문항 없이 ${a}세 읽기 = 손 문항`);
   ok(Array.from({length:120},(_,i)=>bare.Questions.at(a,'story',i,3)).every(q=>q&&q.id),`생성 문항 없이 ${a}세 at() 동작`);
 }
+/* 0.11: 듣고 고르기 문항은 두 파일 어디에도 남지 않음 */
+ok(!/"mode":"sound"|-sound-/.test(gbuf.toString('utf8')),'questions-gen.js에 sound 문항 없음');
+ok(!/-sound-|mode:'sound'|\.sound\b|SOUND_PROMPT/.test(buf.toString('utf8')),'questions.js에 sound 문항·규칙 없음');
 
 console.log(`PASS ${n} question bank assertions.`);

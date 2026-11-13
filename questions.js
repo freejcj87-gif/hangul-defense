@@ -1,40 +1,18 @@
 /* 7~10세 문제은행: 데이터·출제 순서·검사(DOM 없음). 생성 문항은 questions-gen.js(QUESTIONS_GEN)에서 합침 */
 (function(root){
-  const AGES=[7,8,9,10],MODES=['sound','story'];
+  /* 0.11: 듣고 고르기(sound) 모드와 문항은 폐쇄했다(game-plan §10). 모드는 읽고 고르기(story) 하나이고, mode 인자는 호출부 호환용으로만 받는다 */
+  const AGES=[7,8,9,10],MODES=['story'];
   const LEVELS={
-    7:{sound:'받침 없는 글자',story:'낱말과 그림'},
-    8:{sound:'받침 있는 낱말',story:'한 문장 읽기'},
-    9:{sound:'헷갈리는 낱말',story:'두 문장 읽기'},
-    10:{sound:'문장 받아쓰기',story:'짧은 글 이해'}
-  };
-  const SOUND_PROMPT={
-    7:'소리를 듣고 맞는 글자를 찾아주세요',
-    8:'소리를 듣고 맞는 낱말을 찾아주세요',
-    9:'들은 낱말을 바르게 쓴 것을 찾아주세요',
-    10:'소리를 듣고 바르게 쓴 문장을 찾아주세요'
+    7:{story:'낱말과 그림'},
+    8:{story:'한 문장 읽기'},
+    9:{story:'두 문장 읽기'},
+    10:{story:'짧은 글 이해'}
   };
   const WORD_PROMPT='낱말을 읽고 알맞은 그림을 찾아주세요';
-  const NOTE_SPELL='소리≠표기';
 
-  /* sound [choices, answer, note?] · story 7세 [낱말, 그림 보기, answer] · 8~10세 [지문, 질문, 보기, answer](오답 하나 이상은 지문 속 말) */
+  /* story 7세 [낱말, 그림 보기, answer] · 8~10세 [지문, 질문, 보기, answer](오답 하나 이상은 지문 속 말) */
   const DATA={7:{},8:{},9:{},10:{}};
 
-  DATA[7].sound=[
-    [['나','마','다'],0],
-    [['무','모','마'],1],
-    [['나','다','가'],2],
-    [['바','파','다'],0],
-    [['수','소','서'],1],
-    [['나','아','하'],2],
-    [['도','토','두'],0],
-    [['니','리','디'],1],
-    [['추','수','주'],2],
-    [['고','거','커'],1],
-    [['비','피','미'],0],
-    [['노','나','너'],2],
-    [['보','포','푸'],1],
-    [['키','기','치'],0]
-  ];
   DATA[7].story=[
     ['나무',['🌳','🦋','🍄'],0],
     ['사과',['🍌','🍎','🍇'],1],
@@ -54,24 +32,6 @@
     ['개미',['🐜','🐌','🐛'],0]
   ];
 
-  DATA[8].sound=[
-    [['곰','공','곳'],0],
-    [['담','달','단'],1],
-    [['벌','볼','별'],2],
-    [['물','문','묵'],1],
-    [['수박','수방','소박'],0],
-    [['삼','삽','산'],2],
-    [['강','감','갈'],0],
-    [['논','눈','눌'],1],
-    [['짐','징','집'],2],
-    [['밤','밥','방'],1],
-    [['손','솜','솔'],0],
-    [['언필','연필','연핀'],1],
-    [['감차','간자','감자'],2],
-    [['풍선','품선','풍성'],0],
-    [['척','책','챙'],1],
-    [['우산','우삼','오산'],0]
-  ];
   DATA[8].story=[
     ['꼬꼬가 마당에서 모이를 먹어요.','꼬꼬는 어디에서 모이를 먹나요?',['마당','모이','지붕'],0],
     ['농부가 밭에 씨앗을 심었어요.','농부가 심은 것은 무엇인가요?',['밭','씨앗','꽃'],1],
@@ -89,28 +49,6 @@
     ['고양이가 지붕 위에서 하품을 해요.','고양이는 어디에 있나요?',['하품','지붕 위','방 안'],1]
   ];
 
-  DATA[9].sound=[
-    [['토끼','톡끼','톡기','토키'],0],
-    [['가치','까치','깍치','깟치'],1],
-    [['닥장','닭짱','닭장','닥짱'],2],
-    [['무니','므늬','므니','무늬'],3],
-    [['궁물','국물','국믈','궁믈'],1,NOTE_SPELL],
-    [['여덟','여덜','여덥','여덞'],0],
-    [['안따','앉따','않따','앉다'],3],
-    [['꽈자','과쟈','과자','꽈쟈'],2],
-    [['참외','차뫼','참웨','참왜'],0],
-    [['떡복이','떡복기','떡볶기','떡볶이'],3],
-    [['엽집','옆집','엽찝','옆찝'],1,NOTE_SPELL],
-    [['꼳받','꽃받','꽃밭','꼿밭'],2],
-    [['숟가락','숫가락','숙가락','수까락'],0,NOTE_SPELL],
-    [['무릅','므릅','므릎','무릎'],3,NOTE_SPELL],
-    [['쓰래기','쓰레기','스레기','스래기'],1],
-    [['괜찬아','괸찬아','괜찮아','괸찮아'],2],
-    [['학교','학꾜','하꾜','학겨'],0,NOTE_SPELL],
-    [['만타','많다','만다','맍다'],1],
-    [['널따','넙다','넗다','넓다'],3],
-    [['찌게','지개','찌개','지게'],2]
-  ];
   DATA[9].story=[
     ['꼬꼬는 아침 일찍 일어나 마당을 쓸었어요.\n그다음에 병아리들에게 모이를 나누어 주었어요.','꼬꼬가 마당을 쓴 다음에 한 일은 무엇인가요?',['모이를 나누어 주었어요','마당을 쓸었어요','아침 일찍 일어났어요','울타리를 고쳐 주었어요'],0],
     ['농부 아저씨가 밭에서 당근을 뽑았어요.\n당근을 바구니에 담아 염소네 집에 가져다주었어요.','농부 아저씨는 당근을 어디에 가져다주었나요?',['밭','염소네 집','토끼네 집','창고'],1],
@@ -128,24 +66,6 @@
     ['마을 도서관에 새 그림책이 다섯 권 들어왔어요.\n꼬꼬는 그림책을 세 권 빌려서 집으로 갔어요.','꼬꼬는 그림책을 몇 권 빌렸나요?',['한 권','다섯 권','세 권','네 권'],2]
   ];
 
-  DATA[10].sound=[
-    [['우리 같이 그네를 타자.','우리 가치 그네를 타자.','우리 갗이 그네를 타자.','우리 같히 그네를 타자.'],0],
-    [['꼬꼬가 알을 나았어요.','꼬꼬가 알을 낳았어요.','꼬꼬가 알을 나앗어요.','꼬꼬가 알을 낫았어요.'],1],
-    [['굳이 서두르지 안아도 돼요.','굳이 서두르지 않아도 되요.','굳이 서두르지 않아도 돼요.','굳이 서두르지 안아도 되요.'],2],
-    [['병아리가 마니 자랐어요.','병아리가 많이 자랏어요.','병아리가 마니 자랏어요.','병아리가 많이 자랐어요.'],3],
-    [['해도지를 보러 언덕에 올라요.','해돋이를 보러 언덕에 올라요.','해돋이를 보러 언더게 올라요.','해도지를 보러 언더게 올라요.'],1],
-    [['꽃잎이 활짝 피었어요.','꼰니피 활짝 피었어요.','꽃잎이 활짝 피어써요.','꼰니피 활짝 피어써요.'],0],
-    [['꼬꼬가 무늘 꼭 닫았어요.','꼬꼬가 문을 꼭 다다써요.','꼬꼬가 무늘 꼭 다다써요.','꼬꼬가 문을 꼭 닫았어요.'],3],
-    [['바블 먹고 이를 닦아요.','밥을 먹고 이를 다까요.','밥을 먹고 이를 닦아요.','바블 먹고 이를 다까요.'],2],
-    [['설겆이를 깨끗이 했어요.','설거지를 깨끗이 했어요.','설거지를 깨끗히 했어요.','설겆이를 깨끗히 했어요.'],1],
-    [['책을 일꼬 생각을 적어요.','책을 읽고 생가글 적어요.','책을 일꼬 생가글 적어요.','책을 읽고 생각을 적어요.'],3],
-    [['웬일로 일찍 일어났니?','왠일로 일찍 일어났니?','웬일로 일찍 이러났니?','왠일로 일찍 이러났니?'],0],
-    [['몇일 동안 비가 내렸어요.','며칠 동안 비가 내려써요.','며칠 동안 비가 내렸어요.','몇일 동안 비가 내려써요.'],2],
-    [['울타리 여페 씨앗을 심어요.','울타리 옆에 씨아슬 심어요.','울타리 여페 씨아슬 심어요.','울타리 옆에 씨앗을 심어요.'],3],
-    [['어제는 날씨가 무척 좋았어요.','어제는 날씨가 무척 조았어요.','어제는 날시가 무척 좋았어요.','어제는 날시가 무척 조았어요.'],0],
-    [['숙제를 끈내고 밖에서 놀아요.','숙제를 끝내고 바께서 놀아요.','숙제를 끝내고 밖에서 놀아요.','숙제를 끈내고 바께서 놀아요.'],2],
-    [['달기 지붕 위로 올라갔어요.','닭이 지붕 위로 올라갔어요.','닭이 지붕 위로 올라가써요.','달기 지붕 위로 올라가써요.'],1]
-  ];
   DATA[10].story=[
     ['밤새 비가 와서 다리가 물에 잠겼어요.\n꼬꼬는 친구를 만나러 언덕길로 돌아갔어요.\n조금 늦었지만 친구는 반갑게 맞아 주었어요.','꼬꼬는 왜 언덕길로 갔나요?',['다리가 물에 잠겨서','언덕길이 더 짧아서','친구를 만나기 싫어서','비를 피하려고','친구가 이사해서'],0],
     ['꼬꼬는 꽃에 물을 주었어요.\n다음 날 작은 꽃이 활짝 피었어요.\n꼬꼬는 꽃을 보며 기쁘게 노래했어요.','꼬꼬가 꽃을 위해 한 일은 무엇인가요?',['꽃을 꺾었어요','그늘에 숨겼어요','물을 주었어요','꽃을 친구에게 주었어요','물을 마셨어요'],2],
@@ -335,8 +255,6 @@
   const BANK={};
   for(const age of AGES){
     BANK[age]={
-      sound:DATA[age].sound.map((r,i)=>({id:'a'+age+'-sound-'+pad(i+1),age,mode:'sound',prompt:SOUND_PROMPT[age],
-        passage:'',speak:r[0][r[1]],choices:r[0],answer:r[1],note:r[2]||''})),
       story:DATA[age].story.map((r,i)=>age===7
         ?{id:'a7-story-'+pad(i+1),age,mode:'story',prompt:WORD_PROMPT,passage:r[0],speak:r[0],choices:r[1],answer:r[2],note:''}
         :{id:'a'+age+'-story-'+pad(i+1),age,mode:'story',prompt:r[1],passage:r[0],speak:r[0],choices:r[2],answer:r[3],note:''}),
@@ -344,7 +262,7 @@
     };
   }
   const normAge=age=>AGES.includes(age)?age:8;
-  const normMode=mode=>MODES.includes(mode)?mode:'sound';
+  const normMode=()=>'story';/* 예전 호출('sound' 포함)도 언제나 읽기 문항 */
   const copy=(q,withNote)=>{
     const o={id:q.id,age:q.age,mode:q.mode};
     if(q.mode==='quiz')o.cat=q.cat;
@@ -355,13 +273,7 @@
   },qcopy=copy;
 
   /* ---------- 수준 규칙 ---------- */
-  const CHOICE_COUNT={7:{sound:3,story:3},8:{sound:3,story:3},9:{sound:4,story:4},10:{sound:4,story:5}};
-  const noteOf=q=>typeof q.note==='string'?q.note:((BANK[q.age]&&BANK[q.age][q.mode]||[]).find(b=>b.id===q.id)||{note:''}).note;
-  /* 수렴 단서: 같은 자리 같은 음절(10세 어절) 수의 합이 정답만 단독 1위 */
-  function clue(c,a,word){
-    const us=c.map(x=>word?String(x).split(/\s+/):chars(x)),sc=us.map((u,i)=>u.reduce((s,x,p)=>s+us.filter((v,j)=>j!==i&&v[p]===x).length,0)),top=Math.max(...sc);
-    return sc[a]===top&&sc.filter(x=>x===top).length===1;
-  }
+  const CHOICE_COUNT={7:{story:3},8:{story:3},9:{story:4},10:{story:5}};
   /* 지문 속 말: 통째로 있거나 첫 어절 줄기(조사 뗌)가 지문에 있음 */
   const PART=/(에서|에게|으로|이에요|예요|은|는|이|가|을|를|에|의|와|과|로|도)$/;
   const stem=w=>{const s=w.replace(/[^가-힣]/g,''),t=s.replace(PART,'');return t||s};
@@ -374,27 +286,7 @@
     const want=CHOICE_COUNT[age]&&CHOICE_COUNT[age][mode];
     if(!want)return ['알 수 없는 수준 '+age+'/'+mode];
     if(c.length!==want)e.push('보기 '+want+'개여야 함(현재 '+c.length+'개)');
-    if(mode==='sound'){
-      if(age===7){
-        if(!c.every(x=>H.isSyllable(x)&&!H.hasBatchim(x)))e.push('모든 보기가 받침 없는 한글 1음절이어야 함');
-      }else if(age===8){
-        const a=chars(ans);
-        if(!H.isWord(ans)||a.length>2)e.push('정답이 한글 1~2음절이어야 함');
-        if(!a.some(H.hasBatchim))e.push('정답에 받침 있는 음절이 있어야 함');
-        if(a.some(H.hasDoubleBatchim))e.push('정답에 겹받침이 없어야 함');
-        if(!c.every(x=>H.isWord(x)&&chars(x).length<=2))e.push('모든 보기가 한글 1~2음절이어야 함');
-      }else if(age===9){
-        const a=chars(ans);
-        if(!H.isWord(ans)||a.length<2||a.length>3)e.push('정답이 한글 2~3음절(공백 없음)이어야 함');
-        if(!(a.some(H.hasTenseInitial)||a.some(H.hasDoubleBatchim)||a.some(H.hasDiphthong)||noteOf(q)===NOTE_SPELL))
-          e.push('정답에 된소리·겹받침·이중모음 또는 소리≠표기 표시가 있어야 함');
-      }else{
-        if(!/\S\s+\S/.test(ans))e.push('정답이 공백을 포함한 문장이어야 함');
-        const n=H.compactLength(ans);
-        if(n<8||n>18)e.push('정답이 공백 제외 8~18자여야 함(현재 '+n+'자)');
-      }
-      if(age>=9&&c.length===want&&clue(c,q.answer,age===10))e.push('수렴 단서(정답이 보기 공통부 조합)');
-    }else if(age===7){
+    if(age===7){
       const w=chars(p);
       if(!H.isWord(p)||w.length>3||w.some(H.hasBatchim))e.push('지문이 받침 없는 한글 1~3음절이어야 함');
       if(!c.every(x=>typeof x==='string'&&x.length>0&&!HANGUL_RE.test(x)))e.push('보기는 한글이 아닌 그림 문자여야 함');
@@ -414,36 +306,22 @@
     }
     return e;
   }
-  /* 공통 형식(생성 문항 id는 a8-sound-g001 꼴) */
+  /* 공통 형식(생성 문항 id는 a8-story-g001 꼴) */
   function checkCommon(q){
     if(q&&q.mode==='quiz')return quizCommon(q);
     const e=[];
-    if(typeof q.id!=='string'||!/^a(7|8|9|10)-(sound|story)-(\d{2,}|g\d{3,})$/.test(q.id))e.push('id 형식 오류');
+    if(typeof q.id!=='string'||!/^a(7|8|9|10)-story-(\d{2,}|g\d{3,})$/.test(q.id))e.push('id 형식 오류');
     if(typeof q.prompt!=='string'||!q.prompt.trim())e.push('prompt가 비어 있음');
     if(!Array.isArray(q.choices)||!q.choices.every(x=>typeof x==='string'&&x.trim().length>0)){e.push('choices는 비어 있지 않은 문자열 배열이어야 함');return e;}
     if(new Set(q.choices).size!==q.choices.length)e.push('보기 중복');
     if(!Number.isInteger(q.answer)||q.answer<0||q.answer>=q.choices.length){e.push('answer 범위 오류');return e;}
-    if(q.mode==='sound'){
-      if(q.passage!=='')e.push("sound는 passage가 ''여야 함");
-      if(q.speak!==q.choices[q.answer])e.push('sound는 speak가 정답 표기와 같아야 함');
-    }else if(q.mode==='story'){
+    if(q.mode==='story'){
       if(typeof q.passage!=='string'||!q.passage.trim())e.push('story는 passage가 비어 있으면 안 됨');
       if(q.speak!==q.passage)e.push('story는 speak가 passage와 같아야 함');
     }else e.push('mode 오류');
     return e;
   }
-  const keyOf=q=>q.mode==='story'?q.passage:(Array.isArray(q.choices)?q.choices[q.answer]:undefined);
-  /* 7·8세 소리 중복 키: 정답+바뀐 자리(음절 번호+o·v·c). 같은 정답은 3문항까지 */
-  function axisKey(q){
-    const a=q.choices[q.answer],A=chars(a),H=hangul,s=new Set();
-    for(const c of q.choices){
-      if(c===a)continue;
-      const C=chars(c);
-      if(C.length!==A.length){s.add('n');continue}
-      C.forEach((ch,k)=>{const x=A[k];if(ch!==x)s.add(k+(H.cho(ch)!==H.cho(x)?'o':'')+(H.jung(ch)!==H.jung(x)?'v':'')+(H.jong(ch)!==H.jong(x)?'c':''))});
-    }
-    return a+'|'+[...s].sort().join(',');
-  }
+  const keyOf=q=>q.passage;
 
   /* ---------- 퀴즈 규칙 ---------- */
   const QUIZ_CHOICES={7:3,8:3,9:4,10:4},QUIZ_PROMPT_MAX={7:10,8:20,9:30,10:40},QUIZ_MIN={};
@@ -482,12 +360,11 @@
   if(typeof module!=='undefined'&&typeof require==='function'){try{GEN=require('./questions-gen.js')}catch(err){if(!err||err.code!=='MODULE_NOT_FOUND')throw err}}
   else GEN=root.QUESTIONS_GEN||null;
   const genRejected=[];
-  if(GEN&&typeof GEN==='object')for(const age of AGES)for(const mode of ['sound','story','quiz']){
+  if(GEN&&typeof GEN==='object')for(const age of AGES)for(const mode of ['story','quiz']){
     const src=GEN[age]&&GEN[age][mode],list=BANK[age][mode];
     if(!Array.isArray(src))continue;
-    const k7=q=>mode==='quiz'?q.prompt+'\n'+q.passage:mode==='sound'&&age<=8?axisKey(q):keyOf(q);
-    const keys=new Set(list.map(k7)),per={};
-    if(mode==='sound')list.forEach(q=>{const a=keyOf(q);per[a]=(per[a]||0)+1});
+    const k7=q=>mode==='quiz'?q.prompt+'\n'+q.passage:keyOf(q);
+    const keys=new Set(list.map(k7));
     for(const g of src){
       if(!g||typeof g!=='object'){genRejected.push(age+'/'+mode+': 객체 아님');continue}
       const q={id:g.id,age:g.age,mode:g.mode,prompt:g.prompt,passage:g.passage,speak:g.speak,choices:Array.isArray(g.choices)?g.choices.slice():g.choices,answer:g.answer,note:g.note||''};
@@ -496,9 +373,9 @@
       if([1,2,3].includes(g.level))q.level=g.level;
       let e=g.age!==age||g.mode!==mode?['age/mode가 묶음과 다름']:mode==='quiz'?checkQuiz(age,q):checkCommon(q);
       if(!e.length&&mode!=='quiz')e=checkLevel(age,mode,q);
-      if(!e.length){const k=k7(q);if(keys.has(k))e=['중복'];else if(mode==='sound'&&(per[keyOf(q)]||0)>=3)e=['같은 정답 3문항 초과'];}
+      if(!e.length&&keys.has(k7(q)))e=['중복'];
       if(e.length){genRejected.push(q.id+': '+e.join(', '));continue}
-      keys.add(k7(q));if(mode==='sound')per[keyOf(q)]=(per[keyOf(q)]||0)+1;
+      keys.add(k7(q));
       list.push(q);
     }
   }
@@ -535,18 +412,17 @@
         if(!Array.isArray(list)){errors.push(tag+': 묶음 없음');continue;}
         if(list.length<12)errors.push(tag+': 12문항 이상이어야 함(현재 '+list.length+')');
         listCheck(list,age,mode,tag);
-        const keys=new Map(),per={};let longest=0;
+        const keys=new Map();let longest=0;
         list.forEach(q=>{
           if(!q||typeof q!=='object')return;
           if(q.age!==age||q.mode!==mode)E(q.id,'age/mode가 묶음과 다름');
           const ce=checkCommon(q);
           ce.concat(ce.length?[]:checkLevel(age,mode,q)).forEach(m=>E(q.id,m));
           if(ce.length)return;
-          const k=keyOf(q),o=seen.get(k),kk=mode==='sound'&&age<=8?axisKey(q):k;
-          if(o&&o.age!==age)E(q.id,'정답/지문이 '+o.id+'와 중복');else if(!o)seen.set(k,{age,id:q.id});
-          if(keys.has(kk))E(q.id,'정답/지문이 '+keys.get(kk)+'와 중복');else keys.set(kk,q.id);
-          if(mode==='sound'&&(per[k]=(per[k]||0)+1)===4)E(q.id,'같은 정답은 3문항까지');
-          if(mode==='story'&&age>=9&&soleLongest(q))longest++;
+          const k=keyOf(q),o=seen.get(k);
+          if(o&&o.age!==age)E(q.id,'지문이 '+o.id+'와 중복');else if(!o)seen.set(k,{age,id:q.id});
+          if(keys.has(k))E(q.id,'지문이 '+keys.get(k)+'와 중복');else keys.set(k,q.id);
+          if(age>=9&&soleLongest(q))longest++;
         });
         if(longest>list.length*(1/CHOICE_COUNT[age][mode]+.1))errors.push(tag+': 정답=가장 긴 보기 과다('+longest+')');
       }
@@ -572,7 +448,7 @@
 
   /* ---------- 출제 순서 ----------
      칸 종류는 (나이, 번호)로만: 20칸마다 퀴즈 칸 수 QUIZ_PHASE([시작 묶음, 칸 수]), 고르게·연속 없음. 분류는 QUIZ_MIX 순환(시드로 시작 자리).
-     묶음마다 (시드, 바퀴) 순열: 바퀴 안 반복 0, level 낮은 것 앞쪽, 같은 정답 듣기는 GAP칸·바퀴 경계는 min(GAP, 크기/4)칸 띄움 */
+     묶음마다 (시드, 바퀴) 순열: 바퀴 안 반복 0, level 낮은 것 앞쪽, 바퀴 경계는 같은 문항을 min(GAP, 크기/4)칸 띄움 */
   const QUIZ_PHASE={7:[[0,2]],8:[[0,3]],9:[[0,5],[2,6],[5,7]],10:[[0,7],[2,8],[4,9],[6,10]]};
   const QUIZ_MIX={7:{math:13,common:6,english:1},8:{math:10,common:8,english:2},9:{math:8,common:8,english:4},10:{math:7,common:9,english:4}};
   const qIn=(age,b)=>{let q=0;for(const [s,n] of QUIZ_PHASE[age])if(b>=s)q=n;return q};
@@ -594,20 +470,12 @@
   const hash=str=>{let h=2166136261;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0};
   const rng=a=>()=>{a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
   const GAP=10,STEP=.5,MEMO=new Map();
-  const grp=q=>q.mode==='sound'?q.choices[q.answer]:q.id;
+  const grp=q=>q.id;
   const memo=(key,f)=>{if(MEMO.has(key))return MEMO.get(key);if(MEMO.size>96)MEMO.clear();const v=f();MEMO.set(key,v);return v};
   function rawOrder(age,pool,list,seed,lap){
     return memo('r|'+age+'|'+pool+'|'+seed+'|'+lap,()=>{
       const r=rng(hash(age+'|'+pool+'|'+seed+'|'+lap)),n=list.length,w=list.map(q=>r()+((q.level||2)-1)*STEP);
-      const o=[...Array(n).keys()].sort((x,y)=>w[x]-w[y]||x-y),G=Math.min(GAP,Math.floor((n-1)/2));
-      for(let i=1;i<n;i++){
-        const near=new Set(o.slice(Math.max(0,i-G),i).map(x=>grp(list[x]))),g=grp(list[o[i]]),ok=x=>!near.has(grp(list[x]));
-        if(!near.has(g))continue;
-        let j=o.findIndex((x,k)=>k>i&&ok(x));
-        if(j<0)j=o.findIndex((x,k)=>k<i-G&&ok(x)&&!o.slice(Math.max(0,k-G),k+G+1).some(y=>y!==x&&grp(list[y])===g));
-        if(j>=0)[o[i],o[j]]=[o[j],o[i]];
-      }
-      return o;
+      return [...Array(n).keys()].sort((x,y)=>w[x]-w[y]||x-y);
     });
   }
   function lapOrder(age,pool,list,seed,lap){
@@ -651,7 +519,7 @@
       const i=Number.isFinite(index)?Math.floor(index):0;
       return qcopy(list[((i%n)+n)%n],false);
     },
-    /* 게임 문제(seed는 0 이상 정수, 기본 0): 같은 입력 = 같은 문항, lap = 몇 바퀴째(보기 돌리기) */
+    /* 게임 문제(seed는 0 이상 정수, 기본 0): 같은 입력 = 같은 문항, lap = 몇 바퀴째(보기 돌리기). mode는 무엇을 넣어도 읽기(story) */
     at(age,mode,index,seed){
       const a=normAge(age),m=normMode(mode),s=normSeed(seed),t=slot(a,m,index,s);
       if(t.kind==='quiz'){const list=QPOOL[a][t.cat],q=qcopy(list[lapOrder(a,'q-'+t.cat,list,s,t.lap)[t.pos]],false);q.lap=t.lap;return q}

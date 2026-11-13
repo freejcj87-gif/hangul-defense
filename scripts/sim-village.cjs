@@ -2,7 +2,8 @@
    문제 풀이(경제, combat.js)와 늑대 세계(world.js)를 함께 돌려, 같은 벽시계 시간 동안 아이 유형별로 game-plan §4.7 지표를 잰다.
    0.9 방식: 카드 고르기 멈춤이 없다. 상점은 늘 열려 있고 세계는 계속 흐른다. 아이는 꼬꼬 추천(Combat.recommend, 게임과 같은 순수 함수)을
    따라 금화가 되는 대로 산다(한 번 사는 데 0.8초, 그동안에도 늑대는 온다). 추천이 '조금만 더 모으자'면 기다린다.
-   읽기 속도·정확도·화면 시간은 가정값이다. 거르기: '8sound'·'10story'처럼 나이+모드 일부, 또는 'typ' 같은 아이 유형. */
+   읽기 속도·정확도·화면 시간은 가정값이다. 거르기: '8story'·'10'처럼 나이(+모드) 일부, 또는 'typ' 같은 아이 유형.
+   0.11: 듣고 고르기 모드 폐쇄로 읽고 고르기(story)만 돌린다(Questions.MODES = ['story']). */
 const path=require('node:path'),ROOT=path.join(__dirname,'..');
 const C=require(path.join(ROOT,'combat.js')),W=require(path.join(ROOT,'world.js')),Q=require(path.join(ROOT,'questions.js'));
 const MIN=Number(process.argv[2])||40,RUNS=Number(process.argv[3])||16,ONLY=process.argv[4]||'';
@@ -14,7 +15,7 @@ const KIDS=['slow','typ','fast','guess'];
 const syl=C.syl,units=C.units;
 const need=(q,r,kind)=>{const rps=r/60,n=q.choices.length,cc=q.choices.reduce((s,c)=>s+units(c),0),p=syl(q.passage);
   if(q.mode==='quiz'){const t=(C.THINK[q.cat]||C.THINK.common)[q.age]||2;return 1+(syl(q.prompt)+units(q.passage))/rps+cc/rps+.4*n+t*THINK[kind]}
-  return q.mode==='sound'?1+cc/rps+.4*n:1.5+p/rps+(q.age===7?0:syl(q.prompt)/rps)+cc/rps+.4*n+(q.age>=9?.3*p/rps:0)};
+  return 1.5+p/rps+(q.age===7?0:syl(q.prompt)/rps)+cc/rps+.4*n+(q.age>=9?.3*p/rps:0)};
 const BUY_SEC=.8,CHEER_SEC=1.2,MAX_BUYS=3,MID_SEC=20; /* 한 번 사기 0.8초, 정답 축하·판매 연출 1.2초, 한 번 쉴 때 최대 3개, 20초 넘는 문제는 읽는 도중 한 번 더 */
 const BUBBLE={gap:200,urgent:100,bonus:600};    /* 말풍선 간격(틱): 20초, 고치기·위험 10초, '조금만 더 모으자'는 60초에 한 번 */
 const marksFor=min=>{const out=[];for(let m=5;m<=min;m+=5)out.push(m);if(!out.length||out[out.length-1]!==min)out.push(min);return out};
@@ -53,7 +54,6 @@ function play(age,mode,kind,minutes){
   }
   while(clock()<MIN_*60){
     const q=Q.at(age,mode,s.index),n=q.choices.length,lock=C.reveal(q)/10;qn++;
-    if(mode==='sound')run(1+syl(q.speak)/4.5);
     let t,ok1;
     if(kind==='guess'){t=lock+.4;ok1=rnd()<1/n}else{t=Math.max(lock+.3,need(q,RATE[age][kind],kind)*(.75+rnd()*.5));ok1=rnd()<ACC[kind]}
     /* 긴 문제(20초 넘게 읽음)는 읽는 도중에도 한 번 상점을 본다(상점은 늘 열려 있음, 최대 2개) */
@@ -66,7 +66,7 @@ function play(age,mode,kind,minutes){
       run(W.dashTicks(w)*W.TICK);
       const t2=kind==='guess'?.4:need(q,RATE[age][kind],kind)*.35;run(t2);
       if(kind==='guess'?rnd()<1/(n-1):rnd()<.8)C.settle(s,q,'second');else{s.misses++;s.streak=0}
-      run(syl(C.lesson(q))/4.5+1.2+(kind==='guess'?.4:1));shop(false);
+      run(C.learnTicks(q)*C.TICK+(kind==='guess'?.4:1));shop(false);
     }
     s.index++;
   }

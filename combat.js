@@ -64,48 +64,40 @@
   const syl=s=>{let n=0;for(const ch of String(s||''))if(ch>='가'&&ch<='힣')n++;return n};
   const clamp=(lo,hi,v)=>Math.min(hi,Math.max(lo,v));
 
-  function fresh(age){return {gold:20,level:0,fence:0,chickens:1,hidden:0,farmers:0,pond:0,hall:0,feast:0,wins:0,misses:0,index:0,help:0,late:0,repairs:0,broken:0,power:0,streak:0,nest:0,marketDown:0,pace:100,paced:0,seed:0,mode:'sound',age:age||8,round:null}}
+  function fresh(age){return {gold:20,level:0,fence:0,chickens:1,hidden:0,farmers:0,pond:0,hall:0,feast:0,wins:0,misses:0,index:0,help:0,late:0,repairs:0,broken:0,power:0,streak:0,nest:0,marketDown:0,pace:100,paced:0,seed:0,mode:'story',age:age||8,round:null}}
   /* 숨은 상한(산 횟수). 아이에게 보이지 않는다. 타워 1+19=20 · 닭 1+19=20 · 농부 1+9=10 */
   const max=key=>key==='feast'||key==='repair'?Infinity:ITEMS[key]?ITEMS[key].prices.length:0;
   const HENS_MAX=1+ITEMS.chicken.prices.length,TOWERS_MAX=1+ITEMS.tower.prices.length,FARMERS_MAX=1+ITEMS.farmer.prices.length;
   /* 그 상품을 지금까지 산 횟수(닭은 처음 1마리를 빼고, 물려 가면 줄어든다) */
   const count=(s,key)=>{const it=ITEMS[key];if(!it)return 0;return Math.max(0,(s[it.key]|0)-(it.base||0))};
 
-  /* 보통 아이가 읽고 고르는 데 드는 시간(초, 가정). 소리 모드는 듣는 시간을 뺀다(듣는 동안 시계가 멈춤).
-     읽기 모드는 지문 + 질문(8세부터) + 보기를 읽고, 9세부터는 지문을 한 번 더 훑는 시간을 더한다. */
+  /* 보통 아이가 읽고 고르는 데 드는 시간(초, 가정). 지문 + 질문(8세부터) + 보기를 읽고, 9세부터는 지문을 한 번 더 훑는 시간을 더한다.
+     (0.11: 듣고 고르기 모드는 폐쇄. 문항은 읽기(story)와 상식·수학·영어(quiz)뿐이다) */
   /* 보기 읽는 양: 한글 음절 + 숫자·영문 글자 3개당 1 */
   const units=s=>syl(s)+(String(s||'').match(/[0-9A-Za-z]/g)||[]).length/3;
   function needSeconds(q){
     const age=SPEED[q.age]?q.age:8,r=SPEED[age],n=q.choices.length,choices=q.choices.reduce((a,c)=>a+syl(c),0);
     /* 상식·수학·영어: 질문과 그림·식을 읽고, 생각하고, 보기를 읽는다 */
     if(q.mode==='quiz'){const t=THINK[q.cat]||THINK.common;return 1.5+(syl(q.prompt)+units(q.passage))/r+q.choices.reduce((a,c)=>a+units(c),0)/r+.4*n+(t[age]||2)}
-    if(q.mode!=='story')return 1+choices/r+.4*n;
     const p=syl(q.passage);
     return 1.5+(p+(age>=8?syl(q.prompt):0)+choices)/r+.4*n+(age>=9?.3*p/r:0);
   }
   /* 기본 제한시간(초) = 필요 시간 × 1.3, 나이별 최저(7세 10 · 8세 9 · 9·10세 8초)와 최고 50초 사이 */
   function baseSeconds(q){const age=SPEED[q.age]?q.age:8;return clamp(MIN_SEC[age],MAX_SEC,Math.ceil(SLACK*needSeconds(q)))}
   const limit=(q,s)=>Math.round(baseSeconds(q)*(1+FENCE*Math.min(6,s&&s.fence||0)+HELP*(s&&s.help||0))/TICK);
-  /* 보기가 나타나기까지의 틱. 8세 이상 읽기 모드는 '글 먼저 읽기': 빠른 아이(보통의 1.5배)가 지문을 읽는 시간만큼 보기를 숨긴다.
+  /* 보기가 나타나기까지의 틱. 8세 이상 읽기 문제는 '글 먼저 읽기': 빠른 아이(보통의 1.5배)가 지문을 읽는 시간만큼 보기를 숨긴다.
      그 밖에는 0.3초(앞 화면에서 이어진 두 번 누르기 방지). 이 동안에도 시계는 흐른다. */
   function reveal(q){
     const age=SPEED[q.age]?q.age:8;
-    if(q.mode!=='story'||age<8)return 3; /* 소리·상식·수학·영어 문제와 7세 낱말은 바로 보인다 */
+    if(q.mode!=='story'||age<8)return 3; /* 상식·수학·영어 문제와 7세 낱말은 바로 보인다 */
     return Math.max(3,Math.round(syl(q.passage)/(1.5*SPEED[age])/TICK));
   }
-  /* 놓쳤을 때 읽어 줄 글: 소리 모드는 정답 낱말, 읽기 모드는 지문 · 질문 · 정답.
-     상식·수학·영어는 질문을 다시 읽고, 정답이 한국어 음성으로 읽을 수 있는 글(한글·숫자)일 때만 '정답은 …'을 붙인다.
-     그림 문자·영어 정답은 기기마다 엉뚱하게 읽히므로 화면의 초록 보기로 보여 준다. */
-  const sayable=a=>/[가-힣0-9]/.test(a)&&!/[A-Za-z]/.test(a);
-  /* full이 아니면 9세 이상 읽기는 질문과 정답만 읽는다(0.10, 10세 점검: 틀린 뒤 지문 전체 해설 약 22초를 다 들어야 다음 문제라 한 번 틀리면 80~95초 수입이 없었다).
-     지문 전체는 🔊 다시 듣기(full)로 들을 수 있다. */
-  function lesson(q,full){
-    const answer=q.choices[q.answer];
-    /* say: 정답을 읽는 말(예: '119' → '일일구'). 있으면 보기 글 대신 그것을 읽는다 */
-    if(q.mode==='quiz')return q.speak+(q.say?' 정답은 '+q.say+'.':sayable(answer)?' 정답은 '+answer+'.':' 정답은 초록색 보기예요.');
-    if(q.mode!=='story')return answer;
-    if(!full&&q.age>=9)return q.prompt+' 정답은 '+answer+'.';
-    return q.passage.replace(/\n/g,' ')+' '+(q.age>=8?q.prompt+' ':'')+'정답은 '+answer+'.';
+  /* 놓친 뒤(두 번째에 맞혔거나 두 번 틀림) 초록 정답을 누를 수 있기까지 기다리는 틱. 읽어 주는 음성은 없다(0.11).
+     아이가 다시 볼 글의 양 ÷ 4음절/초: 8세 이하 읽기는 지문·질문·정답, 9세 이상 읽기는 질문·정답만(짧게), 상식·수학·영어는 질문·지문·정답. 1.5~8초 */
+  const LEARN={min:15,max:80,rate:4};
+  function learnTicks(q){
+    const answer=q.choices[q.answer],text=q.mode==='quiz'?q.prompt+' '+q.passage+' '+answer:q.age>=9?q.prompt+' '+answer:q.passage+' '+(q.age>=8?q.prompt+' ':'')+answer;
+    return clamp(LEARN.min,LEARN.max,Math.ceil(units(text)/LEARN.rate/TICK));
   }
   /* 긴 글은 문제 하나에 시간이 더 드는 만큼 금화도 더 준다(분당 수입이 비슷해지도록). 느리게 푼다고 더 주지는 않는다. */
   const scale=q=>Math.max(1,baseSeconds(q)/10);
@@ -264,12 +256,13 @@
 
   /* 저장 복원·이행. 0.5 저장(hp·combat·claimed)도 받아들인다. 정답 보상을 이미 받은 문제는 다음 문제로 넘겨 이중 지급을 막는다.
      0.8 저장: 카드 고르기 중(round.phase 'pick')이던 문제는 금화를 이미 받았으므로 round를 버리고 다음 문제로. 남은 카드 수(left)는 버린다.
-     새 상한으로 자르고, 둥지 알은 닭 수 이하, 매대 부서짐은 0/1. 저장 형식은 그대로 version 1. */
+     새 상한으로 자르고, 둥지 알은 닭 수 이하, 매대 부서짐은 0/1. 저장 형식은 그대로 version 1.
+     0.11: 듣고 고르기 폐쇄. 예전 저장의 mode 'sound'(또는 없음)는 story로 바꾸고, 풀던 소리 문제(round, token '나이:sound:번호')는 버려 같은 번호의 읽기 문제로 잇는다. */
   function restore(saved,ages){
     const s=fresh(8),list=ages||[7,8,9,10];
     if(!saved||typeof saved!=='object'||saved.version!==1)return s;
     for(const k of NUMS)if(Number.isSafeInteger(saved[k])&&saved[k]>=0)s[k]=saved[k];
-    s.mode=saved.mode==='story'?'story':'sound';
+    const old=saved.mode==='story'?'story':'sound';s.mode='story';
     s.age=list.includes(saved.age)?saved.age:8;
     s.chickens=clamp(0,HENS_MAX,s.chickens);if(!('round' in saved)&&s.chickens===0)s.chickens=1;
     for(const k of ['tower','fence','power','farmer','pond','hall']){const key=ITEMS[k].key;s[key]=Math.min(s[key],max(k))}
@@ -277,14 +270,14 @@
     s.nest=Math.min(s.nest,s.chickens);s.marketDown=s.marketDown?1:0;s.pace=clamp(PACE.lo,PACE.hi,s.pace);
     const r=saved.round;
     if(r&&typeof r==='object'&&r.phase==='pick'&&typeof r.token==='string')s.index++;
-    else if(r&&typeof r==='object'&&typeof r.token==='string'&&['ask','learn'].includes(r.phase)&&Number.isSafeInteger(r.t)&&r.t>=0&&[0,1].includes(r.tries))
-      s.round={token:r.token,phase:r.phase,t:r.t,tries:r.tries,gold:Number.isSafeInteger(r.gold)?r.gold:0};
-    else if(!('round' in saved)&&typeof saved.claimed==='string'&&saved.claimed===s.mode+':'+s.index)s.index++;
+    else if(r&&typeof r==='object'&&typeof r.token==='string'&&['ask','learn'].includes(r.phase)&&Number.isSafeInteger(r.t)&&r.t>=0&&[0,1].includes(r.tries)){
+      if(saved.mode!=='sound'&&!r.token.includes(':sound:'))s.round={token:r.token,phase:r.phase,t:r.t,tries:r.tries,gold:Number.isSafeInteger(r.gold)?r.gold:0};
+    }else if(!('round' in saved)&&typeof saved.claimed==='string'&&saved.claimed===old+':'+s.index)s.index++;
     return s;
   }
 
-  const api={API:3,TICK,SPEED,MIN_SEC,MAX_SEC,SLACK,FENCE,HELP,FAST,FAST_BONUS,FAST_MIN,isFast,sayable,STREAK,BOUNTY,combo,DASH,DASH_TICKS,MAX_WOLVES,PACE,PAY,REPAIR,CURVE,ITEMS,SHOP,ORDER,POWER_NOTE,THINK,LINES,REC,units,
-    HENS_MAX,TOWERS_MAX,FARMERS_MAX,syl,fresh,max,count,needSeconds,baseSeconds,limit,reveal,lesson,scale,picks,built,wolves,basket,eggPrice,income,raid,settle,price,open,canBuy,buy,shopKeys,shop,recommend,offers,restore,
+  const api={API:3,TICK,SPEED,MIN_SEC,MAX_SEC,SLACK,FENCE,HELP,FAST,FAST_BONUS,FAST_MIN,isFast,STREAK,BOUNTY,combo,DASH,DASH_TICKS,MAX_WOLVES,PACE,PAY,REPAIR,CURVE,ITEMS,SHOP,ORDER,POWER_NOTE,THINK,LINES,REC,units,
+    HENS_MAX,TOWERS_MAX,FARMERS_MAX,syl,fresh,max,count,needSeconds,baseSeconds,limit,reveal,LEARN,learnTicks,scale,picks,built,wolves,basket,eggPrice,income,raid,settle,price,open,canBuy,buy,shopKeys,shop,recommend,offers,restore,
     GUARD,guard,trackPace};
   if(typeof module!=='undefined')module.exports=api;
   else root.Combat=api;
