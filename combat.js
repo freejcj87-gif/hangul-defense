@@ -92,18 +92,12 @@
     if(q.mode!=='story'||age<8)return 3; /* 상식·수학·영어 문제와 7세 낱말은 바로 보인다 */
     return Math.max(3,Math.round(syl(q.passage)/(1.5*SPEED[age])/TICK));
   }
-  /* 놓쳤을 때 읽어 줄 글: 지문 · 질문 · 정답.
-     상식·수학·영어는 질문을 다시 읽고, 정답이 한국어 음성으로 읽을 수 있는 글(한글·숫자)일 때만 '정답은 …'을 붙인다.
-     그림 문자·영어 정답은 기기마다 엉뚱하게 읽히므로 화면의 초록 보기로 보여 준다. */
-  const sayable=a=>/[가-힣0-9]/.test(a)&&!/[A-Za-z]/.test(a);
-  /* full이 아니면 9세 이상 읽기는 질문과 정답만 읽는다(0.10, 10세 점검: 틀린 뒤 지문 전체 해설 약 22초를 다 들어야 다음 문제라 한 번 틀리면 80~95초 수입이 없었다).
-     지문 전체는 🔊 다시 듣기(full)로 들을 수 있다. */
-  function lesson(q,full){
-    const answer=q.choices[q.answer];
-    /* say: 정답을 읽는 말(예: '119' → '일일구'). 있으면 보기 글 대신 그것을 읽는다 */
-    if(q.mode==='quiz')return q.speak+(q.say?' 정답은 '+q.say+'.':sayable(answer)?' 정답은 '+answer+'.':' 정답은 초록색 보기예요.');
-    if(!full&&q.age>=9)return q.prompt+' 정답은 '+answer+'.';
-    return q.passage.replace(/\n/g,' ')+' '+(q.age>=8?q.prompt+' ':'')+'정답은 '+answer+'.';
+  /* 놓친 뒤(두 번째에 맞혔거나 두 번 틀림) 초록 정답을 누를 수 있기까지 기다리는 틱. 읽어 주는 음성은 없다(0.11).
+     아이가 다시 볼 글의 양 ÷ 4음절/초: 8세 이하 읽기는 지문·질문·정답, 9세 이상 읽기는 질문·정답만(짧게), 상식·수학·영어는 질문·지문·정답. 1.5~8초 */
+  const LEARN={min:15,max:80,rate:4};
+  function learnTicks(q){
+    const answer=q.choices[q.answer],text=q.mode==='quiz'?q.prompt+' '+q.passage+' '+answer:q.age>=9?q.prompt+' '+answer:q.passage+' '+(q.age>=8?q.prompt+' ':'')+answer;
+    return clamp(LEARN.min,LEARN.max,Math.ceil(units(text)/LEARN.rate/TICK));
   }
   /* 긴 글은 문제 하나에 시간이 더 드는 만큼 금화도 더 준다(분당 수입이 비슷해지도록). 느리게 푼다고 더 주지는 않는다. */
   const scale=q=>Math.max(1,baseSeconds(q)/10);
@@ -282,8 +276,8 @@
     return s;
   }
 
-  const api={API:3,TICK,SPEED,MIN_SEC,MAX_SEC,SLACK,FENCE,HELP,FAST,FAST_BONUS,FAST_MIN,isFast,sayable,STREAK,BOUNTY,combo,DASH,DASH_TICKS,MAX_WOLVES,PACE,PAY,REPAIR,CURVE,ITEMS,SHOP,ORDER,POWER_NOTE,THINK,LINES,REC,units,
-    HENS_MAX,TOWERS_MAX,FARMERS_MAX,syl,fresh,max,count,needSeconds,baseSeconds,limit,reveal,lesson,scale,picks,built,wolves,basket,eggPrice,income,raid,settle,price,open,canBuy,buy,shopKeys,shop,recommend,offers,restore,
+  const api={API:3,TICK,SPEED,MIN_SEC,MAX_SEC,SLACK,FENCE,HELP,FAST,FAST_BONUS,FAST_MIN,isFast,STREAK,BOUNTY,combo,DASH,DASH_TICKS,MAX_WOLVES,PACE,PAY,REPAIR,CURVE,ITEMS,SHOP,ORDER,POWER_NOTE,THINK,LINES,REC,units,
+    HENS_MAX,TOWERS_MAX,FARMERS_MAX,syl,fresh,max,count,needSeconds,baseSeconds,limit,reveal,LEARN,learnTicks,scale,picks,built,wolves,basket,eggPrice,income,raid,settle,price,open,canBuy,buy,shopKeys,shop,recommend,offers,restore,
     GUARD,guard,trackPace};
   if(typeof module!=='undefined')module.exports=api;
   else root.Combat=api;

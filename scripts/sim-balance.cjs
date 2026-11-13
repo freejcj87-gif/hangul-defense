@@ -19,7 +19,6 @@ for(const a of Q.AGES)for(const m of Q.MODES){const qs=bank(a,m),T=qs.map(C.base
 console.log('10초 이하 문항',short,'/',total);
 
 /* ---------- 플레이 시뮬 ---------- */
-const TTS=4.5; /* 음성 읽기 음절/초 */
 function play(age,mode,kind,minutes){
   const s=C.fresh(age);s.mode=mode;let clock=0,earned=0,first=0,second=0,miss=0,fast=0,qn=0,done=0,firstBuy=0;const recent=[];
   const prof={read_slow:{r:RATE[age].slow,acc:.75},read_typ:{r:RATE[age].typ,acc:.85},read_fast:{r:RATE[age].fast,acc:.95}}[kind];
@@ -45,7 +44,7 @@ function play(age,mode,kind,minutes){
       clock+=kind==='guess'?.8:2.5;
       if(offers.length){C.buy(s,offers[0]);clock+=1.0;if(!firstBuy)firstBuy=qn;if(!done&&C.built(s)>=26)done=clock/60}}
     else{if(outcome==='miss'){miss++;clock+=1.2}else second++;
-      const learn=syl(C.lesson(q))/TTS+1.2;clock+=learn+(kind==='guess'?.4:1.0)}
+      const learn=C.learnTicks(q)*C.TICK;clock+=learn+(kind==='guess'?.4:1.0)}
     s.index++;
   }
   return {done:done||99,firstBuy,earned,first,second,miss,fast,qn,built:C.built(s),wolves:C.wolves(s),hidden:s.hidden,chickens:s.chickens,level:s.level,fence:s.fence,help:s.help};

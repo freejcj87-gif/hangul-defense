@@ -66,7 +66,7 @@ function play(age,mode,kind,minutes){
       run(W.dashTicks(w)*W.TICK);
       const t2=kind==='guess'?.4:need(q,RATE[age][kind],kind)*.35;run(t2);
       if(kind==='guess'?rnd()<1/(n-1):rnd()<.8)C.settle(s,q,'second');else{s.misses++;s.streak=0}
-      run(syl(C.lesson(q))/4.5+1.2+(kind==='guess'?.4:1));shop(false);
+      run(C.learnTicks(q)*C.TICK+(kind==='guess'?.4:1));shop(false);
     }
     s.index++;
   }

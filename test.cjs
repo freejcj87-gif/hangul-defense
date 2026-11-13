@@ -5,15 +5,15 @@ const INTERIM=process.env.INTERIM_NO_3D_BUILD==='1',FULL_SHOTS=process.env.FULL_
 const ONLY=process.env.ONLY||'',run=part=>!ONLY||ONLY.split(',').includes(part);/* ONLY=matrix,clock,feel,fallback,demo,flow 중 일부만 돌릴 때(개발용). CI는 전부 돌린다. */
 const KEY='hangul-defense-v1',SWIFT=['--enable-webgl','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader'];
 /* 검사 기본: 시계를 세우고(__HOLD_CLOCK) 틱을 직접 돌린다. CI의 SwiftShader는 프레임 간격이 200ms를 넘기도 해서 벽시계 대기는 쓰지 않는다.
-   음성은 가짜(바로 읽기 시작·끝, 읽은 글은 window.__said에 남김)로 바꾼다. 실제 음성은 실기기에서 따로 확인해야 한다. */
+   0.11: 게임은 읽어 주는 음성(음성 합성)을 쓰지 않는다. speechSynthesis를 감시용으로 바꿔, 부르면 window.__said에 남긴다(언제나 비어 있어야 함). */
 const HOLD=()=>{window.__HOLD_CLOCK=true};
-const FAKE_TTS=()=>{window.__said=[];const S={speak(u){window.__said.push(u.text);setTimeout(()=>{u.onstart&&u.onstart();u.onend&&u.onend()},0)},cancel(){},getVoices(){return [{lang:'ko-KR',name:'test'}]}};
- Object.defineProperty(window,'speechSynthesis',{value:S,configurable:true});Object.defineProperty(window,'SpeechSynthesisUtterance',{value:function(t){this.text=t},configurable:true,writable:true})};
+const FAKE_TTS=()=>{window.__said=[];const S={speak(u){window.__said.push('speak:'+(u&&u.text))},cancel(){window.__said.push('cancel')},getVoices(){window.__said.push('getVoices');return []}};
+ Object.defineProperty(window,'speechSynthesis',{value:S,configurable:true})};
 const CHICK=Combat.LINES.moreHens;
-/* 0.11: 듣고 고르기 모드 폐쇄. 게임은 언제나 읽고 고르기(story), 듣기(listen) 단계는 7세 상식·수학·영어 질문에만 남았다 */
+/* 0.11: 소리 모드도 읽어 주는 음성도 없다. 아이는 글을 읽기만 한다. phase는 start → ask → reward / learn */
 /* 그 나이 읽기 문항 기준 무리 간격(index.html waveInterval과 같은 식) */
 const ivFor=age=>{const t=[];for(let i=0;i<Questions.count(age,'story');i++)t.push(Combat.baseSeconds(Questions.get(age,'story',i)));t.sort((a,b)=>a-b);return World.intervalFor(t[t.length>>1])};
-/* 7세 첫 퀴즈 칸(질문을 읽어 주는 문제) */
+/* 7세 첫 퀴즈 칸(예전에는 질문을 읽어 주던 문제) */
 const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
 (async()=>{
  const output=path.join(__dirname,'.pages-build'),shots=path.join(__dirname,'test-results');
@@ -40,10 +40,9 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
  const notGone=page=>page.evaluate(()=>world.wolves.filter(v=>v.state!=='gone').length);
  const game=page=>page.evaluate(()=>window.__game());
  const tick=(page,n)=>page.evaluate(n=>window.__tick(n),n);
- const quiet=page=>page.waitForFunction(()=>!window.__game().speaking,{},{timeout:20000});
  const phaseIs=(page,p)=>page.waitForFunction(p=>window.__game().phase===p,p,{timeout:20000});
  const ready=page=>page.waitForFunction(()=>['three','fallback'].includes(document.querySelector('.scene').dataset.renderer),{},{timeout:45000});
- /* 한 번에 맞힌 뒤 판매 연출(1.2초)이 끝나 다음 문제를 풀 수 있을 때까지 틱을 돌린다(7세 퀴즈는 질문을 읽어 준 뒤: 가짜 음성은 틱 사이에 끝난다). */
+ /* 한 번에 맞힌 뒤 판매 연출(1.2초)이 끝나 다음 문제를 풀 수 있을 때까지 틱을 돌린다. */
  async function settle(page){for(let i=0;i<120&&(await game(page)).phase==='reward';i++)await tick(page,1);await phaseIs(page,'ask')}
  /* 시작 화면: 나이만 고르고 시작(모드 고르기 없음) */
  async function begin(page,{age=8}={},touch){const tap=l=>touch?l.tap():l.click();
@@ -100,7 +99,7 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
  eq(await gold(page),'🪙 20','initial gold');ok(await noOverflow(page),'no horizontal overflow');ok(await pillsFit(page),'status pills do not overlap');
  await expectQuestion(page,8,'story',0,tag+' default');
  let g=await game(page);eq([g.state.mode,g.world.interval,g.world.radius],['story',ivFor(8),7],'reading mode, wave rhythm for 8세 reading items, starting village radius');
- ok(await page.locator('#speak').isHidden(),'reading item: no replay button while answering');eq(await page.evaluate(()=>window.__said.length),0,'reading item is not read aloud');
+ eq(await page.locator('#speak, #rate, #voiceStatus').count(),0,'no voice controls (replay button, reading speed, voice notice)');eq(await page.evaluate(()=>window.__said.length),0,'nothing is read aloud');
  eq(await page.locator('#drawerSummary').textContent(),'⚙️ 설정 · 8세','settings summary shows the age only');
  await tick(page,20);g=await game(page);eq(g.round.t,20,'held clock advances only by explicit ticks');
  /* 0.9: 늑대 시간 바가 없다. 압박은 🐺 수·상태 문구·발자국·울음으로(숫자 없음). ⚡는 문제 칸 귀퉁이에. */
@@ -137,7 +136,7 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
  eq(await page.locator('#go').textContent(),'이어서 하기 ▶','unfinished question resumes');
  await page.locator('#ageRow button[data-age="8"]').click();await page.locator('#go').click();await phaseIs(page,'ask');await expectQuestion(page,8,'story',0,'back to 8세');
 
- /* 한 번에 정답 → 판매 연출(세계는 흐름, 말풍선은 글로만) → 1.2초 뒤 저절로 다음 문제(말풍선을 읽어 주느라 기다리지 않는다).
+ /* 한 번에 정답 → 판매 연출(세계는 흐름, 말풍선은 글로만) → 1.2초 뒤 저절로 다음 문제.
     앞 구간에서 오래 흐른 세계(늑대가 마을 안·닭 잃음·건물 부서짐)는 급한 말풍선을 먼저 띄우므로, 이 확인 동안만 세계를 조용히 하고 말풍선 간격을 처음으로 돌린다. */
  await page.evaluate(()=>{world.wolves=[];world.arrows=[];world.trickle=world.t+99999;world.wave.arrive=world.t+99999;world.wave.spawned=true;World.repairAll(world);Object.assign(state,{broken:0,chickens:1,hidden:0,nest:0});World.sync(world,state);syncMarket();recReset();render()});
  g=await game(page);const fresh=JSON.parse(JSON.stringify(g.state)),Q0=Questions.at(8,'story',0,g.state.seed),said0=await page.evaluate(()=>window.__said.length);
@@ -151,7 +150,7 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
  await tick(page,3);eq((await game(page)).phase,'reward','still the sale at 0.8 s');let bb=await bubbleBox(page);ok(bb&&bb.text===CHICK&&bb.key==='chicken'&&bb.inside&&bb.tailOnSlot&&bb.glow,tag+' chicken bubble above the shop, tail on the chicken slot, slot glows: '+JSON.stringify(bb));
  if(name==='chromium'&&(width===390||height===568))await shot(page,'reward-bubble-'+width+'x'+height);
  await tick(page,4);eq((await game(page)).phase,'ask','the next question comes 1.2 s after the answer (the sale never waits for the bubble)');await expectQuestion(page,8,'story',1,'next question by itself');
- eq(await page.evaluate(()=>window.__said.length),said0,'nothing is read aloud by itself: the bubble is text only, reading items are silent');
+ eq(await page.evaluate(()=>window.__said.length),said0,'nothing is read aloud: the bubble is text only');
  await tick(page,40);ok(await page.locator('#bubble').isHidden(),'the bubble goes away by itself');
  await page.evaluate(()=>{world.trickle=world.t+5;world.wave.arrive=world.t+world.interval;world.wave.spawned=false});
  if(touch){const v=await stickyView(page,'answers');ok(together(v,false),tag+' after the sale: scene + shop + answers: '+JSON.stringify(v))}
@@ -176,7 +175,9 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
  if(name==='chromium'&&width===390)await shot(page.locator('.stage-card'),'dash-390');
  await tick(page,Combat.DASH_TICKS);ok(!(await page.locator('#scene').evaluate(n=>n.classList.contains('dash'))),'border clears after the dash');
  await answer(page,true,touch);g=await game(page);eq([g.phase,g.round.result],['learn','second'],'second try only stops the wolves');eq(await gold(page),before,'no gold on the second try');
- await quiet(page);await tick(page,12);ok(await page.locator('#answers button.tap-me').count()===1,tag+' the right answer glows after it is read: '+JSON.stringify(await game(page)));
+ /* 음성 없이: 다시 볼 시간(Combat.learnTicks, 1.5~8초)이 지나면 초록 답이 열린다 */
+ {const lt=Combat.learnTicks(Questions.at(8,'story',1,(await game(page)).seed));eq(await page.locator('#answers button.tap-me').count(),0,'the green answer waits first');ok((await page.locator('#feedback').textContent()).includes('초록색 정답을 확인해요'),'learning notice');
+  await tick(page,lt-1);eq(await page.locator('#answers button.tap-me').count(),0,'still waiting one tick before the end');await tick(page,1);ok(await page.locator('#answers button.tap-me').count()===1,tag+' the right answer glows after the wait (no voice): '+JSON.stringify(await game(page)))}
  await page.locator('#answers button.tap-me').click();await phaseIs(page,'ask');await expectQuestion(page,8,'story',2,'continue after learning');
  /* 늑대가 닭을 물어 가고 건물이 부서지면: 닭 수가 줄고, 고치기 칸이 켜짐 */
  g=await game(page);const hensBefore=g.state.chickens;
@@ -363,17 +364,13 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
   eq(await page.evaluate(()=>localStorage.getItem('hangul-defense-v1')),null,'demo never touches the real save');ok(await page.evaluate(()=>!!localStorage.getItem('hangul-defense-demo3')),'demo has its own save');
   eq(errors,[],'demo page errors');await ctx.close();
  }}finally{await demoBrowser.close()}
- /* ===== 6. 흐름 가장자리: 판매 연출 중 쉬기·새로고침·나이 바꾸기, 7세 퀴즈 질문 읽어 주기와 음성 실패, 예전 듣고 고르기 저장 이어받기, 움직임 줄이기의 알림 띠, 우두머리 보상, 체험 초기화,
-    말풍선(누르면 읽어 줌·움직임 줄이기의 굵은 테두리), 320 가게 안내.
+ /* ===== 6. 흐름 가장자리: 판매 연출 중 쉬기·새로고침·나이 바꾸기, 7세 퀴즈(듣기 없이 바로 풀이·놓친 뒤 기다림), 예전 듣고 고르기 저장 이어받기, 움직임 줄이기의 알림 띠, 우두머리 보상, 체험 초기화,
+    말풍선(글만·움직임 줄이기의 굵은 테두리), 320 가게 안내.
     3D와 무관한 흐름이라 GLB를 막아 그림 화면으로 돌린다. ===== */
  const flowBrowser=await chromium.launch({headless:true,args:SWIFT});
  try{if(run('flow')){
   const BANNERS=()=>{window.__banners=[];document.addEventListener('DOMContentLoaded',()=>{new MutationObserver(m=>m.forEach(r=>r.addedNodes.forEach(n=>{if(n.classList&&n.classList.contains('banner'))window.__banners.push(n.textContent)}))).observe(document.getElementById('effects'),{childList:true})})};
-  const BROKEN_TTS=()=>{const S={speak(u){setTimeout(()=>{u.onerror&&u.onerror({error:'synthesis-failed'})},0)},cancel(){},getVoices(){return [{lang:'ko-KR',name:'test'}]}};
-   Object.defineProperty(window,'speechSynthesis',{value:S,configurable:true});Object.defineProperty(window,'SpeechSynthesisUtterance',{value:function(t){this.text=t},configurable:true,writable:true})};
-  const SILENT_TTS=()=>{const S={speak(){},cancel(){},getVoices(){return [{lang:'ko-KR',name:'test'}]}};
-   Object.defineProperty(window,'speechSynthesis',{value:S,configurable:true});Object.defineProperty(window,'SpeechSynthesisUtterance',{value:function(t){this.text=t},configurable:true,writable:true})};
-  const open=async(o={})=>{const ctx=await flowBrowser.newContext({viewport:{width:o.width||390,height:o.height||844},hasTouch:true,reducedMotion:o.motion?'no-preference':'reduce'});await ctx.addInitScript(HOLD);await ctx.addInitScript(o.tts||FAKE_TTS);await ctx.addInitScript(BANNERS);
+  const open=async(o={})=>{const ctx=await flowBrowser.newContext({viewport:{width:o.width||390,height:o.height||844},hasTouch:true,reducedMotion:o.motion?'no-preference':'reduce'});await ctx.addInitScript(HOLD);await ctx.addInitScript(FAKE_TTS);await ctx.addInitScript(BANNERS);
    const page=await ctx.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.route('**/environment-pack.glb',r=>r.abort());await page.goto(url+(o.query||''));await ready(page);return {ctx,page,errors}};
   const bannerBoxes=page=>page.evaluate(()=>{const s=document.getElementById('scene').getBoundingClientRect();
    return [...document.querySelectorAll('#effects .banner')].map(b=>{const r=b.getBoundingClientRect(),cs=getComputedStyle(b);return {text:b.textContent,shown:cs.display!=='none',opacity:cs.opacity,anim:cs.animationName,inside:r.left>=s.left-.5&&r.right<=s.right+.5&&r.top>=s.top-.5&&r.bottom<=s.bottom+.5,w:Math.round(r.width),sceneW:Math.round(s.width)}})});
@@ -396,23 +393,15 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
    await settle(page);await expectQuestion(page,8,'story',2,'flow: next question in the new age');
    eq(errors,[],'flow reward page errors');await ctx.close()}
 
-  /* 7세 상식·수학·영어: 질문을 읽어 준 뒤 풀고, 풀이 중 🔊 다시 듣기로 다시 듣는다(듣기 단계가 남은 유일한 곳) */
-  {const {ctx,page,errors}=await open();await seed(page,{age:7,index:I7});await page.locator('#ageRow button[data-age="7"]').tap();await page.locator('#go').tap();await phaseIs(page,'ask');
-   const q=await expectQuestion(page,7,'story',I7,'flow: 7세 quiz item');eq(q.mode,'quiz','7세 quiz slot');eq(await page.evaluate(()=>window.__said.slice()),[q.speak],'7세 quiz: the question is read aloud once before answering');
-   ok(!(await page.locator('#speak').isHidden()),'7세 quiz: replay button while answering');await page.locator('#speak').tap();eq(await page.evaluate(()=>window.__said.slice()),[q.speak,q.speak],'replay reads the question again');
-   await answer(page,true,true);eq((await game(page)).phase,'reward','7세 quiz answered');await settle(page);await expectQuestion(page,7,'story',I7+1,'flow: reading item after the quiz');ok(await page.locator('#speak').isHidden(),'reading item: no replay button');
+  /* 7세 상식·수학·영어: 듣기 없이 바로 푼다. 놓치면 음성 없이 다시 볼 시간만큼 기다린 뒤 초록 답을 눌러 다음 문제 */
+  {const {ctx,page,errors}=await open();await seed(page,{age:7,index:I7});await page.locator('#ageRow button[data-age="7"]').tap();await page.locator('#go').tap();
+   let g=await game(page);eq([g.phase,g.round.t],['ask',0],'7세 quiz: answering starts at once (no listening step)');const q=await expectQuestion(page,7,'story',I7,'flow: 7세 quiz item');eq(q.mode,'quiz','7세 quiz slot');
+   eq(await page.locator('#speak, #rate, #voiceStatus').count(),0,'7세 quiz: no voice controls');ok(!('voiceOff' in g)&&!('speaking' in g),'no voice state in __game');
+   await answer(page,false,true);await tick(page,Combat.DASH_TICKS);await answer(page,false,true,1);eq((await game(page)).phase,'learn','7세 quiz missed twice: learning step');
+   const lt=Combat.learnTicks(q);eq(await page.locator('#answers button.tap-me').count(),0,'the green answer waits first');await tick(page,lt-1);eq(await page.locator('#answers button.tap-me').count(),0,'still waiting');await tick(page,1);eq(await page.locator('#answers button.tap-me').count(),1,'the green answer opens by time');
+   await page.locator('#answers button.tap-me').tap();await phaseIs(page,'ask');await expectQuestion(page,7,'story',I7+1,'flow: next item after learning');
+   await answer(page,true,true);eq((await game(page)).phase,'reward','play goes on');eq(await page.evaluate(()=>window.__said),[],'speech synthesis is never called');
    eq(errors,[],'flow 7세 quiz page errors');await ctx.close()}
-
-  /* 그 질문 읽어 주기에서 음성이 안 되면(오류·무응답): 읽어 주기만 끄고 같은 문제를 그대로 푼다(모드 전환·경고 문구 없음) */
-  for(const [label,tts] of [['error',BROKEN_TTS],['silent',SILENT_TTS]]){const {ctx,page,errors}=await open({tts});
-   await seed(page,{age:7,index:I7});await page.locator('#ageRow button[data-age="7"]').tap();await page.locator('#go').tap();
-   if(label==='silent'){eq((await game(page)).phase,'listen','silent voice: waiting to hear the question');await tick(page,31)}
-   await page.waitForFunction(()=>window.__game().voiceOff&&window.__game().phase==='ask',{},{timeout:20000});
-   const q=await expectQuestion(page,7,'story',I7,'flow: voice '+label+' on a quiz item');eq(q.mode,'quiz','voice '+label+': still the quiz item');
-   const g=await game(page);eq(g.state.mode,'story','voice '+label+': reading mode as always');ok(!(await page.locator('#feedback').textContent()).includes('🔇'),'voice '+label+': no mode-switch notice');ok((await page.locator('#voiceStatus').textContent()).includes('소리가 나오지 않아요'),'voice '+label+': one line in the settings drawer');ok(await page.locator('#speak').isHidden(),'voice '+label+': no replay button');
-   await answer(page,true,true);eq((await game(page)).phase,'reward','voice '+label+': the quiz can still be answered');await settle(page);await expectQuestion(page,7,'story',I7+1,'voice '+label+': the game goes on');
-   await answer(page,false,true);await tick(page,Combat.DASH_TICKS);await answer(page,false,true,1);eq((await game(page)).phase,'learn','voice '+label+': learning step without a voice');await tick(page,151);ok(await page.locator('#answers button.tap-me').count()===1,'voice '+label+': the right answer opens by time when nothing can be read');
-   eq(errors,[],'flow voice '+label+' page errors');await ctx.close()}
 
   /* 예전 '듣고 고르기' 저장(풀던 소리 문제 포함): 읽고 고르기로 이어진다. 금화·번호는 그대로, 풀던 소리 문제는 같은 번호의 읽기 문제로 새로 */
   {const {ctx,page,errors}=await open();
@@ -421,7 +410,7 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
    eq(await page.locator('#go').textContent(),'시작하기 ▶','no resume prompt for the dropped sound item');eq(await page.locator('#startSound, #startStory, #mode').count(),0,'no mode buttons');
    await page.locator('#go').tap();await phaseIs(page,'ask');const q=await expectQuestion(page,8,'story',4,'flow: old sound save continues with the reading item of the same number');eq(q.mode,'story','a reading item');
    g=await game(page);eq([g.round.t,g.round.tries,g.state.gold],[0,0,321],'fresh question, gold kept');eq((await stored(page)).mode,'story','saved again as story');eq((await stored(page)).version,1,'save version stays 1');
-   await answer(page,true,true);eq((await game(page)).phase,'reward','old sound save: play goes on');
+   await answer(page,true,true);eq((await game(page)).phase,'reward','old sound save: play goes on');eq(await page.evaluate(()=>window.__said),[],'old sound save: nothing is read aloud');
    eq(errors,[],'flow old sound save page errors');await ctx.close()}
 
   /* ?demo=3 첫 무리: 새 몬스터 여러 종류가 한꺼번에 → 알림 띠는 하나씩 차례로(움직임 줄이기에서도 멈춘 채 읽힘), 판매 연출 동안 숨김, 우두머리 보상 띠는 바로 */
@@ -455,15 +444,14 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
    await page.goto(url);await ready(page);g=await game(page);eq([g.state.gold,g.state.wins,g.state.index],[777,5,9],'real progress intact outside the demo');eq(await page.locator('header .demo-tag').count(),0,'no demo label without ?demo');
    eq(errors,[],'flow demo reset page errors');await ctx.close()}
 
-  /* 말풍선(320×568, 움직임 줄이기 = 굵은 금빛 테두리만): 맞힌 뒤 뜨고, 꼬리가 칸을 가리키고, 누르면 읽어 준다. 사면 반짝임이 끝난다. */
+  /* 말풍선(320×568, 움직임 줄이기 = 굵은 금빛 테두리만): 맞힌 뒤 뜨고, 꼬리가 칸을 가리킨다(글만, 눌러 듣기 없음). 사면 반짝임이 끝난다. */
   {const {ctx,page,errors}=await open({width:320,height:568});await seed(page,{age:7,index:0});await begin(page,{age:7},true);
    await answer(page,true,true);await tick(page,2);let bb=await bubbleBox(page);
    ok(bb&&bb.text===CHICK&&bb.inside&&bb.tailOnSlot&&bb.glow,'320: bubble above the shop, tail on the chicken slot: '+JSON.stringify(bb));
-   eq(await page.evaluate(()=>window.__said.length),0,'the bubble is not read by itself');
+   eq(await page.evaluate(()=>window.__said.length),0,'the bubble is not read aloud');eq(await page.locator('#bubble').getAttribute('title'),null,'no tap-to-listen hint on the bubble');
    {const lit=await page.locator('#shop .slot[data-key="chicken"]').evaluate(s=>[s.classList.contains('lit'),getComputedStyle(s,'::after').display]);ok(lit[0]&&lit[1]==='none','reduced motion: the slot lights up without a leftover light band: '+lit)}
    const rim=await page.locator('#shop .slot[data-key="chicken"]').evaluate(s=>{const c=getComputedStyle(s);return [parseFloat(c.borderTopWidth),c.animationName,c.borderTopColor]});ok(rim[0]>=3&&rim[1]==='none','reduced motion: a still, thick gold border: '+rim);
    await shot(page,'flow-bubble-320x568');
-   await page.locator('#bubble').tap();eq(await page.evaluate(()=>window.__said.at(-1)),CHICK,'tapping the bubble reads it');
    await settle(page);await buy(page,'chicken',true);ok(!(await page.locator('#shop .slot[data-key="chicken"]').evaluate(s=>s.classList.contains('rec'))),'buying it ends the glow');eq(await page.evaluate(()=>getVillageState().recommend),null,'getVillageState.recommend cleared');
    /* 320 가게 안내는 카드 안에 */
    await page.evaluate(()=>{state.gold=0;render()});await buy(page,'farmer',true);const tip=await page.evaluate(()=>{const t=document.getElementById('shopTip').getBoundingClientRect(),c=document.getElementById('stageCard').getBoundingClientRect();return {text:document.getElementById('shopTip').textContent,inside:t.left>=c.left-.5&&t.right<=c.right+.5&&t.top>=c.top}});

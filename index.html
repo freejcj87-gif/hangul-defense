@@ -84,11 +84,9 @@ body.paused #pauseNote{display:grid}
 #fastIcon[data-state="on"]{background:#ffe266;border-color:#f2b931;box-shadow:0 0 0 3px #ffd84a66,0 0 14px #ffc400;animation:fastGlow .9s ease-in-out infinite}
 #fastIcon[data-state="won"]{background:#ffe266;border-color:#f2b931;box-shadow:0 0 16px #ffc400;animation:yay .6s}
 #fastIcon[data-state="off"]{opacity:.25;filter:grayscale(1)}
-#speak{min-height:40px;padding:6px 12px;font-size:13px;border-color:#17766a;white-space:nowrap;flex:none}
 .settings-drawer{margin:0 0 4px;font-size:13px}.settings-drawer summary{cursor:pointer;font-weight:800;color:#7a6331;padding:4px 0}
 .toolbar{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin-top:8px}.toolbar label{font-size:13px}.toolbar button{flex:1 1 auto;min-height:40px}.settings{display:flex;flex-wrap:wrap;align-items:center;gap:10px;font-size:12px;margin-top:10px}.settings input{width:17px;height:17px;vertical-align:middle}
 #age{font-weight:800;font-size:15px}
-#voiceStatus{font-size:12px;line-height:1.5;color:#74836d;margin:6px 0 0}#voiceStatus:empty{display:none}
 h2{font-size:20px;line-height:1.5;letter-spacing:-.5px;margin:10px 0 10px}
 #passage{font-size:18px;line-height:1.85;white-space:pre-line}#passage.big{font-size:44px;font-weight:800;text-align:center;line-height:1.4;letter-spacing:2px}
 #passage:empty{display:none}
@@ -176,9 +174,9 @@ body.paused.covered #quiz{filter:blur(9px);pointer-events:none}
  .slot[data-state="none"] .pr,.slot[data-state="max"] .pr{font-size:0;padding:0 5px}.slot[data-state="none"] .pr:before,.slot[data-state="max"] .pr:before{content:'✓';font-size:12px}
  .bubble{font-size:14px;min-height:44px}.bubble img{width:32px;height:32px}
  .panel{padding:14px;border-radius:19px}h2{margin:6px 0 8px;font-size:18px}#answers{margin:10px 0}#feedback{min-height:28px;font-size:13px}.growth-panel{margin-top:12px}.growth-title small{display:none}#passage{font-size:17px;line-height:1.75}#passage.big{font-size:38px}}
-/* 좁은 폰(320): 칸 = 그림 + 가격 한 줄(이름은 숨김, 읽어 주는 이름표는 남김) */
+/* 좁은 폰(320): 칸 = 그림 + 가격 한 줄(이름은 숨김, 화면 낭독기용 이름표는 남김) */
 @media(max-width:380px){.slot{min-height:40px;gap:2px;padding:3px 2px 4px}.slot .nm{display:none}.slot .ico,.slot .ico img{width:22px;height:22px}.slot .ico{font-size:18px}.slot .pr{padding:0 2px;border:0;background:none}
- .slot[data-state="none"] .pr,.slot[data-state="max"] .pr{background:none}.slot.rec:before{font-size:13px;top:-8px;right:-4px}#fastIcon{width:26px;height:26px;font-size:14px}#speak{padding:6px 9px}.kick-left{gap:5px}#levelChip{padding:3px 8px}}
+ .slot[data-state="none"] .pr,.slot[data-state="max"] .pr{background:none}.slot.rec:before{font-size:13px;top:-8px;right:-4px}#fastIcon{width:26px;height:26px;font-size:14px}.kick-left{gap:5px}#levelChip{padding:3px 8px}}
 @media(max-width:350px){.pill{font-size:10px;letter-spacing:-.5px}.shop-wrap{padding:5px 6px 6px}.shop{gap:4px}}
 @media(max-width:760px) and (max-height:700px){.scene{height:clamp(120px,22svh,200px)}.stage-caption{display:none}.bubble{font-size:13px;min-height:36px;padding:4px 10px 4px 4px;bottom:calc(100% + 10px);line-height:1.3}.bubble img{width:26px;height:26px}#answers button{min-height:56px;font-size:28px}#answers.word button{min-height:52px}#answers.long button{min-height:44px;font-size:15px;line-height:1.4;padding:7px 9px}#answers{gap:8px}}
 /* 0.10: 긴 글(9세 이상 읽기)을 읽는 동안 작은 폰은 장면을 줄여 지문·보기가 한 화면에 들어오게(390px에서 보기 5개가 모두 화면 밖이었음). 320px는 제목을 한 줄로 */
@@ -195,10 +193,10 @@ body.paused *,body.paused *:before,body.paused *:after{animation-play-state:paus
 <div class="stats"><span class="pill" id="gold"></span><span class="pill" id="flockPill"></span><span class="pill" id="level"></span><span class="pill" id="stage"></span></div>
 <div class="scene" id="scene"><div class="road"></div><div class="pond hidden" id="pond" aria-hidden="true"></div><div class="house"><img id="houseArt" src="art-handoff/coopnight/browser/buildings/home-01.png" alt="마을회관"></div><div class="village-extra" id="villageExtra" aria-hidden="true"></div><div class="fence-row" id="fenceRow" aria-hidden="true"></div><div id="tower"><img id="towerArt" src="art-handoff/coopnight/browser/buildings/tower-01.png" alt="방어 타워"><span class="tower-tag" id="towerTag"></span></div><div class="farmers" id="farmers" aria-hidden="true"></div><div class="flock" id="flock" aria-hidden="true"></div><div id="enemies" aria-label="다가오는 늑대"></div><div id="effects" aria-hidden="true"></div><div id="pauseNote">⏸️ 쉬는 중이에요</div></div>
 <div class="stage-caption"><span class="live-dot" aria-hidden="true"></span><span id="villageStatus">마을을 준비하고 있어요…</span></div>
-<div class="shop-wrap" id="shopWrap"><div class="bubble hidden" id="bubble" role="status" aria-live="polite" title="누르면 읽어 줘요"><img src="art-handoff/coopnight/browser/characters/chicken.png" alt="꼬꼬"><span id="bubbleText"></span></div><div class="shop-tip hidden" id="shopTip" role="status" aria-live="polite"></div><div class="shop" id="shop" role="group" aria-label="가게: 누르면 바로 사요"></div></div>
+<div class="shop-wrap" id="shopWrap"><div class="bubble hidden" id="bubble" role="status" aria-live="polite"><img src="art-handoff/coopnight/browser/characters/chicken.png" alt="꼬꼬"><span id="bubbleText"></span></div><div class="shop-tip hidden" id="shopTip" role="status" aria-live="polite"></div><div class="shop" id="shop" role="group" aria-label="가게: 누르면 바로 사요"></div></div>
 <div id="coinLayer" aria-hidden="true"></div></section>
-<section class="panel lesson"><details class="settings-drawer" id="drawer"><summary id="drawerSummary">⚙️ 설정</summary><div class="toolbar"><label>나이 <select id="age" aria-label="나이에 맞는 문제 고르기"><option>7</option><option selected>8</option><option>9</option><option>10</option></select>세</label></div><div class="settings"><label><input id="sfx" type="checkbox" checked> 효과음</label><label><input id="motion" type="checkbox"> 움직임 줄이기</label><label>읽어 주는 속도 <select id="rate"><option value=".7">천천히</option><option value=".85" selected>보통</option><option value="1">자연스럽게</option></select></label><button id="reset">처음부터 시작</button></div><p id="voiceStatus"></p></details>
-<div id="quiz"><p class="lesson-kicker"><span class="kick-left"><span id="fastIcon" data-state="off" role="img" aria-label="번개: 빨리 맞히면 금화가 더 생겨요" title="빨리 맞히면 금화가 더 생겨요">⚡</span><span id="levelChip" title="지금 문제의 나이와 단계"></span></span><button id="speak" class="hidden">🔊 다시 듣기</button></p><h2 id="prompt"></h2><div id="passage"></div><div id="answers"></div></div><div id="feedback" role="status" aria-live="polite"></div></section></div>
+<section class="panel lesson"><details class="settings-drawer" id="drawer"><summary id="drawerSummary">⚙️ 설정</summary><div class="toolbar"><label>나이 <select id="age" aria-label="나이에 맞는 문제 고르기"><option>7</option><option selected>8</option><option>9</option><option>10</option></select>세</label></div><div class="settings"><label><input id="sfx" type="checkbox" checked> 효과음</label><label><input id="motion" type="checkbox"> 움직임 줄이기</label><button id="reset">처음부터 시작</button></div></details>
+<div id="quiz"><p class="lesson-kicker"><span class="kick-left"><span id="fastIcon" data-state="off" role="img" aria-label="번개: 빨리 맞히면 금화가 더 생겨요" title="빨리 맞히면 금화가 더 생겨요">⚡</span><span id="levelChip" title="지금 문제의 나이와 단계"></span></span></p><h2 id="prompt"></h2><div id="passage"></div><div id="answers"></div></div><div id="feedback" role="status" aria-live="polite"></div></section></div>
 <section class="panel growth-panel"><div class="growth-title"><b>조금씩 자라는 우리 마을</b><small>한 번에 맞힐 때마다 금화가 생겨요</small></div><div id="garden"></div><small>늑대와 몬스터가 쉬지 않고 사방에서 몰려와 닭을 물어 가고 건물을 부숴요. 문제를 한 번에 맞히면 모든 타워가 일제 사격을 하고, 닭이 알을 낳아 농부가 팔아 금화가 생겨요(빨리, 연속으로 맞히면 더 많이). 금화로 언제든 가게에서 타워·닭·농부·울타리를 사요. 회관을 키우면 마을이 넓어지고 새 물건과 새 몬스터가 나와요. 부서진 건물은 🔨 고치기로 고쳐요.</small></section>
 <footer>진행 상황은 이 브라우저에 저장됩니다. 나이는 ⚙️ 설정에서 바꿀 수 있어요.</footer>
 </main>
@@ -210,11 +208,11 @@ body.paused *,body.paused *:before,body.paused *:after{animation-play-state:paus
 const DEMO=(()=>{try{const m=/[?&]demo=([123])\b/.exec(location.search);return m?Number(m[1]):0}catch{return 0}})();
 const KEY=DEMO?'hangul-defense-demo'+DEMO:'hangul-defense-v1',AGES=Questions.AGES,ART='art-handoff/coopnight/browser/';
 const DEMO_VILLAGE={1:{hall:1,level:2,fence:2,chickens:4,gold:250},2:{hall:2,level:3,fence:4,chickens:6,farmers:1,power:1,gold:450},3:{hall:3,level:5,fence:6,chickens:8,farmers:2,pond:2,power:2,gold:700}};
-/* 규칙은 combat.js(Combat)·world.js(World)가 정한다. 이 스크립트는 단계(phase) 진행, 화면, 소리만 맡는다. 계약: docs/v09-contract.md
-   게임은 언제나 읽고 고르기다(0.11: 듣고 고르기 모드 폐쇄, state.mode는 저장 호환용으로 늘 'story').
-   phase: start(시작 화면) → listen(7세 상식·수학·영어만: 질문을 읽어 주는 동안 풀이 시계는 멈춤) → ask(풀이)
+/* 규칙은 combat.js(Combat)·world.js(World)가 정한다. 이 스크립트는 단계(phase) 진행, 화면, 효과음만 맡는다. 계약: docs/v09-contract.md
+   0.11: 아이는 글을 읽기만 한다. 소리 모드도, 읽어 주는 음성(음성 합성)도 없다. state.mode는 저장 호환용으로 늘 'story'.
+   phase: start(시작 화면) → ask(풀이)
           → reward(한 번에 정답: 판매·동전 연출 약 1.2초) → 다음 문제
-          → learn(두 번째에 정답 또는 두 번 틀림: 정답을 읽어 주고, 초록 답을 누르면 다음 문제)
+          → learn(두 번째에 정답 또는 두 번 틀림: 정답을 초록으로 보여 주고, 잠깐 뒤 초록 답을 누르면 다음 문제)
    늑대 세계는 start와 '잠깐 쉬기'에서만 멈춘다. 가게는 그 밖에는 언제든 열려 있고, 사도 세계는 멈추지 않는다. */
 if(!(Combat.API>=3)||typeof Combat.shop!=='function')console.warn('combat.js 버전이 index.html과 맞지 않아요. 새로고침해 주세요.');
 let state=Combat.fresh(8);
@@ -223,7 +221,7 @@ if(DEMO&&!state.wins&&!state.index)Object.assign(state,DEMO_VILLAGE[DEMO]);
 /* 문제 순서 씨앗(0.10): 판마다 다른 순서. 예전 저장(씨앗 0)은 이어하는 순간 하나를 받는다 */
 const newSeed=()=>1+Math.floor(Math.random()*2147483646);
 if(!(state.seed>0))state.seed=newSeed();
-let phase='start',paused=false,round=null,voiceOff=false,speech=null,speechSeq=0,acc=0,last=null,worldNote=null,lastShot=-99;
+let phase='start',paused=false,round=null,acc=0,last=null,worldNote=null,lastShot=-99;
 /* uiT: 화면 시계(틱, 쉬는 동안 멈춤). 동전·말풍선·가게 두 번 누름 방지는 모두 이 시계로 센다(검사는 __tick으로). */
 let uiT=0,coins=[],pendingGold=0,lastLaunch=-1,shopLock=0,tipLeft=0,lastHowl=-999,lastDing=-99,shopPrev=[];
 /* 상품 key → 상태(state)에서 그 개수를 세는 칸 */
@@ -253,7 +251,7 @@ function say(text,warn){put($('feedback'),text);$('feedback').classList.toggle('
 function syncMarket(){state.marketDown=world.buildings.some(b=>b.kind==='market'&&b.broken)?1:0}
 function save(){
  /* 시작 화면에서는 저장된 '하던 문제'를 지우지 않는다(이어서 하기). 한 번에 맞힌 뒤(reward)는 문제 번호가 이미 다음으로 넘어가 있어 '하던 문제'가 없다. */
- const keep=round&&{listen:'ask',ask:'ask',learn:'learn'}[phase];
+ const keep=round&&{ask:'ask',learn:'learn'}[phase];
  if(phase!=='start')state.round=keep?{token:round.token,phase:keep,t:Math.floor(round.t),tries:round.tries}:null;
  try{localStorage.setItem(KEY,JSON.stringify({...state,version:1,world:{...world,events:[]}}))}catch{say('저장 공간을 사용할 수 없어요. 이번 판은 계속할 수 있어요.')}
 }
@@ -294,12 +292,10 @@ function pills(){
  put($('stage'),state.streak>=2?'🔥 '+state.streak+'연속':'⭐ '+state.wins);attr($('stage'),'aria-label',state.streak>=2?state.streak+'번 연속으로 한 번에 맞힘':'한 번에 맞힌 문제 '+state.wins+'개');
 }
 function render(){
- document.body.classList.toggle('paused',paused);document.body.classList.toggle('covered',paused&&['listen','ask','learn'].includes(phase));
+ document.body.classList.toggle('paused',paused);document.body.classList.toggle('covered',paused&&['ask','learn'].includes(phase));
  updateVillageArt();bannerShow();put($('pause'),paused?'계속하기':'잠깐 쉬기');
  put($('drawerSummary'),'⚙️ 설정 · '+state.age+'세');
  if($('age').value!==String(state.age))$('age').value=String(state.age);
- /* 🔊 다시 듣기: 7세 상식·수학·영어 질문(풀이 중), 놓친 뒤 정답 읽기(learn) */
- const speakable=!paused&&!voiceOff&&((phase==='ask'&&readsQuiz())||(phase==='learn'&&round&&round.ready));$('speak').classList.toggle('hidden',!speakable);
  frame();
 }
 /* 틱마다: 상태 알약·상태 문구·성큼 테두리·번개 표시·가게 칸·그림 마을 늑대만 바꾼다(값이 바뀔 때만 쓴다). 늑대 시간 표시(시간 바)는 0.9에서 없앴다. */
@@ -312,11 +308,11 @@ function frame(){
 }
 /* 문제 칸 귀퉁이 ⚡: 번개 보너스를 받을 수 있는 동안(Combat.isFast) 빛나고, 그 시간이 지나면 조용히 꺼진다. 한 번에 번개로 맞히면 잠깐 반짝. */
 function fastLight(){let s='off';
- if(round&&(phase==='ask'||phase==='listen')&&round.tries===0){const q=round.q,end=(1-Combat.FAST)*Combat.baseSeconds(q)/Combat.TICK;s=round.t>end+1e-6?'off':Combat.isFast(q,round.t)?'on':'wait'}
+ if(round&&phase==='ask'&&round.tries===0){const q=round.q,end=(1-Combat.FAST)*Combat.baseSeconds(q)/Combat.TICK;s=round.t>end+1e-6?'off':Combat.isFast(q,round.t)?'on':'wait'}
  else if(phase==='reward'&&round&&round.info&&round.info.bonus)s='won';
  if($('fastIcon').dataset.state!==s)$('fastIcon').dataset.state=s}
 
-/* ---------- 소리 ---------- */
+/* ---------- 효과음 ---------- */
 let audioContext,audioOut,noiseBuffer;
 /* 효과음은 음원 파일 없이 합성한다. 여러 소리가 겹쳐도 찢어지지 않게 압축기(compressor)를 거쳐 내보낸다. */
 function ac(){if(!$('sfx').checked||paused)return null;try{const A=window.AudioContext||window.webkitAudioContext;if(!A)return null;if(!audioContext){audioContext=new A();audioOut=audioContext.createDynamicsCompressor();audioOut.threshold.value=-14;audioOut.ratio.value=6;audioOut.connect(audioContext.destination)}if(audioContext.state==='suspended'){const r=audioContext.resume();if(r&&r.catch)r.catch(()=>{})}return audioContext}catch{return null}}
@@ -387,19 +383,6 @@ const SFX={
 /* sfxCount: 효과음 이름별 호출 수(검사·플레이 봇이 효과음 밀도를 잰다) */
 const sfxCount={};
 function jingle(name,...args){sfxCount[name]=(sfxCount[name]|0)+1;try{SFX[name]&&SFX[name](...args)}catch{}}
-/* 음성 읽기. done(true)는 다 읽었을 때, done(false)는 이 기기에서 음성이 안 될 때. 다른 말로 끊긴 것(canceled)은 실패가 아니다. */
-function cancelSpeech(){speechSeq++;speech=null;try{window.speechSynthesis&&window.speechSynthesis.cancel()}catch{}}
-function speak(text,done){
- cancelSpeech();const seq=speechSeq,S=window.speechSynthesis;
- if(voiceOff||!S||typeof SpeechSynthesisUtterance==='undefined'){done&&done(false);return}
- const job={seq,started:false,ticks:0,cap:40+Math.ceil(Combat.syl(text)/2*10),end(ok){if(seq!==speechSeq||speech!==job)return;speech=null;done&&done(ok)}};
- speech=job;
- try{const u=new SpeechSynthesisUtterance(text);u.lang='ko-KR';u.rate=Number($('rate').value)||.85;const ko=(S.getVoices()||[]).find(v=>/^ko([-_]|$)/i.test(v.lang));if(ko)u.voice=ko;
-  u.onstart=()=>{job.started=true};u.onend=()=>job.end(true);u.onerror=e=>{const c=e&&e.error;if(c==='canceled'||c==='interrupted')return;job.end(false)};S.speak(u)}catch{job.end(false)}
-}
-function watchSpeech(){if(!speech)return;speech.ticks++;if(!speech.started&&speech.ticks>30)speech.end(false);else if(speech.ticks>speech.cap)speech.end(true)}
-/* 소리가 안 나오는 기기: 읽어 주기만 끄고 게임은 그대로 간다(설정에 한 줄 안내) */
-function voiceFail(){voiceOff=true;put($('voiceStatus'),'이 기기에서는 읽어 주는 소리가 나오지 않아요.')}
 
 /* ---------- 문제 ---------- */
 function layout(choices){const len=Math.max(...choices.map(c=>[...c].length)),n=choices.length;if(len>6)return ['long','1'];if(len>1)return ['word',n===3&&len<=3?'3':'2'];return ['',n===3?'3':'2']}
@@ -429,12 +412,9 @@ function newRound(resume){
  makeRound();
  if(resume){round.t=resume.t;round.tries=resume.tries}
  say('');
- /* 7세는 상식·수학·영어 질문을 읽어 준다(0.10, 퀴즈 검증: 7세가 질문 글을 읽지 못해 그림 보기만 보고 찍게 됨). 그 밖의 문제는 바로 풀이 */
- if(readsQuiz()&&!voiceOff){phase='listen';hideBubble();veil('🔊 잘 들어 보세요');listen()}else startAsk();
+ startAsk();
  save();render();
 }
-const readsQuiz=()=>!!round&&round.q.mode==='quiz'&&state.age===7;
-function listen(){speak(round.q.speak,ok=>{if(phase!=='listen')return;if(ok)startAsk();else{voiceFail();if(phase==='listen')startAsk()}})}
 function startAsk(){phase='ask';round.lock=Math.max(round.lock,3);
  if(round.lock>3){veil('📖 먼저 글을 읽어요. 곧 질문의 답이 나와요');say('📖 글을 끝까지 읽어 보세요.')}else{veil('');if(round.tries)say('한 번만 더 고를 수 있어요.')}
  render()}
@@ -488,16 +468,15 @@ function enterReward(g){
 /* 판매 연출이 끝나면 바로 다음 문제. 추천 말풍선은 동전이 다 닿을 때(coinsLanded) 따로 뜬다. */
 function rewardTick(){if(--round.wait<=0)newRound()}
 
-/* 두 번째에 정답이거나 두 번 틀렸을 때: 정답을 보여 주고 읽어 준 뒤, 초록 답을 누르면 다음 문제 */
+/* 두 번째에 정답이거나 두 번 틀렸을 때: 정답을 초록으로 보여 주고, 다시 볼 만한 시간(Combat.learnTicks) 뒤 초록 답을 누르면 다음 문제. 읽어 주는 음성은 없다 */
 function enterLearn(message){
  phase='learn';round.dash=0;round.ready=false;veil('');
  answerButtons().forEach(b=>{const right=Number(b.dataset.i)===round.q.answer;b.disabled=!right;if(right)b.classList.add('correct')});
- say(message+' 정답을 함께 읽어요.',round.result==='miss');
- const text=Combat.lesson(round.q);round.learn=voiceOff?Math.min(150,Math.max(15,Math.ceil(Combat.syl(text)/4*10))):10;
- speak(text,ok=>{if(!ok)round.learn=Math.min(150,Math.max(15,Math.ceil(Combat.syl(text)/4*10)))});
+ say(message+' 초록색 정답을 확인해요.',round.result==='miss');
+ round.learn=Combat.learnTicks(round.q);
  save();render();
 }
-function learnReady(){round.ready=true;const b=answerButtons().find(x=>Number(x.dataset.i)===round.q.answer);if(b){b.disabled=false;b.classList.add('tap-me')}put($('feedback'),$('feedback').textContent.replace(' 정답을 함께 읽어요.','')+' 👆 초록 답을 누르면 다음 문제예요.');render()}
+function learnReady(){round.ready=true;const b=answerButtons().find(x=>Number(x.dataset.i)===round.q.answer);if(b){b.disabled=false;b.classList.add('tap-me')}put($('feedback'),$('feedback').textContent.replace(' 초록색 정답을 확인해요.','')+' 👆 초록 답을 누르면 다음 문제예요.');render()}
 
 /* ---------- 가게: 2줄 × 4칸, 언제든 한 번 눌러 바로 산다 ---------- */
 const SHOP_LOOK={repair:['고치기','🔨'],tower:['타워'],power:['강화','💥'],fence:['울타리'],chicken:['닭'],farmer:['농부','🧑‍🌾'],pond:['연못','🐟'],hall:['회관'],feast:['잔치','🎉']};
@@ -525,8 +504,8 @@ function renderShop(){
   put(b._pr,rowText(r));attr(b,'aria-label',rowSay(r));
   b.classList.toggle('rec',rec.glow===r.key);
   shopPrev[i]=r.key+':'+r.state});
- /* 동전이 닿아 살 수 있게 된 칸이 켜지면 '띵'(문제 소리를 듣는 동안은 조용히) */
- if(lit&&uiT-lastDing>=5&&phase!=='listen'){lastDing=uiT;jingle('ding')}
+ /* 동전이 닿아 살 수 있게 된 칸이 켜지면 '띵' */
+ if(lit&&uiT-lastDing>=5){lastDing=uiT;jingle('ding')}
 }
 function slotOf(key){return shopRows().findIndex(r=>r.key===key)}
 function tapSlot(i){
@@ -576,7 +555,7 @@ function coinTick(){if(!coins.length)return;
  for(const c of coins)if(!c.el&&uiT>=c.at)launchCoin(c);
  const landed=coins.filter(c=>uiT>=c.land);if(!landed.length)return;
  coins=coins.filter(c=>uiT<c.land);
- for(const c of landed){if(c.el)c.el.remove();pendingGold=Math.max(0,pendingGold-c.share);if(phase!=='listen')jingle('clink',c.i);if(c.last)coinsLanded(c.total)}
+ for(const c of landed){if(c.el)c.el.remove();pendingGold=Math.max(0,pendingGold-c.share);jingle('clink',c.i);if(c.last)coinsLanded(c.total)}
  pills();renderShop();
 }
 /* 한 번의 금화가 다 닿음: 금화 칸이 통통, '+58'이 떠오르고, 이때 추천 말풍선 */
@@ -589,7 +568,7 @@ function clearCoins(){for(const c of coins)if(c.el)c.el.remove();coins=[];pendin
 /* ---------- 추천: 꼬꼬 말풍선 + 상품 칸 반짝임 ----------
    무엇을 추천할지는 규칙(Combat.recommend, 순수 함수)이 고르고, 언제·얼마나 자주는 화면이 정한다.
    말풍선은 한 번에 하나, 3.5초. 말풍선 사이 20초(급한 것 10초), 1분에 2개(급한 것 3개)까지. 같은 추천을 두 번 연달아 안 따르면 60초 쉰다.
-   문제를 듣는 동안·글 먼저 읽기 동안·음성이 나오는 동안에는 띄우지 않는다. 반짝임은 사거나 상황이 바뀔 때까지 남는다. */
+   글 먼저 읽기 동안에는 띄우지 않는다. 반짝임은 사거나 상황이 바뀔 때까지 남는다. */
 /* 0.10(플레이 점검: "금화를 모아서 회관을 키워 봐요!"가 한 판에 30~70번): 급하지 않은 같은 문장은 회관 단계마다 2번까지(perStage),
    '회관을 위해 모으자'는 회관 값의 절반(saveFrom)을 모으기 전에는 띄우지 않는다, 급한 것도 1분에 2개까지 */
 const REC={show:35,gap:200,urgentGap:100,window:600,mute:600,stale:150,perStage:2,saveFrom:.5,perMin:2};
@@ -600,7 +579,7 @@ function recCtx(){const kinds=[];for(const b of world.buildings)if(b.broken&&b.k
  return {wolvesInside:wolvesInside(),towers:world.buildings.filter(b=>b.kind==='tower'&&!b.broken).length,lostHenRecently:world.t-rec.lostAt<=300,brokenKinds:kinds,opened:rec.opened.slice()}}
 function recommendNow(){const s={...state,gold:shownGold()};try{return Combat.recommend(s,recCtx())||null}catch{return null}}
 /* 새 몬스터 알림 띠가 떠 있는 동안에도 기다린다(작은 화면에서 띠와 말풍선이 겹쳐 마을이 가려지지 않게). */
-const recQuiet=()=>phase==='start'||phase==='listen'||paused||!!speech||(phase==='ask'&&round&&round.lock>0)||(!!bannerEl&&!bannerEl.classList.contains('later'));
+const recQuiet=()=>phase==='start'||paused||(phase==='ask'&&round&&round.lock>0)||(!!bannerEl&&!bannerEl.classList.contains('later'));
 /* 지난 말풍선을 따랐는지 한 번만 센다(다음에 말풍선을 띄우려 할 때). 같은 추천을 두 번 연달아 안 따르면 60초 쉰다. */
 function recAccount(){const p=rec.prev;if(!p||p.done)return;p.done=true;if(p.followed){rec.ign[p.key]=0;return}rec.ign[p.key]=(rec.ign[p.key]||0)+1;if(rec.ign[p.key]>=2){rec.mute[p.key]=world.t+REC.mute;rec.ign[p.key]=0}}
 /* 지금 말풍선을 띄워도 되는 추천(빈도·쉬기 규칙 통과) 또는 null */
@@ -624,14 +603,13 @@ function showBubble(){
  renderShop();return true;
 }
 function hideBubble(){rec.bubble=null;rec.left=0;$('bubble').classList.add('hidden')}
-/* 말풍선을 띄울 때를 알린다(동전 도착·건물 부서짐·닭 잃음). 띄울 수 없는 때(듣기·글 먼저 읽기)면 15초 안에 될 때 띄우고, 넘으면 버린다(띄울 때 추천을 다시 고르므로 묵은 추천은 나오지 않는다). */
+/* 말풍선을 띄울 때를 알린다(동전 도착·건물 부서짐·닭 잃음). 띄울 수 없는 때(글 먼저 읽기)면 15초 안에 될 때 띄우고, 넘으면 버린다(띄울 때 추천을 다시 고르므로 묵은 추천은 나오지 않는다). */
 function askBubble(urgent){if(!rec.want||urgent)rec.want={at:world.t,urgent:!!urgent}}
 function recTick(){
  if(rec.bubble&&--rec.left<=0)hideBubble();
  if(rec.glow&&uiT%10===0){const r=recommendNow();if(!r||r.key!==rec.glow){rec.glow=null;renderShop()}}
  if(rec.want){if(world.t-rec.want.at>REC.stale)rec.want=null;else if(!recQuiet()&&!rec.bubble){rec.want=null;showBubble()}}
 }
-$('bubble').onclick=()=>{if(!rec.bubble||paused||voiceOff||phase==='listen'||phase==='start')return;rec.left=Math.max(rec.left,25);speak(rec.bubble.line)};
 
 /* ---------- 늑대 무리 알림: 울음소리 + 장면 가장자리 붉은 발자국 ---------- */
 const PAW='<svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="15.5" rx="5.6" ry="4.7"/><circle cx="5.4" cy="9.6" r="2.3"/><circle cx="9.4" cy="5.6" r="2.4"/><circle cx="14.6" cy="5.6" r="2.4"/><circle cx="18.6" cy="9.6" r="2.3"/></svg>';
@@ -689,7 +667,7 @@ function celebrate(kind,at,slot){
 /* ---------- 시계: 0.1초 = 1틱. 밀린 시간은 한 번에 최대 3틱까지만 따라잡고, 쉬는 동안·탭이 숨은 동안은 흐르지 않는다. ---------- */
 function tick(){
  if(phase==='start'||paused)return;
- uiT++;watchSpeech();bannerTick();coinTick();recTick();if(shopLock>0)shopLock--;if(tipLeft>0&&--tipLeft===0)$('shopTip').classList.add('hidden');
+ uiT++;bannerTick();coinTick();recTick();if(shopLock>0)shopLock--;if(tipLeft>0&&--tipLeft===0)$('shopTip').classList.add('hidden');
  {const n=phase==='ask'&&round.dash>0?Math.max(1,Math.round(World.dashTicks(world)/Combat.DASH_TICKS)):1;for(let i=0;i<n;i++)worldStep()}
  if(phase==='ask'){
   if(round.dash>0){if(--round.dash===0){answerButtons().forEach(b=>b.disabled=b.classList.contains('wrong'));if(round.lock<=0)say('한 번만 더 고를 수 있어요.',true)}}
@@ -697,15 +675,15 @@ function tick(){
   if(round.lock>0&&--round.lock===0)showAnswers();
   if(round.t%10<1)save();
  }else if(phase==='reward'){rewardTick();if(phase!=='reward')return}
- else if(phase==='learn'){if(round.learn>0)round.learn--;if(!round.ready&&round.learn<=0&&!speech)learnReady()}
+ else if(phase==='learn'){if(round.learn>0)round.learn--;if(!round.ready&&round.learn<=0)learnReady()}
  frame();
 }
-/* 세계 한 틱: 사건을 3D 마을에 넘기고, 닭 잃음·건물 부서짐·새 몬스터·무리를 경제 상태와 문구·소리·추천에 반영한다. */
+/* 세계 한 틱: 사건을 3D 마을에 넘기고, 닭 잃음·건물 부서짐·새 몬스터·무리를 경제 상태와 문구·효과음·추천에 반영한다. */
 let lastBoom=-99,lastCrash=-99,lastYelp=-99,hushUntil=-99;
-/* 전투 효과음 예산(0.10, 플레이 점검: 후반 분당 430~690번, 정답 소리가 1.5%로 묻히고 듣기 문제 음성 위로 계속 남):
-   깨갱 0.3초·펑 1초·화살 1.5초 간격, 문제를 듣는 동안·음성이 나오는 동안·정답 직후 1초는 쉰다 */
+/* 전투 효과음 예산(0.10, 플레이 점검: 후반 분당 430~690번, 정답 효과음이 1.5%로 묻힘):
+   깨갱 0.3초·펑 1초·화살 1.5초 간격, 정답 직후 1초는 쉰다 */
 const SFX_GAP={yelp:3,boom:10,shoot:15};
-const hush=()=>phase==='listen'||!!speech||world.t<hushUntil;
+const hush=()=>world.t<hushUntil;
 /* 알림 띠는 한 번에 하나씩: 새 몬스터 여러 종류가 한 무리로 처음 나와도 같은 자리에 겹치지 않게 줄을 세워 33틱(3.3초)씩 보여 준다.
    시계 틱으로 세므로 쉬는 동안 함께 멈추고, 정답 판매 연출(reward) 동안에는 금화 띠와 겹치지 않게 숨겼다가 끝나면 처음부터 다시 보여 준다.
    now=true(우두머리 보상)는 줄을 건너뛰어 바로 보여 주고, 보던 띠는 그다음에 다시 보여 준다. */
@@ -748,26 +726,25 @@ setInterval(()=>{
 /* 검사용 훅: 시계를 세운 채(__HOLD_CLOCK) 틱을 직접 돌린다. */
 window.__tick=n=>{for(let i=0;i<(n||1);i++)tick();return window.__game()};
 window.__game=()=>{const kinds={};for(const v of liveWolves())kinds[v.kind||'wolf']=(kinds[v.kind||'wolf']||0)+1;
- return {phase,paused,voiceOff,speaking:!!speech,uiT,state:JSON.parse(JSON.stringify(state)),world:{t:world.t,wave:{...world.wave},interval:world.interval,trickle:world.trickle,mercy:world.mercy,wolves:liveWolves().length,kinds,seen:{...world.seen},inside:wolvesInside(),arrows:world.arrows.length,splashArrows:world.arrows.filter(a=>a.splash>0).length,stunned:world.buildings.filter(b=>b.stun>0).length,hens:world.hens.map(h=>h.state),broken:World.brokenCount(world),fencesDown:world.buildings.filter(b=>b.kind==='fence'&&b.broken).length,stats:{...world.stats},radius:World.radius(world)},
+ return {phase,paused,uiT,state:JSON.parse(JSON.stringify(state)),world:{t:world.t,wave:{...world.wave},interval:world.interval,trickle:world.trickle,mercy:world.mercy,wolves:liveWolves().length,kinds,seen:{...world.seen},inside:wolvesInside(),arrows:world.arrows.length,splashArrows:world.arrows.filter(a=>a.splash>0).length,stunned:world.buildings.filter(b=>b.stun>0).length,hens:world.hens.map(h=>h.state),broken:World.brokenCount(world),fencesDown:world.buildings.filter(b=>b.kind==='fence'&&b.broken).length,stats:{...world.stats},radius:World.radius(world)},
  round:round&&{token:round.token,id:round.q.id,mode:round.q.mode,cat:round.q.cat||'',t:round.t,tries:round.tries,dash:round.dash,lock:round.lock,result:round.result,ready:round.ready,wait:round.wait,answer:round.q.answer,choices:round.q.choices.slice(),gold:round.info&&round.info.gold||0},
  shop:shopRows(),shopLock,gold:{shown:shownGold(),pending:pendingGold,coins:coins.length,flying:coins.filter(c=>c.el).length},fast:$('fastIcon').dataset.state,
  rec:{glow:rec.glow,bubble:rec.bubble&&{...rec.bubble},left:rec.left,last:rec.last,times:rec.times.slice(),shown:rec.shown,want:rec.want&&{...rec.want},mute:{...rec.mute},ign:{...rec.ign},opened:rec.opened.slice(),said:{...rec.said}},
  sfx:{...sfxCount},calm:world.calm|0,keep:!!world.keep,seed:state.seed}};
 
 /* ---------- 버튼 ---------- */
-$('pause').onclick=()=>{if(phase==='start')return;paused=!paused;if(paused){cancelSpeech();if(phase==='listen')veil('🔊 계속하기를 누르면 다시 읽어 줘요')}else{acc=0;last=null;if(phase==='listen'){veil('🔊 잘 들어 보세요');listen()}else if(phase==='learn'&&!round.ready)round.learn=Math.min(round.learn,5)}save();render()};
+$('pause').onclick=()=>{if(phase==='start')return;paused=!paused;if(!paused){acc=0;last=null}save();render()};
 function changeSetting(){
  world.interval=waveInterval();
  if(phase==='start'){drawStart();save();return}
- if(phase==='listen'||phase==='ask'){const tries=round.tries;cancelSpeech();newRound();round.tries=tries;say(state.age+'세 문제로 바꿨어요. 늑대는 그대로 와요.');render()}
+ if(phase==='ask'){const tries=round.tries;newRound();round.tries=tries;say(state.age+'세 문제로 바꿨어요. 늑대는 그대로 와요.');render()}
  else{say('다음 문제부터 '+state.age+'세 문제가 나와요.');save();render()}
 }
 $('age').value=String(state.age);$('age').onchange=()=>{const age=Number($('age').value);if(!AGES.includes(age)||paused){$('age').value=String(state.age);return}state.age=age;changeSetting()};
-$('speak').onclick=()=>{if(paused||!round)return;if(phase==='ask'&&readsQuiz())speak(round.q.speak);else if(phase==='learn'&&round.ready)speak(Combat.lesson(round.q,true))};/* 다시 듣기는 지문까지 전부 */
-$('reset').onclick=()=>{if(!confirm('저장된 금화와 마을을 초기화할까요?'))return;cancelSpeech();state=Object.assign(Combat.fresh(state.age),{seed:newSeed()},DEMO?DEMO_VILLAGE[DEMO]:{});world=freshWorld();lastBoom=lastShot=lastYelp=lastCrash=lastHowl=hushUntil=-99;state.broken=0;syncMarket();worldNote=null;paused=false;artStamp='';clearCoins();recReset();shopPrev=[];newRound()};
+$('reset').onclick=()=>{if(!confirm('저장된 금화와 마을을 초기화할까요?'))return;state=Object.assign(Combat.fresh(state.age),{seed:newSeed()},DEMO?DEMO_VILLAGE[DEMO]:{});world=freshWorld();lastBoom=lastShot=lastYelp=lastCrash=lastHowl=hushUntil=-99;state.broken=0;syncMarket();worldNote=null;paused=false;artStamp='';clearCoins();recReset();shopPrev=[];newRound()};
 $('motion').onchange=()=>document.body.classList.toggle('reduced',$('motion').checked);
 if(DEMO){const t=document.querySelector('header small');if(t){const d=document.createElement('span');d.className='demo-tag';d.textContent='체험: 마을회관 '+DEMO+'단계';t.append(' · ',d)}}
-/* 시작 화면: 나이만 고른다. 처음 누르는 순간이 소리 재생 허락이 되므로, 첫 문제가 읽어 주는 문제(7세 퀴즈)면 이 클릭 안에서 바로 읽기 시작한다. */
+/* 시작 화면: 나이만 고른다. */
 function drawStart(){
  if(!$('ageRow').children.length)for(const a of AGES){const b=document.createElement('button');b.textContent=a+'살';b.dataset.age=String(a);b.onclick=()=>{state.age=a;drawStart()};$('ageRow').append(b)}
  for(const b of $('ageRow').children)b.classList.toggle('on',Number(b.dataset.age)===state.age);
