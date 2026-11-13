@@ -908,9 +908,9 @@ a=seed({age:7,mode:'story',hall:1,chickens:8,level:4,gold:150},{rec:'real'});a.g
  /* 닭은 가까운 늑대에만 숨는다 */
  {const s=S0({chickens:8,hall:3}),w=quiet(s,55);wolf(w,{x:15,z:0,speed:0,state:'hunt'});for(let i=0;i<40;i++)W.step(w,s);
   eq(w.hens.filter(h=>h.state==='hidden'||h.state==='flee').length,0,'큰 마을 가장자리 늑대 한 마리로는 닭이 숨지 않음');
-  /* 마당 한쪽 바깥(닭 0번 자리에서 4칸 왼쪽)의 늑대: 그쪽 닭은 숨고, 반대편 닭은 마당에 남는다 */
-  const h0=w.hens.find(h=>h.slot===0);wolf(w,{x:h0.x-4,z:h0.z,speed:0,state:'hunt'});for(let i=0;i<10;i++)W.step(w,s);ok(h0.state==='flee'||h0.state==='hidden','가까운 닭은 숨으러 감 '+h0.state);
-  const farH=w.hens.filter(h=>Math.hypot(h.x-(h0.x-4),h.z-h0.z)>W.HEN.alert+1);ok(farH.length>0&&farH.every(h=>h.state==='yard'),'먼 닭은 마당에 남음 '+farH.map(h=>h.state))}
+  /* 마당 한쪽 바깥(닭 0번 자리에서 경보 반경보다 조금 가까이)의 늑대: 그쪽 닭은 숨고, 반대편 닭은 마당에 남는다 */
+  const h0=w.hens.find(h=>h.slot===0),wx=h0.x-(W.HEN.alert-.5);wolf(w,{x:wx,z:h0.z,speed:0,state:'hunt'});for(let i=0;i<10;i++)W.step(w,s);ok(h0.state==='flee'||h0.state==='hidden','가까운 닭은 숨으러 감 '+h0.state);
+  const farH=w.hens.filter(h=>Math.hypot(h.x-wx,h.z-h0.z)>W.HEN.alert+1);ok(farH.length>0&&farH.every(h=>h.state==='yard'),'먼 닭은 마당에 남음 '+farH.map(h=>h.state))}
  /* 찍기 막기·읽기 속도 */
  {const q=Q.get(8,'story',0),need=C.needSeconds(q),at=Math.ceil(C.FAST_MIN*need/C.TICK);
   eq([C.guard(q,0),C.guard(q,at),C.guard(q,undefined)],[C.GUARD.floor,1,1],'찍기 막기: 바로 누르면 75%, 번개를 받을 수 있는 때부터 100%, 시간을 모르면 100%');
@@ -940,6 +940,10 @@ a=fresh();a.go();a.unlock();a.tick(40);{const q=a.api.round.q,t=a.api.round.t,s=
 /* 9세 이상 읽기: 놓치면 질문·정답만 짧게, 🔊는 지문까지 */
 {const a=seed({age:9,mode:'story'},{tts:'manual'});a.go();a.unlock();a.wrong(0);a.tick(C.DASH_TICKS);a.wrong(1);eq(a.api.phase,'learn','(배우기)');
  eq(a.speakLog.at(-1),C.lesson(a.api.round.q),'두 번 틀리면 짧은 해설(질문·정답)');a.speechEnd();a.tick(12);ok(a.api.round.ready,'(해설 뒤 초록 답)');a.n.speak.click();eq(a.speakLog.at(-1),C.lesson(a.api.round.q,true),'🔊 다시 듣기는 지문까지')}
+/* 시작 화면에서 고른 나이·모드로 무리 간격(전: 페이지를 연 때의 8세 듣기 13초로 고정) */
+{const want=(age,mode)=>{const t=[];for(let i=0;i<Q.count(age,mode);i++)t.push(C.baseSeconds(Q.get(age,mode,i)));t.sort((x,y)=>x-y);return W.intervalFor(t[t.length>>1])};
+ const a=fresh();a.n.ageRow.children.find(b=>b.dataset.age==='10').click();a.n.startStory.click();a.go();
+ eq([a.api.state.age,a.api.state.mode,a.api.world.interval,a.api.world.wave.arrive],[10,'story',want(10,'story'),want(10,'story')],'새 판은 고른 나이·모드의 무리 간격으로 시작');ok(want(10,'story')>want(8,'sound'),'(10세 읽기 간격이 8세 듣기보다 김)')}
 /* '모아서 회관을 키워 봐요'는 회관 값의 절반을 모은 뒤에만 */
 a=seed({age:7,mode:'story',level:5,fence:4,chickens:4,gold:0},{rec:'real'});a.go();calmWorld(a);eq(answerLand(a),0,'회관 값의 절반 전에는 모으자 말풍선 없음');
 a.tick(250);a.api.state.gold=70;eq(answerLand(a),1,'절반을 넘으면 띄움');eq(a.bubble(),C.LINES.hallSave,'(모으자 말풍선)');

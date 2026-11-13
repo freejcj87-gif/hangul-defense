@@ -459,6 +459,7 @@ function choose(i,b){
   return}
  if(round.tries===0){
   Combat.trackPace(state,q,round.t);/* 0.10: 틀려도 첫 고르기까지의 시간으로 읽기 속도를 갱신(천천히 읽는 아이 완충이 첫 정답 전부터 켜짐) */
+  World.answered(world);/* 새 판 보호는 처음 몇 문제(맞히든 틀리든) */
   round.tries=1;state.streak=0;b.classList.add('wrong');b.disabled=true;pop(b,'nope');jingle('wrong');jingle('dash');
   round.dash=Combat.DASH_TICKS;/* 그동안 세계를 빨리 감는다(무리 간격의 30%) */
   answerButtons().forEach(x=>x.disabled=true);say('앗! 늑대가 성큼 다가왔어요. 한 번 더 골라 보세요.',true);
@@ -788,6 +789,8 @@ $('go').onclick=()=>{
   if(r.phase==='pick'){state.round=null;state.index++;newRound();return}
   if(r.phase==='learn'){makeRound();round.t=r.t;round.result='miss';round.info={};enterLearn('지난번에 놓친 문제예요.');return}
   newRound({t:r.t,tries:r.tries});return}
+ /* 0.10: 시작 화면에서 고른 나이·모드로 무리 간격을 다시 정한다(전에는 페이지를 연 때의 기본값 8세 듣기 13초로 돌아 9·10세 읽기에 무리가 1.4~1.5배 잦았다) */
+ world.interval=waveInterval();if(world.t===0){world.wave.arrive=world.interval;world.wave.spawned=false}
  newRound();
 };
 window.addEventListener('beforeunload',save);
