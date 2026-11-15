@@ -69,7 +69,7 @@
   function sellEggs(s,n){const g=Math.max(0,n|0)*eggPrice(s);s.gold+=g;return g}
   /* 결전: 별 방패 shields개, 문제는 이번 판에 맞힌 것 ok + 틀린 것 review, 최근 recent문제는 뺀다.
      8세부터 두 번 틀리면 왕이 한 걸음(최대 steps), noStepAge 이하는 다가오지 않음(결정 E). 지는 경우는 없다 */
-  const FINALE={shields:6,ok:4,review:2,steps:3,noStepAge:7,recent:10};
+  const FINALE={shields:6,ok:2,fresh:2,review:2,steps:3,noStepAge:7,recent:10};
   /* 도둑 여우: 이번 판 지은 수 at에 한 마리씩(회관 needHall 뒤), 닭까지 오는 시간 = 문제 기본 시간 × max(1, pace/100) × f,
      second = 두 번째 정답도 구출 인정, scareOnlyAge 이하는 놀래키기만(결정 E). on:false면 여우가 나오지 않는다 */
   const FOX={on:true,at:[20,40,55],needHall:1,f:1.3,second:true,scareOnlyAge:7};
@@ -356,17 +356,21 @@
   /* 종 권유 말풍선을 띄웠음 */
   function bellPrompted(s){const r=runOf(s);if(r.bell===1&&r.prompts<FLAGS.BELL_PROMPTS)r.prompts++;return r.prompts}
   /* 종을 울림(값 없음): 결전 문제 번호 shields개를 정해 run.fpick에 넣는다(이어하기에도 같은 문제).
-     이번 판에 한 번에 맞힌 것(최근 recent문제 제외, 모자라면 최근 것도) ok개 + 틀린 것 review개, 순서는 맞힌 것 2 → 복습 → 맞힌 것 → 복습 → 맞힌 것(마지막 방패는 맞힌 문제).
+     이번 판에 한 번에 맞힌 것(최근 recent문제 제외, 모자라면 최근 것도) ok개 + 처음 보는 새 문제 fresh개(−1) + 틀린 것 review개.
+     순서는 맞힌 것 → 새 문제 → 복습 → 새 문제 → 복습 → 맞힌 것(첫 방패와 마지막 방패는 맞힌 문제). 0.13.1: 맞힌 것만 4개면 결전이 싱거워서 새 문제 2개를 넣었다.
      기록이 모자라면(예전 저장 등) 평소 순서의 다음 문제(−1)로 채운다. opt.rnd = 0~1 난수, opt.idOf(번호) = 그 번호의 문항 id(같은 문항을 두 번 고르지 않게, 없어도 됨) */
   function ringBell(s,opt){
     const r=runOf(s),o=opt||{};if(r.bell!==1)return false;
     const R=typeof o.rnd==='function'?o.rnd:Math.random,idOf=typeof o.idOf==='function'?o.idOf:(i=>i),used=new Set(),N=FINALE.shields;
     const take=(list,n)=>{const a=list.slice(),out=[];while(out.length<n&&a.length){const i=a.splice(Math.min(a.length-1,Math.floor(R()*a.length)),1)[0],k=idOf(i);if(used.has(k))continue;used.add(k);out.push(i)}return out};
     const cut=(s.index|0)-FINALE.recent,review=take(r.miss,Math.min(FINALE.review,N-1));
-    let oks=take(r.ok.filter(i=>i<cut),N-review.length);
-    if(oks.length<N-review.length)oks=oks.concat(take(r.ok.filter(i=>i>=cut),N-review.length-oks.length));
+    const rest=N-review.length,want=Math.max(0,rest-Math.max(0,Math.min(FINALE.fresh|0,rest-1)));
+    let oks=take(r.ok.filter(i=>i<cut),want);
+    if(oks.length<want)oks=oks.concat(take(r.ok.filter(i=>i>=cut),want-oks.length));
+    /* 복습이 아닌 자리: 맞힌 것 하나 → 새 문제(−1)들 → 나머지 맞힌 것 */
+    const plain=oks.slice(0,1).concat(Array(rest-oks.length).fill(-1),oks.slice(1));
     const pick=[];let a=0,b=0;
-    for(let i=0;i<N;i++)pick.push(i%3===2&&b<review.length?review[b++]:a<oks.length?oks[a++]:-1);
+    for(let i=0;i<N;i++)pick.push(i%3===2&&b<review.length?review[b++]:a<plain.length?plain[a++]:-1);
     while(b<review.length){const j=pick.indexOf(-1);if(j<0)break;pick[j]=review[b++]}
     /* 마지막 방패는 복습이 아니게: 마지막이 복습이면 바로 앞과 바꾼다 */
     if(N>=2&&review.includes(pick[N-1])&&!review.includes(pick[N-2])){const t=pick[N-1];pick[N-1]=pick[N-2];pick[N-2]=t}

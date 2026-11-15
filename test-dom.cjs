@@ -668,8 +668,8 @@ a.tick(30);eq(a.api.round,null,'시작 화면에서는 문제 없음');eq(a.api.
 for(const id of ['battle','next','shield','combatInfo','buildPrompt','buyChicken','buyFence','timebar','timeFill','wolfHead','timeTag','choices','cards','skip','gainLine','gainParts'])ok(!html.includes('id="'+id+'"'),'없앤 요소: '+id);
 ok(!html.includes('소리 도움말'),'정답을 글자로 보여 주던 소리 도움말 제거');ok(!src.includes('다음 무리')&&!src.includes('barLeft')&&!src.includes('secondsLeft'),'늑대 시간 표시(초·막대) 코드 없음');
 ok(!src.includes('enterPick')&&!src.includes('picks')&&!src.includes('offers('),'카드 고르기 단계 코드 없음');
-ok(html.includes('src="combat.js?v=0.13"')&&html.includes('src="world.js?v=0.13"')&&html.includes('src="questions.js?v=0.13"')&&html.includes('src="village.js?v=0.13"')&&!html.includes('?v=0.12'),'캐시 갱신용 ?v=0.13');
-ok(html.indexOf('src="questions-gen.js?v=0.13"')>0&&html.indexOf('src="questions-gen.js?v=0.13"')<html.indexOf('src="questions.js?v=0.13"'),'생성 문항 파일을 questions.js보다 먼저 불러옴');
+ok(html.includes('src="combat.js?v=0.13.1"')&&html.includes('src="world.js?v=0.13.1"')&&html.includes('src="questions.js?v=0.13.1"')&&html.includes('src="village.js?v=0.13.1"')&&!html.includes('?v=0.12'),'캐시 갱신용 ?v=0.13');
+ok(html.indexOf('src="questions-gen.js?v=0.13.1"')>0&&html.indexOf('src="questions-gen.js?v=0.13.1"')<html.indexOf('src="questions.js?v=0.13.1"'),'생성 문항 파일을 questions.js보다 먼저 불러옴');
 /* 0.11: 듣고 고르기 모드 폐쇄. 시작 화면·설정에 모드 고르기가 없고, 스크립트에 소리 모드 분기가 없다 */
 for(const id of ['startSound','startStory','mode'])ok(!html.includes('id="'+id+'"'),'없앤 모드 버튼: '+id);
 ok(!html.includes('mode-row')&&!html.replace(/<script>[\s\S]*?<\/script>/,'').includes('듣고 고르기'),'화면에 모드 고르기·듣고 고르기 문구 없음');
@@ -1013,7 +1013,7 @@ a.tick(250);a.api.state.gold=62;eq(answerLand(a),1,'절반을 넘으면 띄움')
  eq([f.level,f.gold,f.chickens,C.built(f),f.run.bell,f.run.no,f.run.village,f.run.wolfMul,f.meta.stamps.length],[1,20,1,1,0,1,'meadow',100,0],'새 판: 타워 2개(level 1, 지은 수에 1로 셈), 초원 마을');
  eq(W.towerUnits(W.sync(W.create({seed:1}),f)),2,'세계의 타워 2개');
  eq([C.FLAGS.GOLD_SCALE,C.FLAGS.HALL_MODE,C.FLAGS.HALL_AUTO,C.FLAGS.BELL_BUILT,C.FLAGS.BELL_PROMPTS,C.FLAGS.BELL_COUNTS_PACK,C.FLAGS.FEAST_AFTER_END,C.FLAGS.FEAST_MAX,C.FLAGS.START_TOWERS],['flat','auto',[10,32,54],66,3,false,true,20,2],'손잡이 기본값(경제·회관·종·잔치)');
- eq([C.FINALE.shields,C.FINALE.ok,C.FINALE.review,C.FINALE.steps,C.FINALE.noStepAge,C.FOX.at,C.FOX.needHall,C.FOX.f,C.FOX.second,C.FOX.scareOnlyAge],[6,4,2,3,7,[20,40,55],1,1.3,true,7],'결전·여우 기본값');
+ eq([C.FINALE.shields,C.FINALE.ok+C.FINALE.fresh,C.FINALE.review,C.FINALE.steps,C.FINALE.noStepAge,C.FOX.at,C.FOX.needHall,C.FOX.f,C.FOX.second,C.FOX.scareOnlyAge],[6,4,2,3,7,[20,40,55],1,1.3,true,7],'결전·여우 기본값');
  eq([C.START_PACK,C.WOLF_MUL.step,C.WOLF_MUL.max,C.WOLF_MUL.raiseAcc,C.MIGRATE.goldRate,C.MIGRATE.feastMax,C.SAVE_VERSION],[{perStamp:{towers:1,hens:1},max:3},5,120,80,.25,10,3],'다회차·이행 기본값');
  eq([1,2,3,4,5,6].map(C.villageOf).map(v=>C.VILLAGE_NAME[v]),['초원','채석장','서리 과수원','불씨 숲','초원','채석장'],'마을 이름 순서(4개 뒤 반복)');}
 
@@ -1060,14 +1060,14 @@ a.tick(250);a.api.state.gold=62;eq(answerLand(a),1,'절반을 넘으면 띄움')
  withFlags({BELL_BUILT_BY_AGE:{9:54}},()=>eq([C.bellBuilt(S({age:9})),C.bellBuilt(S({age:8})),C.bellDue(S({age:9,level:19,fence:18,chickens:15,hall:3})),C.bellDue(S({age:8,level:19,fence:18,chickens:15,hall:3}))],[54,66,true,false],'(손잡이, 결정 B ②) 9세만 54'));
  withFlags({BELL_WINS_CAP:3},()=>{const w=S();for(let i=0;i<3;i++)C.settle(w,Q.get(8,'story',0),'first');eq(w.run.bell,1,'(손잡이) 한 번에 맞힌 수 상한으로도 열림')});}
 
-/* 3-5 결전: 문제 6개 = 이번 판에 맞힌 것 4 + 틀린 것 2(최근 10문제 제외, 마지막 방패는 맞힌 문제), 한 번에 맞혀야 방패가 깨짐, 지는 경우 없음 */
+/* 3-5 결전: 문제 6개 = 이번 판에 맞힌 것 2 + 새 문제 2 + 틀린 것 2(최근 10문제 제외, 첫·마지막 방패는 맞힌 문제. 0.13.1), 한 번에 맞혀야 방패가 깨짐, 지는 경우 없음 */
 {let sr=3;const rnd=()=>{sr=(sr*1103515245+12345)%2147483648;return sr/2147483648};
  const mk=age=>{const s=S({age,index:60,chickens:5});s.run.bell=1;s.run.ok=Array.from({length:57},(_,i)=>i);s.run.miss=[57,58,59];return s};
  eq(C.ringBell(S()),false,'닫힌 종은 울리지 못함');
  const s=mk(8);ok(C.ringBell(s,{rnd}),'종을 울림');const p=s.run.fpick.slice(),isMiss=i=>i>=57;
- eq([s.run.bell,p.length,new Set(p).size,s.run.shields,s.run.fq,s.run.steps],[2,6,6,0,0,0],'결전 시작: 문제 6개, 방패 0개 깸');
- eq(p.map(isMiss),[false,false,true,false,true,false],'순서: 맞힌 것 2 → 복습 → 맞힌 것 → 복습 → 맞힌 것(마지막은 맞힌 문제)');
- ok(p.filter(i=>!isMiss(i)).every(i=>i<50),'맞힌 문제는 최근 10문제를 뺀 것에서');eq(C.ringBell(s,{rnd}),false,'두 번 울리지 못함');
+ eq([s.run.bell,p.length,new Set(p).size,s.run.shields,s.run.fq,s.run.steps],[2,6,5,0,0,0],'결전 시작: 문제 6개(새 문제 2개는 −1), 방패 0개 깸');
+ eq(p.map(i=>i<0?'new':isMiss(i)?'review':'ok'),['ok','new','review','new','review','ok'],'순서: 맞힌 것 → 새 문제 → 복습 → 새 문제 → 복습 → 맞힌 것');
+ ok(p.filter(i=>i>=0&&!isMiss(i)).every(i=>i<50),'맞힌 문제는 최근 10문제를 뺀 것에서');eq(C.ringBell(s,{rnd}),false,'두 번 울리지 못함');
  eq(C.shop(s)[7],{key:'bell',state:'fight',price:0,need:0},'종 칸: 결전 중');eq(C.finaleNow(s),{index:p[0],normal:false},'지금 낼 결전 문제');eq(C.finaleNow(S()),null,'결전이 아니면 null');
  let r=C.finaleSettle(s,'first');eq([r.shield,r.shields,r.won,s.run.fpick,s.run.fq],[true,1,false,p.slice(1),1],'한 번에 맞힘: 방패 1개');
  r=C.finaleSettle(s,'second');eq([r.shield,r.shields,r.stepped,s.run.fpick],[false,1,false,p.slice(2).concat(p[1])],'두 번째 정답: 방패 그대로(반짝임만), 그 문제는 맨 뒤로');
@@ -1196,7 +1196,7 @@ a.tick(250);a.api.state.gold=62;eq(answerLand(a),1,'절반을 넘으면 띄움')
  /* 종을 울림 */
  const g0=a.api.state.gold;a.tick(5);a.buy('bell');const pick=a.api.state.run.fpick.slice();
  eq([a.api.state.run.bell,a.api.state.gold,pick.length,a.game().king.state,a.api.round.fin,a.slots()[7].dataset.state,a.slots()[7]._pr.textContent],[2,g0,6,'come',null,'fight','결전!'],'종을 울림: 금화 그대로, 문제 6개 정함, 왕이 다가옴, 풀던 문제는 그대로');
- ok(pick.every(i=>i>=0&&i<45)&&new Set(pick.map(i=>qOf(a,i).id)).size===6,'결전 문제는 이번 판에 푼 문제에서, 서로 다른 문항');
+ {const old=pick.filter(i=>i>=0);ok(old.length===4&&old.every(i=>i<45)&&new Set(old.map(i=>qOf(a,i).id)).size===4&&pick.filter(i=>i<0).length===2,'결전 문제: 이번 판에 푼 서로 다른 문항 4개 + 새 문제 2개')}
  a.buy('bell');eq(a.n.shopTip.textContent,'👑 한 번에 맞히면 방패가 깨져요','결전 중 종 칸은 안내만');
  const i1=a.api.state.index;solve(a);a.untilAsk();eq([a.api.state.index,a.api.round.fin,a.api.round.token,a.n.answers.dataset.qid],[i1+1,{normal:false},'8:story:F0-'+pick[0],qOf(a,pick[0]).id],'다음 문제부터 결전 문제(정해 둔 번호의 문항)');
  ok(!a.n.finale.classList.contains('hidden')&&a.n.finale.children.length===7&&a.n.finale.children.filter(x=>x.classList.contains('off')).length===0,'별 방패 6개 표시');
@@ -1204,7 +1204,7 @@ a.tick(250);a.api.state.gold=62;eq(answerLand(a),1,'절반을 넘으면 띄움')
  const gold1=a.api.state.gold;a.unlock();a.right();eq([a.api.state.run.shields,a.api.state.index,a.api.phase,a.api.state.gold>gold1,a.game().goldArrows],[1,i1+1,'reward',true,1],'한 번에 맞힘: 방패 1개, 금화도 받음, 문제 번호는 그대로, 황금 화살');
  ok(a.events.some(e=>e.type==='shield'&&e.left===5),'3D에 방패 사건');a.tick(1);eq(a.n.finale.children.filter(x=>x.classList.contains('off')).length,1,'깨진 방패는 흐리게');
  /* 두 번째에 맞힘 → 방패 그대로 */
- a.untilAsk();a.unlock();a.wrong(0);a.tick(C.DASH_TICKS);a.right();eq([a.api.state.run.shields,a.api.phase,a.api.state.run.fpick[4]],[1,'learn',pick[1]],'두 번째 정답: 방패 그대로, 그 문제는 뒤로');learnOut(a);eq([a.api.phase,a.api.state.index],['ask',i1+1],'결전 문제는 번호를 넘기지 않음');
+ a.untilAsk();a.unlock();a.wrong(0);a.tick(C.DASH_TICKS);a.right();eq([a.api.state.run.shields,a.api.phase,a.api.state.run.fpick[4]],[1,'learn',pick[1]],'두 번째 정답: 방패 그대로, 그 문제는 뒤로');learnOut(a);eq([a.api.phase,a.api.state.index],['ask',i1+2],'새 문제(결전 두 번째)는 평소처럼 번호가 넘어감, 맞힌·복습 문제는 그대로');
  /* 두 번 틀림(8세) → 왕이 한 걸음, 지지 않음 */
  missTwice(a);eq([a.api.state.run.steps,a.game().king.steps,a.api.state.run.shields,a.api.phase],[1,1,1,'learn'],'두 번 틀림(8세): 왕이 한 걸음');ok(a.n.feedback.textContent.includes('한 걸음'),'안내 문구');learnOut(a);
  for(let i=0;i<6;i++){missTwice(a);learnOut(a)}eq([a.api.state.run.steps,a.api.state.run.shields,a.api.state.run.bell,a.api.state.chickens,a.api.world.stats.broken,a.api.phase],[3,1,2,17,0,'ask'],'계속 틀려도 지지 않음: 걸음 3까지, 닭·건물 그대로, 결전은 이어짐');
@@ -1346,7 +1346,7 @@ C.FLAGS.FLOW=true;
   for(let i=0;i<6000;i++){for(const e of W.step(w,s0))if(e.type==='sold')sold+=e.n;maxYard=Math.max(maxYard,W.flowYard(w))}
   ok(maxYard<=cap,'마당 알은 상한을 넘지 않음(최대 '+maxYard+')');
   for(let i=0;i<40000&&(w.flow.credit>0||W.flowYard(w)>0||w.flow.slots.some(x=>x.job));i++)for(const e of W.step(w,s0))if(e.type==='sold')sold+=e.n;
-  ok(Math.abs(sold+w.flow.lay-2*W.FLOW.egg*30)<1e-6&&sold>=80,'꽉 차서 기다린 기운도 버려지지 않고 끝내 다 알이 됨(기운 30 × 닭 2 → 알 '+sold+')');}
+  ok(Math.abs(sold+w.flow.lay-2*W.FLOW.egg*30)<1e-6&&sold>=Math.floor(2*W.FLOW.egg*30)-1,'꽉 차서 기다린 기운도 버려지지 않고 끝내 다 알이 됨(기운 30 × 닭 2 → 알 '+sold+')');}
  /* 한 번 틀려도 닭이 멈추지 않는다: 남은 기운을 박 spread개에 걸쳐 쓴다 */
  {const s=FS({chickens:10,farmers:9}),w=flowWorld(s);W.flowQuestion(w,200);W.flowCorrect(w,1.3,0,200);for(let i=0;i<200;i++)W.step(w,s);ok(w.flow.credit>.2,'한 박 뒤에도 기운이 남아 있음('+w.flow.credit.toFixed(2)+')');
   W.flowQuestion(w,200);ok(w.flow.rate>0,'다음 문제(틀린 뒤)에도 낳는 속도 > 0')}

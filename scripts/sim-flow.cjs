@@ -22,7 +22,7 @@ function playEnd(age,kind,seed,opt){
   const w=W.sync(W.create({seed:Math.floor(rnd()*2147483646)+1,interval:W.tempoInterval(meanBase(age,s.seed)),guard:true}),s);
   if(flowing)W.flowOn(w);
   const clock=()=>w.t*W.TICK;let qn=0,phaseQuiet=false,shopLock=0,minHen10=s.chickens,ended=null,finale=null,earned=0,first=0,reading=false,fenceHits=0;
-  const st={ticks:0,pile:0,full:0,boost:0,read:0,readLow:0,sold:0,eggGold:0,credit:0,laid:0,tries:0,poor:0},snaps={},ms={};
+  const st={ticks:0,pile:0,full:0,boost:0,read:0,readLow:0,late:0,latePile:0,lateFull:0,sold:0,eggGold:0,credit:0,laid:0,tries:0,poor:0},snaps={},ms={};
   const mark=k=>{if(!ms[k])ms[k]={q:qn,min:clock()/60}};
   const REC={show:35,gap:200,urgentGap:100,window:600,mute:600,stale:150,perMin:2,bellGap:600},rec={glow:null,bubble:null,left:0,last:-1e9,times:[],prev:null,ign:{},mute:{},want:null,opened:[],lostAt:-1e9,uiT:0,bellAt:-1e9};
   const ctx=()=>({wolvesInside:W.wolvesInside(w),towers:w.buildings.filter(b=>b.kind==='tower'&&!b.broken).length,lostHenRecently:w.t-rec.lostAt<=300,brokenKinds:W.brokenKinds(w),opened:rec.opened.slice(),bellQuiet:w.t-rec.bellAt<REC.bellGap,pile:W.flowPile(w)});
@@ -46,7 +46,7 @@ function playEnd(age,kind,seed,opt){
       else if(e.type==='laid')st.laid++;
       else if(e.type==='broken'){if(e.kind==='fence')fenceHits++;else{s.broken=W.brokenCount(w);s.marketDown=W.marketDown(w);ask(true)}}}
     earned+=s.gold-g0;st.ticks++;
-    if(w.flow){const f=w.flow,yard=W.flowYard(w),hens=W.flowLayers(w);if(yard>=Math.max(2,hens))st.pile++;if(yard>=W.flowCap(w))st.full++;if(f.boost.left>0)st.boost++;
+    if(w.flow){const f=w.flow,yard=W.flowYard(w),hens=W.flowLayers(w);if(yard>=Math.max(2,hens))st.pile++;if(yard>=W.flowCap(w))st.full++;if(f.boost.left>0)st.boost++;if((s.farmers|0)>=9){st.late++;if(yard>=Math.max(2,hens))st.latePile++;if(yard>=W.flowCap(w))st.lateFull++}
       if(reading){st.read++;if(f.rate*f.beat<.25||f.credit<=0)st.readLow++}}
     if(shopLock>0)shopLock--;recTick();
     if(clock()<=600&&s.chickens<minHen10)minHen10=s.chickens;
@@ -102,14 +102,14 @@ const avg=a=>{const x=a.filter(Number.isFinite);return x.length?x.reduce((p,q)=>
 const f=(x,d=0)=>Number.isFinite(x)?x.toFixed(d):'-';
 function endReport(runs,ages,kinds,opt){
   const out={};
-  console.log('| 나이 | 아이 | 엔딩 문제(p25~p75) | 분 | 10분 붕괴 | 금화/문제 | 10분 지음 | 20분 지음 | 쌓임(알≥닭) | 꽉 참 | 신바람 | 읽는 중 닭이 쉼 | 끝 농부 | 못 산 횟수 | 20분까지 울타리 부서짐 |');
-  console.log('|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|');
+  console.log('| 나이 | 아이 | 엔딩 문제(p25~p75) | 분 | 10분 붕괴 | 금화/문제 | 10분 지음 | 20분 지음 | 쌓임(알≥닭) | 꽉 참 | 신바람 | 읽는 중 닭이 쉼 | 농부 다 산 뒤 쌓임·꽉 참 | 끝 농부 | 못 산 횟수 | 20분까지 울타리 부서짐 |');
+  console.log('|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|');
   for(const age of ages)for(const kind of kinds){
     const rs=Array.from({length:runs},(_,i)=>playEnd(age,kind,1000+7919*i,opt)),dn=rs.filter(r=>r.ended),qs=dn.map(r=>r.ended.q).sort((a,b)=>a-b),q=med(qs);
     const fs=k=>avg(rs.map(r=>r.st.ticks?100*r.st[k]/r.st.ticks:NaN)),bl=m=>avg(rs.map(r=>r.snaps[m]?r.snaps[m].built:(r.ended?NaN:r.built)));
     const idle=kind==='idle'||kind==='idleBuy'||kind==='wrong';
     const row=out[age+kind]={q,gpq:avg(rs.map(r=>r.idle?NaN:r.earned/r.qn)),gpm:avg(rs.map(r=>r.earned/r.min)),b10:bl(10),earned:avg(rs.map(r=>r.earned)),built:avg(rs.map(r=>r.built)),undone:rs.length-dn.length,col:rs.filter(r=>r.collapse).length};
-    console.log(`| ${age}세 | ${NAME[kind]} | ${idle?'30분 금화 '+f(row.earned)+' · 지음 '+f(row.built,1)+' · 남은 알 '+f(avg(rs.map(r=>r.yard)),1):f(q)+' ('+f(qs[Math.floor(qs.length*.25)])+'~'+f(qs[Math.floor(qs.length*.75)])+')'+(row.undone?' 못 감 '+row.undone:'')} | ${idle?'-':f(med(dn.map(r=>r.ended.min)),1)} | ${idle?'-':row.col+'/'+rs.length} | ${f(row.gpq,1)} | ${f(row.b10,1)} | ${f(bl(20),1)} | ${f(fs('pile'))}% | ${f(fs('full'))}% | ${f(fs('boost'))}% | ${f(avg(rs.map(r=>r.st.read?100*r.st.readLow/r.st.read:NaN)))}% | ${f(avg(rs.map(r=>r.farmers)),1)} | ${f(avg(rs.map(r=>r.st.poor)),1)} | ${f(avg(rs.map(r=>r.snaps[20]?r.snaps[20].fenceHits:NaN)),1)} |`);
+    console.log(`| ${age}세 | ${NAME[kind]} | ${idle?'30분 금화 '+f(row.earned)+' · 지음 '+f(row.built,1)+' · 남은 알 '+f(avg(rs.map(r=>r.yard)),1):f(q)+' ('+f(qs[Math.floor(qs.length*.25)])+'~'+f(qs[Math.floor(qs.length*.75)])+')'+(row.undone?' 못 감 '+row.undone:'')} | ${idle?'-':f(med(dn.map(r=>r.ended.min)),1)} | ${idle?'-':row.col+'/'+rs.length} | ${f(row.gpq,1)} | ${f(row.b10,1)} | ${f(bl(20),1)} | ${f(fs('pile'))}% | ${f(fs('full'))}% | ${f(fs('boost'))}% | ${f(avg(rs.map(r=>r.st.read?100*r.st.readLow/r.st.read:NaN)))}% | ${f(avg(rs.map(r=>r.st.late?100*r.st.latePile/r.st.late:NaN)))}%·${f(avg(rs.map(r=>r.st.late?100*r.st.lateFull/r.st.late:NaN)))}% | ${f(avg(rs.map(r=>r.farmers)),1)} | ${f(avg(rs.map(r=>r.st.poor)),1)} | ${f(avg(rs.map(r=>r.snaps[20]?r.snaps[20].fenceHits:NaN)),1)} |`);
   }
   console.log('\n| 나이 | 느린 ÷ 보통(문제) | 빠른 ÷ 보통(문제) | 빠른 ÷ 보통(금화/문제) | 찍기 엔딩 ÷ 보통 | 찍기 10분 지음 ÷ 보통 | 방치·상점만·틀리기만 30분 금화 |');console.log('|---|---|---|---|---|---|---|');
   for(const age of ages){const g=k=>out[age+k]||{},t=g('typ');if(!t.q)continue;const pc=(x,y)=>Number.isFinite(x)&&y?f(100*x/y)+'%':'-';
