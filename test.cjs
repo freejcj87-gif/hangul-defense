@@ -4,7 +4,7 @@ const Questions=require('./questions.js'),Combat=require('./combat.js'),World=re
 const INTERIM=process.env.INTERIM_NO_3D_BUILD==='1',FULL_SHOTS=process.env.FULL_SHOTS==='1';
 const ONLY=process.env.ONLY||'',run=part=>!ONLY||ONLY.split(',').includes(part);/* ONLY=matrix,clock,feel,fallback,demo,flow,farm 중 일부만 돌릴 때(개발용). CI는 전부 돌린다. */
 /* 0.13: 아래 matrix·clock·feel·fallback·demo·flow 구간은 0.12 경제 회귀 검사라 주소에 flow=0을 붙여 연다(OLD). 흐르는 농장(기본 켬)은 맨 끝 farm 구간이 본다 */
-const OLD='/?flow=0';
+const OLD='/?flow=0';Combat.FLAGS.FLOW=false;/* 이 파일의 기대값 계산(Node 쪽 Combat)도 0.12 경제로. farm 구간은 상수만 읽는다 */
 const KEY='hangul-defense-v1',SWIFT=['--enable-webgl','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader'];
 /* 검사 기본: 시계를 세우고(__HOLD_CLOCK) 틱을 직접 돌린다. CI의 SwiftShader는 프레임 간격이 200ms를 넘기도 해서 벽시계 대기는 쓰지 않는다.
    0.11: 게임은 읽어 주는 음성(음성 합성)을 쓰지 않는다. speechSynthesis를 감시용으로 바꿔, 부르면 window.__said에 남긴다(언제나 비어 있어야 함). */
