@@ -396,7 +396,8 @@ async function start(){
  const sides=[0,1,2,3,4,5].map(k=>({kind:'fence',side:k,id:null,on:false,b:null,born:-9,fxDone:true,wasBroken:false,brokeAt:-9,pop:-9,smash:0,layer:1,layerAt:-9,layerFx:true}));
  const FCAP=6*24,fences=instanced(G.panel,FCAP,false),rails=instanced(G.rail,FCAP,false),walls=instanced(G.wall,FCAP,true),FP=FENCE_W/2-.06;
  const fenceShade=shadowOnly(solid([['box',0,[-FP,.42,0],[.1,.84,.1]],['box',0,[FP,.42,0],[.1,.84,.1]],['box',0,[0,.34,0],[FENCE_W,.08,.06]],['box',0,[0,.62,0],[FENCE_W,.08,.06]]]),FCAP);
- const FENCE_TINT=DAMAGE.map(h=>new THREE.Color(h));for(let i=0;i<FCAP;i++)for(const m of [fences,rails,walls])m.setColorAt(i,FENCE_TINT[0]);
+ const FENCE_TINT=DAMAGE.map(h=>new THREE.Color(h)),FENCE_TINT2=DAMAGE.map(h=>new THREE.Color(h).multiply(new THREE.Color(.84,.7,.56))),LAYER_H=[1,1.2,1.14];   // 0.13: a second layer is taller and darker wood, the stone wall a little taller
+ for(let i=0;i<FCAP;i++)for(const m of [fences,rails,walls])m.setColorAt(i,FENCE_TINT[0]);
  for(const m of [...towerBody,bows])for(let i=0;i<MAXT;i++)m.setColorAt(i,FENCE_TINT[0]);for(let i=0;i<MAXT*MAX_FLOORS;i++)storeys.setColorAt(i,FENCE_TINT[0]);
  // What each hall stage adds (egg nests from the start; dirt paths, lanterns, hay and feast flags later): one mesh, swapped per stage.
  const props=new THREE.Mesh(G.props[0],lit);props.castShadow=props.receiveShadow=true;world.add(props);let propsStage=0;
@@ -451,9 +452,18 @@ async function start(){
  const farmers=Array.from({length:MAXF},(_,k)=>{const a=proxy(1);a.hide=false;a.x=FARM_HOME[k][0];a.z=FARM_HOME[k][1];
   return {k,a,on:k===0,limb:[0,0,0,0],nod:0,eggs:0,up:0,tx:a.x,tz:a.z,wait:.5+k*.55,job:null,off:OFF[k],range:RANGE[k]}});
  const farmerShade=shadowOnly(solid([['cyl',0,[0,.55,0],[.27,1.0,.22]],['sphere',0,[0,1.32,.02],[.36,.34,.33]],['cyl',0,[0,1.62,0],[.5,.07,.5]]]),MAXF);
- const ECAP=MAXF*BASKET+NEST_MAX,eggMesh=instanced(solid([['egg',0xfff6e2,[0,0,0],[1,1.3,1]]]),ECAP,false),EGG_TINT=[new THREE.Color(1,1,1),new THREE.Color(.98,.88,.74),new THREE.Color(1,.95,.86)];
+ const ECAP=MAXF*BASKET+NEST_MAX+72,eggMesh=instanced(solid([['egg',0xfff6e2,[0,0,0],[1,1.3,1]]]),ECAP,false),EGG_TINT=[new THREE.Color(1,1,1),new THREE.Color(.98,.88,.74),new THREE.Color(1,.95,.86)];
  for(let i=0;i<ECAP;i++)eggMesh.setColorAt(i,EGG_TINT[i%3]);
  let nestShown=0,lastLeft=0;const nestPop=new Array(NEST_MAX).fill(-9);
+ /* ----- 0.13 flowing farm (world.flow, only while the page runs it): golden eggs lie beside the hens (two each) and in the nests, each farmer
+    carries one egg at a time to the market along his work slot, runs while the 신바람 boost lasts, and an idle farmer walks to a fallen fence
+    side and hammers it up while the world's 15 s rebuild counts down (looks only: the rule is unchanged). No new art. ----- */
+ let flowS=null,yardDrawn=0,repairers=0,runners=0;
+ const GOLD_EGG=new THREE.Color(1.0,.82,.36),EGG_OFF=[[.36,.14],[-.34,.2],[.04,.4]],eggSeen=new Map(),eggLive=new Set(),hammerMarks=[];
+ const eggSpot=(slot,i,out)=>{if(slot<0){const s=NEST_SPOTS[i%NEST_SPOTS.length];return out.set(s[0],s[1]-.03,s[2])}const h=W('HOME')(slot),o=EGG_OFF[Math.min(2,i)];return out.set(h[0]+o[0],.02,h[1]+o[1])};
+ const eggBig=()=>clamp(fxScale,1,1.45);   // eggs grow with the zoomed-out view so they still read on a phone
+ const flowLv=()=>flowS&&flowS.boost&&num(flowS.boost.left)>0?clamp(flowS.boost.lv|0,0,2):0;
+ const flowSlot=f=>flowS&&flowS.slots[f.k]&&typeof flowS.slots[f.k]==='object'?flowS.slots[f.k]:null;
  const SHADE_FIT={boar:new V3(1.12,.74,1.02)};   // the stand-in has wolf proportions; the boar is lower and wider
  const arrowMesh=instanced(G.arrow,240,false);
  const malletGeo=solid([['cyl',0x9a6a3a,[0,.45,0],[.06,.9,.06]],['cyl',0xc98f52,[0,.95,0],[.2,.5,.2],[0,0,Math.PI/2]],['cyl',0x8a5a2e,[.26,.95,0],[.21,.04,.21],[0,0,Math.PI/2]],['cyl',0x8a5a2e,[-.26,.95,0],[.21,.04,.21],[0,0,Math.PI/2]]]);
@@ -614,6 +624,7 @@ async function start(){
   market.down=!!(s&&Number(s.marketDown)>0);
   syncBuildings(w,init||initial);syncWolves(w,ticked);syncHens(w,init||initial,ticked);syncArrows(w,volley);
   Rgoal=radiusOf(s||IDLE,w);initial=false;
+  flowS=real&&s.flow&&w.flow&&typeof w.flow==='object'&&Array.isArray(w.flow.slots)?w.flow:null;
   return w;
  }
  function syncBuildings(w,init){
@@ -777,7 +788,9 @@ async function start(){
   after(T+.2,()=>sparkles(x,H*.7,z,10,1.1,GOLD,0,.7));
  }
  function rebuildFence(sl){         // the farmers stand a fallen fence side back up after 15 s: a mallet knocks it in, panels spring up
-  const {x,z,a}=sideMid(sl.side),HIT=.3,R=1.71;sl.rebuiltAt=time;sl.pop=time+(reduced()?0:HIT);
+  const {x,z,a}=sideMid(sl.side),HIT=.3,R=1.71;sl.rebuiltAt=time;
+  if(sl.fixer&&sl.fixing){sl.fixer.fix=null;sl.fixer=null;sl.fixing=false;dustBurst(x,z,5,.6);ringWave(x,z,3.4,LEAF,.4,0,CELL.halo,.5);sparkles(x,.8,z,8,1.4,LEAF,.05,.5);return}   // 0.13: a farmer hammered it up panel by panel
+  sl.pop=time+(reduced()?0:HIT);
   const m=reduced()?null:mallet();
   if(m){const ry=Math.PI-a;m.ry=ry;m.x=x+Math.cos(ry)*R;m.y=1.21;m.z=z-Math.sin(ry)*R;m.obj.visible=true;
    tween(0,.55,(u,t)=>{const k=Math.min(1,t/.08)*(t>.44?Math.max(.001,1-(t-.44)/.11):1);m.sx*=Math.max(.001,k);m.sy*=Math.max(.001,k);
@@ -931,6 +944,19 @@ async function start(){
    sparkles(x,H+.6,z,6,1,GOLD,.15,.5);shake(.05)});
   after(1.6,()=>crewOn.forEach((f,k)=>hop(f.a,.38,(k%5)*.05,.34)));
  }
+ function fishToMarket(delay){     // 0.13: the pond's fish leaps all the way to the market counter and turns into coins
+  if(!pond.obj.visible)return;const {x,z}=marketFront(),H=Math.min(2,market.height*.75);
+  tween(delay,.75,u=>{fish.obj.visible=true;fish.x=POND.x+(x-POND.x)*u;fish.z=POND.z+(z-POND.z)*u;fish.lift+=.1+4*2.1*u*(1-u)+H*.6*u;fish.pitch+=(u-.5)*2.4;fish.ry=Math.atan2(x-POND.x,z-POND.z)},()=>{fish.obj.visible=false;fish.ry=Math.PI/2});
+  after(delay,()=>splash(POND.x,POND.z,8,.9));
+  after(delay+.75,()=>{flashAt(x,H,z,1.2,GOLD);for(let i=0;i<3;i++)coinPop(x,H+.1,z,span(-.8,.8),span(3.4,4.4),span(-.5,.5),i*.04,.8)});
+ }
+ function cheerFx(e){
+  if(reduced())return;
+  yardHens().forEach((c,i)=>hop(c.a,.42,(i%6)*.03,.34));
+  for(const f of farmers)if(f.on&&!f.trip&&!f.fix)hop(f.a,.3,.05+(f.k%4)*.04,.3);
+  if((Number(e.fish)||0)>0)fishToMarket(.1);
+  if((e.boost|0)>0)for(const c of yardHens())sparkles(c.a.x,1,c.a.z,(e.boost|0)>=2?3:2,.25,GOLD,.1,.3);
+ }
  function towerFire(t,big,fast=false,hot=false){   // recoil + a twang of light at the crossbow (orange once the towers shoot fire arrows)
   if(!t||!t.on||t.b&&t.b.broken)return;t.kick=1;
   if(time-t.shotAt<.12&&!big)return;t.shotAt=time;const p=bowWorld(t),k=fast?1.4:1,fire=hot||t.tier>0;
@@ -957,6 +983,10 @@ async function start(){
   for(const e of list){if(!e||typeof e!=='object')continue;
    const wolf=wolfVis.get(e.wolf);
    switch(e.type){
+    // 0.13 flowing farm: a right answer makes every hen hop (the first egg drops at once), a fish leaps to the market; eggs then come one by one
+    case 'cheer':cheerFx(e);break;
+    case 'laid':{const c=Number.isInteger(e.slot)&&e.slot>=0?henSlots[e.slot]:null;if(c&&c.on&&!reduced()){const a=c.a;tween(0,.4,(u,tt)=>{const q=Math.sin(Math.min(1,tt/.16)*Math.PI);a.sy*=1-.28*q;a.sx*=1+.18*q;if(tt>.16)a.lift+=.2*Math.sin((tt-.16)/.24*Math.PI)});flashAt(a.x,.35,a.z,.55,CREAM,.14)}break}
+    case 'sold':{const f=farmers[e.slot|0];if(f&&f.on&&!reduced()){const mk=marketShift(),x=DROP[f.k][0]+mk.x,z=DROP[f.k][1]+mk.z;coinPop(x,1.5,z,span(-.4,.4),span(3,3.8),span(-.3,.3),0,.7);sparkles(x,1.4,z,2,.25,GOLD,0,.2);if(time-(market.soldAt||-9)>.5){market.soldAt=time;wobble(market.a,.035)}}break}
     case 'produce':if(reduced()){popUntil=time+1.4;lastLeft=count(e.left??0,NEST_MAX)}else produceFx(e);break;
     case 'shoot':towerFire(towerById.get(e.tower),false,false,!!e.splash);break;
     case 'volley':for(const t of towers)towerFire(t,true,!!e.fast);shake(e.fast?.07:.05);break;   // the arrows themselves come from the pull (marked as a volley above)
@@ -1038,7 +1068,7 @@ async function start(){
     buildingsBroken:[...BUILDINGS,...sides].filter(sl=>sl.on&&sl.b&&sl.b.broken).length,
     towers:towers.filter(t=>t.on).length,fences:sides.filter(f=>f.on).length,fencePanels:fences.count,
     hall:shown.hall,farmers:shown.farmers,pond:shown.pond,feast:shown.feast,farmerActors:farmers.filter(f=>f.on).length,
-    towerFloors:towers.reduce((n,t)=>n+(t.on?t.floors:0),0),farmersVisible:farmersDrawn,farmersCarrying:farmers.filter(f=>f.on&&f.eggs>0).length,basketEggs:basketDrawn,nestEggs:nestShown,
+    towerFloors:towers.reduce((n,t)=>n+(t.on?t.floors:0),0),farmersVisible:farmersDrawn,farmersCarrying:farmers.filter(f=>f.on&&f.eggs>0).length,basketEggs:basketDrawn,nestEggs:nestShown,flow:!!flowS,yardEggs:yardDrawn,farmersRunning:runners,repairers,boost:flowLv(),
     fenceLayers:(()=>{const o={1:0,2:0,3:0};for(const sd of sides)if(sd.on)o[sd.layer]++;return o})(),wallSegments:walls.count,railSegments:rails.count,
     marketTier:market.mtier,marketDown:market.on&&isBroken(market),hammers:hammersDrawn,propsStage,lanterns:lanterns(propsStage).length,
     pondVisible:pond.obj.visible,garlands:garlands.filter(g=>g.obj.visible).length,sale:!!sale||time<popUntil,
@@ -1109,21 +1139,25 @@ async function start(){
  }
  const pm=new THREE.Matrix4(),pq=new THREE.Quaternion(),pe=new THREE.Euler(0,0,0,'YXZ'),pp=new V3(),ps=new V3();
  // Each side is a row of segments along the ring: layer 1 panels, layer 2 panels + outer rails, layer 3 stone wall (same layout).
+ const REBUILD_T=num(W('REBUILD'))||150;
  function updateFences(less){
   let n=0,nr=0,nw=0;const Rf=Rd-FENCE_IN,max=FCAP;
   for(const side of sides){if(!side.on||!side.b)continue;
    const b=side.b,k=side.side,L=side.layer,a0=k*Math.PI/3,arc=Rf*Math.PI/3,cnt=Math.max(3,Math.round(arc/FENCE_W)),step=Math.PI/3/cnt,sx=arc/cnt/FENCE_W*1.03;
-   const f=num(b.max)>0?clamp(num(b.hp)/num(b.max),0,1):1,tier=b.broken?3:f<=.34?2:f<=.67?1:0,fall=b.broken?(less?1:easeIn(clamp((time-side.brokeAt)/.4,0,1))):0;
+   const f=num(b.max)>0?clamp(num(b.hp)/num(b.max),0,1):1,tier=b.broken?3:f<=.34?2:f<=.67?1:0,fallAll=b.broken?(less?1:easeIn(clamp((time-side.brokeAt)/.4,0,1))):0;
    const smash=!less&&smashOn.get(b.id)?Math.min(3,smashOn.get(b.id)):0,heavy=L>=3?.45:1;   // a stone wall barely shakes and tips over less
+   const up=b.broken&&side.fixer&&side.fixing?Math.floor(clamp(1-num(b.rebuild)/REBUILD_T,0,1)*cnt+.001):0,tintOf=L===2?FENCE_TINT2:FENCE_TINT;   // panels a farmer has already hammered up
    for(let i=0;i<cnt;i++){
-    const a=a0+(i+.5)*step,j=hash(k*31+i);let r=Rf,y=0,rx=0,ry=-a-Math.PI/2,rz=0,sy=1;
-    if(!less&&time-side.pop<1.5){const t=time-side.pop-.035*i;sy=t<0?.001:Math.max(.001,springy(t))}
+    const a=a0+(i+.5)*step,j=hash(k*31+i),fall=i<up?0:fallAll;let r=Rf,y=0,rx=0,ry=-a-Math.PI/2,rz=0,sy=LAYER_H[L-1];
+    if(!less&&time-side.pop<1.5){const t=time-side.pop-.035*i;sy*=t<0?.001:Math.max(.001,springy(t))}
     if(fall>0){rx=(j>.5?1:-1)*1.42*fall*heavy;r+=(j-.5)*.9*fall;ry+=(j-.5)*.7*fall;y=.03*fall;if(L>=3)sy*=1-.45*fall}
+    else if(i<up){rx=(j-.5)*.16;rz=(hash(k*17+i)-.5)*.1}
     else{rx=(1-f)*(j-.5)*.5*heavy;rz=(1-f)*(hash(k*17+i)-.5)*.25*heavy;if(smash)rz+=Math.sin(wclock*33+i*1.7)*.035*smash*heavy}
     pe.set(rx,ry,rz);pq.setFromEuler(pe);pm.compose(pp.set(Math.cos(a)*r,y,Math.sin(a)*r),pq,ps.set(sx,sy,1));
-    if(L>=3){if(nw<max){walls.setMatrixAt(nw,pm);walls.setColorAt(nw,FENCE_TINT[tier]);nw++}continue}
-    if(n<max){fences.setMatrixAt(n,pm);fences.setColorAt(n,FENCE_TINT[tier]);n++}
-    if(L===2&&nr<max){rails.setMatrixAt(nr,pm);rails.setColorAt(nr,FENCE_TINT[tier]);nr++}
+    const tc=tintOf[i<up?2:tier];
+    if(L>=3){if(nw<max){walls.setMatrixAt(nw,pm);walls.setColorAt(nw,tc);nw++}continue}
+    if(n<max){fences.setMatrixAt(n,pm);fences.setColorAt(n,tc);n++}
+    if(L===2&&nr<max){rails.setMatrixAt(nr,pm);rails.setColorAt(nr,tc);nr++}
    }
   }
   for(const [m,c] of [[fences,n],[rails,nr],[walls,nw]]){m.count=c;m.instanceMatrix.needsUpdate=true;if(m.instanceColor)m.instanceColor.needsUpdate=true}
@@ -1328,18 +1362,32 @@ async function start(){
    hv2.copy(handL).sub(shoulder).applyAxisAngle(XAX,f.limb[0]).add(shoulder);hv2.y-=.25;
    ev.set(hv2.x*(1-f.up),hv2.y+(BASKET_UP-hv2.y)*f.up,hv2.z*(1-f.up)+.02*f.up);
    bm.copy(a.obj.matrix).multiply(tm.compose(ev,eq.setFromAxisAngle(XAX,(1-f.up)*f.limb[0]*.5),es.setScalar(1+.25*f.up)));baskets.setMatrixAt(n,bm);
-   for(let i=0;i<f.eggs&&i<BASKET&&e<ECAP;i++){em.copy(bm).multiply(tm.compose(BASKET_EGGS[i],eq.identity(),es.set(.08,.08,.08)));eggMesh.setMatrixAt(e++,em)}
+   if(f.big&&f.eggs>0&&e<ECAP){em.copy(bm).multiply(tm.compose(ev.set(0,.2,0),eq.identity(),es.setScalar(.2*eggBig())));eggMesh.setColorAt(e,GOLD_EGG);eggMesh.setMatrixAt(e++,em)}   // 0.13: one big golden egg per trip
+   else for(let i=0;i<f.eggs&&i<BASKET&&e<ECAP;i++){em.copy(bm).multiply(tm.compose(BASKET_EGGS[i],eq.identity(),es.set(.08,.08,.08)));eggMesh.setColorAt(e,EGG_TINT[e%3]);eggMesh.setMatrixAt(e++,em)}
    n++;
   }
   farmersDrawn=n;basketDrawn=e;crew.mesh.count=farmerShade.count=baskets.count=n;crew.mesh.visible=n>0;crew.mesh.instanceMatrix.needsUpdate=farmerShade.instanceMatrix.needsUpdate=baskets.instanceMatrix.needsUpdate=true;
   for(const p of crew.pose)p.needsUpdate=true;if(crew.mesh.instanceColor)crew.mesh.instanceColor.needsUpdate=true;
   // left-over eggs wait in the nests by the hall (each new one pops in)
   const less=reduced();
-  for(let i=0;i<nestShown&&e<ECAP;i++){const s=NEST_SPOTS[i],p=less?1:Math.max(.001,springy(clamp(time-nestPop[i],0,2)));eggMesh.setMatrixAt(e++,em.compose(ev.set(s[0],s[1],s[2]),eq.setFromAxisAngle(es.set(0,0,1),(i%3-1)*.25),es.set(.095*p,.095*p,.095*p)))}
-  eggMesh.count=e;eggMesh.instanceMatrix.needsUpdate=true;
+  // 0.13 yard eggs: up to two beside each hen (plus one a farmer is walking to), the shared ones in the nests; each pops in where it is laid
+  yardDrawn=0;
+  if(flowS&&wRef&&Array.isArray(wRef.hens)){
+   const wait=new Map();for(const f of farmers)if(f.on&&f.trip&&!f.trip.picked)wait.set(f.trip.from,(wait.get(f.trip.from)||0)+1);
+   eggLive.clear();
+   const put=(slot,i,key)=>{if(e>=ECAP)return;let t0=eggSeen.get(key);if(t0===undefined){t0=time;eggSeen.set(key,t0)}eggLive.add(key);
+    const p=less?1:Math.max(.001,springy(clamp(time-t0,0,2))),sc=(slot<0?.15:.23)*p*eggBig();eggSpot(slot,i,ev);ev.y+=sc*.62;
+    eggMesh.setColorAt(e,GOLD_EGG);eggMesh.setMatrixAt(e++,em.compose(ev,eq.setFromAxisAngle(es.set(0,0,1),(i%3-1)*.22),es.set(sc,sc,sc)));yardDrawn++};
+   for(const h of wRef.hens){if(!h||typeof h!=='object'||!Number.isInteger(h.slot))continue;const n=Math.min(3,clamp(h.egg|0,0,2)+(wait.get(h.slot)||0));for(let i=0;i<n;i++)put(h.slot,i,h.slot*4+i)}
+   const nn=Math.min(NEST_SPOTS.length,clamp(flowS.nest|0,0,99)+(wait.get(-1)||0));for(let i=0;i<nn;i++)put(-1,i,1000+i);
+   for(const k of [...eggSeen.keys()])if(!eggLive.has(k))eggSeen.delete(k);
+  }
+  for(let i=0;i<nestShown&&e<ECAP;i++){const s=NEST_SPOTS[i],p=less?1:Math.max(.001,springy(clamp(time-nestPop[i],0,2)));eggMesh.setColorAt(e,EGG_TINT[e%3]);eggMesh.setMatrixAt(e++,em.compose(ev.set(s[0],s[1],s[2]),eq.setFromAxisAngle(es.set(0,0,1),(i%3-1)*.25),es.set(.095*p,.095*p,.095*p)))}
+  eggMesh.count=e;eggMesh.instanceMatrix.needsUpdate=true;if(eggMesh.instanceColor)eggMesh.instanceColor.needsUpdate=true;
  }
  // How many eggs the nests show: scripted during a sale, otherwise the page's `nest` (0.9) or the last sale's left-over.
  function updateNest(s){
+  if(flowS){nestShown=0;return}   // 0.13: the nests hold the flow's shared eggs (drawn golden with the yard eggs)
   const st=Number(s&&s.nest),want=sale?(sale.t<.12?sale.nest0:sale.t<.58?sale.kept:sale.left):Number.isFinite(st)?st:lastLeft,n=clamp(Math.floor(want)||0,0,NEST_MAX);
   if(n>nestShown)for(let i=nestShown;i<n;i++)nestPop[i]=time+(i-nestShown)*.04;
   nestShown=n;
@@ -1381,10 +1429,55 @@ async function start(){
    f.wait=span(.8,2.4);f.tx=ax+(bx-ax)*u-(bz-az)/L*side;f.tz=az+(bz-az)*u+(bx-ax)/L*side;return false}
   const step=Math.min(d,.95*dt);a.x+=dx/d*step;a.z+=dz/d*step;turnTo(a,Math.atan2(dx,dz),dt*7);return true;
  }
+ // 0.13: which idle farmer mends which fallen fence side (only while the world's rebuild countdown is running, i.e. no wolf stands by that side)
+ function assignRepairs(s){
+  const act=!!(flowS&&s&&s.repairAct);
+  for(const sd of sides){const b=sd.b,need=act&&sd.on&&b&&b.broken;
+   if(need){const rb=num(b.rebuild);if(sd.rbLast===undefined||rb<sd.rbLast-1e-9||rb>sd.rbLast+1)sd.rbT=wclock;sd.rbLast=rb}else sd.rbLast=undefined;
+   const live=need&&wclock-(sd.rbT??-9)<.6;
+   if(sd.fixer&&!(live&&sd.fixer.on&&!sd.fixer.trip&&(flowSlot(sd.fixer)||{}).job===0)){sd.fixer.fix=null;sd.fixer=null;sd.fixing=false}
+   if(live&&!sd.fixer){const p=sideMid(sd.side);let best=null,bd=1e9;for(const f of farmers){if(!f.on||f.fix||f.trip||(flowSlot(f)||{}).job!==0)continue;const d=Math.hypot(f.a.x-p.x,f.a.z-p.z);if(d<bd){bd=d;best=f}}
+    if(best){sd.fixer=best;best.fix=sd;sd.fixing=false}}
+  }
+ }
+ function flowFarmer(f,dt,less){     // → [moving, run, up] or null when this farmer just strolls
+  const a=f.a,sl=flowSlot(f),lv=flowLv();
+  if(sl&&sl.job===1&&num(sl.total)>0){
+   const left=num(sl.left),total=num(sl.total);
+   if(!f.trip||left>f.trip.last+1e-6||f.trip.from!==(sl.from|0)){   // a new trip: from where he stands to the egg, past the market's corner, to his counter spot
+    const from=sl.from|0,mk=marketShift();eggSpot(from,0,tv);
+    const t={from,sx:a.x,sz:a.z,ex:tv.x-.18,ez:tv.z+.22,gx:MARKET_GATE.x+mk.x,gz:MARKET_GATE.z+mk.z,mx:DROP[f.k][0]+mk.x,mz:DROP[f.k][1]+mk.z,last:left,picked:false,p0:clamp(1-left/total,0,.5)};
+    t.d1=Math.hypot(t.ex-t.sx,t.ez-t.sz);t.d2=Math.hypot(t.gx-t.ex,t.gz-t.ez);t.d3=Math.hypot(t.mx-t.gx,t.mz-t.gz);f.trip=t;if(f.fix){if(f.fix.fixer===f){f.fix.fixer=null;f.fix.fixing=false}f.fix=null}}
+   const t=f.trip;t.last=left;
+   const sp=(W('FLOW')&&W('FLOW').boost&&W('FLOW').boost[lv])||1,est=less?left:Math.max(0,left-sp*clamp(sinceTick/.1,0,1)),p=clamp((1-est/total-t.p0)/(1-t.p0),0,1),D=t.d1+t.d2+t.d3,d=p*D;
+   let x,z;if(d<t.d1){const v=t.d1?d/t.d1:1;x=t.sx+(t.ex-t.sx)*v;z=t.sz+(t.ez-t.sz)*v}else if(d<t.d1+t.d2){const v=t.d2?(d-t.d1)/t.d2:1;x=t.ex+(t.gx-t.ex)*v;z=t.ez+(t.gz-t.ez)*v}else{const v=t.d3?(d-t.d1-t.d2)/t.d3:1;x=t.gx+(t.mx-t.gx)*v;z=t.gz+(t.mz-t.gz)*v}
+   if(d>=t.d1&&!t.picked){t.picked=true;if(!less)flashAt(t.ex+.18,.3,t.ez-.22,.5,CREAM)}
+   const dx=x-a.x,dz=z-a.z,mv=Math.hypot(dx,dz);if(mv>.003)turnTo(a,Math.atan2(dx,dz),less?1:dt*14);a.x=x;a.z=z;
+   const speed=D/Math.max(.2,total*.1/sp),run=lv>0||speed>2.4;f.eggs=t.picked?1:0;f.big=true;
+   if(lv>=2&&!less&&dt>0&&(f.dustT=(f.dustT||0)-dt)<=0){f.dustT=.2;dustBurst(a.x,a.z,2,.32)}
+   return [mv>.0005,run,t.picked?1:0];
+  }
+  if(f.trip){f.trip=null;f.tx=a.x;f.tz=a.z;f.wait=span(.15,.5)}
+  f.big=false;
+  const sd=f.fix;
+  if(sd&&sd.fixer===f){const k=sd.side,p=sideMid(k,Rd-FENCE_IN-.8),dx=p.x-a.x,dz=p.z-a.z,d=Math.hypot(dx,dz);
+   if(d>.12){const step=less?d:Math.min(d,2.6*dt);a.x+=dx/d*step;a.z+=dz/d*step;turnTo(a,Math.atan2(dx,dz),less?1:dt*10);sd.fixing=false;f.tx=a.x;f.tz=a.z;return [true,true,0]}
+   sd.fixing=true;turnTo(a,Math.atan2(p.x,p.z),less?1:dt*10);f.tx=a.x;f.tz=a.z;
+   if(!less){const ph=(time/.6)%1,sw=ph<.7?-2.5*easeOut(ph/.7):-2.5+2.1*easeIn((ph-.7)/.3);f.hammer=sw;a.pitch+=ph>.7?.18*(ph-.7)/.3:0;
+    if(ph<(f.lastPh??0)){const o=sideMid(k);chipBurst(o.x+span(-.6,.6),.55,o.z+span(-.6,.6),3,sd.layer>=3?[STONE,ROCK]:undefined);dustBurst(o.x,o.z,2,.4)}f.lastPh=ph}
+   else f.hammer=-1.6;
+   hammerMarks.push(a.x,a.z);
+   return [false,false,0];
+  }
+  return null;
+ }
  function farmersLife(dt,less){
   if(sale&&!less){sale.t+=dt;if(sale.t>=SALE_END)sale=null}
-  for(const f of farmers){const a=f.a;if(!f.on)continue;let moving=false,run=false,up=0;f.eggs=0;f.nod=0;
-   if(f.job&&sale&&!less){
+  hammerMarks.length=0;repairers=runners=0;assignRepairs(curS);
+  for(const f of farmers){const a=f.a;if(!f.on)continue;let moving=false,run=false,up=0;f.eggs=0;f.nod=0;f.hammer=undefined;
+   const fw=flowS?flowFarmer(f,dt,less):(f.trip=null,f.fix=null,f.big=false,null);
+   if(fw){moving=fw[0];run=fw[1];up=fw[2];if(run)runners++;if(f.hammer!==undefined)repairers++;f.job=null}
+   else if(f.job&&sale&&!less){
     const j=f.job,t=Math.max(0,sale.t-j.lag);let x,z,face=null;
     if(t<.5){const u=easeInOut(t/.5);x=j.fx+(j.px-j.fx)*u;z=j.fz+(j.pz-j.fz)*u;run=moving=Math.hypot(j.px-j.fx,j.pz-j.fz)>.05}
     else if(t<.66){x=j.px;z=j.pz;const k=Math.sin((t-.5)/.16*Math.PI);a.pitch+=.35*k;f.nod=.4*k}   // scoops the eggs into the basket
@@ -1401,6 +1494,7 @@ async function start(){
    f.up=less?up:f.up+(up-f.up)*Math.min(1,dt*12);   // the basket swings up onto the head and back down to the hand
    const pace=run?14:7,sw=i=>moving&&!less?Math.sin(time*pace+f.k+(i===1||i===2?Math.PI:0))*(run?.7:.42):0,hold=ARM_UP+(less?0:Math.sin(time*pace+f.k)*.06);
    f.limb[0]=sw(0)*.55+(hold-sw(0)*.55)*f.up;f.limb[1]=sw(1)+(hold-sw(1))*f.up;f.limb[2]=sw(2);f.limb[3]=sw(3);   // the basket arm swings less; both arms up under a full basket
+   if(f.hammer!==undefined)f.limb[1]=f.hammer;   // 0.13: the right arm swings the hammer at the fence
    if(moving&&!less)a.lift+=Math.abs(Math.sin(time*pace+f.k))*(run?.08:.045);
   }
  }
@@ -1424,6 +1518,11 @@ async function start(){
    else if(sl.hp<.999){bar(a.x,H+.45,a.z,sl.hp,1.1,hpColor(sl.hp));
     const cracks=sl.hp<=.34?3:sl.hp<=.67?2:sl.hp<.9?1:0,r=sl.size*.85;
     for(let i=0;i<cracks;i++){const off=(i-(cracks-1)/2)*r*.7,y=H*(.28+.17*((i*7)%3));sprite(CELL.impact,a.x-fwdXZ.x*r+camRight.x*off,y,a.z-fwdXZ.z*r+camRight.z*off,.55,.55,CRACK,.8,0,i*1.3)}}
+  }
+  for(let i=0;i<hammerMarks.length;i+=2){const b=.8*Math.max(1,fxScale*.8),ph=less?0:(time/.6)%1;sprite(CELL.hammer,hammerMarks[i],2.25+(less?0:.12*Math.abs(Math.sin(time*5))),hammerMarks[i+1],b,b,WHITE,1,0,less?0:(ph>.7?.5:-.3))}
+  if(flowS&&wRef&&Array.isArray(wRef.hens)){
+   for(const h of wRef.hens)if(h&&(h.egg|0)>0&&Number.isInteger(h.slot)){const hm=W('HOME')(h.slot);decal(CELL.glow,hm[0],hm[1]+.18,1.5,GOLD,.3,.6,.035)}
+   const lv=flowLv();if(lv>0&&!less)for(const c of yardHens()){const bob=Math.abs(Math.sin(time*6+c.phase));sprite(lv>=2?CELL.star:CELL.sparkle,c.a.x,1.05+.18*bob,c.a.z,.3,.3,GOLD,.9,.4,Math.sin(time*3+c.phase)*.4)}
   }
   for(const sd of sides)if(sd.on&&sd.b&&!sd.b.broken&&num(sd.b.hp)<num(sd.b.max)){const {x,z}=sideMid(sd.side),f=clamp(num(sd.b.hp)/num(sd.b.max),0,1);bar(x,1.35,z,f,1,hpColor(f))}
   for(let i=scorches.length-1;i>=0;i--){const sc=scorches[i],age=time-sc.t0;if(age>4.5){scorches.splice(i,1);continue}   // fire-arrow scorch marks fade out
