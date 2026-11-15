@@ -101,6 +101,74 @@
     [-.1,1.6],[-.7,2.4],[.4,2.5],[-.2,3.3],[-2.7,.2],[-1.3,3.2],[.8,3.5],[-3.5,-.4],[0,4.3],[1,4.5],[-4.3,.4],[-4.3,-1]].map(p=>Object.freeze(p)));
   const HENS_MAX=HOMES.length;
   const HOME=i=>HOMES[i]||HOMES[0];
+  /* ---------- 흐르는 농장(0.13, 설계: v013-design.md §1·§4, game-plan §13). w.flow가 있을 때만 돈다(없으면 0.12와 한 글자도 다르지 않다) ----------
+     정답이 기운(credit)을 주면(flowCorrect) 닭이 그 기운을 박(beat, 틱)에 걸쳐 알로 바꿔 마당에 놓고, 농부(1 + s.farmers명)가 한 알씩 매대로 나른다. 매대에 닿는 틱에 'sold' 사건 → 화면·시뮬이 Combat.sellEggs로 금화를 준다.
+     egg: 닭 한 마리가 기운 1마다 낳는 알 · carry: 농부 한 명이 한 박에 나르는 알 · boost: 신바람 단계별 농부 빠르기(한 박 동안)
+     spread·layCap: 낳는 속도(기운/박) = min(layCap, 남은 기운 ÷ spread). 남은 기운을 박 spread개에 걸쳐 쓰므로 한 번 틀려도 닭이 멈추지 않는다
+     perHen·nest: 마당 알 상한 = 닭 수 × perHen + nest(둥지 공용). 꽉 차면 닭은 기운을 쓰지 않고 기다린다(기운은 버려지지 않는다. 상한 없이 이월)
+     pileQ: 마당 알이 닭 수 이상인 채로 문제가 이만큼 이어지면 '일손 부족'(flowPile → 농부 추천). 난수를 쓰지 않는다(결정성) */
+  const FLOW={egg:1.35,carry:4,boost:[1,1.4,1.8],spread:2.5,layCap:3,perHen:2,nest:8,men:10,pileQ:2,creditMax:10000,beatMin:10,beatMax:6000};
+  const flowFresh=()=>({credit:0,rate:0,beat:100,boost:{lv:0,left:0},lay:0,nest:0,pile:0,next:0,slots:[]});
+  const layer=h=>h.state!=='caught'&&h.state!=='carried'&&h.state!=='gone';
+  const flowRate=f=>Math.min(FLOW.layCap,f.credit/FLOW.spread)/f.beat;
+  const flowBeat=b=>Math.max(FLOW.beatMin,Math.min(FLOW.beatMax,Math.round(Number(b)||100)));
+  /* 흐름 켜기(화면·시뮬이 Combat.flowOn(s)일 때 부른다). 이미 있으면 그대로 */
+  function flowOn(w){if(!w.flow||typeof w.flow!=='object'||Array.isArray(w.flow))w.flow=flowFresh();return w.flow}
+  const flowLayers=w=>{let n=0;for(const h of w.hens)if(layer(h))n++;return n};
+  /* 마당 알 수(닭 자리 옆 + 둥지. 농부가 들고 가는 알은 세지 않는다)와 상한 */
+  const flowYard=w=>{if(!w.flow)return 0;let n=w.flow.nest|0;for(const h of w.hens)n+=h.egg|0;return n};
+  const flowCap=w=>flowLayers(w)*FLOW.perHen+FLOW.nest;
+  const flowPile=w=>!!w.flow&&(w.flow.pile|0)>=FLOW.pileQ;
+  const flowIdle=w=>w.flow?w.flow.slots.filter(sl=>sl.job===0).length:0;
+  /* 알 하나를 놓는다: 알이 가장 적은 닭 자리(같으면 next부터 돌아가며), 다 찼으면 둥지. 자리가 없으면 false */
+  function flowPlace(w,ev){
+    const f=w.flow,n=w.hens.length;let best=null;
+    for(let k=0;k<n;k++){const h=w.hens[(f.next+k)%n];if(!layer(h))continue;const e=h.egg|0;if(e<FLOW.perHen&&(!best||e<(best.egg|0)))best=h}
+    if(best){best.egg=(best.egg|0)+1;f.next=(w.hens.indexOf(best)+1)%n;if(ev)w.events.push({type:'laid',hen:best.id,slot:best.slot});return true}
+    if(f.nest<FLOW.nest){f.nest++;if(ev)w.events.push({type:'laid',hen:0,slot:-1});return true}
+    return false;
+  }
+  /* 농부가 집을 알: 알이 가장 많은 닭 자리(같으면 앞), 없으면 둥지. → 그 닭의 자리 번호(slot) · −1(둥지) · −2(알 없음) */
+  function flowTake(w){
+    const f=w.flow;let best=null;for(const h of w.hens)if((h.egg|0)>0&&(!best||h.egg>best.egg))best=h;
+    if(best){best.egg--;return best.slot}
+    if(f.nest>0){f.nest--;return -1}
+    return -2;
+  }
+  /* 새 문제가 시작됨: 그 문제의 박으로 바꾸고 낳는 속도를 다시 맞춘다. 마당 알이 닭 수 이상이면 '쌓임' 한 칸(아니면 0) */
+  function flowQuestion(w,beat){
+    const f=flowOn(w);f.beat=flowBeat(beat);f.rate=flowRate(f);
+    f.pile=flowYard(w)>=Math.max(2,flowLayers(w))?Math.min(99,(f.pile|0)+1):0;return f;
+  }
+  /* 한 번에 맞힘: 기운을 더하고(상한 없이 이월), 다음 문제의 박에 맞춰 낳는 속도를 정하고, 신바람(lv 1·2)이면 한 박 동안 농부가 빨라진다.
+     첫 알은 이 순간 바로 낳는다(그만큼의 기운을 먼저 쓴다. 공짜 알이 아니다) */
+  function flowCorrect(w,credit,lv,beat){
+    const f=flowOn(w),c=Number(credit);if(Number.isFinite(c)&&c>0)f.credit=Math.min(FLOW.creditMax,f.credit+c);
+    if(beat)f.beat=flowBeat(beat);f.rate=flowRate(f);
+    const L=lv|0;if(L>0&&FLOW.boost[L]){f.boost.lv=Math.max(f.boost.left>0?f.boost.lv:0,L);f.boost.left=f.beat}
+    const n=flowLayers(w);
+    if(n>0&&f.lay<1){const dc=(1-f.lay)/(n*FLOW.egg);if(f.credit>=dc&&flowYard(w)<flowCap(w)){f.credit-=dc;f.lay=1}}
+    if(f.lay>=1&&flowPlace(w,false))f.lay-=1;
+    return f;
+  }
+  /* 예전 저장의 남은 알(0.12 s.nest) 등 알 n개를 마당에 놓는다(자리가 없으면 둥지에 넘치게 둔다. 사라지지 않는다) */
+  function flowAdd(w,n){const f=flowOn(w);for(let i=0;i<(n|0);i++)if(!flowPlace(w,false))f.nest++;return flowYard(w)}
+  /* 잃은 닭 자리의 알은 둥지로 옮긴다(알은 사라지지 않는다) */
+  function flowKeep(w,h){if(w.flow&&(h.egg|0)>0){w.flow.nest+=h.egg|0;h.egg=0}}
+  function flowStep(w,s){
+    const f=w.flow,men=Math.max(1,Math.min(FLOW.men,1+((s&&s.farmers)|0)));
+    while(f.slots.length<men)f.slots.push({job:0,from:-1,left:0,total:0});
+    while(f.slots.length>men){const sl=f.slots.pop();if(sl.job===1)f.nest++}
+    /* 낳기: 기운을 낳는 속도만큼 쓰고, 닭 수 × egg만큼 알이 된다. 마당이 꽉 차면(놓지 못한 알이 있으면) 기운을 쓰지 않고 기다린다 */
+    const n=flowLayers(w);
+    while(f.lay>=1&&flowPlace(w,true))f.lay-=1;
+    if(f.lay<1&&f.credit>0&&n>0){const dc=Math.min(f.credit,f.rate);f.credit-=dc;if(f.credit<1e-9)f.credit=0;f.lay+=n*FLOW.egg*dc;while(f.lay>=1&&flowPlace(w,true))f.lay-=1}
+    /* 나르기: 농부 한 명이 한 번에 한 알. 한 알에 박 ÷ carry틱(신바람이면 그만큼 빨리). 닿는 틱에 sold, 쉬는 농부는 바로 다음 알을 집는다 */
+    const b=f.boost,k=b.left>0?FLOW.boost[b.lv]||1:1;if(b.left>0&&--b.left<=0){b.left=0;b.lv=0}
+    for(let i=0;i<men;i++){const sl=f.slots[i];let over=0;
+      if(sl.job===1){sl.left-=k;if(sl.left<=0){over=-sl.left;sl.job=0;sl.left=0;w.events.push({type:'sold',n:1,slot:i})}}
+      if(sl.job===0){const src=flowTake(w);if(src>-2){sl.job=1;sl.from=src;sl.total=Math.max(1,f.beat/FLOW.carry);sl.left=Math.max(.001,sl.total-over)}}}
+  }
 
   /* ---------- 난수(mulberry32, 상태는 w.rng 한 칸) ---------- */
   function rand(w){let t=(w.rng=(w.rng+0x6D2B79F5)>>>0);t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296}
@@ -149,9 +217,10 @@
       if(f){const a=(k+.5)*Math.PI/3;f.x=Math.cos(a)*R;f.z=Math.sin(a)*R}
     }
     const hens=Math.max(0,Math.min(HENS_MAX,s.chickens|0));
+    for(const h of w.hens)if(h.state==='gone')flowKeep(w,h);
     w.hens=w.hens.filter(h=>h.state!=='gone');
     /* 경제보다 닭이 많으면(망가진 저장 등) 잡히지 않은 닭부터 뒤에서 뺀다: 세계 닭 수 = s.chickens */
-    for(let i=w.hens.length-1;i>=0&&w.hens.length>hens;i--)if(w.hens[i].state!=='caught'&&w.hens[i].state!=='carried')w.hens.splice(i,1);
+    for(let i=w.hens.length-1;i>=0&&w.hens.length>hens;i--)if(w.hens[i].state!=='caught'&&w.hens[i].state!=='carried'){flowKeep(w,w.hens[i]);w.hens.splice(i,1)}
     for(let i=w.hens.length;i<hens;i++){const slot=freeHome(w);const [x,z]=HOME(slot);w.hens.push({id:id(w),slot,x,z,state:'yard',calm:0})}
     return w;
   }
@@ -338,7 +407,9 @@
       if(--b.rebuild<=0){b.broken=false;b.hp=Math.round(b.max/2);b.rebuild=REBUILD;w.events.push({type:'rebuilt',building:b.id,kind:'fence'})}
     }
     w.wolves=w.wolves.filter(v=>v.state!=='gone'&&!(v.state==='dead'&&++v.timer>15));
+    if(w.flow)for(const h of w.hens)if(h.state==='gone')flowKeep(w,h);
     w.hens=w.hens.filter(h=>h.state!=='gone');
+    if(w.flow)flowStep(w,s);
     return w.events;
   }
   const liveWolves=w=>w.wolves.filter(alive);
@@ -480,6 +551,22 @@
   const fin=Number.isFinite,int=(x,lo,hi)=>Number.isSafeInteger(x)&&x>=lo&&x<=hi;
   const WOLF_STATES=['walk','smash','hunt','bite','carry','leave','dead','gone'],HEN_STATES=['yard','flee','hidden','home','caught','carried','gone'];
   const KING_STATES=['wait','come','stand','flee'],FOX_STATES=['come','flee'];
+  /* 흐르는 농장 칸 다듬기(선택 칸): 음수·모양이 틀린 값만 고친다. 망가진 일손 슬롯은 쉬는 슬롯으로(들고 있던 알은 버린다) */
+  function tidyFlow(w){
+    if(!isObj(w.flow)){w.flow=flowFresh();return}
+    const f=w.flow;
+    if(!(fin(f.credit)&&f.credit>=0))f.credit=0;else if(f.credit>FLOW.creditMax)f.credit=FLOW.creditMax;
+    if(!int(f.beat,FLOW.beatMin,FLOW.beatMax))f.beat=flowBeat(f.beat);
+    if(!(fin(f.lay)&&f.lay>=0&&f.lay<=50))f.lay=0;
+    if(!int(f.nest,0,FLOW.nest+HENS_MAX*FLOW.perHen))f.nest=Number.isSafeInteger(f.nest)&&f.nest>0?FLOW.nest:0;
+    if(!int(f.pile,0,99))f.pile=0;if(!int(f.next,0,HENS_MAX))f.next=0;
+    if(!isObj(f.boost)||!int(f.boost.lv,0,FLOW.boost.length-1)||!(fin(f.boost.left)&&f.boost.left>=0&&f.boost.left<=FLOW.beatMax))f.boost={lv:0,left:0};
+    if(!(fin(f.rate)&&f.rate>=0&&f.rate<=FLOW.layCap/FLOW.beatMin))f.rate=flowRate(f);
+    if(!Array.isArray(f.slots))f.slots=[];
+    if(f.slots.length>FLOW.men)f.slots.length=FLOW.men;
+    for(let i=0;i<f.slots.length;i++){const sl=f.slots[i];
+      if(!isObj(sl)||(sl.job!==0&&sl.job!==1)||!int(sl.from,-1,HENS_MAX-1)||!(fin(sl.total)&&sl.total>=0&&sl.total<=FLOW.beatMax)||!(fin(sl.left)&&sl.left>=0&&sl.left<=sl.total)||sl.job===1&&!(sl.total>0))f.slots[i]={job:0,from:-1,left:0,total:0}}
+  }
   function tidy(w){
     w.hall=Math.max(0,Math.min(3,w.hall|0));w.interval=Math.max(80,w.interval);
     const wv=w.wave;if(!int(wv.n,0,Number.MAX_SAFE_INTEGER))wv.n=0;if(!Number.isSafeInteger(wv.arrive)||wv.arrive<=w.t)wv.arrive=w.t+w.interval;if(typeof wv.spawned!=='boolean')wv.spawned=false;
@@ -503,7 +590,8 @@
       if(K.boss&&!fin(v.roar))v.roar=ROAR.every>>1;
     }
     w.hens=w.hens.filter(h=>isObj(h)&&Number.isSafeInteger(h.id)&&fin(h.x)&&fin(h.z)).slice(0,HENS_MAX);
-    for(const h of w.hens){if(!HEN_STATES.includes(h.state))h.state='yard';if(!int(h.slot,0,HENS_MAX-1))h.slot=0;if(!fin(h.calm))h.calm=0}
+    for(const h of w.hens){if(!HEN_STATES.includes(h.state))h.state='yard';if(!int(h.slot,0,HENS_MAX-1))h.slot=0;if(!fin(h.calm))h.calm=0;if('egg' in h&&!int(h.egg,0,FLOW.perHen))h.egg=Number.isSafeInteger(h.egg)&&h.egg>FLOW.perHen?FLOW.perHen:0}
+    if('flow' in w)tidyFlow(w);
     const one=new Set();
     w.buildings=w.buildings.filter(b=>{
       if(!isObj(b)||!HP[b.kind]||!Number.isSafeInteger(b.id)||!fin(b.x)||!fin(b.z))return false;
@@ -522,7 +610,7 @@
     if(!(Number.isSafeInteger(w.nextId)&&w.nextId>top))w.nextId=top+1;
   }
 
-  const api={V:2,TEMPO,tempoInterval,mulOf,KING,FOX,king,kingHit,fox,foxShoo,retreat,peaceOff,TICK,RADIUS,EDGE,SPAWNS,WOLF,AGE,THREAT,PACK,TRICKLE,SLOW,slowEase,KINDS,MIX,BOSS_EVERY,TOWER,POWER,POWER_STEP,FLOOR,ROAR,HP,FENCE_HP,MEND,REBUILD,HEN,DASH,RUSH,MERCY,MERCY_CAP,INNER,SIDE_REACH,INTERVAL,MAX_WOLVES,TRAVEL,GUARD,answered,
+  const api={V:2,FLOW,flowOn,flowQuestion,flowCorrect,flowAdd,flowYard,flowCap,flowPile,flowIdle,flowLayers,TEMPO,tempoInterval,mulOf,KING,FOX,king,kingHit,fox,foxShoo,retreat,peaceOff,TICK,RADIUS,EDGE,SPAWNS,WOLF,AGE,THREAT,PACK,TRICKLE,SLOW,slowEase,KINDS,MIX,BOSS_EVERY,TOWER,POWER,POWER_STEP,FLOOR,ROAR,HP,FENCE_HP,MEND,REBUILD,HEN,DASH,RUSH,MERCY,MERCY_CAP,INNER,SIDE_REACH,INTERVAL,MAX_WOLVES,TRAVEL,GUARD,answered,
     TOWER_SLOTS,RINGS,ALL_SLOTS,SLOT_COUNT,TOWER_UNITS,PLACE,HOMES,HENS_MAX,HOME,towerSlots,fenceLayers,
     intervalFor,create,sync,step,volley,volleyArrows,dashTicks,built,threat,repairAll,brokenCount,brokenKinds,marketDown,wolvesInside,towerUnits,barLeft,secondsLeft,packSize,trickleGap,kindsAt,restore,radius,sectorOf,rand,range,cooldown,damage,towerDamage,towerRange,power,ageOf};
   if(typeof module!=='undefined')module.exports=api;

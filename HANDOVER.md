@@ -55,7 +55,18 @@
 
 ## 실제 규칙과 한계
 
-### 0.12 (현재)
+### 0.13 (현재)
+
+흐르는 농장과 신바람입니다(브랜치 `claude/flow-farm`, worktree `work\claude-v013`, 0.12 main `3fb318f` 기준). 정본은 [docs/game-plan.md](docs/game-plan.md) §13, 설계 근거는 저장소 밖 `work\verification-20261113\design\v013-design.md`입니다. 결정 질문 5개는 추천 기본값이고 `combat.js`의 `FLAGS.FLOW`·`FLOW_OFF_AGES`·`BUBBLE_BUY`·`REPAIR_ACT`와 `Combat.FLOW`·`World.FLOW`로 바꿉니다(§13.4 표).
+
+- 규칙(`combat.js`, API 5): `flowOn(s)`이면 `income`이 기본금(+물고기)만 주고 `flow:{credit, boost}`를 돌려줍니다(연속·번개 금화 배수 없음). `beatTicks(s,q)`가 그 문제의 박, `sellEggs(s,n)`이 알 금화입니다. 농부 추천 조건은 `ctx.pile`(마당 알 ≥ 닭 수가 문제 2개).
+- 세계(`world.js`): 선택 칸 `w.flow`(`credit`·`rate`·`beat`·`boost`·`lay`·`nest`·`pile`·`slots[]`)와 닭의 `egg`(0~2). `flowOn`·`flowQuestion(w, 박)`·`flowCorrect(w, 기운, 신바람, 다음 박)`·`flowAdd`(예전 남은 알)·`flowYard`·`flowPile`. `step`이 낳기와 나르기를 돌리고 `sold`·`laid` 사건을 냅니다. `w.flow`가 없으면 0.12와 결과가 같고, 난수를 쓰지 않습니다. 저장은 `v:2` 그대로(`tidyFlow`).
+- 화면(`index.html`): `flowSync`(흐름 켜기 + 0.12 `nest` 이행), `flowHud`(마당 알 숫자 `#yardEggs`, 불꽃 3칸 `#streakRow`), `eggSold`(작은 동전), 말풍선 누르기 `bubbleTap`, 읽는 중 새 말풍선 없음(`recQuiet`). 3D에는 `cheer` 사건과 `getVillageState().flow`·`repairAct`를 넘깁니다. `__game().flow`로 검사합니다.
+- 3D(`src/village.js`): `flowS`(world.flow)를 읽어 금빛 알(`eggSpot`), 농부 운반(`flowFarmer`: 슬롯의 `left/total`로 위치를 정함), 수리 농부(`assignRepairs`: 복구 카운트가 줄고 있는 면에만 쉬는 농부를 보냄), 물고기(`fishToMarket`)를 그립니다. `inspect()`에 `flow`·`yardEggs`·`farmersRunning`·`repairers`·`boost`가 있습니다.
+- 시뮬: `node scripts/sim-flow.cjs end [판 수] [나이] [아이] [덮어쓰기 JSON]`, `farm [나이]`. 실제 규칙을 그대로 돌립니다.
+- 검사: `test-dom.cjs`·`test.cjs`의 기존 검사는 0.12 경제(`FLOW=false`, 주소 `flow=0`)로 돌고, 흐름은 따로 봅니다(`ONLY=farm`). 통과선에 못 미친 세 가지와 확인하지 못한 것은 §13.3·§13.5에 있습니다.
+
+### 0.12 (참고)
 
 엔딩과 경제 개편을 넣은 판입니다(브랜치 `claude/ending-economy`, worktree `work\claude-v012-ending`, 0.11.1 main `427ba73`을 병합함). 정본은 [docs/game-plan.md](docs/game-plan.md) §11, 설계 근거는 저장소 밖 `work\verification-20261113\design\ending-and-progression-v2.md`·`ending-review.md`입니다. 프로듀서 결정 A~F는 추천 기본값이고 `combat.js` 맨 위 `FLAGS`·`FINALE`·`FOX`·`MIGRATE`·`START_PACK`·`WOLF_MUL`로 바꿉니다(§11.2 표).
 

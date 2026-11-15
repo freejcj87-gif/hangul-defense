@@ -193,6 +193,9 @@ body.paused *,body.paused *:before,body.paused *:after{animation-play-state:paus
 .scene.fin .banner{top:50px}/* 결전 중: 알림 띠는 별 방패 줄 아래로 */
 .finale{position:absolute;left:50%;top:8px;translate:-50% 0;z-index:6;display:flex;align-items:center;gap:2px;padding:5px 11px;border-radius:99px;background:#2b1d14e6;border:2px solid #f2b931;font-size:19px;line-height:1;white-space:nowrap;box-shadow:0 3px 0 #0004}
 .finale b{font-size:21px;margin-right:5px}.finale i{font-style:normal;transition:opacity .3s,scale .3s}.finale i.off{opacity:.28;scale:.72;filter:grayscale(1)}.finale.crack{animation:cardPop .45s}
+.yard-eggs{position:absolute;right:8px;top:8px;z-index:6;display:flex;align-items:center;gap:3px;padding:3px 9px;border-radius:99px;background:#fffdf3e6;border:2px solid #f2b931;font-size:15px;font-weight:900;color:#4a3410;line-height:1.3;box-shadow:0 2px 0 #0003;white-space:nowrap}.yard-eggs[data-n="0"]{opacity:.55}.yard-eggs.bump{animation:goldBump .3s}.scene.fin .yard-eggs{top:46px}
+#streakRow{display:inline-flex;align-items:center;gap:2px;flex:none;font-size:15px;line-height:1}#streakRow i{font-style:normal;opacity:.22;filter:grayscale(1);transition:opacity .25s,scale .25s;scale:.8}#streakRow i.on{opacity:1;filter:none;scale:1}#streakRow.flash i.on{animation:fastGlow .5s 2}
+#bubbleTap{flex:none;margin-left:auto;font-size:18px;animation:fastGlow 1s ease-in-out infinite}.coin-fly.small{scale:.6}
 #foxIcon{display:inline-grid;place-items:center;padding:1px 8px;border-radius:99px;background:#ffe9cf;border:1px solid #e9a55c;font-size:15px;line-height:1.5}
 .slot[data-key="bell"][data-state="buy"]{background:linear-gradient(#fff6c4,#f6c843);border-color:#d79a12}
 .slot[data-state="auto"],.slot[data-state="fight"],.slot[data-state="done"]{opacity:.92}.slot[data-state="auto"] .pr,.slot[data-state="fight"] .pr,.slot[data-state="done"] .pr{background:#e9f3dc;border-color:#b9d29a;color:#3c6b3f;letter-spacing:1px}
@@ -207,12 +210,12 @@ body.paused *,body.paused *:before,body.paused *:after{animation-play-state:paus
 <header><div><small>한글 디펜스 · 늑대가 오기 전에 읽어요 0.9</small><h1><img class="brand-chicken" src="art-handoff/coopnight/browser/characters/chicken.png" alt="">꼬꼬마을: 읽어서 지켜요</h1></div><button id="pause">잠깐 쉬기</button></header>
 <div class="game-layout"><section class="stage-card" id="stageCard" aria-label="우리 마을">
 <div class="stats"><span class="pill" id="gold"></span><span class="pill" id="flockPill"></span><span class="pill" id="level"></span><span class="pill" id="stage"></span></div>
-<div class="scene" id="scene"><div class="road"></div><div class="pond hidden" id="pond" aria-hidden="true"></div><div class="house"><img id="houseArt" src="art-handoff/coopnight/browser/buildings/home-01.png" alt="마을회관"></div><div class="village-extra" id="villageExtra" aria-hidden="true"></div><div class="fence-row" id="fenceRow" aria-hidden="true"></div><div id="tower"><img id="towerArt" src="art-handoff/coopnight/browser/buildings/tower-01.png" alt="방어 타워"><span class="tower-tag" id="towerTag"></span></div><div class="farmers" id="farmers" aria-hidden="true"></div><div class="flock" id="flock" aria-hidden="true"></div><div id="enemies" aria-label="다가오는 늑대"></div><div id="effects" aria-hidden="true"></div><div class="finale hidden" id="finale" role="img"></div><div id="pauseNote">⏸️ 쉬는 중이에요</div></div>
+<div class="scene" id="scene"><div class="road"></div><div class="pond hidden" id="pond" aria-hidden="true"></div><div class="house"><img id="houseArt" src="art-handoff/coopnight/browser/buildings/home-01.png" alt="마을회관"></div><div class="village-extra" id="villageExtra" aria-hidden="true"></div><div class="fence-row" id="fenceRow" aria-hidden="true"></div><div id="tower"><img id="towerArt" src="art-handoff/coopnight/browser/buildings/tower-01.png" alt="방어 타워"><span class="tower-tag" id="towerTag"></span></div><div class="farmers" id="farmers" aria-hidden="true"></div><div class="flock" id="flock" aria-hidden="true"></div><div id="enemies" aria-label="다가오는 늑대"></div><div id="effects" aria-hidden="true"></div><div class="finale hidden" id="finale" role="img"></div><div class="yard-eggs hidden" id="yardEggs" role="img"></div><div id="pauseNote">⏸️ 쉬는 중이에요</div></div>
 <div class="stage-caption"><span class="live-dot" aria-hidden="true"></span><span id="villageStatus">마을을 준비하고 있어요…</span></div>
-<div class="shop-wrap" id="shopWrap"><div class="bubble hidden" id="bubble" role="status" aria-live="polite"><img src="art-handoff/coopnight/browser/characters/chicken.png" alt="꼬꼬"><span id="bubbleText"></span></div><div class="shop-tip hidden" id="shopTip" role="status" aria-live="polite"></div><div class="shop" id="shop" role="group" aria-label="가게: 누르면 바로 사요"></div></div>
+<div class="shop-wrap" id="shopWrap"><div class="bubble hidden" id="bubble" role="status" aria-live="polite"><img src="art-handoff/coopnight/browser/characters/chicken.png" alt="꼬꼬"><span id="bubbleText"></span><span id="bubbleTap" class="hidden" aria-hidden="true">👆</span></div><div class="shop-tip hidden" id="shopTip" role="status" aria-live="polite"></div><div class="shop" id="shop" role="group" aria-label="가게: 누르면 바로 사요"></div></div>
 <div id="coinLayer" aria-hidden="true"></div></section>
 <section class="panel lesson"><details class="settings-drawer" id="drawer"><summary id="drawerSummary">⚙️ 설정</summary><div class="toolbar"><label>나이 <select id="age" aria-label="나이에 맞는 문제 고르기"><option>7</option><option selected>8</option><option>9</option><option>10</option></select>세</label></div><div class="settings"><label><input id="sfx" type="checkbox" checked> 효과음</label><label><input id="motion" type="checkbox"> 움직임 줄이기</label><button id="reset">처음부터 시작</button></div></details>
-<div id="quiz"><p class="lesson-kicker"><span class="kick-left"><span id="fastIcon" data-state="off" role="img" aria-label="번개: 빨리 맞히면 금화가 더 생겨요" title="빨리 맞히면 금화가 더 생겨요">⚡</span><span id="levelChip" title="지금 문제의 나이와 단계"></span><span id="foxIcon" class="hidden" role="img" aria-label="도둑 여우가 와요. 맞히면 쫓아내요" title="도둑 여우가 와요. 맞히면 쫓아내요">🦊</span></span></p><h2 id="prompt"></h2><div id="passage"></div><div id="answers"></div></div><div id="feedback" role="status" aria-live="polite"></div></section></div>
+<div id="quiz"><p class="lesson-kicker"><span class="kick-left"><span id="fastIcon" data-state="off" role="img" aria-label="번개: 빨리 맞히면 더 좋아요" title="빨리 맞히면 더 좋아요">⚡</span><span id="levelChip" title="지금 문제의 나이와 단계"></span><span id="foxIcon" class="hidden" role="img" aria-label="도둑 여우가 와요. 맞히면 쫓아내요" title="도둑 여우가 와요. 맞히면 쫓아내요">🦊</span></span><span id="streakRow" class="hidden" role="img"><i>🔥</i><i>🔥</i><i>🔥</i></span></p><h2 id="prompt"></h2><div id="passage"></div><div id="answers"></div></div><div id="feedback" role="status" aria-live="polite"></div></section></div>
 <section class="panel growth-panel"><div class="growth-title"><b>조금씩 자라는 우리 마을</b><small>한 번에 맞힐 때마다 금화가 생겨요</small></div><div id="garden"></div><small>늑대와 몬스터가 쉬지 않고 사방에서 몰려와 닭을 물어 가고 건물을 부숴요. 문제를 한 번에 맞히면 모든 타워가 일제 사격을 하고, 닭이 알을 낳아 농부가 팔아 금화가 생겨요(빨리, 연속으로 맞히면 더 많이). 금화로 언제든 가게에서 타워·닭·농부·울타리를 사요. 마을이 자라면 회관이 저절로 커져 마을이 넓어지고 새 물건과 새 몬스터가 나와요. 부서진 건물은 🔨 고치기로 고쳐요. 마을이 다 자라면 늑대 왕이 와요. 🔔 종을 울려 물리치면 새 마을로 떠날 수 있어요.</small></section>
 <footer>진행 상황은 이 브라우저에 저장됩니다. 나이는 ⚙️ 설정에서 바꿀 수 있어요.</footer>
 </main>
@@ -222,9 +225,11 @@ body.paused *,body.paused *:before,body.paused *:after{animation-play-state:paus
 <ul class="rules"><li>🐺 늑대가 쉬지 않고 사방에서 와서 닭을 물어 가고 건물을 부숴요.</li><li>🏹 한 번에 맞히면 타워가 일제히 쏘고, 닭이 알을 낳아 금화가 생겨요.</li><li>🪙 금화로 언제든 가게에서 타워·닭·농부를 사요.</li><li>💥 문제에는 상식·수학·영어도 섞여 있어요.</li></ul>
 <p class="start-q">몇 살이에요?</p><div class="age-row" id="ageRow"></div>
 <button id="go">시작하기 ▶</button><small>어려우면 나이를 낮춰도 괜찮아요.</small></div></div>
-<script src="combat.js?v=0.12"></script><script src="world.js?v=0.12"></script><script src="questions-gen.js?v=0.12"></script><script src="questions.js?v=0.12"></script><script>/* 체험 주소 ?demo=1~3: 그 회관 단계까지 자란 마을로 시작해 새 몬스터를 바로 본다(프로듀서·보호자 확인용). 저장은 따로 해서 원래 진행을 건드리지 않는다. */
+<script src="combat.js?v=0.13"></script><script src="world.js?v=0.13"></script><script src="questions-gen.js?v=0.13"></script><script src="questions.js?v=0.13"></script><script>/* 체험 주소 ?demo=1~3: 그 회관 단계까지 자란 마을로 시작해 새 몬스터를 바로 본다(프로듀서·보호자 확인용). 저장은 따로 해서 원래 진행을 건드리지 않는다. */
 const DEMO=(()=>{try{const m=/[?&]demo=([123])\b/.exec(location.search);return m?Number(m[1]):0}catch{return 0}})();
 const KEY=DEMO?'hangul-defense-demo'+DEMO:'hangul-defense-v1',AGES=Questions.AGES,ART='art-handoff/coopnight/browser/';
+/* 0.13: 주소에 ?flow=0을 붙이면 흐르는 농장을 끄고 0.12 경제로 돈다(비교·회귀 검사용) */
+try{if(/[?&]flow=0\b/.test(location.search))Combat.FLAGS.FLOW=false}catch{}
 const DEMO_VILLAGE={1:{hall:1,level:2,fence:2,chickens:4,gold:250},2:{hall:2,level:3,fence:4,chickens:6,farmers:1,power:1,gold:450},3:{hall:3,level:5,fence:6,chickens:8,farmers:2,pond:2,power:2,gold:700}};
 /* 규칙은 combat.js(Combat)·world.js(World)가 정한다. 이 스크립트는 단계(phase) 진행, 화면, 효과음만 맡는다. 계약: docs/v09-contract.md
    0.11: 아이는 글을 읽기만 한다. 소리 모드도, 읽어 주는 음성(음성 합성)도 없다. state.mode는 저장 호환용으로 늘 'story'.
@@ -261,11 +266,14 @@ const TEMPO_SPAN=120;
 function waveInterval(){let sum=0;for(let i=0;i<TEMPO_SPAN;i++)sum+=Combat.baseSeconds(Questions.at(state.age,state.mode,state.index+i,state.seed));return World.tempoInterval(sum/TEMPO_SPAN)}
 /* guard(0.10): 새 판은 처음 한 번에 맞힐 때까지(3번) 늑대가 쫓기만 하고, 마지막 닭 한 마리는 늘 지켜진다 */
 const freshWorld=()=>World.sync(World.create({seed:(Date.now()%2147483647)||1,interval:waveInterval(),guard:true}),state);
+/* 0.13 흐르는 농장: 켜져 있으면 세계에 흐름 칸(world.flow)을 만들고, 0.12 저장의 남은 알(state.nest)은 마당 알로 한 번만 옮긴다(옮긴 뒤 nest 0 → 다시 불러와도 알이 늘지 않는다) */
+const flowing=()=>Combat.flowOn(state);
+function flowSync(){if(!flowing())return;World.flowOn(world);if((state.nest|0)>0){World.flowAdd(world,state.nest|0);state.nest=0}}
 let world=null;try{const raw=JSON.parse(localStorage.getItem(KEY));world=raw&&raw.world?World.restore(raw.world,{interval:waveInterval()}):null}catch{}
 if(world&&world.keep===undefined)world.keep=true;/* 0.9 저장도 마지막 닭은 지킨다 */
 const KIND_ICON={wolf:'🐺',bramble:'🌿',boar:'🐗',granite:'🪨',frost:'❄️',ember:'🔥'};
 const CAT_ICON={common:'🌍',math:'🔢',english:'🔤'};
-if(!world)world=freshWorld();World.sync(world,state);state.broken=World.brokenCount(world);syncMarket();
+if(!world)world=freshWorld();World.sync(world,state);flowSync();state.broken=World.brokenCount(world);syncMarket();
 /* 판 진행(run.bell)에 늑대 왕과 물러남을 맞춘다. 1 = 숲 가장자리에서 기다림, 2 = 결전(멈춤 지점), 3 = 물리침(늑대가 물러남), 4 = 자유 놀이.
    snap(이어하기·불러오기): 걷는 장면 없이 제자리에 두고, 결전 중이던 왕은 멈춤 지점 처음 자리로(걸음 0, Combat.restoreRun도 steps를 0으로 한다) */
 function syncKing(snap){const b=state.run.bell;
@@ -328,7 +336,8 @@ function pills(){
  const g=shownGold(),alive=liveWolves().length;put($('gold'),'🪙 '+g);attr($('gold'),'aria-label','금화 '+g);
  put($('flockPill'),'🐔 '+state.chickens+(state.broken?' 💥'+state.broken:''));attr($('flockPill'),'aria-label','닭 '+state.chickens+'마리'+(state.broken?', 부서진 건물 '+state.broken+'곳':''));
  put($('level'),'🏹'+(1+state.level)+(state.power?'💥'+state.power:'')+' 🐺'+alive);attr($('level'),'aria-label','화살 타워 '+(1+state.level)+'개'+(state.power?', 타워 강화 '+state.power+'단계':'')+', 늑대 '+alive+'마리');
- put($('stage'),state.streak>=2?'🔥 '+state.streak+'연속':'⭐ '+state.wins);attr($('stage'),'aria-label',state.streak>=2?state.streak+'번 연속으로 한 번에 맞힘':'한 번에 맞힌 문제 '+state.wins+'개');
+ const sn=state.streak>=2&&(!flowing()||state.age>=9);/* 0.13: 연속은 불꽃 3칸으로 보이고, 숫자는 9세 이상만 */
+ put($('stage'),sn?'🔥 '+state.streak+'연속':'⭐ '+state.wins);attr($('stage'),'aria-label',sn?state.streak+'번 연속으로 한 번에 맞힘':'한 번에 맞힌 문제 '+state.wins+'개');
 }
 function render(){
  document.body.classList.toggle('paused',paused);document.body.classList.toggle('covered',paused&&['ask','learn'].includes(phase));
@@ -344,7 +353,7 @@ function frame(){
  if(worldNote&&world.t>worldNote.until)worldNote=null;
  put($('villageStatus'),paused?'⏸️ 쉬는 동안 늑대도 멈춰요':phase==='start'?'시작하기를 누르면 늑대 무리가 와요':worldNote?worldNote.text:round&&round.dash>0?'🐺 늑대가 성큼 다가왔어요!':inside?'🐺 늑대 '+inside+'마리가 마을에 들어왔어요!':state.run.bell===2?'👑 늑대 왕과 겨뤄요! 한 번에 맞혀요':alive?'🐺 늑대 '+alive+'마리가 다가와요':world.peace?'🌅 늑대가 물러났어요. 마을이 평화로워요':state.run.bell===1?'👑 늑대 왕이 숲에서 기다려요':'🌾 조용해요. 늑대가 또 올 거예요');
  $('scene').classList.toggle('dash',!!(round&&round.dash>0&&phase==='ask'));
- fastLight();pills();renderShop();drawWolves();finaleHud();
+ fastLight();pills();renderShop();drawWolves();finaleHud();flowHud();
  $('foxIcon').classList.toggle('hidden',!(phase!=='start'&&world.fox&&world.fox.state==='come'));
 }
 /* 결전 표시: 늑대 왕 머리 위 별 방패 6개를 장면 위쪽에 그린다(3D·그림 화면 공통). 깨진 방패는 흐리게. 시간 표시는 없다 */
@@ -355,6 +364,17 @@ function finaleHud(){
  const b=document.createElement('b');b.textContent='👑';el.append(b);
  for(let i=0;i<N;i++){const s=document.createElement('i');s.textContent='⭐';if(i>=N-r.shields)s.className='off';el.append(s)}
  attr(el,'aria-label','늑대 왕의 별 방패 '+(N-r.shields)+'개 남았어요');
+}
+/* 0.13 흐르는 농장 표시: 장면 위 마당 알 수(🥚 12)와 문제 칸의 연속 불꽃 3칸(1번 맞힘 · 3연속 = 신바람 · 6연속 = 큰 신바람). 기운 수치는 보이지 않는다.
+   경고색·'못 팔았어요' 문구는 쓰지 않는다. 움직임 줄이기에서도 이 두 표시만으로 읽힌다 */
+let yardShown=-1;
+function flowHud(){
+ const on=flowing()&&phase!=='start',y=$('yardEggs'),row=$('streakRow');
+ y.classList.toggle('hidden',!on);row.classList.toggle('hidden',!on);if(!on){yardShown=-1;return}
+ const n=World.flowYard(world);
+ if(n!==yardShown){if(n>yardShown&&yardShown>=0&&!calm())pop(y,'bump');yardShown=n;put(y,'🥚 '+n);y.dataset.n=String(n);attr(y,'aria-label','마당에 알 '+n+'개')}
+ const st=state.streak|0,lit=st>=Combat.FLOW.boost2?3:st>=Combat.FLOW.boost1?2:st>=1?1:0;
+ if(row.dataset.n!==String(lit)){row.dataset.n=String(lit);[...row.children].forEach((c,i)=>c.classList.toggle('on',i<lit));attr(row,'aria-label',st>=1?st+'번 연속으로 맞혔어요':'연속으로 맞히면 불꽃이 켜져요')}
 }
 /* 문제 칸 귀퉁이 ⚡: 번개 보너스를 받을 수 있는 동안(Combat.isFast) 빛나고, 그 시간이 지나면 조용히 꺼진다. 한 번에 번개로 맞히면 잠깐 반짝. */
 function fastLight(){let s='off';
@@ -396,6 +416,8 @@ const SFX={
  /* 알 낳기 '뽁' (알 수만큼, 최대 5번) → 금화 '짤랑' */
  sale(eggs,at=0){const n=Math.min(5,eggs);for(let i=0;i<n;i++)note(1100+i*90,at+i*.09,.07,'sine',.05,620);const c=at+n*.09+.35;note(1568,c,.06,'square',.028);note(2093,c+.07,.22,'square',.028);note(2637,c+.07,.3,'sine',.03);noise(c+.07,.25,.025,7000,9000,1,'highpass')},
  /* 동전이 금화 칸에 닿을 때 '짤랑': 하나 닿을 때마다 음이 조금씩 높아진다(작게) */
+ /* 알 한 개가 팔림: 아주 작은 '틱'(읽기를 방해하지 않게) */
+ egg(){note(1760,0,.05,'sine',.012);note(2349,.03,.09,'sine',.01)},
  clink(i=0){const f=1320*Math.pow(1.07,Math.min(12,i));note(f,0,.07,'square',.012);note(f*1.5,.015,.16,'sine',.022);noise(0,.06,.012,8000,9500,1,'highpass')},
  /* 살 수 있게 된 상품이 켜짐 '띵' */
  ding(){note(1760,0,.28,'sine',.03);note(2637,.07,.32,'sine',.018)},
@@ -462,6 +484,8 @@ function veil(text){const a=$('answers');a.classList.toggle('veiled',!!text);if(
 function newRound(resume){
  makeRound();
  if(resume){round.t=resume.t;round.tries=resume.tries}else foxMaybe();
+ /* 흐르는 농장: 이 문제의 박(필요 시간 × 1.3 × 읽기 속도)으로 닭·농부의 빠르기를 맞춘다. 이어하기는 저장된 박 그대로 */
+ if(flowing()){flowSync();if(!resume)World.flowQuestion(world,Combat.beatTicks(state,round.q))}
  say('');
  startAsk();
  save();render();
@@ -498,6 +522,8 @@ function choose(i,b){
       결전 문제는 번호 대신 결전 진행(깬 방패·남은 문제)이 이 순간 넘어간다(Combat.finaleSettle) */
    const fz=fin?Combat.finaleSettle(state,'first',{now:Date.now()}):null;
    if(!fin||fin.normal)state.index++;
+   /* 0.13 흐르는 농장: 알은 이 순간 팔리지 않는다. 정답이 닭에게 기운을 주고(연속·번개는 덤 기운과 신바람), 닭·농부가 다음 문제를 읽는 동안 그 기운을 쓴다 */
+   if(round.info.flow){const nf=Combat.finaleNow(state),nq=Questions.at(state.age,state.mode,nf?nf.index:state.index,state.seed);flowSync();World.flowCorrect(world,round.info.flow.credit,round.info.flow.boost,Combat.beatTicks(state,nq))}
    /* 새 판 보호 한 칸 줄이기, 정답 소리가 묻히지 않게 1초 동안 전투음 쉬기 */
    World.answered(world);hushUntil=world.t+10;
    /* 읽기가 곧 방어: 한 번에 맞히면 모든 타워가 일제 사격(긴 글일수록·빨리 맞힐수록 많이) */
@@ -570,6 +596,7 @@ function showEnding(){
 function resetView(){lastBoom=lastShot=lastYelp=lastCrash=lastHowl=hushUntil=-99;state.broken=World.brokenCount(world);syncMarket();worldNote=null;paused=false;artStamp='';clearCoins();recReset();shopPrev=[];bannerQueue.length=0;if(bannerEl){bannerEl.remove();bannerEl=null}acc=0;last=null}
 /* 번개: 기본 시간의 60% 안이면서 글을 읽을 만한 최소 시간은 지나서 맞혔을 때(Combat.isFast) */
 const isFast=()=>Combat.isFast(round.q,round.t);
+const isFastAt=r=>Combat.isFast(r.q,r.t);
 function view(list){try{window.VillageView&&window.VillageView.events(list)}catch{}}
 
 /* 한 번에 정답: 알 → 농부 → 매대 → 금화. 카드 고르기 없이 약 1.2초 판매 연출 뒤 바로 다음 문제(세계는 계속 흐름, 가게도 열려 있음). */
@@ -579,6 +606,14 @@ function enterReward(g){
  const sold=g.sold!==undefined?g.sold:(g.eggs|0),laid=g.laid!==undefined?g.laid:sold,left=g.left|0;
  /* 연속·번개로 더 받은 금화를 숫자로 보여 준다(규칙 수치는 그대로): streakGold = 연속 배수로 늘어난 몫, bonus = 번개 몫 */
  const extra=bonusNote(g);
+ /* 0.13 흐르는 농장: 정답 순간에는 기본금(+물고기)만 큰 동전으로 받고, 닭이 일제히 깡충 뛰며 첫 알을 낳는다. 알 금화는 농부가 매대에 내려놓을 때마다 따로 온다(worldStep 'sold').
+    연속·번개는 금화 숫자 대신 신바람(농부가 뛴다)으로 보인다. 추천 말풍선은 문제 사이인 이때 띄운다(읽는 중에는 새로 뜨지 않는다) */
+ if(g.flow){const lv=g.flow.boost|0,fast=!!(round.info&&isFastAt(round));
+  say('✅ '+round.q.choices[round.q.answer]+' — 타워가 일제히 쐈어요! 🪙 +'+g.gold+(lv>=2?' · 🔥 신바람! 농부가 달려요':lv===1?' · 🔥 신바람! 농부가 뛰어요':''));
+  jingle('correct',fast);if(g.fish)jingle('sale',1,.75);
+  view([{type:'cheer',fish:g.fish,gold:g.gold,boost:lv,fast,back:g.back}]);
+  if(lv>0&&!calm())pop($('streakRow'),'flash');
+  payout(g.gold,g.coin,'');askBubble(false);save();render();return}
  say('✅ '+round.q.choices[round.q.answer]+' — 타워가 '+(g.bonus?'더 많이 ':'')+'일제히 쐈어요! 🪙 +'+g.gold+(extra?' ('+extra+')':''));
  jingle('correct',!!g.bonus);jingle('sale',sold+(g.fish?1:0),.75);sale(g,sold,left);
  view([{type:'produce',laid,sold,left,eggs:sold,fish:g.fish,gold:g.gold,back:g.back}]);
@@ -595,6 +630,7 @@ function enterLearn(message){
  answerButtons().forEach(b=>{const right=Number(b.dataset.i)===round.q.answer;b.disabled=!right;if(right)b.classList.add('correct')});
  say(message+' 초록색 정답을 확인해요.',round.result==='miss');
  round.learn=Combat.learnTicks(round.q);
+ if(flowing())askBubble(false);/* 0.13: 말풍선은 문제 사이에만 새로 뜬다 */
  save();render();
 }
 function learnReady(){round.ready=true;const b=answerButtons().find(x=>Number(x.dataset.i)===round.q.answer);if(b){b.disabled=false;b.classList.add('tap-me')}put($('feedback'),$('feedback').textContent.replace(' 초록색 정답을 확인해요.','')+' 👆 초록 답을 누르면 다음 문제예요.');render()}
@@ -698,24 +734,31 @@ function payout(gold,coin,note){
 }
 function coinGeom(from,i){try{const card=$('stageCard').getBoundingClientRect(),s=$('scene').getBoundingClientRect(),p=$('gold').getBoundingClientRect();if(!card.width||!s.width||!p.width)return null;
  return {x0:s.left-card.left+from.x*s.width+((i%3)-1)*9,y0:s.top-card.top+from.y*s.height+(((i*7)%5)-2)*4,x1:p.left-card.left+11,y1:p.top-card.top+p.height/2}}catch{return null}}
-function launchCoin(c){const g=coinGeom(c.from,c.i),e=document.createElement('span');e.className='coin-fly';e.append(document.createElement('i'));
+function launchCoin(c){const g=coinGeom(c.from,c.i),e=document.createElement('span');e.className='coin-fly'+(c.small?' small':'');e.append(document.createElement('i'));
  if(g){e.style.setProperty('--x0',Math.round(g.x0)+'px');e.style.setProperty('--y0',Math.round(g.y0)+'px');e.style.setProperty('--dx',Math.round(g.x1-g.x0)+'px');e.style.setProperty('--dy',Math.round(g.y1-g.y0)+'px')}
  e.style.setProperty('--dur',(COIN.fly*.1)+'s');$('coinLayer').append(e);c.el=e}
 function coinTick(){if(!coins.length)return;
  for(const c of coins)if(!c.el&&uiT>=c.at)launchCoin(c);
  const landed=coins.filter(c=>uiT>=c.land);if(!landed.length)return;
  coins=coins.filter(c=>uiT<c.land);
- for(const c of landed){if(c.el)c.el.remove();pendingGold=Math.max(0,pendingGold-c.share);jingle('clink',c.i);if(c.last)coinsLanded(c.total,c.note)}
+ for(const c of landed){if(c.el)c.el.remove();pendingGold=Math.max(0,pendingGold-c.share);
+  if(c.small){if(uiT-lastEggClink>=EGG_CLINK){lastEggClink=uiT;jingle('egg')}}/* 알 한 개 값: 작은 소리만(큰 '+숫자'·말풍선 없음) */
+  else{jingle('clink',c.i);if(c.last)coinsLanded(c.total,c.note)}}
  pills();renderShop();
 }
 /* 한 번의 금화가 다 닿음: 금화 칸이 통통, '+58'이 떠오르고, 이때 추천 말풍선 */
-function coinsLanded(total,note){pop($('gold'),'bump');goldPlus(total);if(note)goldExtra(note);pills();renderShop();askBubble(false)}
+function coinsLanded(total,note){pop($('gold'),'bump');goldPlus(total);if(note)goldExtra(note);pills();renderShop();if(!flowing())askBubble(false)}
 function goldExtra(note){const e=document.createElement('span');e.className='gold-extra';e.textContent=note;
  try{const card=$('stageCard').getBoundingClientRect(),p=$('gold').getBoundingClientRect();if(card.width&&p.width){e.style.setProperty('--x',Math.round(p.left-card.left)+'px');e.style.setProperty('--y',Math.round(p.bottom-card.top+4+($('scene').classList.contains('fin')?42:0))+'px')}}catch{}/* 결전 중에는 별 방패 줄 아래에 */
  $('coinLayer').append(e);setTimeout(()=>e.remove(),1450)}
 function goldPlus(total){const e=document.createElement('span');e.className='gold-plus';e.textContent='+'+total;
  try{const card=$('stageCard').getBoundingClientRect(),p=$('gold').getBoundingClientRect();if(card.width&&p.width){e.style.setProperty('--x',Math.round(p.right-card.left+4)+'px');e.style.setProperty('--y',Math.round(p.top-card.top-2)+'px')}}catch{}
  $('coinLayer').append(e);setTimeout(()=>e.remove(),1150)}
+/* 0.13 흐르는 농장: 농부가 알을 매대에 내려놓을 때마다(World 'sold') 금화가 생긴다. 작은 동전 하나가 금화 칸으로 날아가고, 소리는 0.8초에 한 번만 작게 */
+const EGG_CLINK=8;let lastEggClink=-99;
+function eggSold(n){syncMarket();const g=Combat.sellEggs(state,n);if(!(g>0))return;
+ if(!flyable()){if(uiT-lastEggClink>=EGG_CLINK){lastEggClink=uiT;jingle('egg')}return}
+ pendingGold+=g;coins.push({at:uiT,land:uiT+COIN.fly,share:g,i:coins.length%5,total:g,last:false,small:true,el:null,from:marketSpot()})}
 function clearCoins(){for(const c of coins)if(c.el)c.el.remove();coins=[];pendingGold=0;lastLaunch=-1}
 
 /* ---------- 추천: 꼬꼬 말풍선 + 상품 칸 반짝임 ----------
@@ -730,10 +773,11 @@ const rec={glow:null,bubble:null,left:0,last:-1e9,times:[],prev:null,ign:{},mute
 function recReset(){Object.assign(rec,{glow:null,bubble:null,left:0,last:-1e9,times:[],prev:null,ign:{},mute:{},want:null,opened:[],lostAt:-1e9,said:{},bellAt:-1e9});hideBubble()}
 const saidKey=r=>(state.hall|0)+':'+r.line;
 function recCtx(keep){const kinds=[];for(const b of world.buildings)if(b.broken&&b.kind!=='fence'&&!kinds.includes(b.kind))kinds.push(b.kind);
- return {wolvesInside:wolvesInside(),towers:world.buildings.filter(b=>b.kind==='tower'&&!b.broken).length,lostHenRecently:world.t-rec.lostAt<=300,brokenKinds:kinds,opened:rec.opened.filter(k=>k!==keep),bellQuiet:world.t-rec.bellAt<REC.bellGap}}
+ return {wolvesInside:wolvesInside(),towers:world.buildings.filter(b=>b.kind==='tower'&&!b.broken).length,lostHenRecently:world.t-rec.lostAt<=300,brokenKinds:kinds,opened:rec.opened.filter(k=>k!==keep),bellQuiet:world.t-rec.bellAt<REC.bellGap,pile:World.flowPile(world)}}
 function recommendNow(keep){const s={...state,gold:shownGold()};try{return Combat.recommend(s,recCtx(keep))||null}catch{return null}}
 /* 새 몬스터 알림 띠가 떠 있는 동안에도 기다린다(작은 화면에서 띠와 말풍선이 겹쳐 마을이 가려지지 않게). */
-const recQuiet=()=>phase==='start'||phase==='ending'||paused||(phase==='ask'&&round&&round.lock>0)||(!!bannerEl&&!bannerEl.classList.contains('later'));
+/* 0.13 흐르는 농장: 문제를 읽는 동안(ask)에는 새 말풍선을 띄우지 않는다. 문제 사이(정답 연출·정답 배우기)에만 새로 뜨고, 떠 있던 것은 조용히 남았다가 사라진다 */
+const recQuiet=()=>phase==='start'||phase==='ending'||paused||(phase==='ask'&&round&&(round.lock>0||flowing()))||(!!bannerEl&&!bannerEl.classList.contains('later'));
 /* 지난 말풍선을 따랐는지 한 번만 센다(다음에 말풍선을 띄우려 할 때). 같은 추천을 두 번 연달아 안 따르면 60초 쉰다. */
 function recAccount(){const p=rec.prev;if(!p||p.done)return;p.done=true;if(p.followed){rec.ign[p.key]=0;return}rec.ign[p.key]=(rec.ign[p.key]||0)+1;if(rec.ign[p.key]>=2){rec.mute[p.key]=world.t+REC.mute;rec.ign[p.key]=0}}
 /* 지금 말풍선을 띄워도 되는 추천(빈도·쉬기 규칙 통과) 또는 null */
@@ -754,9 +798,15 @@ function showBubble(){
  if(rec.prev&&rec.prev.key!==r.key)rec.ign[rec.prev.key]=0;
  if(r.key==='bell'){Combat.bellPrompted(state);rec.bellAt=t}
  rec.prev={key:r.key,line:r.line,followed:false,done:false};rec.glow=r.key;rec.bubble=r;rec.left=REC.show;rec.last=t;rec.times=rec.times.filter(x=>t-x<REC.window).concat(t);rec.shown++;if(!r.urgent){const k=saidKey(r);rec.said[k]=(rec.said[k]|0)+1}if(r.rule===4&&!rec.opened.includes(r.key))rec.opened.push(r.key);
- const i=Math.max(0,slotOf(r.key)),el=$('bubble');put($('bubbleText'),r.line);el.style.setProperty('--tail',(((i%4)+.5)*25)+'%');el.dataset.key=r.key;el.classList.remove('hidden');attr(el,'aria-label','꼬꼬: '+r.line);
+ const i=Math.max(0,slotOf(r.key)),el=$('bubble');put($('bubbleText'),r.line);el.style.setProperty('--tail',(((i%4)+.5)*25)+'%');el.dataset.key=r.key;el.classList.remove('hidden');
+ const tap=bubbleBuy()&&(r.key==='bell'||Combat.canBuy({...state,gold:shownGold()},r.key));$('bubbleTap').classList.toggle('hidden',!tap);attr(el,'aria-label','꼬꼬: '+r.line+(tap?' 누르면 바로 해요.':''));
  renderShop();return true;
 }
+/* 0.13 한 번 누르기(결정 질문 5, Combat.FLAGS.BUBBLE_BUY): 추천 말풍선을 누르면 그 상품을 바로 산다(종 권유면 종을 울린다). 살 수 없으면 그 칸의 안내만 뜬다.
+   자동 구매는 없다. 0.12 경제(?flow=0)에서는 예전처럼 글만 */
+const bubbleBuy=()=>!!Combat.FLAGS.BUBBLE_BUY&&!!Combat.FLAGS.FLOW;
+function bubbleTap(){if(!rec.bubble||phase==='start'||phase==='ending'||paused)return;const i=slotOf(rec.bubble.key);if(i>=0)tapSlot(i)}
+if(bubbleBuy())$('bubble').onclick=bubbleTap;
 function hideBubble(){rec.bubble=null;rec.left=0;$('bubble').classList.add('hidden')}
 /* 말풍선을 띄울 때를 알린다(동전 도착·건물 부서짐·닭 잃음). 띄울 수 없는 때(글 먼저 읽기)면 15초 안에 될 때 띄우고, 넘으면 버린다(띄울 때 추천을 다시 고르므로 묵은 추천은 나오지 않는다). */
 function askBubble(urgent){if(!rec.want||urgent)rec.want={at:world.t,urgent:!!urgent}}
@@ -804,7 +854,7 @@ const LABEL={repair:()=>'🔨 다 고쳤어요!',power:n=>(POWER_NAME[n]||'🏹 
 /* 지은 뒤 가게 칸 위에 뜨는 한 줄(7세가 읽을 만큼 짧게). 문제 안내 줄은 건드리지 않는다. */
 const DONE={repair:()=>'🔨 부서진 건물을 다 고쳤어요!',tower:n=>1+n>towerSpots()?'🏹 타워가 한 층 높아졌어요!':'🏹 타워가 늑대를 쏴요!',
  power:n=>n===1?'💥 펑! 터지는 화살이에요.':n===2?'💥 더 크게 펑!':n===3?'🏹 한 번에 세 마리!':'🏹 화살이 더 세졌어요!',fence:()=>'🪵 울타리가 늑대를 막아요!',chicken:()=>'🐔 꼬꼬가 왔어요! 알을 더 낳아요.',
- farmer:()=>'🧑‍🌾 농부가 알을 더 많이 날라요!',pond:()=>'🐟 정답마다 물고기 금화 +'+Combat.PAY.fish+'!',hall:()=>'🏠 마을이 넓어졌어요! 새 몬스터도 와요.',feast:()=>'🎉 잔치! 금화가 더 생겨요.'};
+ farmer:()=>flowing()?'🧑‍🌾 농부가 알을 하나씩 날라요!':'🧑‍🌾 농부가 알을 더 많이 날라요!',pond:()=>'🐟 정답마다 물고기 금화 +'+Combat.PAY.fish+'!',hall:()=>'🏠 마을이 넓어졌어요! 새 몬스터도 와요.',feast:()=>'🎉 잔치! 금화가 더 생겨요.'};
 function celebrate(kind,at,slot){
  const n=state[COUNT[kind]]|0,three=$('scene').dataset.renderer==='three';
  const made=kind==='tower'?$('tower'):kind==='chicken'?$('flock').children[Math.min(n,FLOCK_MAX)-1]:kind==='fence'?$('fenceRow').children[Math.min(n,6)-1]:kind==='pond'?$('pond'):kind==='hall'?$('houseArt'):kind==='farmer'?$('farmers'):null;
@@ -856,7 +906,8 @@ const BUILDING_NAME={coop:'회관을',market:'매대를',nursery:'작은 닭장�
 function worldStep(){
  const ev=World.step(world,state);if(!ev.length)return;view(ev);
  for(const e of ev){
-  if(e.type==='henLost'){Combat.lostHen(state);jingle('raid');worldNote={text:(e.fox?'🦊 여우가 꼬꼬를 데려갔어요!':'🐺 늑대가 꼬꼬를 물어 갔어요!')+' 닭 '+state.chickens+'마리 남음',until:world.t+30};pop($('flockPill'),'bump');rec.lostAt=world.t;askBubble(true)}
+  if(e.type==='sold'){eggSold(e.n)}
+  else if(e.type==='henLost'){Combat.lostHen(state);jingle('raid');worldNote={text:(e.fox?'🦊 여우가 꼬꼬를 데려갔어요!':'🐺 늑대가 꼬꼬를 물어 갔어요!')+' 닭 '+state.chickens+'마리 남음',until:world.t+30};pop($('flockPill'),'bump');rec.lostAt=world.t;askBubble(true)}
   else if(e.type==='foxLost'){Combat.foxEnded(state,false)}
   else if(e.type==='foxScare'){Combat.foxEnded(state,false);jingle('chicken');worldNote={text:'🦊 휴, 꼬꼬가 숨었어요! 여우가 그냥 갔어요',until:world.t+40}}
   else if(e.type==='kingStand'){jingle('roar');if(!worldNote||worldNote.low)worldNote={text:'👑 늑대 왕이 울타리 앞에 섰어요!',until:world.t+40}}
@@ -889,6 +940,7 @@ window.__game=()=>{const kinds={};for(const v of liveWolves())kinds[v.kind||'wol
  round:round&&{fin:round.fin&&{...round.fin},token:round.token,id:round.q.id,mode:round.q.mode,cat:round.q.cat||'',t:round.t,tries:round.tries,dash:round.dash,lock:round.lock,result:round.result,ready:round.ready,wait:round.wait,answer:round.q.answer,choices:round.q.choices.slice(),gold:round.info&&round.info.gold||0},
  shop:shopRows(),shopLock,gold:{shown:shownGold(),pending:pendingGold,coins:coins.length,flying:coins.filter(c=>c.el).length},fast:$('fastIcon').dataset.state,
  rec:{glow:rec.glow,bubble:rec.bubble&&{...rec.bubble},left:rec.left,last:rec.last,times:rec.times.slice(),shown:rec.shown,want:rec.want&&{...rec.want},mute:{...rec.mute},ign:{...rec.ign},opened:rec.opened.slice(),said:{...rec.said}},
+ flow:world.flow?{on:flowing(),yard:World.flowYard(world),cap:World.flowCap(world),credit:world.flow.credit,beat:world.flow.beat,boost:{...world.flow.boost},nest:world.flow.nest,pile:world.flow.pile,slots:world.flow.slots.map(x=>({...x})),eggs:world.hens.map(h=>h.egg|0),hud:$('yardEggs').textContent,flames:Number($('streakRow').dataset.n||0)}:null,
  sfx:{...sfxCount},calm:world.calm|0,keep:!!world.keep,seed:state.seed}};
 
 /* ---------- 버튼 ---------- */
@@ -940,5 +992,5 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden&&!paused&&p
 drawStart();
 /* 3D 마을(village.js)은 이 상태(늑대 세계 world 포함)를 매 프레임 읽어 간다. 일회성 연출(세계 사건·volley·produce·dash·build)만 따로 알린다.
    running: 늑대 세계 시계가 흐르는지(시작 화면·쉬기만 멈춤). 0.9에서 reward 단계가 생겨, 3D는 phase 목록 대신 이 값을 보면 된다. */
-window.getVillageState=()=>({phase,paused,running:phase!=='start'&&phase!=='ending'&&!paused,village:state.run.village,bell:state.run.bell,shields:state.run.shields,level:state.level,power:state.power|0,streak:state.streak|0,chickens:state.chickens,fence:state.fence,farmers:state.farmers,farmersTotal:1+(state.farmers|0),nest:state.nest|0,marketDown:state.marketDown|0,recommend:rec.glow||null,pond:state.pond,hall:state.hall,feast:state.feast,wins:state.wins,world,radius:World.radius(world),tries:round?round.tries:0,dash:!!(round&&round.dash>0),result:round?round.result:null});
-</script><script src="village.js?v=0.12" defer></script></body></html>
+window.getVillageState=()=>({phase,paused,running:phase!=='start'&&phase!=='ending'&&!paused,village:state.run.village,bell:state.run.bell,shields:state.run.shields,level:state.level,power:state.power|0,streak:state.streak|0,chickens:state.chickens,fence:state.fence,farmers:state.farmers,farmersTotal:1+(state.farmers|0),nest:state.nest|0,flow:!!world.flow&&flowing(),repairAct:!!Combat.FLAGS.REPAIR_ACT,marketDown:state.marketDown|0,recommend:rec.glow||null,pond:state.pond,hall:state.hall,feast:state.feast,wins:state.wins,world,radius:World.radius(world),tries:round?round.tries:0,dash:!!(round&&round.dash>0),result:round?round.result:null});
+</script><script src="village.js?v=0.13" defer></script></body></html>
