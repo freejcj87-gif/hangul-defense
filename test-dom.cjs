@@ -668,8 +668,8 @@ a.tick(30);eq(a.api.round,null,'시작 화면에서는 문제 없음');eq(a.api.
 for(const id of ['battle','next','shield','combatInfo','buildPrompt','buyChicken','buyFence','timebar','timeFill','wolfHead','timeTag','choices','cards','skip','gainLine','gainParts'])ok(!html.includes('id="'+id+'"'),'없앤 요소: '+id);
 ok(!html.includes('소리 도움말'),'정답을 글자로 보여 주던 소리 도움말 제거');ok(!src.includes('다음 무리')&&!src.includes('barLeft')&&!src.includes('secondsLeft'),'늑대 시간 표시(초·막대) 코드 없음');
 ok(!src.includes('enterPick')&&!src.includes('picks')&&!src.includes('offers('),'카드 고르기 단계 코드 없음');
-ok(html.includes('src="combat.js?v=0.13"')&&html.includes('src="world.js?v=0.13"')&&html.includes('src="questions.js?v=0.13"')&&html.includes('src="village.js?v=0.13"')&&!html.includes('?v=0.12'),'캐시 갱신용 ?v=0.13');
-ok(html.indexOf('src="questions-gen.js?v=0.13"')>0&&html.indexOf('src="questions-gen.js?v=0.13"')<html.indexOf('src="questions.js?v=0.13"'),'생성 문항 파일을 questions.js보다 먼저 불러옴');
+ok(html.includes('src="combat.js?v=0.13.1"')&&html.includes('src="world.js?v=0.13.1"')&&html.includes('src="questions.js?v=0.13.1"')&&html.includes('src="village.js?v=0.13.1"')&&!html.includes('?v=0.12'),'캐시 갱신용 ?v=0.13');
+ok(html.indexOf('src="questions-gen.js?v=0.13.1"')>0&&html.indexOf('src="questions-gen.js?v=0.13.1"')<html.indexOf('src="questions.js?v=0.13.1"'),'생성 문항 파일을 questions.js보다 먼저 불러옴');
 /* 0.11: 듣고 고르기 모드 폐쇄. 시작 화면·설정에 모드 고르기가 없고, 스크립트에 소리 모드 분기가 없다 */
 for(const id of ['startSound','startStory','mode'])ok(!html.includes('id="'+id+'"'),'없앤 모드 버튼: '+id);
 ok(!html.includes('mode-row')&&!html.replace(/<script>[\s\S]*?<\/script>/,'').includes('듣고 고르기'),'화면에 모드 고르기·듣고 고르기 문구 없음');

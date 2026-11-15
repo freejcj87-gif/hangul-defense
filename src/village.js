@@ -480,6 +480,7 @@ async function start(){
  const after=(delay,fn)=>tween(delay,0,null,fn);
  function shake(amp){if(reduced())return;if(amp>=shakeNow){shakeAmp=amp;shakeAge=0;shakeNow=amp}}
  const EYE=new V3().copy(EYE_DIR).multiplyScalar(EYE_DIST),FOCUS=new V3();let focusHalf=0;   // FOCUS/focusHalf: close-up (VillageView.focus / debug); focusHalf 0 = normal view
+ const KING_WAIT_PULL=.2;   // waiting king (bell open, 0.13.1): a gentler lean so he is not cut off at the edge of the view
  const KING_PULL=.28;   // finale: how far the view centre moves toward the wolf king (fraction of his distance)
  function stepEffects(dt){
   for(let i=0;i<anims.length;){const a=anims[i];a.t+=dt;if(a.t<0){i++;continue}
@@ -1104,7 +1105,7 @@ async function start(){
  function updateView(dt,less){       // the camera pulls back (and the forest steps back) over about a second when the village grows
   const k=less?1:1-Math.exp(-dt*3.6);Rd+=(Rgoal-Rd)*k;if(Math.abs(Rgoal-Rd)<.004)Rd=Rgoal;
   // finale camera: while the child is fighting the wolf king (bell 2) the view leans a little toward him; it eases back when he flees
-  if(!focusHalf){const kg=curS&&curS.bell===2&&curS.world&&curS.world.king,gx=kg?num(kg.x)*KING_PULL:0,gz=kg?num(kg.z)*KING_PULL:0,d=Math.abs(gx-FOCUS.x)+Math.abs(gz-FOCUS.z);
+  if(!focusHalf){const kg=curS&&(curS.bell===1||curS.bell===2)&&curS.world&&curS.world.king,pull=kg?(curS.bell===2?KING_PULL:KING_WAIT_PULL):0,gx=kg?num(kg.x)*pull:0,gz=kg?num(kg.z)*pull:0,d=Math.abs(gx-FOCUS.x)+Math.abs(gz-FOCUS.z);
    if(d>1e-4){const kk=less?1:1-Math.exp(-dt*2.2);FOCUS.x+=(gx-FOCUS.x)*kk;FOCUS.z+=(gz-FOCUS.z)*kk;if(Math.abs(gx-FOCUS.x)+Math.abs(gz-FOCUS.z)<.01){FOCUS.x=gx;FOCUS.z=gz}camera.position.copy(EYE).add(FOCUS);dirty=true}}
   applyView();
  }
