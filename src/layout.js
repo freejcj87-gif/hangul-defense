@@ -59,3 +59,26 @@ export const HAY3=[[-8.1,-2.6,1],[-7.4,-2.1,.85],[-7.8,-1.6,.9]];
 
 /* ---------- egg nests between the hall and the small coop, behind the front hens ---------- */
 export const NESTS=[[-.62,-1.98],[.3,-2.0]];
+
+/* ---------- 0.14 visible stages (0 farm · 1 village · 2 market village · 3 mill village · 4 walled village · 5 castle) ----------
+   The rules own the stage radius and the open wolf roads (world.js STAGE). Everything here is decor only (no rule reads it).
+   Cottages, the well and the mill stand in the two quiet quarters around the spawn directions that never open (67.5° and 247.5°),
+   later ones in the gaps of the outer ring; every spot keeps the same clearances as the other props (checked in test-dom.cjs).
+   Each entry appears at 'stage' and stays. [r, deg] polar positions keep the table readable. */
+const polar=(r,deg)=>[+(Math.cos(deg*D)*r).toFixed(2),+(Math.sin(deg*D)*r).toFixed(2)];
+export const COTTAGE_R=.6;
+export const COTTAGES=[
+ {at:polar(7.3,67.5),stage:1,roof:0xc8553a},{at:polar(7.6,246.5),stage:1,roof:0x4f86c6},
+ {at:polar(9.3,62),stage:2,roof:0x5aa05a},{at:polar(9.5,251),stage:2,roof:0xc8553a},
+ {at:polar(11.6,72),stage:3,roof:0x4f86c6},{at:polar(11.4,60),stage:3,roof:0xd9a441},
+ {at:polar(13.6,64),stage:4,roof:0xc8553a},{at:polar(13.9,240),stage:4,roof:0x5aa05a},{at:polar(14.2,125),stage:4,roof:0x4f86c6},{at:polar(14.2,325),stage:4,roof:0xd9a441},
+ {at:polar(16.6,70),stage:5,roof:0x5aa05a},{at:polar(16.4,252),stage:5,roof:0x4f86c6},{at:polar(16.8,145),stage:5,roof:0xc8553a},{at:polar(16.8,305),stage:5,roof:0x5aa05a},
+ {at:polar(16.9,10),stage:5,roof:0xd9a441},{at:polar(16.9,190),stage:5,roof:0xc8553a}];
+export const WELL={at:polar(8.9,71),r:.5,stage:2};
+// 0.14 stand-in for the mill village: a hut with a (still) water wheel. The river, the bridge and the working mill come in 0.15.
+export const MILL={at:polar(11.2,247.5),r:1,stage:3};
+// The castle keep rises behind the hall (it overlaps the hall's back corner on purpose: the hall becomes the castle).
+export const KEEP={at:[-1.8,-3.9],r:.7,stage:5};
+// Road-entrance markers stand outside the village edge on both sides of every open wolf road: [distance beyond the radius, lateral offset]
+export const ROAD_MARK={out:.55,side:1.75};
+export const ROAD={r0:7.9,r1:50,edge:2.0,width:1.45};   // an open wolf road (dirt), from inside the village edge out into the forest
