@@ -107,7 +107,7 @@
      spread·layCap: 낳는 속도(기운/박) = min(layCap, 남은 기운 ÷ spread). 남은 기운을 박 spread개에 걸쳐 쓰므로 한 번 틀려도 닭이 멈추지 않는다
      perHen·nest: 마당 알 상한 = 닭 수 × perHen + nest(둥지 공용). 꽉 차면 닭은 기운을 쓰지 않고 기다린다(기운은 버려지지 않는다. 상한 없이 이월)
      pileQ: 마당 알이 닭 수 이상인 채로 문제가 이만큼 이어지면 '일손 부족'(flowPile → 농부 추천). 난수를 쓰지 않는다(결정성) */
-  const FLOW={egg:1,carry:4,boost:[1,1.4,1.8],spread:2.5,layCap:3,perHen:2,nest:8,men:10,pileQ:2,creditMax:10000,beatMin:10,beatMax:6000};
+  const FLOW={egg:1.35,carry:5.5,boost:[1,1.4,1.8],spread:2.5,layCap:3,perHen:2,nest:8,men:10,pileQ:2,creditMax:10000,beatMin:10,beatMax:6000};
   const flowFresh=()=>({credit:0,rate:0,beat:100,boost:{lv:0,left:0},lay:0,nest:0,pile:0,next:0,slots:[]});
   const layer=h=>h.state!=='caught'&&h.state!=='carried'&&h.state!=='gone';
   const flowRate=f=>Math.min(FLOW.layCap,f.credit/FLOW.spread)/f.beat;

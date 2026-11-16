@@ -13,7 +13,7 @@ const NAME={typ:'보통',slow:'느린',fast:'빠른',guess:'찍기',idle:'방치
 const ALL=Object.keys(NAME);
 const meanCache={};
 function meanBase(age,seed){const k=age+':'+seed;if(!meanCache[k]){let sum=0;for(let i=0;i<120;i++)sum+=C.baseSeconds(Q.at(age,'story',i,seed));meanCache[k]=sum/120}return meanCache[k]}
-function apply(over){const o=over||{};if('FLOW' in o)C.FLAGS.FLOW=!!o.FLOW;if(o.C)Object.assign(C.FLOW,o.C);if(o.W)Object.assign(W.FLOW,o.W);if(o.FLAGS)Object.assign(C.FLAGS,o.FLAGS)}
+function apply(over){const o=over||{};if('FLOW' in o)C.FLAGS.FLOW=!!o.FLOW;if(o.C)Object.assign(C.FLOW,o.C);if(o.W)Object.assign(W.FLOW,o.W);if(o.FLAGS)Object.assign(C.FLAGS,o.FLAGS);if(o.PAY)Object.assign(C.PAY,o.PAY)}
 
 /* 엔딩까지 한 판. opt.buys = 한 번에 맞힐 때마다 사는 횟수(기본 1) */
 function playEnd(age,kind,seed,opt){

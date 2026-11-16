@@ -88,7 +88,7 @@
      낳은 알 = 닭 수(숨은 닭 제외), 판 알 = min(둥지 알 + 낳은 알, 바구니 × (1 + 농부)), 남은 알 = min(닭 수, 둥지 알 + 낳은 알 − 판 알)
      알값 = egg + hall × 회관 단계(매대 4 · 가게 5 · 천막 시장 6 · 큰 시장 7), 매대가 부서져 있으면 절반(내림, 최소 1) */
   /* 값은 scripts/sim-village.cjs로 맞춤(2026-11-12): 알값 2 · 3 · 4 · 5(매대 → 큰 시장), 기본 9. 알값을 올리면 복리가 커져 느린 아이가 뒤처지고, 기본금을 올리면 찍는 아이가 따라온다 */
-  const PAY={base:9,egg:2,hall:1,basket:4,fish:6,feast:5};
+  const PAY={base:14,egg:3,hall:1,basket:4,fish:6,feast:5};
   /* 고치기 값 = base + per × 부서진 건물 수(0.8과 같음) */
   const REPAIR={base:10,per:11};
 
@@ -104,7 +104,7 @@
     power:{slot:0,key:'power',name:'타워 강화',note:'펑! 터지는 화살',prices:[90,160,240].concat(curve(CURVE.power4[0],CURVE.power4[1],7)),need:1},
     fence:{slot:0,key:'fence',name:'울타리',note:'마을 한 면을 막아요',prices:curve(CURVE.fence[0],CURVE.fence[1],18)},
     chicken:{slot:1,key:'chickens',name:'닭',note:'정답마다 알 +1개',prices:curve(CURVE.chicken[0],CURVE.chicken[1],19),base:1},
-    farmer:{slot:1,key:'farmers',name:'농부',note:'알을 4개 더 날라요',prices:curve(CURVE.farmer[0],CURVE.farmer[1],9)},
+    farmer:{slot:1,key:'farmers',name:'농부',note:'알을 더 많이 날라요',prices:curve(CURVE.farmer[0],CURVE.farmer[1],9)},
     pond:{slot:1,key:'pond',name:'연못',note:'정답마다 물고기 +6골드',prices:[120,200,300],need:2},
     hall:{slot:2,key:'hall',name:'회관 키우기',note:'마을이 커져요',prices:[120,320,650]},
     feast:{slot:2,key:'feast',name:'마을 잔치',note:'정답마다 +5골드',need:3},
