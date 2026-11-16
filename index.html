@@ -207,7 +207,7 @@ body.paused *,body.paused *:before,body.paused *:after{animation-play-state:paus
 .end-stars{display:grid;gap:6px;margin:10px 0;padding:0;text-align:left;font-size:16px;font-weight:800;line-height:1.4;word-break:keep-all}.end-stars li{list-style:none;padding:7px 11px;border-radius:12px;background:#f6edd2}.end-stars li.off{opacity:.5}
 #endNew{width:100%;font-size:19px;min-height:58px;background:linear-gradient(#f8d255,#e0a21a);color:#4a3200;border-color:#b8860b}#endStay{width:100%;margin-top:8px;min-height:46px;font-size:16px}
 </style></head><body><main>
-<header><div><small>한글 디펜스 · 늑대가 오기 전에 읽어요 0.13.1</small><h1><img class="brand-chicken" src="art-handoff/coopnight/browser/characters/chicken.png" alt="">꼬꼬마을: 읽어서 지켜요</h1></div><button id="pause">잠깐 쉬기</button></header>
+<header><div><small>한글 디펜스 · 늑대가 오기 전에 읽어요 0.13.2</small><h1><img class="brand-chicken" src="art-handoff/coopnight/browser/characters/chicken.png" alt="">꼬꼬마을: 읽어서 지켜요</h1></div><button id="pause">잠깐 쉬기</button></header>
 <div class="game-layout"><section class="stage-card" id="stageCard" aria-label="우리 마을">
 <div class="stats"><span class="pill" id="gold"></span><span class="pill" id="flockPill"></span><span class="pill" id="level"></span><span class="pill" id="stage"></span></div>
 <div class="scene" id="scene"><div class="road"></div><div class="pond hidden" id="pond" aria-hidden="true"></div><div class="house"><img id="houseArt" src="art-handoff/coopnight/browser/buildings/home-01.png" alt="마을회관"></div><div class="village-extra" id="villageExtra" aria-hidden="true"></div><div class="fence-row" id="fenceRow" aria-hidden="true"></div><div id="tower"><img id="towerArt" src="art-handoff/coopnight/browser/buildings/tower-01.png" alt="방어 타워"><span class="tower-tag" id="towerTag"></span></div><div class="farmers" id="farmers" aria-hidden="true"></div><div class="flock" id="flock" aria-hidden="true"></div><div id="enemies" aria-label="다가오는 늑대"></div><div id="effects" aria-hidden="true"></div><div class="finale hidden" id="finale" role="img"></div><div class="yard-eggs hidden" id="yardEggs" role="img"></div><div id="pauseNote">⏸️ 쉬는 중이에요</div></div>
@@ -225,7 +225,7 @@ body.paused *,body.paused *:before,body.paused *:after{animation-play-state:paus
 <ul class="rules"><li>🐺 늑대가 쉬지 않고 사방에서 와서 닭을 물어 가고 건물을 부숴요.</li><li>🏹 한 번에 맞히면 타워가 일제히 쏘고, 닭이 알을 낳아 금화가 생겨요.</li><li>🪙 금화로 언제든 가게에서 타워·닭·농부를 사요.</li><li>💥 문제에는 상식·수학·영어도 섞여 있어요.</li></ul>
 <p class="start-q">몇 살이에요?</p><div class="age-row" id="ageRow"></div>
 <button id="go">시작하기 ▶</button><small>어려우면 나이를 낮춰도 괜찮아요.</small></div></div>
-<script src="combat.js?v=0.13.1"></script><script src="world.js?v=0.13.1"></script><script src="questions-gen.js?v=0.13.1"></script><script src="questions.js?v=0.13.1"></script><script>/* 체험 주소 ?demo=1~3: 그 회관 단계까지 자란 마을로 시작해 새 몬스터를 바로 본다(프로듀서·보호자 확인용). 저장은 따로 해서 원래 진행을 건드리지 않는다. */
+<script src="combat.js?v=0.13.2"></script><script src="world.js?v=0.13.2"></script><script src="questions-gen.js?v=0.13.2"></script><script src="questions.js?v=0.13.2"></script><script>/* 체험 주소 ?demo=1~3: 그 회관 단계까지 자란 마을로 시작해 새 몬스터를 바로 본다(프로듀서·보호자 확인용). 저장은 따로 해서 원래 진행을 건드리지 않는다. */
 const DEMO=(()=>{try{const m=/[?&]demo=([123])\b/.exec(location.search);return m?Number(m[1]):0}catch{return 0}})();
 const KEY=DEMO?'hangul-defense-demo'+DEMO:'hangul-defense-v1',AGES=Questions.AGES,ART='art-handoff/coopnight/browser/';
 /* 0.13: 주소에 ?flow=0을 붙이면 흐르는 농장을 끄고 0.12 경제로 돈다(비교·회귀 검사용) */
@@ -996,4 +996,4 @@ drawStart();
 /* 3D 마을(village.js)은 이 상태(늑대 세계 world 포함)를 매 프레임 읽어 간다. 일회성 연출(세계 사건·volley·produce·dash·build)만 따로 알린다.
    running: 늑대 세계 시계가 흐르는지(시작 화면·쉬기만 멈춤). 0.9에서 reward 단계가 생겨, 3D는 phase 목록 대신 이 값을 보면 된다. */
 window.getVillageState=()=>({phase,paused,running:phase!=='start'&&phase!=='ending'&&!paused,village:state.run.village,bell:state.run.bell,shields:state.run.shields,level:state.level,power:state.power|0,streak:state.streak|0,chickens:state.chickens,fence:state.fence,farmers:state.farmers,farmersTotal:1+(state.farmers|0),nest:state.nest|0,flow:!!world.flow&&flowing(),repairAct:!!Combat.FLAGS.REPAIR_ACT,marketDown:state.marketDown|0,recommend:rec.glow||null,pond:state.pond,hall:state.hall,feast:state.feast,wins:state.wins,world,radius:World.radius(world),tries:round?round.tries:0,dash:!!(round&&round.dash>0),result:round?round.result:null});
-</script><script src="village.js?v=0.13.1" defer></script></body></html>
+</script><script src="village.js?v=0.13.2" defer></script></body></html>
