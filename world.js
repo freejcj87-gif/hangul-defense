@@ -4,7 +4,25 @@
 (function(root){
   'use strict';
   const TICK=.1;
-  const RADIUS=[7,10,13,16];      /* 마을 반지름(마을회관 단계별) */
+  const RADIUS=[7,10,13,16];      /* 마을 반지름(마을회관 단계별). 0.14 단계를 끄면(Combat.FLAGS.STAGES=false) 이 표를 쓴다 */
+  /* ---------- 0.14 보이는 단계 6개(농가 · 마을 · 장터 마을 · 물레방아 마을 · 성곽 마을 · 성. 설계: v014-scale-design.md §9, game-plan §14) ----------
+     단계는 Combat.stage(s)가 이번 판 지은 수에서 계산하고, 세계는 w.stage(0~5)에 래치한다(닭을 잃어 지은 수가 줄어도 영역은 줄지 않는다. 새 판은 새 세계라 0부터).
+     radius: 단계별 마을 반지름(영역이 단계마다 넓어진다. 마지막은 0.13의 최대 16보다 크다). 회관이 오르는 단계(2·3·5)의 반지름은 그 회관의 타워 고리(8.5·11.5·14.5)보다 1.4 이상 크다
+     open: 단계별 '열린 길' = 늑대가 나오는 출현 지점 번호 목록(0단계는 null = 8방향 전부, 0.13과 같은 난수 순서). 길은 단계가 올라도 없어지지 않고 늘기만 한다.
+       화면에서 0 = 오른쪽 · 2 = 아래(정문, 늑대 왕 자리 KING.point) · 4 = 왼쪽 · 6 = 위. 울타리는 0번 면부터 서므로 처음 두 길(0·2)은 울타리 0·1번 면으로 온다
+     range: 단계별 타워 사거리 덤 = (반지름 − 7) × 0.75(TOWER.hallRange 대신 쓴다). 0.13의 회관 덤(반지름 +3에 +1.5)과 같은 0.5배로는 타워 고리가 늦게 열리는 단계(마을 · 물레방아 마을)에서
+       울타리 줄의 화력이 모자라 '20분까지 울타리 부서짐'이 2배가 됐다. 0.75배면 반지름만 예전 값으로 둔 경우와 같다(시뮬, game-plan §14)
+     w.stage가 없으면(단계를 끔, 또는 Combat 없이 혼자 쓰임) 0.13.2와 한 글자도 다르지 않다 */
+  const STAGE={radius:[7,9,11,13.5,16,19],open:[null,[0,2],[0,2,4],[0,2,4,6],[0,2,3,4,6],[0,2,3,4,6,7]],range:[0,1.5,3,4.875,6.75,9]};
+  const STAGE_MAX=STAGE.radius.length-1;
+  let CB=null;try{CB=root.Combat||(typeof module!=='undefined'&&typeof require==='function'?require('./combat.js'):null)}catch(e){CB=null}
+  const combat=()=>root.Combat||CB;
+  const stagesOn=()=>{const C=combat();return !!(C&&C.FLAGS&&C.FLAGS.STAGES&&typeof C.stage==='function')};
+  const hasStage=w=>Number.isSafeInteger(w.stage)&&w.stage>=0&&w.stage<=STAGE_MAX;
+  /* 지금 열린 길(출현 지점 번호 목록) 또는 null(8방향 전부) */
+  const routes=w=>{const C=combat();return hasStage(w)&&w.stage>0&&C&&C.FLAGS&&C.FLAGS.ROUTES?STAGE.open[w.stage]:null};
+  /* 출현 지점 하나를 고른다. 난수는 길이 열려 있든 아니든 한 번만 쓴다(결정성, 0단계는 0.13과 같은 결과) */
+  const spawnPoint=w=>{const o=routes(w),r=rand(w);return o?o[Math.min(o.length-1,Math.floor(r*o.length))]:Math.floor(r*SPAWNS)};
   const EDGE=7;                    /* 출현 지점 = 마을 반지름 + 7(숲 가장자리). 나오자마자 화면에 보인다 */
   const SPAWNS=8;                  /* 둘레의 출현 지점 수(방향 (p+0.5)×45°: 22.5° · 67.5° …) */
   const WOLF={speed:1,hp:12,hpPerBuilt:1.25,hpMax:90,bite:10,carry:.65,smash:.3,bored:250,reach:.55};
@@ -173,7 +191,7 @@
   /* ---------- 난수(mulberry32, 상태는 w.rng 한 칸) ---------- */
   function rand(w){let t=(w.rng=(w.rng+0x6D2B79F5)>>>0);t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296}
   const dist=(ax,az,bx,bz)=>Math.hypot(ax-bx,az-bz);
-  const radius=w=>RADIUS[Math.max(0,Math.min(3,w.hall|0))];
+  const radius=w=>hasStage(w)?STAGE.radius[w.stage]:RADIUS[Math.max(0,Math.min(3,w.hall|0))];
   const sectorOf=(x,z)=>{let a=Math.atan2(z,x);if(a<0)a+=Math.PI*2;return Math.floor(a/(Math.PI/3))%6};
   const kindOf=v=>KINDS[v&&v.kind]||KINDS.wolf;
   const alive=v=>v.state!=='dead'&&v.state!=='gone';
@@ -198,8 +216,12 @@
      닭 = s.chickens(최대 20), 회관 단계 = s.hall. 잡혀간 닭은 index.html이 s.chickens를 줄여서 반영한다. */
   /* 울타리 산 수 n(0~18) → 6면의 겹 수 [0~3, …] */
   const fenceLayers=n=>{const f=Math.max(0,Math.min(18,n|0)),out=[];for(let k=0;k<6;k++)out.push(f>k?Math.min(3,1+Math.floor((f-1-k)/6)):0);return out};
-  function sync(w,s){
-    w.hall=Math.max(0,Math.min(3,s.hall|0));
+  /* opt.hold(0.14): 단계·회관이 오르는 것을 세계에 아직 반영하지 않는다(화면이 문제를 읽는 동안 산 것은 문제 사이에 넓힌다. 그동안 반지름·열린 길·타워 자리·새 건물은 그대로).
+     처음 맞추는 세계(w.stage 없음)는 hold여도 바로 맞춘다 */
+  function sync(w,s,opt){
+    if(stagesOn()){
+      if(!(opt&&opt.hold&&hasStage(w))){w.hall=Math.max(0,Math.min(3,s.hall|0));w.stage=Math.max(hasStage(w)?w.stage:0,Math.max(0,Math.min(STAGE_MAX,combat().stage(s)|0)))}
+    }else{w.hall=Math.max(0,Math.min(3,s.hall|0));if('stage' in w)delete w.stage}
     const R=radius(w);
     const want={coop:1,market:1,nursery:w.hall>=1?1:0,barn:w.hall>=3?1:0};
     for(const kind of Object.keys(want))if(want[kind]&&!w.buildings.some(b=>b.kind===kind)){const [x,z]=PLACE[kind];w.buildings.push({id:id(w),kind,x,z,hp:HP[kind],max:HP[kind],broken:false})}
@@ -269,7 +291,7 @@
     const boss=(s.hall|0)>=3&&w.wave.n%BOSS_EVERY===BOSS_EVERY-1;
     const n=Math.min(packSize(w,s),MAX_WOLVES-w.wolves.length);if(n<=0)return;
     const R=radius(w)+EDGE,groups=Math.min(3,1+Math.floor(n/5)),points=[];
-    for(let g=0;g<groups;g++)points.push(Math.floor(rand(w)*SPAWNS));
+    for(let g=0;g<groups;g++)points.push(spawnPoint(w));
     for(let i=0;i<n;i++){
       const p=points[i%groups],a=(p+.5)*Math.PI*2/SPAWNS+(rand(w)-.5)*.4,back=Math.floor(i/groups)*.75;
       addWolf(w,s,pickKind(w,s,boss&&i===0),Math.cos(a)*(R+back),Math.sin(a)*(R+back));
@@ -278,7 +300,7 @@
   }
   function spawnStraggler(w,s){
     const cap=Math.round(MAX_WOLVES*.8);if(w.wolves.length>=cap)return;
-    const n=1+(rand(w)<Math.min(.5,threat(s)/TRICKLE.pair)?1:0),p=Math.floor(rand(w)*SPAWNS),R=radius(w)+EDGE;
+    const n=1+(rand(w)<Math.min(.5,threat(s)/TRICKLE.pair)?1:0),p=spawnPoint(w),R=radius(w)+EDGE;
     for(let i=0;i<n;i++){const a=(p+.5)*Math.PI*2/SPAWNS+(rand(w)-.5)*.5;addWolf(w,s,pickKind(w,s,false),Math.cos(a)*(R+i*.8),Math.sin(a)*(R+i*.8))}
     w.events.push({type:'straggler',n,point:p});
   }
@@ -378,7 +400,7 @@
       if(b.stun>0){b.stun--;continue} /* 멈춤은 부서져 있어도 줄어든다(고친 뒤 묵은 멈춤이 남지 않게) */
       if(b.broken)continue;
       if(b.cd>0){b.cd--;continue}
-      if(!live){live=liveWolves(w);reach=range(s)} /* 쏠 타워가 있을 때 한 번만(쏘는 동안 늑대는 그대로) */
+      if(!live){live=liveWolves(w);reach=range(s,w)} /* 쏠 타워가 있을 때 한 번만(쏘는 동안 늑대는 그대로) */
       const near=targets(live,b,reach+FLOOR.range*floors(b),P.multi);
       if(near.length){for(const v of near)shoot(w,b,v,s);b.cd=cooldown(s)}
     }
@@ -416,13 +438,14 @@
   /* 타워가 먼저 노리는 순서: 닭을 물고 가는 늑대 > 무는 늑대 > 건물을 부수는 늑대 > 나머지(가까운 순) */
   const danger=v=>v.state==='carry'?3:v.state==='bite'?2:v.state==='smash'?1:0;
   const power=s=>POWER[Math.max(0,Math.min(3,s&&s.power|0))];
-  const range=s=>TOWER.range+.4*Math.min(5,s&&s.level|0)+TOWER.hallRange*Math.max(0,Math.min(3,s&&s.hall|0));
+  /* 사거리: 기본 + 타워 수(5까지) + 영역 덤. 영역 덤은 세계에 단계가 있으면(0.14) 단계 표(STAGE.range), 없으면 회관 단계 × hallRange(0.13.2) */
+  const range=(s,w)=>TOWER.range+.4*Math.min(5,s&&s.level|0)+(w&&hasStage(w)?STAGE.range[w.stage]:TOWER.hallRange*Math.max(0,Math.min(3,s&&s.hall|0)));
   const cooldown=s=>Math.max(6,TOWER.cooldown-Math.min(5,s&&s.level|0));
   /* 1층 타워의 화살 피해: 기본 + 타워 수(5까지) + 강화(큰 펑부터 +3, 4~10단계 +1씩) */
   const damage=s=>TOWER.damage+2*Math.min(5,s&&s.level|0)+power(s).plus+POWER_STEP*Math.max(0,Math.min(10,s&&s.power|0)-3);
   const floors=b=>Math.max(0,((b&&b.floor)|0)-1); /* 1층 위로 올린 층 수 */
   const towerDamage=(s,b)=>damage(s)+FLOOR.damage*floors(b);
-  const towerRange=(s,b)=>range(s)+FLOOR.range*floors(b);
+  const towerRange=(s,b,w)=>range(s,w)+FLOOR.range*floors(b);
   function shoot(w,b,v,s){
     const d=dist(b.x,b.z,v.x,v.z),t=Math.max(2,Math.ceil(d/(TOWER.arrowSpeed*TICK))),P=power(s);
     w.arrows.push({id:id(w),tower:b.id,wolf:v.id,fx:b.x,fz:b.z,tx:v.x,tz:v.z,t,total:t,damage:towerDamage(s,b),splash:P.splash,share:P.share});
@@ -466,7 +489,7 @@
      세 갈래 화살이면 +2. 사거리 2배 안의 가까운 늑대부터 차례로 노린다. */
   function volleyArrows(s,o){const opt=o||{},m=Math.max(1,opt.scale||1);let n=Math.min(8,Math.round(2*m));if(opt.fast)n=Math.round(n*1.5);if(power(s).multi>1)n+=2;return n}
   function volley(w,s,opt){
-    const per=volleyArrows(s,opt),live=liveWolves(w),base=range(s);let n=0;
+    const per=volleyArrows(s,opt),live=liveWolves(w),base=range(s,w);let n=0;
     for(const b of w.buildings){if(b.kind!=='tower'||b.broken)continue;
       const reach=(base+FLOOR.range*floors(b))*TOWER.volleyRange,near=[];for(const v of live){const d=dist(v.x,v.z,b.x,b.z);if(d<=reach)near.push({v,d})} /* 거리는 한 번만 재서 정렬 */
       if(!near.length)continue;
@@ -499,7 +522,7 @@
   /* 여우 등장: ticks틱 뒤 닭에 닿는다(Combat.foxTicks). opt.scare = 놀래키기만(7세). 이미 여우가 있으면 null */
   function fox(w,s,ticks,opt){
     if(w.fox)return null;
-    const o=opt||{},R=radius(w)+EDGE,p=Math.floor(rand(w)*SPAWNS),a=(p+.5)*Math.PI*2/SPAWNS,x=Math.round(Math.cos(a)*R*1000)/1000,z=Math.round(Math.sin(a)*R*1000)/1000,T=Math.max(10,Math.round(ticks)||10);
+    const o=opt||{},R=radius(w)+EDGE,p=spawnPoint(w),a=(p+.5)*Math.PI*2/SPAWNS,x=Math.round(Math.cos(a)*R*1000)/1000,z=Math.round(Math.sin(a)*R*1000)/1000,T=Math.max(10,Math.round(ticks)||10);
     w.fox={id:id(w),x,z,sx:x,sz:z,left:T,total:T,state:'come',scare:!!o.scare,hen:0,point:p};return w.fox;
   }
   /* 정답 사격이 여우를 맞힘(일제 사격 1순위. 화면이 한 번에 맞혔을 때, 그리고 FOX.second면 두 번째 정답에도 부른다):
@@ -569,6 +592,7 @@
   }
   function tidy(w){
     w.hall=Math.max(0,Math.min(3,w.hall|0));w.interval=Math.max(80,w.interval);
+    if('stage' in w&&!hasStage(w))delete w.stage; /* 0.14 단계 칸(선택): 모양이 틀리면 없는 것으로(다음 sync가 다시 정한다) */
     const wv=w.wave;if(!int(wv.n,0,Number.MAX_SAFE_INTEGER))wv.n=0;if(!Number.isSafeInteger(wv.arrive)||wv.arrive<=w.t)wv.arrive=w.t+w.interval;if(typeof wv.spawned!=='boolean')wv.spawned=false;
     if(!isObj(w.seen))w.seen={};if(!Number.isSafeInteger(w.trickle)||w.trickle>w.t+200)w.trickle=w.t+5;
     if(!int(w.mercy,0,MERCY_CAP))w.mercy=Number.isSafeInteger(w.mercy)&&w.mercy>0?MERCY_CAP:0;
@@ -610,7 +634,7 @@
     if(!(Number.isSafeInteger(w.nextId)&&w.nextId>top))w.nextId=top+1;
   }
 
-  const api={V:2,FLOW,flowOn,flowQuestion,flowCorrect,flowAdd,flowYard,flowCap,flowPile,flowIdle,flowLayers,TEMPO,tempoInterval,mulOf,KING,FOX,king,kingHit,fox,foxShoo,retreat,peaceOff,TICK,RADIUS,EDGE,SPAWNS,WOLF,AGE,THREAT,PACK,TRICKLE,SLOW,slowEase,KINDS,MIX,BOSS_EVERY,TOWER,POWER,POWER_STEP,FLOOR,ROAR,HP,FENCE_HP,MEND,REBUILD,HEN,DASH,RUSH,MERCY,MERCY_CAP,INNER,SIDE_REACH,INTERVAL,MAX_WOLVES,TRAVEL,GUARD,answered,
+  const api={V:2,STAGE,STAGE_MAX,routes,FLOW,flowOn,flowQuestion,flowCorrect,flowAdd,flowYard,flowCap,flowPile,flowIdle,flowLayers,TEMPO,tempoInterval,mulOf,KING,FOX,king,kingHit,fox,foxShoo,retreat,peaceOff,TICK,RADIUS,EDGE,SPAWNS,WOLF,AGE,THREAT,PACK,TRICKLE,SLOW,slowEase,KINDS,MIX,BOSS_EVERY,TOWER,POWER,POWER_STEP,FLOOR,ROAR,HP,FENCE_HP,MEND,REBUILD,HEN,DASH,RUSH,MERCY,MERCY_CAP,INNER,SIDE_REACH,INTERVAL,MAX_WOLVES,TRAVEL,GUARD,answered,
     TOWER_SLOTS,RINGS,ALL_SLOTS,SLOT_COUNT,TOWER_UNITS,PLACE,HOMES,HENS_MAX,HOME,towerSlots,fenceLayers,
     intervalFor,create,sync,step,volley,volleyArrows,dashTicks,built,threat,repairAll,brokenCount,brokenKinds,marketDown,wolvesInside,towerUnits,barLeft,secondsLeft,packSize,trickleGap,kindsAt,restore,radius,sectorOf,rand,range,cooldown,damage,towerDamage,towerRange,power,ageOf};
   if(typeof module!=='undefined')module.exports=api;

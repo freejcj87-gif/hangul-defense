@@ -17,6 +17,8 @@ const withFlags=(f,fn)=>{const keep={...C.FLAGS};Object.assign(C.FLAGS,f);try{re
 const BUY_MODE={HALL_MODE:'buy',FEAST_AFTER_END:false};
 /* 0.13: 아래 1~N절(0.12까지의 검사)은 흐르는 농장을 끄고 돈다 = FLAGS.FLOW=false면 0.12와 결과가 같다는 회귀 검사. 흐름 검사는 맨 끝 '0.13 흐르는 농장' 절에서 켜고 돈다 */
 C.FLAGS.FLOW=false;
+/* 0.14: 같은 까닭으로 아래 검사는 단계도 끄고 돈다 = FLAGS.STAGES·ROUTES=false면 0.13.2와 결과가 같다는 회귀 검사. 단계 검사는 맨 끝 '0.14 단계' 절에서 켜고 돈다 */
+C.FLAGS.STAGES=false;C.FLAGS.ROUTES=false;
 
 /* ======================= 1. 규칙 모듈 ======================= */
 eq(C.API,4,'규칙 API 버전(0.12 판 진행·저장 v3)');
