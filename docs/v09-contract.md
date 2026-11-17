@@ -65,3 +65,8 @@
 ## 검사 기준
 - `node test-questions.cjs`, `node test-dom.cjs`, `node test.cjs`(전체, `ONLY` 없이) 모두 통과.
 - 시뮬레이터: game-plan §4.7 목표표를 8개 나이·모드 × 4유형으로 출력, 찍는 아이 ≤ 보통의 50%이고 느린 아이보다 적게.
+
+## 0.14 추가(단계)
+- `getVillageState()`에 추가: `stage`(지금 보이는 단계 0~5, 단계를 끄면 −1), `routes`(열린 길 = 출현 지점 번호 목록, 8방향 전부면 null). `hall`은 단계를 켰을 때 세계에 반영된 회관 단계(`world.hall`)다(읽는 중에 산 승급은 문제 사이에 반영).
+- `VillageView.build('stage')`: 단계가 오른 직후 화면이 부른다(새 집·길목 표시가 솟는 연출). `inspect()`에 `stage` · `roads`('all' 또는 '0,2,4') · `stageHouses` · `roadMarks` · `stageRising`.
+- 규칙: `Combat.stage(s)` · `stageInfo(s, cur)`, `World.STAGE` · `World.routes(w)` · `World.sync(w, s, {hold})`. 정본: docs/game-plan.md §14
