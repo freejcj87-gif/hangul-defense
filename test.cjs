@@ -225,7 +225,8 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
   ok(walked,'wolves walk toward the village: '+JSON.stringify(seen))}
  /* 🐺 알약은 틱마다 세계를 따라간다 */
  {let miss=0;for(let k=0;k<5;k++){await tick(page,7);const [txt,n]=await page.evaluate(()=>[document.getElementById('level').textContent,window.__game().world.wolves]);if(!txt.endsWith('🐺'+n))miss++}eq(miss,0,'🐺 pill follows the world every tick')}
- if(three&&!INTERIM){await frames(page,3);const i=await page.evaluate(()=>window.VillageView.inspect());ok(i.wolvesVisible>=1,'3D wolves visible: '+i.wolvesVisible);eq(i.wolvesVisible,await notGone(page),'3D wolf count = simulated wolves (incl. falling ones)')}
+ /* 0.14: 세계 씨앗이 실행 시각이라 이 순간 늑대가 모두 쓰러져 0마리일 때가 있었다(0.13.2에서도 WebKit 390에서 재현). 늑대가 없으면 다음 낙오 늑대가 나올 때까지 틱을 돌린 뒤 본다 */
+ if(three&&!INTERIM){for(let k=0;k<60&&!(await notGone(page));k++)await tick(page,5);await frames(page,3);const i=await page.evaluate(()=>window.VillageView.inspect());ok(i.wolvesVisible>=1,'3D wolves visible: '+i.wolvesVisible);eq(i.wolvesVisible,await notGone(page),'3D wolf count = simulated wolves (incl. falling ones)')}
  if(name==='chromium'&&(width===390||width===1366))await shot(page.locator('.scene'),'pack-'+width);
  ok(await noOverflow(page),'no overflow after a few rounds');
  await page.screenshot({path:path.join(shots,name+'-'+width+'x'+height+'.png'),fullPage:true});
@@ -474,7 +475,8 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
    const three=(await page.locator('.scene').getAttribute('data-renderer'))==='three';
    eq((await slotStates(page))[7],'hall:auto','ending: 65 built, the 8th slot is still the hall picture');
    await buy(page,'farmer',true);let g=await game(page);eq([g.state.run.bell,(await slotStates(page))[7],g.king&&g.king.state],[1,'bell:buy','wait'],'ending: 66 built opens the free bell and the wolf king waits at the forest edge');
-   eq(await page.locator('#shop .slot[data-key="bell"] .pr').textContent(),'울려요','bell slot: no price');ok(await shopFits(page),'shop fits with the bell slot');
+   eq(await page.locator('#shop .slot[data-key="bell"] .pr').textContent(),'울려요','bell slot: no price');/* 0.14: 열린 종 칸은 1.5초 동안 통통 튄다(recBounce −7px, 줄 간격 5~6px). 튀는 순간에 재면 윗줄 칸과 1~2px 겹쳐 가끔 실패했다 → 끝이 있는 애니메이션이 끝난 뒤에 잰다 */
+   await page.evaluate(()=>Promise.all([...document.querySelectorAll('#shop .slot')].flatMap(b=>b.getAnimations()).filter(a=>{try{return Number.isFinite(a.effect.getComputedTiming().endTime)}catch{return false}}).map(a=>a.finished.catch(()=>{}))));ok(await shopFits(page),'shop fits with the bell slot');
    if(three){await tick(page,60);await frames(page,6);const i=await page.evaluate(()=>window.VillageView.inspect());ok(i.king&&i.king.size>3,'3D draws the wolf king (grey ember-king model, twice the size): '+JSON.stringify(i.king));await shot(page.locator('.scene'),'ending-king-wait-390')}
    await buy(page,'bell',true);g=await game(page);eq([g.state.run.bell,g.state.run.fpick.length,(await slotStates(page))[7]],[2,6,'bell:fight'],'ending: ringing the bell starts the finale (six questions fixed)');
    await answer(page,true,true);await settle(page);/* 풀던 문제는 그대로 끝내고, 다음 문제부터 결전 */
@@ -600,7 +602,10 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
     const t=await tagBox(page);ok(t.inside&&t.clearOfEggs,'stage '+k+': name tag inside the scene, clear of the egg counter: '+JSON.stringify(t));
     ok(await noOverflow(page),'stage '+k+': no overflow');ok(await shopFits(page),'stage '+k+': shop fits');
     /* 늑대는 열린 길로만 온다: 300틱 동안 나온 늑대의 출현 방향 */
-    if(k){await page.evaluate(()=>{world.calm=0});await roll(page,60);const dirs=await page.evaluate(()=>world.wolves.map(w=>(Math.atan2(w.sz,w.sx)+Math.PI*2)%(Math.PI*2)));
+    /* 한 순간만 보면 타워가 다 쓰러뜨려 0마리일 때가 있다 → 도는 동안 나온 늑대를 모두(id별 출현 방향) 모으고, 한 마리도 없으면 더 돌린다 */
+    if(k){await page.evaluate(()=>{world.calm=0;world.wolves=[];window.__seenDir={}});/* 앞 단계에서 이미 오던 늑대(같은 세계를 이어 쓴다)는 치우고 새로 나오는 늑대만 본다 */
+     const seen=()=>page.evaluate(()=>{for(const w of world.wolves)window.__seenDir[w.id]=(Math.atan2(w.sz,w.sx)+Math.PI*2)%(Math.PI*2);return Object.values(window.__seenDir)});
+     let dirs=[];for(let n=0;n<240&&(n<60||!dirs.length);n++){await roll(page,1);dirs=await seen()}
      ok(dirs.length>=1&&dirs.every(a=>World.STAGE.open[k].some(p=>{let d=Math.abs(a-(p+.5)*Math.PI/4)%(Math.PI*2);if(d>Math.PI)d=Math.PI*2-d;return d<=.26})),'stage '+k+': every wolf came down an open road ('+dirs.length+' wolves)')}
     await shot(page.locator('.stage-card'),'stage-390-'+k);if(k===5)geo5=v.memory.geometries;}
    eq(errors,[],'stage tour page errors');await ctx.close()}
