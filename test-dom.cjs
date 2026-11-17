@@ -1580,6 +1580,26 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
  });
 }
 
+/* ======================= 0.15 아트 들여오기(계획서 §2, S-9 6) =======================
+   묶음 원본 outputs\art-v015-v016-20261117을 art-handoff/v015-v016/에 그대로 복사했다. 파일이 바뀌거나 빠지면(복사 실수·줄바꿈 변환) 해시로 잡는다.
+   배포 묶음(scripts/build-pages.cjs)에는 0.15가 쓰는 4쌍만, 실제 주소 검사(pages.yml)도 같은 4쌍. */
+{const crypto=require('node:crypto'),dir=__dirname+'/art-handoff/v015-v016/',man=JSON.parse(fs.readFileSync(dir+'manifest.json','utf8'));
+ eq(man.map(a=>a.asset),['watermill','waterwheel','bridge','castle-hall','wall-segment','castle-gate','watchtower','wolf-king','thief-fox'],'0.15 아트 묶음: 모델 9개(manifest)');
+ for(const a of man)for(const ext of ['glb','png']){const f=dir+a[ext],has=fs.existsSync(f);ok(has,'0.15 아트 파일 있음: '+a[ext]);
+  if(has){const buf=fs.readFileSync(f);eq([buf.length,crypto.createHash('sha256').update(buf).digest('hex')],[a.bytes[ext],a.sha256[ext]],'0.15 아트 '+a[ext]+': 크기·SHA-256 = manifest');
+   ok(ext==='glb'?buf.subarray(0,4).toString('latin1')==='glTF':buf.subarray(0,8).equals(Buffer.from('89504e470d0a1a0a','hex')),'0.15 아트 '+a[ext]+': '+(ext==='glb'?'glTF':'PNG')+' 머리')}}
+ const B=require('./scripts/build-pages.cjs'),want=['watermill','bridge','wolf-king','thief-fox'].flatMap(n=>['art-handoff/v015-v016/glb/'+n+'.glb','art-handoff/v015-v016/png/'+n+'.png']);
+ eq(B.art15,['watermill','bridge','wolf-king','thief-fox'],'배포할 0.15 아트: 물레방아·다리·늑대 왕·도둑 여우');
+ eq(B.files.filter(f=>f.startsWith('art-handoff/v015-v016/')),want,'배포 묶음의 0.15 아트 = GLB·PNG 4쌍(0.16 성·성벽·성문·성탑과 따로 된 바퀴는 아직 묶지 않음)');
+ eq(new Set(B.files).size,B.files.length,'배포 묶음에 같은 파일이 두 번 없음');
+ const refs=B.references();eq([...refs].filter(([f])=>!B.files.includes(f)),[],'index.html·src/*.js가 글자 그대로 부르는 아트는 모두 배포 묶음에 있음');
+ ok(refs.has('art-handoff/coopnight/source-3d/models/environment-pack.glb')&&refs.has('art-handoff/coopnight/browser/characters/chicken.png'),'참조 검사가 3D 스크립트의 GLB와 페이지의 PNG를 모두 읽음');
+ for(const wf of ['pages.yml','package-test.yml'])ok(/^\s*- art-handoff\/v015-v016\/\*\*\s*$/m.test(fs.readFileSync(__dirname+'/.github/workflows/'+wf,'utf8')),wf+': art-handoff/v015-v016을 바꾸면 워크플로가 돈다(paths)');
+ {const pg=fs.readFileSync(__dirname+'/.github/workflows/pages.yml','utf8'),m=/art15 = \[([^\]]*)\]/.exec(pg);
+  eq(m&&m[1].split(',').map(s=>s.trim().replace(/'/g,'')),B.art15,'pages.yml 실제 주소 검사: 배포한 0.15 아트 4쌍을 모두 받아 봄');
+  ok(pg.includes("'art-handoff/v015-v016/glb/' + name + '.glb').startswith(b'glTF')")&&pg.includes("'art-handoff/v015-v016/png/' + name + '.png').startswith(bytes.fromhex('89504e470d0a1a0a'))"),'pages.yml: GLB는 glTF 머리, PNG는 PNG 머리로 확인')}
+}
+
 eq(spoken,0,'검사 전체에서 음성 합성(speechSynthesis)을 한 번도 부르지 않음');
 /* 0.14: 3D 단계 소품 자리는 ES 모듈(src/layout.js)이라 맨 끝에서 불러 확인한다 */
 import('./src/layout.js').then(L=>{for(const f of stageLayout)f(L);
