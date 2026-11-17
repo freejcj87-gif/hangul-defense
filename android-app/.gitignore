@@ -1,0 +1,8 @@
+node_modules/
+# prepare-web.cjs가 만드는 앱용 웹 묶음과 버전 파일
+www/
+android/app/hd-version.properties
+# 서명 키·비밀번호는 저장소에 넣지 않는다(로컬은 저장소 밖, CI는 GitHub Secrets)
+*.jks
+*.keystore
+keystore.properties

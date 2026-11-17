@@ -1,0 +1,19 @@
+{
+  "name": "hangul-defense-android",
+  "private": true,
+  "description": "꼬꼬마을 Android 껍데기(Capacitor). 게임은 저장소 루트의 웹 파일이고, 이 폴더는 앱 포장만 맡는다.",
+  "scripts": {
+    "web": "node scripts/prepare-web.cjs",
+    "sync": "node scripts/prepare-web.cjs && cap sync android",
+    "check": "node scripts/version.cjs --self-test"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.6.2",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/core": "8.6.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.6.2",
+    "esbuild": "0.25.10"
+  }
+}

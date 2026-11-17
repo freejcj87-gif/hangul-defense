@@ -1,0 +1,78 @@
+apply plugin: 'com.android.application'
+
+// 버전: android-app/scripts/version.cjs가 게임 버전(index.html의 ?v=)에서 만들어 app/hd-version.properties에 쓴다(npm run sync).
+def hdVersion = new Properties()
+def hdVersionFile = file('hd-version.properties')
+if (hdVersionFile.exists()) {
+    hdVersionFile.withInputStream { hdVersion.load(it) }
+} else {
+    logger.warn('hd-version.properties is missing: run "npm run sync" in android-app first (using temporary versionCode 1).')
+}
+def hdVersionCode = (hdVersion.getProperty('versionCode') ?: '1').toInteger()
+def hdVersionName = hdVersion.getProperty('versionName') ?: '0.0.0-local'
+
+// 서명: 업로드 키 파일·비밀번호는 저장소에 넣지 않는다. 환경 변수 4개가 모두 있을 때만 release를 서명한다.
+// CI는 GitHub Secrets에서 받는다(.github/workflows/android.yml). 없으면 서명 안 된 AAB가 나온다(Play에는 못 올림).
+def hdKeystore = System.getenv('HD_UPLOAD_KEYSTORE')
+def hdSigning = hdKeystore && file(hdKeystore).exists() &&
+        System.getenv('HD_UPLOAD_STORE_PASSWORD') && System.getenv('HD_UPLOAD_KEY_ALIAS') && System.getenv('HD_UPLOAD_KEY_PASSWORD')
+
+android {
+    namespace = "io.github.freejcj87gif.hanguldefense"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        // applicationId는 Play에 한 번 올리면 바꿀 수 없다(임시값, 출시 전 확정: launch\android\01 문서).
+        applicationId "io.github.freejcj87gif.hanguldefense"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode hdVersionCode
+        versionName hdVersionName
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    signingConfigs {
+        if (hdSigning) {
+            release {
+                storeFile file(hdKeystore)
+                storePassword System.getenv('HD_UPLOAD_STORE_PASSWORD')
+                keyAlias System.getenv('HD_UPLOAD_KEY_ALIAS')
+                keyPassword System.getenv('HD_UPLOAD_KEY_PASSWORD')
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (hdSigning) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+
+// 아동 대상 앱: Firebase·Google Services 플러그인은 연결하지 않는다(템플릿의 google-services 적용 블록 삭제).

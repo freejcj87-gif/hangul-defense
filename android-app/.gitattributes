@@ -1,0 +1,5 @@
+# CI(Linux)에서 ./gradlew가 돌도록 줄바꿈을 고정한다
+android/gradlew text eol=lf
+*.bat text eol=crlf
+*.jar binary
+*.png binary

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 안드로이드 자동 백업 규칙(Android 12 이상, targetSdk 31+). Android 11 이하는 backup_rules.xml.
+     프로듀서 결정('26.11.18): 진행은 기기 저장 + 안드로이드 자동 백업(같은 구글 계정 새 기기 복원) + 진행 파일 옮기기.
+     게임 진행은 WebView localStorage(출처 https://localhost)에 있고, WebView는 앱 폴더의 app_webview/(Context.getDir("webview"))에 저장한다.
+     localStorage의 정확한 하위 경로(app_webview/Default/Local Storage/)는 공식 문서가 아니어서 app_webview/ 전체를 넣고
+     캐시성 폴더만 뺀다(백업 용량을 작게 유지). 백업이 실제로 되는지는 기기에서 bmgr로 확인한다(launch\android\02 문서). -->
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="root" path="app_webview/" />
+        <include domain="sharedpref" path="." />
+        <exclude domain="root" path="app_webview/Default/GPUCache/" />
+        <exclude domain="root" path="app_webview/Default/Service Worker/" />
+        <exclude domain="root" path="app_webview/Default/Session Storage/" />
+        <exclude domain="root" path="app_webview/Default/blob_storage/" />
+        <exclude domain="root" path="app_webview/Default/Code Cache/" />
+        <exclude domain="root" path="app_webview/GPUCache/" />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="root" path="app_webview/" />
+        <include domain="sharedpref" path="." />
+        <exclude domain="root" path="app_webview/Default/GPUCache/" />
+        <exclude domain="root" path="app_webview/Default/Service Worker/" />
+        <exclude domain="root" path="app_webview/Default/Session Storage/" />
+        <exclude domain="root" path="app_webview/Default/blob_storage/" />
+        <exclude domain="root" path="app_webview/Default/Code Cache/" />
+        <exclude domain="root" path="app_webview/GPUCache/" />
+    </device-transfer>
+</data-extraction-rules>

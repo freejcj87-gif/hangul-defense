@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 안드로이드 자동 백업 규칙(Android 11 이하 기기). 내용은 data_extraction_rules.xml과 같게 유지한다(설명은 그 파일). -->
+<full-backup-content>
+    <include domain="root" path="app_webview/" />
+    <include domain="sharedpref" path="." />
+    <exclude domain="root" path="app_webview/Default/GPUCache/" />
+    <exclude domain="root" path="app_webview/Default/Service Worker/" />
+    <exclude domain="root" path="app_webview/Default/Session Storage/" />
+    <exclude domain="root" path="app_webview/Default/blob_storage/" />
+    <exclude domain="root" path="app_webview/Default/Code Cache/" />
+    <exclude domain="root" path="app_webview/GPUCache/" />
+</full-backup-content>
