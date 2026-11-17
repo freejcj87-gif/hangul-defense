@@ -1671,6 +1671,30 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   const goal=readT(b.api.round.q,1);U.next.click();M.drain();eq([b.api.state.run.shields,b.api.state.run.bell,b.api.phase,M.last.t,b.api.round.info.guard],[6,3,'reward',goal,1],'결전: 다음 ▶으로 마지막 방패를 깸(그 시간에 한 번에 맞힘)');
   U.next.click();M.drain();eq([b.api.phase,b.n.ending.hidden],['ending',false],'달아나는 장면을 감고 엔딩 카드');eq(U.now(),'엔딩 · 다음 ▶ = 새 마을로 떠나기','막대 안내');
   U.next.click();eq([b.api.phase,b.api.state.run.no,b.n.ending.hidden],['ask',2,true],'엔딩에서 다음 ▶ = 새 마을로 떠나기');ok(!(KEY in saved),'아이 저장 열쇠는 쓰지 않음')}
+ /* TM-11 🗺️ 단계로 바로 가기: 지금 나이 그대로, 그 나이 문턱에 꼭 맞게 '막 들어선' 마을로 새로 시작. Combat.stage · 세계 반지름 · 열린 길 · 회관 · 종,
+    첫 문제에 여우가 밀려오지 않음, 지은 것은 시뮬 중앙값(8세 보통 · 3개씩, scripts/stage-seeds.cjs) 비례, 아이 저장 불변 */
+ {const HALL=[0,0,1,1,2,3];let rows=0;
+  for(const age of [8,7,9,10]){
+   saved={[KEY]:kid};const b=boot({query:TQ}),M=b.window.__testmode,U=UI(b),sel=U.bar.children.find(e=>e.attrs.id==='tmJump');
+   if(age===8)eq(sel.children.map(o=>o.textContent),['🗺️ 단계로','🏡 농가','🏘️ 마을','🏪 장터 마을','💧 물레방아 마을','🧱 성곽 마을','🏰 성','🔔 결전 직전(종 열림)'],'바로 가기 칸: 6단계 + 결전 직전');
+   if(age!==8)b.n.ageRow.children.find(x=>x.dataset.age===String(age)).click();
+   for(const [key,name] of M.JUMPS){const tag=age+'세 '+name;
+    sel.value=key;sel.onchange();
+    const s=b.api.state,w=b.api.world,g=b.game(),k=key==='bell'?5:Number(key),cnt=C.stageCount(s),bn=C.builtNew(s);
+    eq([b.api.phase,b.n.start.hidden,sel.value,s.age,C.stage(s),w.stage,W.radius(w),W.routes(w),s.hall,w.hall],['ask',true,'',age,k,k,W.STAGE.radius[k],k>0?W.STAGE.open[k]:null,HALL[k],HALL[k]],tag+': 단계 · 반지름 · 열린 길 · 회관');
+    if(key==='0')eq([cnt,s.level,s.chickens,s.gold,s.index],[1,1,1,20,0],tag+': 새 판 그대로');
+    else{const goal=key==='bell'?C.bellBuilt({age})-3:C.stageAt({age})[k];eq(cnt,goal,tag+': 지은 수(회관 뺌) = 그 나이 문턱 '+goal);
+     if(k<5)ok(cnt<C.stageAt({age})[k+1],tag+': 다음 단계 문턱 아래');eq(s.gold,M.JUMP_BASE[key].gold,tag+': 금화 = 시뮬 중앙값');ok(s.level>=1&&s.chickens>=1,tag+': 시작 타워·닭')}
+    if(key==='bell')eq([s.run.bell,bn,g.king&&g.king.state,b.slots()[7].dataset.key],[1,C.bellBuilt({age}),'wait','bell'],tag+': 종이 막 열리고 늑대 왕이 기다림');
+    else eq([s.run.bell,g.king],[0,null],tag+': 종은 아직');
+    eq([g.fox,s.run.fox],[null,(s.hall|0)>=C.FOX.needHall?C.FOX.at.filter(n=>bn>=n).length:0],tag+': 지나온 여우 문턱은 이미 지남(첫 문제에 여우가 밀려오지 않음)');
+    if(age===8&&key!=='0'){const B=M.JUMP_BASE[key];ok(['level','fence','chickens','farmers','pond','power'].every(f=>Math.abs(s[f]-B[f])<=2),tag+': 지은 것 = 시뮬 중앙값(±2, 문턱에 맞춤) '+JSON.stringify([s.level,s.fence,s.chickens,s.farmers,s.pond,s.power]))}
+    rows++}
+   /* 바로 간 마을에서 그대로 이어서 놀 수 있다: 결전 직전 → 다음 ▶ → 종 → 결전 문제는 판 기록에서 고름 */
+   M.next();M.drain();eq(b.api.phase,'reward',age+'세 결전 직전: 다음 ▶으로 바로 풀 수 있음');M.next();M.drain();b.tick(5);b.buy('bell');
+   ok(b.api.state.run.bell===2&&b.api.state.run.fpick.length===C.FINALE.shields&&b.api.state.run.fpick.some(i=>i>=0),age+'세: 종을 울리면 결전(판 기록에서 문제를 고름) '+JSON.stringify(b.api.state.run.fpick));
+   b.unload();eq(saved[KEY],kid,age+'세 바로 가기: 아이 저장 그대로');eq(JSON.parse(saved[TKEY]).age,age,age+'세: 테스트 저장에 바로 간 판')}
+  eq(rows,28,'나이 4 × 바로 가기 7')}
 }
 
 eq(spoken,0,'검사 전체에서 음성 합성(speechSynthesis)을 한 번도 부르지 않음');
