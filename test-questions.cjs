@@ -512,6 +512,60 @@ for(const a of [9,10]){
   else{ok(by.size>=24&&info>=.3&&info<=.5,'10세: 지문 24편 이상, 설명문 30~50% ('+by.size+'편, '+info.toFixed(2)+')');ok(deep>=.4&&deep<=.6,'10세: 마음·추론·중심 40~60% ('+deep.toFixed(2)+')')}
 }
 
+/* 9-3. 문제은행 감사(2026-11-17) 재발 방지: 화면에 보이는 글(지문·질문·보기)만 본다(speak는 0.11부터 화면에 쓰지 않음) */
+{const shown=q=>[q.passage,q.prompt,...q.choices];
+ const every=[];for(const a of Q.AGES){every.push(...all(a,'story'));every.push(...quizAll(a))}
+ /* 자주 틀리는 맞춤법, 한 낱말을 띄어 쓴 꼴(밀어내다·끌어당기다·데려다주다 등은 사전에 한 낱말), 공백 */
+ const SPELL=[[/되요|되서|안되|않되/,'되/돼'],[/몇일/,'며칠'],[/어떻해/,'어떡해'],[/금새/,'금세'],[/[할볼줄]께/,'ㄹ게'],[/깨끗히|일일히|곰곰히|틈틈히|번번히|따뜻히|솔직이|꼼꼼이|가만이/,'-이/-히'],[/오랫만/,'오랜만'],[/뵈요/,'봬요'],[/윗층|윗쪽/,'위층·위쪽'],[/아니예요/,'아니에요'],
+   [/[가-힣]수있|[을를] 수있|[가-힣]것같/,'수 있·것 같 띄어쓰기'],[/밀어 내|끌어 당|빨아 들|올라 가|내려 가|뛰어 가|걸어 가|달려 가|날아 다|들려 주|가져다 주|데려다 주|도와 주/,'한 낱말을 띄어 씀'],[/ {2,}/,'공백 두 칸'],[/ [.,?!]/,'문장부호 앞 공백'],[/[가-힣][.?!][가-힣]/,'문장부호 뒤 공백 없음']];
+ /* 예요/이에요: 받침 뒤 '이에요', 받침 없는 말 뒤 '예요' */
+ const spellBad=q=>{const out=[];for(const t of shown(q)){const s=String(t).replace(/\n/g,' ');for(const [re,why] of SPELL)if(re.test(s))out.push(why+': '+s);
+   for(const m of s.matchAll(/([가-힣])(이에요|예요)/g)){const b=H.hasBatchim(m[1]);if(m[2]==='예요'?b&&m[1]!=='이':!b)out.push('예요/이에요: '+m[0])}}return out};
+ for(const q of every){const bad=spellBad(q);ok(!bad.length,q.id+': 맞춤법·띄어쓰기 '+bad.join(' / '))}
+ ok(spellBad({passage:'같은 극끼리는 서로 밀어 내고',prompt:'몇일이 되요?',choices:['책예요']}).length===4,'맞춤법 검사 자체(밀어 내고·몇일·되요·받침 뒤 예요)');
+ /* 이름·동물·물건 낱말 뒤 조사: 받침이 있으면 이·을·은·과·으로(ㄹ받침은 로), 없으면 가·를·는·와·로. 낱말 목록 = 8~10세 읽기 보기 낱말 + 이야기에 나오는 이름 */
+ const NOUN=new Set(['곰','집','밭','공','컵','연','빵','떡','감','밤','죽','꽃','책','형','귤','콩','춤','붓','숲','강','산','문','종','두리','솔이','하늘이','다온이','마루','나래','꼬꼬','병아리','늑대','오리','토끼','염소','다람쥐','고양이','강아지','부엉이','참새','사슴','너구리','거북이','개구리','돼지','여우']);
+ for(const a of [8,9,10])for(const q of all(a,'story'))for(const c of q.choices)if(H.isWord(c)&&chars(c).length>=2)NOUN.add(c);
+ const JOSA=[['이','가'],['을','를'],['은','는'],['과','와'],['으로','로'],['이랑','랑'],['이나','나'],['이라고','라고']];
+ const josaBad=w=>{const out=[];for(const [withB,noB] of JOSA)for(const [p,needB] of [[withB,true],[noB,false]]){if(!w.endsWith(p)||w.length<=p.length)continue;const stem=w.slice(0,-p.length);if(!NOUN.has(stem))continue;const j=H.jong(Array.from(stem).pop());
+   if(!(withB==='으로'?(needB?j>0&&j!==8:j===0||j===8):(needB?j>0:j===0)))out.push(stem+'+'+p)}return out};
+ for(const q of every){const bad=[];for(const t of shown(q))for(const w0 of String(t).split(/\s+/)){const w=w0.replace(/[.,?!'"]/g,'');if(w&&!NOUN.has(w))bad.push(...josaBad(w))}ok(!bad.length,q.id+': 조사 '+bad.join(','))}
+ ok(josaBad('곰가').length&&josaBad('오리이').length&&josaBad('공원로').length&&!josaBad('곰이').length&&!josaBad('오리가').length&&!josaBad('공원으로').length,'조사 검사 자체(곰가·오리이·공원로는 잡고 곰이·오리가·공원으로는 통과)');
+ /* 숫자·단위 뒤 조사는 읽는 소리(십이를, 오를, 그램은, 미터는)를 따른다 */
+ const UNIT={cm:'센티미터',mm:'밀리미터',km:'킬로미터',m:'미터',g:'그램',kg:'킬로그램',mL:'밀리리터',L:'리터'};
+ const numBad=q=>{const out=[];for(const t of shown(q))for(const m of String(t).matchAll(/(\d+)\s?(cm|mm|km|kg|mL|m|g|L)?(으로|은|는|이|가|을|를|과|와|로)(?![가-힣])/g)){
+   const read=m[2]?UNIT[m[2]]:sino(+m[1]),j=H.jong(Array.from(read).pop()),p=m[3];
+   if(!(p==='으로'?j>0&&j!==8:p==='로'?j===0||j===8:['은','이','을','과'].includes(p)?j>0:j===0))out.push(m[0]+'(읽기 '+read+')')}return out};
+ for(const q of every){const bad=numBad(q);ok(!bad.length,q.id+': 숫자·단위 뒤 조사 '+bad.join(','))}
+ ok(numBad({passage:'',prompt:'짧은바늘이 3를, 12을 가리키고 2 kg 600 g는',choices:['1 m은']}).length===4&&!numBad({passage:'',prompt:'3을 12를 600 g은 1 m는 1000이',choices:[]}).length,'숫자 조사 검사 자체');
+ /* 주어(이름·동물)만 바꾼 같은 문항 금지: 지문·질문의 주어를 X로 바꿔도 지문·질문·정답이 같으면 사실상 같은 문항 */
+ const SUBJ=[...NOUN].filter(w=>/^(두리|솔이|하늘이|다온이|마루|나래|꼬꼬|병아리|늑대|오리|토끼|염소|다람쥐|고양이|강아지|부엉이|참새|사슴|너구리|거북이|개구리|돼지|여우|곰)$/.test(w)).sort((x,y)=>y.length-x.length);
+ const PN={'이':'가','가':'가','은':'는','는':'는','을':'를','를':'를','과':'와','와':'와','의':'의','에게':'에게'};
+ const unsubj=s=>String(s).split(/\s+/).map(w=>{for(const n of SUBJ)if(w.startsWith(n)){const r=w.slice(n.length),e=(r.match(/[.,?!]$/)||[''])[0],b=r.replace(/[.,?!]$/,'');return 'X'+(b in PN?PN[b]:b)+e}return w}).join(' ');
+ for(const a of [8,9,10]){const seen=new Map();for(const q of all(a,'story')){const k=unsubj(q.passage)+'|'+unsubj(q.prompt)+'|'+q.choices[q.answer];ok(!seen.has(k),q.id+': 주어만 다른 같은 문항('+seen.get(k)+') '+k);seen.set(k,q.id)}}
+ /* 같은 나이 수학: 같은 틀에 같은 수들(순서만 다름, 3 + 4와 4 + 3)이면 같은 문항 */
+ for(const a of Q.AGES){const seen=new Map();for(const q of quizAll(a).filter(q=>q.cat==='math')){const n=(q.passage+' '+q.prompt).match(/\d+/g);if(!n)continue;const k=q.passage.replace(/\d+/g,'n')+'|'+q.prompt.replace(/\d+/g,'n')+'|'+n.slice().sort().join(',');ok(!seen.has(k),q.id+': 수만 자리를 바꾼 같은 수학 문항('+seen.get(k)+')');seen.set(k,q.id)}}
+ /* 그림 → 영어 낱말: 정답의 상위어(오리 그림에 bird)를 오답으로 두지 않음 */
+ const HYPER={bird:['duck','chicken','owl','chick','swan'],fruit:['apple','grape','banana','strawberry','cherry','peach'],animal:['dog','cat','cow','pig','duck','bear','lion','tiger','fox','horse','monkey','rabbit'],vegetable:['potato','carrot','onion'],color:['red','blue','yellow','green','black','white','pink','brown']};
+ for(const a of Q.AGES)for(const q of quizAll(a).filter(q=>q.cat==='english')){const ans=q.choices[q.answer];for(const [h,kids] of Object.entries(HYPER))if(kids.includes(ans))ok(!q.choices.includes(h),q.id+': 정답 '+ans+'의 상위어 '+h+'가 오답에 있음')}
+ /* 보기끼리 같은 뜻(둘 다 정답으로 읽힘) 금지 */
+ const SAME=[['장대','막대'],['개','강아지'],['엄마','어머니'],['아빠','아버지'],['과자','쿠키'],['차','자동차']];
+ for(const q of every)for(const [x,y] of SAME){const hx=q.choices.some(c=>c.split(/\s+/).includes(x)||c.endsWith(' '+x)||c===x),hy=q.choices.some(c=>c.split(/\s+/).includes(y)||c===y);ok(!(hx&&hy),q.id+': 같은 뜻 보기 '+x+'·'+y)}
+ /* '형보다/언니보다/누나보다/오빠보다' 먼저·더 한 사람은 그 사람의 동생이기도 하므로 '동생'을 오답으로 두지 않음 */
+ for(const q of all(8,'story'))if(/(형|언니|누나|오빠)보다/.test(q.passage))ok(!q.choices.includes('동생'),q.id+': 손위 형제와 견주는 문장에 동생 오답');
+ /* 'n○에는' 세는 말: 상자·봉지처럼 단위로 쓰는 말만(일곱 꽃병 ×) */
+ const COUNTER=['상자','봉지','접시','바구니','묶음','통','병','컵','그릇','판','줄','봉투','주머니','상'];
+ for(const a of Q.AGES)for(const q of quizAll(a)){const m=q.prompt.match(/^한 (\S+)에 .*\. \d+(\S+)에는/);if(m){ok(COUNTER.includes(m[2]),q.id+': 세는 말 '+m[2]);eq(m[1],m[2],q.id+': 한 ○에 / n○에는 같은 말')}}
+ /* 감사에서 고친 문항(번호는 그대로, 내용만 고침) */
+ const byId=new Map(every.map(q=>[q.id,q]));
+ eq(byId.get('a8-story-g185').choices,['곰','형','오리'],'a8-story-g185: 형보다 먼저 온 오리는 동생이기도 해서 오답 동생을 곰으로');
+ ok(!byId.get('a10-story-g004').choices.includes('나무 막대'),'a10-story-g004: 장대 = 긴 나무 막대라 오답에서 뺌');
+ ok(!byId.get('a9-story-g064').choices.includes('겨울에 먹이가 많아서'),'a9-story-g064: 모아 둔 먹이로 겨울에 먹이가 많았으므로 오답에서 뺌');
+ ok(!byId.get('a10-quiz-g051').choices.includes('bird'),'a10-quiz-g051: 오리는 새이기도 해서 bird를 오답에서 뺌');
+ ok(byId.get('a10-story-g049').passage.includes('서로 밀어내고'),'a10-story-g049: 밀어내다는 한 낱말');
+ {const h=byId.get('a10-quiz-31'),g=byId.get('a10-quiz-g046');ok(g.choices[g.answer]!==h.choices[h.answer],'a10-quiz-g046: 손 문항 a10-quiz-31(둔각 120도, 보기 한 개만 다름)과 정답이 같지 않음')}
+}
+
 /* 10. 출제 순서: Questions.at(age, mode, index, seed) */
 const EXPECT=(a,i)=>({7:2,8:3,9:i<40?5:i<100?6:7,10:i<40?7:i<80?8:i<120?9:10})[a];
 for(const a of Q.AGES){
