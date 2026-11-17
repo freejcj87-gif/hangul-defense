@@ -1578,6 +1578,42 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   {const K=L.KEEP;for(const p of W.ALL_SLOTS)ok(d2(K.at,p)>=1.2+K.r,'성탑: 타워 자리와 1.2 이상');for(const p of W.HOMES)ok(d2(K.at,p)>=.9+K.r,'성탑: 닭 자리와 0.9 이상');ok(d2(K.at,W.PLACE.nursery)>=SIZE.nursery+K.r+.3&&d2(K.at,W.PLACE.coop)<2,'성탑: 회관 바로 뒤, 작은 닭장과는 떨어짐')}
   ok(L.ROAD.r0>W.STAGE.radius[0]&&L.ROAD.r0<W.STAGE.radius[1]-.4&&L.ROAD_MARK.out>0&&L.ROAD_MARK.side>L.ROAD.edge/2+.4,'늑대 길은 마을 가장자리 안쪽에서 시작하고, 길목 표시는 울타리 밖 · 길 양옆');
  });
+ /* ======================= S-9 0.15 강 · 다리(계획서 v015-plan §4 · §10, 프로듀서 결정 '26.11.17: 다리 길은 한 줄로, 물레방아는 저절로 서고 바퀴만) ======================= */
+ /* S-9-1 손잡이: 기본 켬, 주소로 끔, 단계·길을 끄면 쓰지 않음 */
+ {eq([C.FLAGS.RIVER,C.FLAGS.BRIDGE],[true,true],'0.15 강 · 다리 길 규칙 기본 켬');ok(/\[\?&\]river=0\\b/.test(src)&&/\[\?&\]bridge=0\\b/.test(src),'주소 ?river=0 · ?bridge=0으로 끄는 손잡이');
+  eq(W.BRIDGE,{road:6,from:3,spread:.06},'다리 길: 6번 길(화면 위), 물레방아 마을(단계 3)부터, 출현 각도 흔들림 ±0.03rad');
+  const w3=W.sync(W.create({seed:1}),built(24)),w2=W.sync(W.create({seed:1}),built(14));eq([w3.stage,w2.stage],[3,2],'(물레방아 마을 · 장터 마을)');
+  eq([W.bridgeAt(w3,6),W.bridgeAt(w3,4),W.bridgeAt(w3,0),W.bridgeAt(w2,6)],[true,false,false,false],'다리 길 규칙은 단계 3 이상의 6번 길만');
+  for(const f of [{RIVER:false},{BRIDGE:false},{ROUTES:false},{STAGES:false}])withFlags(f,()=>ok(!W.bridgeAt(w3,6),'끄면 다리 길 규칙 없음: '+JSON.stringify(f)))}
+ /* S-9-2 세계: 6번 길 늑대만 축 ± 0.03rad 안에서 나온다. 다른 길은 그대로(무리 ±0.2 · 낙오 ±0.25). 거리 · 줄 간격 · 난수 호출 수는 그대로 */
+ {const axis=p=>(p+.5)*Math.PI/4,dev=(a,p)=>{let d=(a-axis(p))%(Math.PI*2);if(d>Math.PI)d-=Math.PI*2;if(d<-Math.PI)d+=Math.PI*2;return d};
+  const spawns=(s,flags,ticks,seed)=>withFlags(flags||{},()=>{const w=W.sync(W.create({seed,interval:150}),s),seen=new Set(),out=[];
+   for(let i=0;i<ticks;i++){W.step(w,s);for(const v of w.wolves)if(!seen.has(v.id)){seen.add(v.id);const a=Math.atan2(v.sz,v.sx);let p=0;for(let q=1;q<8;q++)if(Math.abs(dev(a,q))<Math.abs(dev(a,p)))p=q;out.push({p,d:dev(a,p),r:Math.hypot(v.sx,v.sz)})}}return {w,out}});
+  for(const n of [24,36,50]){const s=built(n),st=C.stage(s);let on6=0,max6=0,maxOther=0;
+   for(const seed of [3,11,29]){const r=spawns(s,null,3000,seed);for(const x of r.out){if(x.p===6){on6++;max6=Math.max(max6,Math.abs(x.d))}else maxOther=Math.max(maxOther,Math.abs(x.d))}}
+   ok(on6>=3&&max6<=.0301,'지은 수 '+n+'('+C.STAGE_NAME[st]+'): 6번 길 늑대 '+on6+'마리 모두 축 ±0.03rad 안(가장 먼 '+max6.toFixed(4)+')');
+   ok(maxOther>.1&&maxOther<=.2501,'다른 길은 0.14 흔들림 그대로(가장 먼 '+maxOther.toFixed(3)+' ≤ 0.25)');
+   let wide=0;for(const seed of [3,11,29])for(const x of spawns(s,{BRIDGE:false},3000,seed).out)if(x.p===6)wide=Math.max(wide,Math.abs(x.d));ok(wide>.1,'BRIDGE를 끄면 6번 길도 넓게(가장 먼 '+wide.toFixed(3)+')')}
+  /* 단계 0~2에는 6번 길이 없거나(1·2) 8방향(0)이라 켬 · 끔 세계가 같다 */
+  for(const n of [3,8,14]){const s=built(n),a=spawns(s,null,1500,7).w,b=spawns(s,{BRIDGE:false},1500,7).w;eq(JSON.stringify(a),JSON.stringify(b),'지은 수 '+n+'(단계 '+C.stage(s)+'): 다리 규칙 켬 = 끔(같은 세계)')}
+  /* 단계 3: 같은 씨앗이면 늑대 목록(id · 종류 · 체력 · 속도 · 출현 거리)은 같고 6번 길 늑대의 x · z만 다르다. 난수 순서가 같다는 뜻 */
+  {const s=built(24),seed=13,mk=f=>withFlags(f,()=>{const w=W.sync(W.create({seed,interval:150}),s);let t=0;while(!w.wolves.length&&t<3000){W.step(w,s);t++}return {w,t}}),A=mk({}),B=mk({BRIDGE:false});
+   const pick=w=>w.wolves.map(v=>[v.id,v.kind,v.hp,v.max,v.speed,+Math.hypot(v.sx,v.sz).toFixed(9)]);eq([A.t,pick(A.w)],[B.t,pick(B.w)],'단계 3 첫 출현: 늑대 목록이 같음(난수 호출 수 그대로)');
+   const on6=v=>{const a=Math.atan2(v.sz,v.sx);return Math.abs(dev(a,6))<.3};let differ=0,same=0;
+   A.w.wolves.forEach((v,i)=>{const u=B.w.wolves[i];if(on6(v))differ+=v.x!==u.x||v.z!==u.z?1:0;else same+=v.x===u.x&&v.z===u.z?1:0});
+   ok(same+differ===A.w.wolves.length,'6번 길이 아닌 늑대는 자리까지 같음, 6번 길 늑대만 자리가 다름('+differ+'마리 다름, '+same+'마리 같음)');
+   eq(JSON.stringify(mk({}).w),JSON.stringify(A.w),'켬: 같은 씨앗 · 같은 입력 → 같은 세계(결정적)')}
+  /* RIVER를 끄면 다리 규칙도 꺼진다(= 0.14 세계) */
+  {const s=built(36),a=spawns(s,{RIVER:false},2000,5).w,b=spawns(s,{BRIDGE:false},2000,5).w;eq(JSON.stringify(a),JSON.stringify(b),'RIVER 끔 = BRIDGE 끔(둘 다 0.14 세계)')}}
+ /* S-9-5 화면: 단계 3이 되는 띠 알림에 다리 길 한 줄, getVillageState가 강 · 다리 켬을 넘긴다 */
+ {const v23=built(23),base={age:8,level:v23.level,fence:v23.fence,chickens:v23.chickens,farmers:v23.farmers,gold:3000,seed:5};
+  const up=(flags,label,want)=>withFlags(flags,()=>{const a=seed(base,{view:true});a.go();calmWorld(a);eq(a.game().stage.now,2,label+': (지은 수 23 = 장터 마을)');a.unlock();a.right();a.tick(5);a.buy('fence');
+   eq([a.game().stage.now,a.fx('banner')[0]&&a.fx('banner')[0].textContent],[3,want],label+': 물레방아 마을 띠 알림');return a.window.getVillageState()});
+  let vs=up({},'켬','💧물레방아 마을이 되었어요!늑대는 길 4곳으로 와요 · 강 건너 다리 길이 열렸어요');eq([vs.river,vs.bridge],[true,true],'켬: 3D에 강 · 다리 켬을 넘김');
+  vs=up({BRIDGE:false},'다리 규칙 끔','💧물레방아 마을이 되었어요!늑대는 길 4곳으로 와요 · 강 건너 다리 길이 열렸어요');eq([vs.river,vs.bridge],[true,false],'다리 규칙만 끄면 강 · 다리 그림은 그대로');
+  vs=up({RIVER:false,BRIDGE:false},'강 끔','💧물레방아 마을이 되었어요!땅이 넓어졌어요 · 늑대는 길 4곳으로 와요');eq([vs.river,vs.bridge],[false,false],'강을 끄면 0.14 띠 알림 · 강 없음');
+  withFlags({ROUTES:false},()=>{const a=seed(base,{view:true});a.go();const s=a.window.getVillageState();eq([s.river,s.bridge],[false,false],'길을 끄면(?routes=0) 강 · 다리 없음')});
+  withFlags(OFF,()=>{const a=seed(base,{view:true});a.go();const s=a.window.getVillageState();eq([s.river,s.bridge],[false,false],'단계를 끄면(?stages=0) 강 · 다리 없음')})}
 }
 
 /* ======================= 0.15 아트 들여오기(계획서 §2, S-9 6) =======================

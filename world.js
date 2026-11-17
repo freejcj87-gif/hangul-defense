@@ -22,6 +22,12 @@
   const hasStage=w=>Number.isSafeInteger(w.stage)&&w.stage>=0&&w.stage<=STAGE_MAX;
   /* 지금 열린 길(출현 지점 번호 목록) 또는 null(8방향 전부) */
   const routes=w=>{const C=combat();return hasStage(w)&&w.stage>0&&C&&C.FLAGS&&C.FLAGS.ROUTES?STAGE.open[w.stage]:null};
+  /* 0.15 다리 길(계획서 v015-plan §4 안 C, 프로듀서 결정 '26.11.17 "다리로 한 줄로"): 물레방아 마을(단계 3)부터 강이 위쪽(6번 길)을 가로지르고
+     6번 길에 다리가 하나 놓인다. 그 길로 나오는 늑대만 출현 각도 흔들림을 ±0.2 · ±0.25rad → ±0.03rad로 좁혀 다리 위로 줄지어 온다.
+     바뀌는 것은 각도 하나다: 출현 거리 · 줄 간격 · 경로 길이 · 도착 시간 · 난수 호출 수는 그대로(난수는 전처럼 한 번 부르고 곱하는 폭만 다르다).
+     Combat.FLAGS.RIVER(강 · 다리 그림)과 BRIDGE(이 규칙)가 모두 켜져 있고 단계 · 길이 켜져 있을 때만. 끄면 0.14와 한 글자도 다르지 않다 */
+  const BRIDGE={road:6,from:3,spread:.06};
+  const bridgeAt=(w,p)=>{const C=combat();return p===BRIDGE.road&&hasStage(w)&&w.stage>=BRIDGE.from&&!!(C&&C.FLAGS&&C.FLAGS.STAGES&&C.FLAGS.ROUTES&&C.FLAGS.RIVER&&C.FLAGS.BRIDGE)};
   /* 출현 지점 하나를 고른다. 난수는 길이 열려 있든 아니든 한 번만 쓴다(결정성, 0단계는 0.13과 같은 결과) */
   const spawnPoint=w=>{const o=routes(w),r=rand(w);return o?o[Math.min(o.length-1,Math.floor(r*o.length))]:Math.floor(r*SPAWNS)};
   const EDGE=7;                    /* 출현 지점 = 마을 반지름 + 7(숲 가장자리). 나오자마자 화면에 보인다 */
@@ -294,7 +300,7 @@
     const R=radius(w)+EDGE,groups=Math.min(3,1+Math.floor(n/5)),points=[];
     for(let g=0;g<groups;g++)points.push(spawnPoint(w));
     for(let i=0;i<n;i++){
-      const p=points[i%groups],a=(p+.5)*Math.PI*2/SPAWNS+(rand(w)-.5)*.4,back=Math.floor(i/groups)*.75;
+      const p=points[i%groups],a=(p+.5)*Math.PI*2/SPAWNS+(rand(w)-.5)*(bridgeAt(w,p)?BRIDGE.spread:.4),back=Math.floor(i/groups)*.75;
       addWolf(w,s,pickKind(w,s,boss&&i===0),Math.cos(a)*(R+back),Math.sin(a)*(R+back));
     }
     w.events.push({type:'pack',n,points:points.slice(),boss});
@@ -302,7 +308,7 @@
   function spawnStraggler(w,s){
     const cap=Math.round(MAX_WOLVES*.8);if(w.wolves.length>=cap)return;
     const n=1+(rand(w)<Math.min(.5,threat(s)/TRICKLE.pair)?1:0),p=spawnPoint(w),R=radius(w)+EDGE;
-    for(let i=0;i<n;i++){const a=(p+.5)*Math.PI*2/SPAWNS+(rand(w)-.5)*.5;addWolf(w,s,pickKind(w,s,false),Math.cos(a)*(R+i*.8),Math.sin(a)*(R+i*.8))}
+    for(let i=0;i<n;i++){const a=(p+.5)*Math.PI*2/SPAWNS+(rand(w)-.5)*(bridgeAt(w,p)?BRIDGE.spread:.5);addWolf(w,s,pickKind(w,s,false),Math.cos(a)*(R+i*.8),Math.sin(a)*(R+i*.8))}
     w.events.push({type:'straggler',n,point:p});
   }
 
@@ -635,7 +641,7 @@
     if(!(Number.isSafeInteger(w.nextId)&&w.nextId>top))w.nextId=top+1;
   }
 
-  const api={V:2,STAGE,STAGE_MAX,routes,FLOW,flowOn,flowQuestion,flowCorrect,flowAdd,flowYard,flowCap,flowPile,flowIdle,flowLayers,TEMPO,tempoInterval,mulOf,KING,FOX,king,kingHit,fox,foxShoo,retreat,peaceOff,TICK,RADIUS,EDGE,SPAWNS,WOLF,AGE,THREAT,PACK,TRICKLE,SLOW,slowEase,KINDS,MIX,BOSS_EVERY,TOWER,POWER,POWER_STEP,FLOOR,ROAR,HP,FENCE_HP,MEND,REBUILD,HEN,DASH,RUSH,MERCY,MERCY_CAP,INNER,SIDE_REACH,INTERVAL,MAX_WOLVES,TRAVEL,GUARD,answered,
+  const api={V:2,STAGE,STAGE_MAX,routes,BRIDGE,bridgeAt,FLOW,flowOn,flowQuestion,flowCorrect,flowAdd,flowYard,flowCap,flowPile,flowIdle,flowLayers,TEMPO,tempoInterval,mulOf,KING,FOX,king,kingHit,fox,foxShoo,retreat,peaceOff,TICK,RADIUS,EDGE,SPAWNS,WOLF,AGE,THREAT,PACK,TRICKLE,SLOW,slowEase,KINDS,MIX,BOSS_EVERY,TOWER,POWER,POWER_STEP,FLOOR,ROAR,HP,FENCE_HP,MEND,REBUILD,HEN,DASH,RUSH,MERCY,MERCY_CAP,INNER,SIDE_REACH,INTERVAL,MAX_WOLVES,TRAVEL,GUARD,answered,
     TOWER_SLOTS,RINGS,ALL_SLOTS,SLOT_COUNT,TOWER_UNITS,PLACE,HOMES,HENS_MAX,HOME,towerSlots,fenceLayers,
     intervalFor,create,sync,step,volley,volleyArrows,dashTicks,built,threat,repairAll,brokenCount,brokenKinds,marketDown,wolvesInside,towerUnits,barLeft,secondsLeft,packSize,trickleGap,kindsAt,restore,radius,sectorOf,rand,range,cooldown,damage,towerDamage,towerRange,power,ageOf};
   if(typeof module!=='undefined')module.exports=api;

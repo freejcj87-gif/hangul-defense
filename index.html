@@ -241,6 +241,8 @@ const KEY=DEMO?'hangul-defense-demo'+DEMO:'hangul-defense-v1',AGES=Questions.AGE
 try{if(/[?&]flow=0\b/.test(location.search))Combat.FLAGS.FLOW=false}catch{}
 /* 0.14: 주소에 ?stages=0을 붙이면 단계(넓어지는 영역·열린 길·단계 진행 칸)를 끄고 0.13.2 규칙으로 돈다. ?routes=0은 열린 길만 끈다(전 단계 8방향) */
 try{if(/[?&]stages=0\b/.test(location.search)){Combat.FLAGS.STAGES=false;Combat.FLAGS.ROUTES=false}if(/[?&]routes=0\b/.test(location.search))Combat.FLAGS.ROUTES=false}catch{}
+/* 0.15: ?river=0이면 강 · 다리 · 물레방아 바퀴와 다리 길 규칙을 끄고(0.14 화면 · 규칙), ?bridge=0이면 다리 길 규칙만 끈다(늑대가 넓게 와서 물을 건넌다). 단계나 길을 끄면(?stages=0 · ?routes=0) 둘 다 쓰지 않는다(rivered · World.bridgeAt가 함께 본다) */
+try{if(/[?&]river=0\b/.test(location.search)){Combat.FLAGS.RIVER=false;Combat.FLAGS.BRIDGE=false}if(/[?&]bridge=0\b/.test(location.search))Combat.FLAGS.BRIDGE=false}catch{}
 const DEMO_VILLAGE={1:{hall:1,level:2,fence:2,chickens:4,gold:250},2:{hall:2,level:3,fence:4,chickens:6,farmers:1,power:1,gold:450},3:{hall:3,level:5,fence:6,chickens:8,farmers:2,pond:2,power:2,gold:700}};
 /* 규칙은 combat.js(Combat)·world.js(World)가 정한다. 이 스크립트는 단계(phase) 진행, 화면, 효과음만 맡는다. 계약: docs/v09-contract.md
    0.11: 아이는 글을 읽기만 한다. 소리 모드도, 읽어 주는 음성(음성 합성)도 없다. state.mode는 저장 호환용으로 늘 'story'.
@@ -299,6 +301,7 @@ syncKing(true);
    문제를 읽는 동안(ask) 산 것으로 단계가 오르면 세계에 바로 넣지 않고(World.sync hold) 그 문제를 답한 순간(정답 연출·정답 배우기 = 문제 사이)에 넓힌다:
    읽는 동안에는 화면(카메라)이 스스로 움직이지 않는다. 그동안 8번째 칸은 '곧!'을 보여 준다 */
 const staged=()=>!!Combat.FLAGS.STAGES;
+const rivered=()=>staged()&&!!Combat.FLAGS.ROUTES&&!!Combat.FLAGS.RIVER;   /* 0.15: 단계 3부터 강 · 다리 · 물레방아(화면). 다리 길 규칙은 World.bridgeAt */
 const stageNow=()=>staged()?(Number.isSafeInteger(world.stage)?world.stage:0):-1;
 const stageDue=()=>staged()&&(Combat.stage(state)>stageNow()||(state.hall|0)>(world.hall|0));
 const STAGE_ICON=['🏡','🏘️','🏪','💧','🧱','🏰'],STAGE_SHORT=['농가','마을','장터','물레방아','성곽','성'];
@@ -762,6 +765,7 @@ function stageUp(st0,h0){
 function stagePerks(st,st0,hallRose){
  const out=[],R=World.STAGE&&World.STAGE.open,n1=R&&Combat.FLAGS.ROUTES&&R[st]?R[st].length:0,n0=R&&Combat.FLAGS.ROUTES&&st0>0&&R[st0]?R[st0].length:0;
  if(n1&&n1!==n0)out.push('늑대는 길 '+n1+'곳으로 와요');
+ if(rivered()&&st>=3&&st0<3)out.push('강 건너 다리 길이 열렸어요');
  if(hallRose){out.push('알값 +'+Combat.PAY.hall);const opened=Combat.SHOP.filter(k=>Combat.ITEMS[k]&&Combat.ITEMS[k].need===(world.hall|0)).map(k=>(SHOP_LOOK[k]||[k])[0]);out.push(opened.length?'새 상품: '+opened.join('·'):'타워 자리 '+towerSpots()+'곳')}
  if(out.length<2)out.unshift('땅이 넓어졌어요');
  return out.slice(0,3).join(' · ');
@@ -1067,5 +1071,5 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden&&!paused&&p
 drawStart();
 /* 3D 마을(village.js)은 이 상태(늑대 세계 world 포함)를 매 프레임 읽어 간다. 일회성 연출(세계 사건·volley·produce·dash·build)만 따로 알린다.
    running: 늑대 세계 시계가 흐르는지(시작 화면·쉬기만 멈춤). 0.9에서 reward 단계가 생겨, 3D는 phase 목록 대신 이 값을 보면 된다. */
-window.getVillageState=()=>({phase,paused,running:phase!=='start'&&phase!=='ending'&&!paused,village:state.run.village,bell:state.run.bell,shields:state.run.shields,level:state.level,power:state.power|0,streak:state.streak|0,chickens:state.chickens,fence:state.fence,farmers:state.farmers,farmersTotal:1+(state.farmers|0),nest:state.nest|0,flow:!!world.flow&&flowing(),repairAct:!!Combat.FLAGS.REPAIR_ACT,marketDown:state.marketDown|0,recommend:rec.glow||null,pond:state.pond,hall:staged()?world.hall|0:state.hall,feast:state.feast,wins:state.wins,world,radius:World.radius(world),stage:stageNow(),routes:World.routes(world),tries:round?round.tries:0,dash:!!(round&&round.dash>0),result:round?round.result:null});
+window.getVillageState=()=>({phase,paused,running:phase!=='start'&&phase!=='ending'&&!paused,village:state.run.village,bell:state.run.bell,shields:state.run.shields,level:state.level,power:state.power|0,streak:state.streak|0,chickens:state.chickens,fence:state.fence,farmers:state.farmers,farmersTotal:1+(state.farmers|0),nest:state.nest|0,flow:!!world.flow&&flowing(),repairAct:!!Combat.FLAGS.REPAIR_ACT,marketDown:state.marketDown|0,recommend:rec.glow||null,pond:state.pond,hall:staged()?world.hall|0:state.hall,feast:state.feast,wins:state.wins,world,radius:World.radius(world),stage:stageNow(),routes:World.routes(world),river:rivered(),bridge:rivered()&&!!Combat.FLAGS.BRIDGE,tries:round?round.tries:0,dash:!!(round&&round.dash>0),result:round?round.result:null});
 </script><script src="village.js?v=0.14" defer></script></body></html>
