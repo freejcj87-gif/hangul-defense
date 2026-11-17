@@ -39,3 +39,7 @@
 
 - 0.16 아트(성 · 성벽 · 성문 · 성탑)와 따로 된 바퀴는 저장소에만 있고 배포 묶음에는 없다. 쓰기 시작하면 `scripts/build-pages.cjs`의 `art15`(이름은 0.15지만 배포 목록) · `pages.yml`의 `art15` · test-dom 기대값을 같이 고친다.
 - 아트 경로는 소스에 한 문자열로 적는다(`'art-handoff/v015-v016/glb/' + name` 같이 조각내면 빌드의 참조 검사가 못 본다).
+- 화면 비교 · 캡처는 `work\verification-20261113\playtest\v015-art.cjs`(모드 `same` · `beasts` · `lineup` · `river` · `fallback`). 3D 화면 시계를 가짜 requestAnimationFrame 시각으로 밀어 같은 저장이면 같은 그림이 나온다(픽셀 비교 가능). main 빌드 사본 경로는 환경 변수 `MAIN`.
+- `src/village.js`의 함수 선언은 `start()` 하나 안에 모여 있어 같은 이름을 다시 선언하면 뒤의 것이 조용히 이긴다(0.15에서 `splash`가 겹쳐 한참 헤맴). 새 함수 이름은 grep으로 먼저 확인.
+- 창 모드 Chrome은 Windows의 애니메이션 설정을 따라 `prefers-reduced-motion`이 켜질 수 있고, 창이 가려지면 rAF가 느려진다. 확인 스크립트는 `reducedMotion:'no-preference'`를 명시한다.
+- 0.16 연결: 성문은 다리 안쪽 끝(반지름 + 1.68 − 1.67 = 울타리 줄 바로 밖) 앞에 세우면 "성문 앞 다리"가 된다(`bridgeSpot(R)`). 강 방향은 280°(계획서 284° 아님).

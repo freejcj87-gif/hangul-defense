@@ -3,7 +3,10 @@
    node scripts/sim-flow.cjs farm [나이들=8] [상수 덮어쓰기 JSON]                                농부 1~10명의 문제당 금화(닭 20 · 회관 3 고정, 늑대 없음)
    덮어쓰기 JSON 예: '{"FLOW":false}'(0.12 기준선) · '{"W":{"carry":4.5},"C":{"paceFloor":100}}'(World.FLOW · Combat.FLOW 상수)
    아이 모형은 가정값이다(실제 아이 측정이 아님): 보통 · 느린(1.8배) · 빠른(0.62배) · 찍기 · 방치 · 방치(상점만) · 틀리기만 · 아주 느린(2.2배) · 농부 안 삼 · 아무거나 삼.
-   0.14: 단계(농가→성) 도달 문제 수, 길(출현 지점)별 늑대 유입, 잃은 닭을 함께 잰다. 0.15: 맨 끝 두 열 = 20분까지 울타리 면별 부서짐, 다리 길(6번) 유입 %(기준선 '{"FLAGS":{"BRIDGE":false}}' = 0.14). 단계가 오르는 구매는 화면처럼 그 문제를 답한 순간에 세계에 반영한다(World.sync hold).
+   0.14: 단계(농가→성) 도달 문제 수, 길(출현 지점)별 늑대 유입, 잃은 닭을 함께 잰다. 0.15: 맨 끝 두 열 = 20분까지 울타리 면별 부서짐, 다리 길(6번) 유입 %(기준선 '{"FLAGS":{"BRIDGE":false}}' = 0.14).
+     단계가 오르는 구매는 화면과 같은 때에 세계에 반영한다: 문제를 읽는 중(ask)에 산 것만 보류했다가(World.sync hold) 그 문제를 답한 순간에 풀고,
+     정답 연출 · 정답 배우기 중(문제 사이)에 산 것은 바로 반영한다(화면의 stageRelease · buy). 0.15에서 고침(리뷰 v014 2번): 0.14 시뮬은 문제 사이 구매까지
+     보류해 다음 답에 반영해서 단계 도달이 약 1문제, 첫 전환이 0.5~0.7분 늦게 잡혔다.
      기준선(0.13.2): '{"FLAGS":{"STAGES":false,"ROUTES":false}}'
    봇은 추천 말풍선을 따르고, 한 번에 맞힐 때마다 하나를 산다(sim-village.cjs playEnd와 같은 방식). 결과 정본: docs/game-plan.md §13 */
 const path=require('node:path'),ROOT=path.join(__dirname,'..');
@@ -23,13 +26,14 @@ function playEnd(age,kind,seed,opt){
   let s=C.fresh(age);const flowing=C.flowOn(s);
   const w=W.sync(W.create({seed:Math.floor(rnd()*2147483646)+1,interval:W.tempoInterval(meanBase(age,s.seed)),guard:true}),s);
   if(flowing)W.flowOn(w);
-  const clock=()=>w.t*W.TICK;let qn=0,phaseQuiet=false,shopLock=0,minHen10=s.chickens,ended=null,finale=null,earned=0,first=0,reading=false,fenceHits=0;
+  const clock=()=>w.t*W.TICK;let qn=0,phaseQuiet=false,shopLock=0,minHen10=s.chickens,ended=null,finale=null,earned=0,first=0,reading=false,idling=false,fenceHits=0;
   const sideHits=Array(6).fill(0);   /* 0.15: 울타리 면(0~5)별 부서진 횟수(다리 길 한 줄이 한 면에 몰리는지) */
   const st={ticks:0,pile:0,full:0,boost:0,read:0,readLow:0,late:0,latePile:0,lateFull:0,sold:0,eggGold:0,credit:0,laid:0,tries:0,poor:0},snaps={},ms={};
   const mark=k=>{if(!ms[k])ms[k]={q:qn,min:clock()/60}};
   /* 0.14: 길별 유입(1단계부터)과 단계 도달. release = 문제 사이에 단계를 세계에 반영(화면의 stageRelease와 같은 때) */
   const inflow=Array(W.SPAWNS).fill(0);let inflowN=0;
-  const release=()=>{W.sync(w,s);if(Number.isSafeInteger(w.stage))for(let k=1;k<=w.stage;k++)mark('s'+k)};
+  const markStages=()=>{if(Number.isSafeInteger(w.stage))for(let k=1;k<=w.stage;k++)mark('s'+k)};
+  const release=()=>{W.sync(w,s);markStages()};
   const REC={show:35,gap:200,urgentGap:100,window:600,mute:600,stale:150,perMin:2,bellGap:600},rec={glow:null,bubble:null,left:0,last:-1e9,times:[],prev:null,ign:{},mute:{},want:null,opened:[],lostAt:-1e9,uiT:0,bellAt:-1e9};
   const ctx=()=>({wolvesInside:W.wolvesInside(w),towers:w.buildings.filter(b=>b.kind==='tower'&&!b.broken).length,lostHenRecently:w.t-rec.lostAt<=300,brokenKinds:W.brokenKinds(w),opened:rec.opened.slice(),bellQuiet:w.t-rec.bellAt<REC.bellGap,pile:W.flowPile(w)});
   const recNow=()=>C.recommend(s,ctx())||null;
@@ -66,10 +70,12 @@ function playEnd(age,kind,seed,opt){
     const rows=C.shopKeys(s).filter(x=>x!=='bell'&&C.canBuy(s,x)&&!(kind==='nofarmer'&&x==='farmer'));st.tries++;if(!rows.length){st.poor++;return 0}
     const key=kind==='randbuy'?rows[Math.floor(rnd()*rows.length)]:rec.glow&&rows.includes(rec.glow)?rec.glow:CHEAP.find(c=>rows.includes(c));if(!key)return 0;
     C.buy(s,key);if(rec.prev&&rec.prev.key===key)rec.prev.followed=true;if(rec.glow===key){rec.glow=null;if(rec.bubble&&rec.bubble.key===key)rec.bubble=null}
-    if(key==='repair')W.repairAll(w);W.sync(w,s,{hold:true});s.broken=W.brokenCount(w);s.marketDown=W.marketDown(w);shopLock=4;run(.5);marks();return 1}
+    /* 읽는 중(그리고 방치 아이가 띄워 둔 문제)에만 보류, 문제 사이에 산 것은 바로(화면과 같음) */
+    const held=reading||idling;if(key==='repair')W.repairAll(w);W.sync(w,s,{hold:held});if(!held)markStages();s.broken=W.brokenCount(w);s.marketDown=W.marketDown(w);shopLock=4;run(.5);marks();return 1}
   const kidTime=(q,firstTry)=>{const lock=Math.max(3,C.reveal(q))/10;if(kind==='guess'||kind==='wrong')return firstTry?lock+.4:.4;const need=C.needSeconds(q)*SPEEDK[kind]*(.75+rnd()*.5);return firstTry?Math.max(lock+.4,need):Math.max(.4,need*.35)};
   const done=()=>({lost:s.run.lost,stage:w.stage,topRoute:inflowN?100*Math.max(...inflow)/inflowN:NaN,bridgeRoute:inflowN?100*inflow[6]/inflowN:NaN,ended,qn,min:clock()/60,ms,collapse:minHen10===0,snaps,earned,first,built:C.built(s),hens:s.chickens,farmers:1+s.farmers,gold:s.gold,st,fenceHits,yard:W.flowYard(w),credit:w.flow?w.flow.credit:0});
   if(kind==='idle'||kind==='idleBuy'){
+    idling=true;   /* 방치 아이는 첫 문제를 띄운 채 답하지 않는다: 산 것은 화면처럼 보류된 채 */
     if(flowing)W.flowQuestion(w,C.beatTicks(s,Q.at(age,mode,0,s.seed)));
     const end=(o.idleMin||30)*60;while(clock()<end){run(3);if(kind==='idleBuy'){ask(false);buyOne()}}
     return Object.assign(done(),{idle:true});
