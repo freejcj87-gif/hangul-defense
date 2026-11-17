@@ -673,8 +673,8 @@ a.tick(30);eq(a.api.round,null,'시작 화면에서는 문제 없음');eq(a.api.
 for(const id of ['battle','next','shield','combatInfo','buildPrompt','buyChicken','buyFence','timebar','timeFill','wolfHead','timeTag','choices','cards','skip','gainLine','gainParts'])ok(!html.includes('id="'+id+'"'),'없앤 요소: '+id);
 ok(!html.includes('소리 도움말'),'정답을 글자로 보여 주던 소리 도움말 제거');ok(!src.includes('다음 무리')&&!src.includes('barLeft')&&!src.includes('secondsLeft'),'늑대 시간 표시(초·막대) 코드 없음');
 ok(!src.includes('enterPick')&&!src.includes('picks')&&!src.includes('offers('),'카드 고르기 단계 코드 없음');
-ok(html.includes('src="combat.js?v=0.14.1"')&&html.includes('src="world.js?v=0.14.1"')&&html.includes('src="questions.js?v=0.14.1"')&&html.includes('src="village.js?v=0.14.1"')&&src.includes("s.src='testmode.js?v=0.14.1'")&&!html.includes('?v=0.12')&&!/\?v=0\.14"/.test(html),'캐시 갱신용 ?v=0.14.1');
-ok(html.indexOf('src="questions-gen.js?v=0.14.1"')>0&&html.indexOf('src="questions-gen.js?v=0.14.1"')<html.indexOf('src="questions.js?v=0.14.1"'),'생성 문항 파일을 questions.js보다 먼저 불러옴');
+ok(html.includes('src="combat.js?v=0.14.2"')&&html.includes('src="world.js?v=0.14.2"')&&html.includes('src="questions.js?v=0.14.2"')&&html.includes('src="village.js?v=0.14.2"')&&src.includes("s.src='testmode.js?v=0.14.2'")&&!html.includes('?v=0.12')&&!/\?v=0\.14"/.test(html),'캐시 갱신용 ?v=0.14.2');
+ok(html.indexOf('src="questions-gen.js?v=0.14.2"')>0&&html.indexOf('src="questions-gen.js?v=0.14.2"')<html.indexOf('src="questions.js?v=0.14.2"'),'생성 문항 파일을 questions.js보다 먼저 불러옴');
 /* 0.11: 듣고 고르기 모드 폐쇄. 시작 화면·설정에 모드 고르기가 없고, 스크립트에 소리 모드 분기가 없다 */
 for(const id of ['startSound','startStory','mode'])ok(!html.includes('id="'+id+'"'),'없앤 모드 버튼: '+id);
 ok(!html.includes('mode-row')&&!html.replace(/<script>[\s\S]*?<\/script>/,'').includes('듣고 고르기'),'화면에 모드 고르기·듣고 고르기 문구 없음');
@@ -1600,7 +1600,7 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
  {const b=seed({age:7,seed:4242});b.go();b.unlock();b.rightNow();ok(b.api.round.info.guard<1,'대조: 열리자마자 누르면 찍기 막기 배수 '+b.api.round.info.guard.toFixed(2)+' < 1')}
  /* TM-2 켜짐: 막대, 따로 저장, 시작 화면에서 다음 ▶ = 시작하기 */
  saved={[KEY]:kid};const a=boot({query:TQ}),T=a.window.__testmode,u=UI(a);
- ok(T&&u.bar&&a.document.body.classList.contains('test-mode'),'test=1: 화면 아래 막대와 훅');ok(a.document.body.children.some(e=>e.tagName==='script'&&e.src==='testmode.js?v=0.14.1'),'test=1: testmode.js를 불러옴');
+ ok(T&&u.bar&&a.document.body.classList.contains('test-mode'),'test=1: 화면 아래 막대와 훅');ok(a.document.body.children.some(e=>e.tagName==='script'&&e.src==='testmode.js?v=0.14.2'),'test=1: testmode.js를 불러옴');
  eq([a.api.KEY,a.api.state.gold],[TKEY,20],'저장 열쇠는 -test, 아이 저장(금화 777)을 읽지 않고 새 판');
  eq([T.speed,T.auto,Object.keys(T.SPEED),Object.values(T.SPEED).map(s=>s.k),T.RETRY],['typ',false,['slow','typ','fast'],[1.8,1,.62],.35],'아이 속도 느림·보통·빠름 = 시뮬 아이 모형(× 1.8 · 1 · 0.62, 두 번째 × 0.35), 기본 보통·자동 끔');
  eq([u.speed('typ').getAttribute('aria-pressed'),u.auto.textContent,u.wrong.disabled,u.now()],['true','⏯ 자동 끔',true,'시작 화면 · 다음 ▶ = 시작하기'],'막대 처음 모습');

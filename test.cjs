@@ -73,7 +73,8 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
  async function frames(page,n){const from=await page.evaluate(()=>window.VillageView.inspect().frames);await page.waitForFunction(t=>window.VillageView.inspect().frames>=t,from+n,{timeout:30000})}
  const beats=(page,n)=>page.evaluate(n=>new Promise(r=>{const goal=(window.__beats||0)+n;const f=()=>(window.__beats||0)>=goal?r():setTimeout(f,20);f()}),n);
  async function seed(page,s){await page.evaluate(s=>{Object.assign(state,s);state.round=null;save()},s);await page.reload();await ready(page)}
- const stored=page=>page.evaluate(k=>JSON.parse(localStorage.getItem(k)),KEY);
+ /* 0.14.2: 주소 stages=0(OLD)은 저장 열쇠가 따로('-stages0')라 페이지가 쓰는 열쇠(페이지 전역 KEY)를 읽는다 */
+ const stored=page=>page.evaluate(()=>JSON.parse(localStorage.getItem(KEY)));
  /* 이펙트는 1초 안팎으로 사라지므로, 생성되는 순간을 페이지 안에서 기록해 두고 읽는다. */
  const RECORD=()=>{window.__fx=[];document.addEventListener('DOMContentLoaded',()=>{const scene=document.getElementById('scene');new MutationObserver(m=>m.forEach(r=>r.addedNodes.forEach(n=>{if(!n.classList)return;if(n.classList.contains('sale')){window.__fx.push({c:'sale',t:n.textContent});return}if(n.classList.contains('paws')){window.__fx.push({c:'paws',t:n.dataset.point});return}if(!n.classList.contains('fx'))return;const e={c:[...n.classList].find(x=>x.startsWith('fx-')),t:n.textContent};if(e.c==='fx-label'){const w=n.offsetWidth/2,h=n.offsetHeight/2,x=parseFloat(n.style.left),y=parseFloat(n.style.top);e.inside=n.style.left.endsWith('px')&&x-w>=0&&x+w<=scene.clientWidth&&y-48-h>=0&&y+h<=scene.clientHeight;e.box=[Math.round(x-w),Math.round(x+w),Math.round(y),scene.clientWidth,scene.clientHeight]}window.__fx.push(e)}))).observe(document.getElementById('effects'),{childList:true})})};
  const fxLog=page=>page.evaluate(()=>window.__fx.splice(0));const names=f=>f.map(x=>x.c+':'+x.t);
@@ -250,7 +251,7 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
   }
   /* 다 자란 마을 */
   const smallHalf=three&&!INTERIM?(await page.evaluate(()=>window.VillageView.inspect())).cameraHalf:0;
-  await page.evaluate(()=>{localStorage.removeItem('hangul-defense-v1')});
+  await page.evaluate(()=>{localStorage.removeItem(KEY)});/* 페이지가 쓰는 열쇠(0.14.2: stages=0이면 '-stages0') */
   await seed(page,{gold:900,level:4,fence:4,chickens:8,farmers:2,pond:2,hall:3,feast:1,wins:40,index:5,age:8});await begin(page,{age:8},touch);
   await page.waitForFunction(()=>window.VillageView?.inspect().ready,{},{timeout:45000});
   await frames(page,40);
@@ -500,13 +501,14 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
 
   /* 체험 초기화: 체험 마을로 돌아가고, 원래 저장은 그대로 */
   {const {ctx,page,errors}=await open();await seed(page,{gold:777,wins:5,index:9,age:8});
-   await page.goto(url+'/?demo=2&flow=0&stages=0');await ready(page);const real=await page.evaluate(()=>localStorage.getItem('hangul-defense-v1'));
+   /* 0.14.2: 이 구간의 원래 저장은 OLD(stages=0) 주소의 열쇠 'hangul-defense-v1-stages0' */
+   await page.goto(url+'/?demo=2&flow=0&stages=0');await ready(page);const real=await page.evaluate(()=>localStorage.getItem('hangul-defense-v1-stages0'));ok(real&&JSON.parse(real).gold===777,'(the real save under the stages=0 key)');
    ok((await page.locator('header .demo-tag').textContent())==='체험: 마을회관 2단계','demo 2 label');
    await begin(page,{age:8},true);await answer(page,true,true);await phaseIs(page,'reward');await settle(page);
    let g=await game(page);ok(g.state.wins===1&&g.state.index===1&&g.state.gold!==450,'progress inside the demo');
    page.once('dialog',d=>d.accept());await page.locator('#drawerSummary').tap();await page.locator('#reset').tap();await phaseIs(page,'ask');
    g=await game(page);eq([g.state.hall,g.state.level,g.state.fence,g.state.chickens,g.state.farmers,g.state.power,g.state.gold,g.state.wins,g.state.index,g.world.radius],[2,3,4,6,1,1,450,0,0,13],'demo reset brings back the demo village');
-   eq(await page.evaluate(()=>localStorage.getItem('hangul-defense-v1')),real,'demo reset leaves the real save alone');eq((await page.evaluate(()=>JSON.parse(localStorage.getItem('hangul-defense-demo2')))).hall,2,'demo save after reset');
+   eq(await page.evaluate(()=>localStorage.getItem('hangul-defense-v1-stages0')),real,'demo reset leaves the real save alone');eq((await page.evaluate(()=>JSON.parse(localStorage.getItem('hangul-defense-demo2')))).hall,2,'demo save after reset');
    await page.goto(url+OLD);await ready(page);g=await game(page);eq([g.state.gold,g.state.wins,g.state.index],[777,5,9],'real progress intact outside the demo');eq(await page.locator('header .demo-tag').count(),0,'no demo label without ?demo');
    eq(errors,[],'flow demo reset page errors');await ctx.close()}
 
@@ -662,7 +664,7 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
    const page=await ctx.newPage(),errors=[],reqs=[];page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>reqs.push(new URL(r.url()).pathname));await page.route('**/environment-pack.glb',r=>r.abort());
    await page.goto(url+q);await ready(page);if(q.includes('test=1'))await page.waitForFunction(()=>!!window.__testmode,{},{timeout:20000});return {ctx,page,errors,reqs}};
   {const {ctx,page,errors,reqs}=await open('/',1366,768);
-   eq([await page.locator('#testBar').count(),await page.evaluate(()=>typeof window.__testmode),await page.locator('header small').textContent()],[0,'undefined','한글 디펜스 · 늑대가 오기 전에 읽어요 0.14.1'],'no test=1: no test bar, no hook, plain header');
+   eq([await page.locator('#testBar').count(),await page.evaluate(()=>typeof window.__testmode),await page.locator('header small').textContent()],[0,'undefined','한글 디펜스 · 늑대가 오기 전에 읽어요 0.14.2'],'no test=1: no test bar, no hook, plain header');
    ok(!reqs.includes('/testmode.js'),'no test=1: testmode.js is not even requested');eq(errors,[],'no test=1 page errors');await ctx.close()}
   for(const [w,h] of [[1366,768],[1180,820],[820,1180]]){const tag='test mode '+w+'x'+h;
    const {ctx,page,errors}=await open('/?test=1',w,h);

@@ -216,7 +216,7 @@ body.paused *,body.paused *:before,body.paused *:after{animation-play-state:paus
 .end-stars{display:grid;gap:6px;margin:10px 0;padding:0;text-align:left;font-size:16px;font-weight:800;line-height:1.4;word-break:keep-all}.end-stars li{list-style:none;padding:7px 11px;border-radius:12px;background:#f6edd2}.end-stars li.off{opacity:.5}
 #endNew{width:100%;font-size:19px;min-height:58px;background:linear-gradient(#f8d255,#e0a21a);color:#4a3200;border-color:#b8860b}#endStay{width:100%;margin-top:8px;min-height:46px;font-size:16px}
 </style></head><body><main>
-<header><div><small>한글 디펜스 · 늑대가 오기 전에 읽어요 0.14.1</small><h1><img class="brand-chicken" src="art-handoff/coopnight/browser/characters/chicken.png" alt="">꼬꼬마을: 읽어서 지켜요</h1></div><button id="pause">잠깐 쉬기</button></header>
+<header><div><small>한글 디펜스 · 늑대가 오기 전에 읽어요 0.14.2</small><h1><img class="brand-chicken" src="art-handoff/coopnight/browser/characters/chicken.png" alt="">꼬꼬마을: 읽어서 지켜요</h1></div><button id="pause">잠깐 쉬기</button></header>
 <div class="game-layout"><section class="stage-card" id="stageCard" aria-label="우리 마을">
 <div class="stats"><span class="pill" id="gold"></span><span class="pill" id="flockPill"></span><span class="pill" id="level"></span><span class="pill" id="stage"></span></div>
 <div class="scene" id="scene"><div class="road"></div><div class="pond hidden" id="pond" aria-hidden="true"></div><div class="house"><img id="houseArt" src="art-handoff/coopnight/browser/buildings/home-01.png" alt="마을회관"></div><div class="village-extra" id="villageExtra" aria-hidden="true"></div><div class="fence-row" id="fenceRow" aria-hidden="true"></div><div id="tower"><img id="towerArt" src="art-handoff/coopnight/browser/buildings/tower-01.png" alt="방어 타워"><span class="tower-tag" id="towerTag"></span></div><div class="farmers" id="farmers" aria-hidden="true"></div><div class="flock" id="flock" aria-hidden="true"></div><div id="enemies" aria-label="다가오는 늑대"></div><div id="effects" aria-hidden="true"></div><div class="finale hidden" id="finale" role="img"></div><div class="yard-eggs hidden" id="yardEggs" role="img"></div><div class="stage-tag hidden" id="stageTag" role="img"></div><div id="pauseNote">⏸️ 쉬는 중이에요</div></div>
@@ -234,15 +234,18 @@ body.paused *,body.paused *:before,body.paused *:after{animation-play-state:paus
 <ul class="rules"><li>🐺 늑대가 쉬지 않고 사방에서 와서 닭을 물어 가고 건물을 부숴요.</li><li>🏹 한 번에 맞히면 타워가 일제히 쏘고, 닭이 알을 낳아 금화가 생겨요.</li><li>🪙 금화로 언제든 가게에서 타워·닭·농부를 사요.</li><li>💥 문제에는 상식·수학·영어도 섞여 있어요.</li></ul>
 <p class="start-q">몇 살이에요?</p><div class="age-row" id="ageRow"></div>
 <button id="go">시작하기 ▶</button><small>어려우면 나이를 낮춰도 괜찮아요.</small></div></div>
-<script src="combat.js?v=0.14.1"></script><script src="world.js?v=0.14.1"></script><script src="questions-gen.js?v=0.14.1"></script><script src="questions.js?v=0.14.1"></script><script>/* 체험 주소 ?demo=1~3: 그 회관 단계까지 자란 마을로 시작해 새 몬스터를 바로 본다(프로듀서·보호자 확인용). 저장은 따로 해서 원래 진행을 건드리지 않는다. */
+<script src="combat.js?v=0.14.2"></script><script src="world.js?v=0.14.2"></script><script src="questions-gen.js?v=0.14.2"></script><script src="questions.js?v=0.14.2"></script><script>/* 체험 주소 ?demo=1~3: 그 회관 단계까지 자란 마을로 시작해 새 몬스터를 바로 본다(프로듀서·보호자 확인용). 저장은 따로 해서 원래 진행을 건드리지 않는다. */
 const DEMO=(()=>{try{const m=/[?&]demo=([123])\b/.exec(location.search);return m?Number(m[1]):0}catch{return 0}})();
 /* 0.14.1 프로듀서 테스트 모드 ?test=1: 화면 아래 '다음 ▶' 막대(testmode.js, 이 스크립트 맨 끝에서 불러옴). 저장은 '-test'를 붙인 열쇠에 따로 해서 아이 저장과 섞이지 않는다 */
 const TEST=(()=>{try{return /[?&]test=1\b/.test(location.search)}catch{return false}})();
-const KEY=(DEMO?'hangul-defense-demo'+DEMO:'hangul-defense-v1')+(TEST?'-test':''),AGES=Questions.AGES,ART='art-handoff/coopnight/browser/';
+/* 0.14.2: 주소 ?stages=0(단계 끄기, 아래)은 아이 저장도 건드리지 않게 '-stages0'을 붙인 열쇠에 따로 저장한다. 같은 저장을 쓰면 끈 채로 맞춘 세계가 단계 래치(world.stage)를 지우고
+   회관도 0.13.2 문턱으로 올라, 나중에 보통 주소로 열면 닭을 잃은 마을의 영역이 줄어들 수 있었다(리뷰 7번). 체험(demo) 저장은 원래 따로라 그대로 */
+const STAGES_OFF=(()=>{try{return /[?&]stages=0\b/.test(location.search)}catch{return false}})();
+const KEY=(DEMO?'hangul-defense-demo'+DEMO:'hangul-defense-v1'+(STAGES_OFF?'-stages0':''))+(TEST?'-test':''),AGES=Questions.AGES,ART='art-handoff/coopnight/browser/';
 /* 0.13: 주소에 ?flow=0을 붙이면 흐르는 농장을 끄고 0.12 경제로 돈다(비교·회귀 검사용) */
 try{if(/[?&]flow=0\b/.test(location.search))Combat.FLAGS.FLOW=false}catch{}
 /* 0.14: 주소에 ?stages=0을 붙이면 단계(넓어지는 영역·열린 길·단계 진행 칸)를 끄고 0.13.2 규칙으로 돈다. ?routes=0은 열린 길만 끈다(전 단계 8방향) */
-try{if(/[?&]stages=0\b/.test(location.search)){Combat.FLAGS.STAGES=false;Combat.FLAGS.ROUTES=false}if(/[?&]routes=0\b/.test(location.search))Combat.FLAGS.ROUTES=false}catch{}
+try{if(STAGES_OFF){Combat.FLAGS.STAGES=false;Combat.FLAGS.ROUTES=false}if(/[?&]routes=0\b/.test(location.search))Combat.FLAGS.ROUTES=false}catch{}
 const DEMO_VILLAGE={1:{hall:1,level:2,fence:2,chickens:4,gold:250},2:{hall:2,level:3,fence:4,chickens:6,farmers:1,power:1,gold:450},3:{hall:3,level:5,fence:6,chickens:8,farmers:2,pond:2,power:2,gold:700}};
 /* 규칙은 combat.js(Combat)·world.js(World)가 정한다. 이 스크립트는 단계(phase) 진행, 화면, 효과음만 맡는다. 계약: docs/v09-contract.md
    0.11: 아이는 글을 읽기만 한다. 소리 모드도, 읽어 주는 음성(음성 합성)도 없다. state.mode는 저장 호환용으로 늘 'story'.
@@ -253,11 +256,12 @@ const DEMO_VILLAGE={1:{hall:1,level:2,fence:2,chickens:4,gold:250},2:{hall:2,lev
    늑대 세계는 start·ending과 '잠깐 쉬기'에서만 멈춘다. 가게는 그 밖에는 언제든 열려 있고, 사도 세계는 멈추지 않는다.
    0.12 판 진행(state.run: 종·결전·여우, state.meta: 도장·지도)의 규칙은 모두 Combat이 정한다(ringBell·finaleNow·finaleSettle·nextRun …). 정본: docs/game-plan.md §11 */
 if(!(Combat.API>=4)||typeof Combat.shop!=='function'||typeof Combat.ringBell!=='function')console.warn('combat.js 버전이 index.html과 맞지 않아요. 새로고침해 주세요.');
-let state=Combat.fresh(8);
-/* 저장 v3: 예전 저장(version 1)은 Combat.restore가 이어받아 바꾼다(금화 ×0.25 등). 바꾸기 전에(모르는 버전은 버리기 전에) 원본을 '-bak' 열쇠에 한 번 복사해 둔다(되돌리기용) */
+let state=Combat.fresh(8),stateKept=false;
+/* 저장 v3: 예전 저장(version 1)은 Combat.restore가 이어받아 바꾼다(금화 ×0.25 등). 바꾸기 전에(모르는 버전은 버리기 전에) 원본을 '-bak' 열쇠에 한 번 복사해 둔다(되돌리기용)
+   stateKept(0.14.2): 경제 저장을 이어받았는지(Combat.restore가 받는 버전 1·3). 버려져 새 판이면 늑대 세계도 새로 만든다(아래). 전에는 세계만 따로 살아나 새 판이 성(단계 래치)에서 시작했다(리뷰 7번) */
 try{const raw=localStorage.getItem(KEY),saved=JSON.parse(raw);
  if(saved&&typeof saved==='object'&&saved.version!==Combat.SAVE_VERSION&&!localStorage.getItem(KEY+'-bak'))try{localStorage.setItem(KEY+'-bak',raw)}catch{}
- state=Combat.restore(saved,AGES)}catch{}
+ state=Combat.restore(saved,AGES);stateKept=!!saved&&typeof saved==='object'&&(saved.version===1||saved.version===Combat.SAVE_VERSION)}catch{}
 if(DEMO&&!state.wins&&!state.index)Object.assign(state,DEMO_VILLAGE[DEMO]);
 /* 문제 순서 씨앗(0.10): 판마다 다른 순서. 예전 저장(씨앗 0)은 이어하는 순간 하나를 받는다 */
 const newSeed=()=>1+Math.floor(Math.random()*2147483646);
@@ -282,7 +286,7 @@ const freshWorld=()=>World.sync(World.create({seed:(Date.now()%2147483647)||1,in
 /* 0.13 흐르는 농장: 켜져 있으면 세계에 흐름 칸(world.flow)을 만들고, 0.12 저장의 남은 알(state.nest)은 마당 알로 한 번만 옮긴다(옮긴 뒤 nest 0 → 다시 불러와도 알이 늘지 않는다) */
 const flowing=()=>Combat.flowOn(state);
 function flowSync(){if(!flowing())return;World.flowOn(world);if((state.nest|0)>0){World.flowAdd(world,state.nest|0);state.nest=0}}
-let world=null;try{const raw=JSON.parse(localStorage.getItem(KEY));world=raw&&raw.world?World.restore(raw.world,{interval:waveInterval()}):null}catch{}
+let world=null;try{const raw=JSON.parse(localStorage.getItem(KEY));world=stateKept&&raw&&raw.world?World.restore(raw.world,{interval:waveInterval()}):null}catch{}
 if(world&&world.keep===undefined)world.keep=true;/* 0.9 저장도 마지막 닭은 지킨다 */
 const KIND_ICON={wolf:'🐺',bramble:'🌿',boar:'🐗',granite:'🪨',frost:'❄️',ember:'🔥'};
 const CAT_ICON={common:'🌍',math:'🔢',english:'🔤'};
@@ -326,19 +330,21 @@ function save(){
 const TOWER_ART=['01','01','03','05','08','10'];
 function artImage(file,alt=''){const img=document.createElement('img');img.src=ART+file;img.alt=alt;img.draggable=false;return img}
 function emoji(ch){const s=document.createElement('span');s.textContent=ch;return s}
-const homeArt=()=>'buildings/home-'+String(Math.min(5,1+state.hall+(state.feast>0?1:0))).padStart(2,'0')+'.png';
+/* 0.14.2: 그림 화면의 회관도 지금 보이는 회관(단계를 켜면 world.hall: 읽는 중에 사서 오른 회관은 문제 사이에 바뀜, 3D와 같음). 단계를 끄면 경제 값 그대로(리뷰 10번) */
+const shownHall=()=>staged()?world.hall|0:state.hall|0;
+const homeArt=()=>'buildings/home-'+String(Math.min(5,1+shownHall()+(state.feast>0?1:0))).padStart(2,'0')+'.png';
 const FLOCK_MAX=20;
 let artStamp='';
 function updateVillageArt(){
- const stamp=[state.level,state.chickens,state.hidden,state.fence,state.farmers,state.pond,state.hall,state.feast,stageNow()].join(':');if(stamp===artStamp)return;artStamp=stamp;
+ const hall=shownHall(),stamp=[state.level,state.chickens,state.hidden,state.fence,state.farmers,state.pond,hall,state.feast,stageNow()].join(':');if(stamp===artStamp)return;artStamp=stamp;
  $('towerArt').src=ART+'buildings/tower-'+TOWER_ART[Math.min(5,state.level)]+'.png';put($('towerTag'),state.level?'타워 '+(1+state.level)+'개':'');$('houseArt').src=ART+homeArt();
- $('villageExtra').innerHTML='';$('villageExtra').append(artImage('buildings/coop.png','닭장'));if(state.hall>=1)$('villageExtra').append(artImage('buildings/store.png','가게'));for(let i=0;i<Math.min(3,state.feast);i++)$('villageExtra').append(emoji('🎏'));
+ $('villageExtra').innerHTML='';$('villageExtra').append(artImage('buildings/coop.png','닭장'));if(hall>=1)$('villageExtra').append(artImage('buildings/store.png','가게'));for(let i=0;i<Math.min(3,state.feast);i++)$('villageExtra').append(emoji('🎏'));
  $('pond').classList.toggle('hidden',!state.pond);$('pond').dataset.size=String(Math.min(3,state.pond));
  const fn=1+(state.farmers|0);put($('farmers'),'🧑‍🌾'.repeat(Math.min(3,fn))+(fn>3?'×'+fn:''));
  $('flock').innerHTML='';const hens=Math.min(FLOCK_MAX,state.chickens);for(let i=0;i<hens;i++){const hen=artImage('characters/chicken.png');hen.style.left=(50+(i%5)*6)+'%';hen.style.bottom=(33+Math.floor(i/5)*8+(i%2)*3)+'%';if(i>=hens-state.hidden)hen.className='hiding';$('flock').append(hen)}
  $('fenceRow').innerHTML='';for(let i=0;i<Math.min(6,state.fence);i++){const post=artImage('buildings/fence.png');post.style.left=(26+i*7)+'%';post.style.bottom='calc(16% + 24px)';$('fenceRow').append(post)}
- $('garden').innerHTML='';$('garden').append(artImage(homeArt(),'마을회관'));$('garden').append(artImage('characters/chicken.png','꼬꼬'));if(state.hall>=1)$('garden').append(artImage('buildings/store.png','가게'));if(state.pond)$('garden').append(Object.assign(document.createElement('i'),{textContent:'🐟'}));
- const label=document.createElement('span');label.textContent=(staged()?Combat.STAGE_NAME[stageNow()]+' · ':'')+'회관 '+state.hall+'단계 · 타워 '+(1+state.level)+'개 · 닭 '+state.chickens+'마리 · 농부 '+(1+state.farmers)+'명 · 연못 '+state.pond+(state.feast?' · 잔치 '+state.feast+'번':'');$('garden').append(label);
+ $('garden').innerHTML='';$('garden').append(artImage(homeArt(),'마을회관'));$('garden').append(artImage('characters/chicken.png','꼬꼬'));if(hall>=1)$('garden').append(artImage('buildings/store.png','가게'));if(state.pond)$('garden').append(Object.assign(document.createElement('i'),{textContent:'🐟'}));
+ const label=document.createElement('span');label.textContent=(staged()?Combat.STAGE_NAME[stageNow()]+' · ':'')+'회관 '+hall+'단계 · 타워 '+(1+state.level)+'개 · 닭 '+state.chickens+'마리 · 농부 '+(1+state.farmers)+'명 · 연못 '+state.pond+(state.feast?' · 잔치 '+state.feast+'번':'');$('garden').append(label);
 }
 const WOLF_POOL=[];
 const liveWolves=()=>world.wolves.filter(v=>v.state!=='dead'&&v.state!=='gone');
@@ -580,6 +586,9 @@ function miss(){round.result='miss';state.misses++;state.streak=0;Combat.track(s
 /* ---------- 종 · 결전 · 엔딩(0.12) ---------- */
 /* 지은 것이 66개가 되어 종이 열림(래치): 늑대 왕이 숲 가장자리에 와서 기다린다. 움직이지 않고 시간 표시도 없다 */
 function bellOpen(){
+ /* 0.14.2: 읽는 동안 미뤄 둔 단계 전환이 있으면 지금 푼다(종이 열리는 순간은 어차피 늑대 왕이 나오는 큰 장면이다). 그대로 두면 왕이 옛 반지름 기준 자리에 서고,
+    답하기 전에 종을 울리면 결전 중에 성 전환이 일어나 왕이 넓어진 울타리 안쪽에 서 있다가 뒷걸음쳤다(리뷰 3번. 10세: 성 37 + 회관 3 = 40, 종 46) */
+ if(stageDue())stageRelease();
  World.king(world,'wait');jingle('alarm');banner('👑','늑대 왕이 왔어요!','준비되면 🔔 종을 울려요',true);
  worldNote={text:'👑 늑대 왕이 숲에서 기다려요. 준비되면 🔔 종을 울려요',until:world.t+60};view([{type:'king'}]);askBubble(false);save();render();
 }
@@ -754,6 +763,8 @@ function stageRelease(){
 function stageUp(st0,h0){
  const st=stageNow(),hallRose=(world.hall|0)>h0;
  if(st<=st0){if(hallRose)hallUp();return}
+ /* 0.14.2: 결전 중(종을 울린 뒤)에는 띠 알림·축하·문구를 생략한다(결전 띠·'늑대 왕이 다가와요'를 덮지 않게). 영역은 세계를 따라 넓어진다. 보통은 종이 열릴 때 이미 풀려 여기 오지 않는다 */
+ if(state.run.bell===2){save();render();return}
  let at=null;try{const v=window.VillageView;if(v&&v.build){if(hallRose)at=v.build('hall')||null;at=v.build('stage')||at}}catch{}
  const perks=stagePerks(st,st0,hallRose),name=Combat.STAGE_NAME[st];
  if(phase==='reward'&&round)round.wait=Math.max(round.wait,STAGE_TICKS);/* 정답 연출 중에 사서 오른 경우에도 화면이 물러나는 동안은 다음 문제를 띄우지 않는다 */
@@ -1017,10 +1028,13 @@ window.__game=()=>{const kinds={};for(const v of liveWolves())kinds[v.kind||'wol
 /* ---------- 버튼 ---------- */
 $('pause').onclick=()=>{if(phase==='start'||phase==='ending')return;paused=!paused;if(!paused){acc=0;last=null}save();render()};
 /* 0.14: 단계 문턱과 종 문턱은 나이마다 다르다. 나이를 바꾸면 회관·종을 그 나이 기준으로 다시 맞춘다(오르기만 한다). 시작 화면에서는 장면 없이 바로 */
+/* 0.14.2: 문제 사이(정답 연출·정답 배우기)에 바꾸면 바로 넓힌다(전환 장면과 띠 알림). 읽는 중(ask)에만 그 문제를 답할 때까지 미룬다.
+   전에는 문제 중 어느 때든 다음 답까지 미뤄져, 8번째 칸이 '이 문제를 풀면…'이라 해 놓고 한 문제를 더 지나야 넓어졌다(리뷰 5번) */
 function regrow(){
  if(!staged())return;const b0=state.run.bell;Combat.grow(state);
- if(phase==='start'){World.sync(world,state);state.broken=World.brokenCount(world);syncMarket();syncKing(true)}
- else if(b0===0&&state.run.bell===1)bellOpen();
+ if(phase==='start'){World.sync(world,state);state.broken=World.brokenCount(world);syncMarket();syncKing(true);return}
+ if(phase==='reward'||phase==='learn')stageRelease();
+ if(b0===0&&state.run.bell===1)bellOpen();
 }
 function changeSetting(){
  world.interval=waveInterval();regrow();
@@ -1070,5 +1084,5 @@ drawStart();
 /* 3D 마을(village.js)은 이 상태(늑대 세계 world 포함)를 매 프레임 읽어 간다. 일회성 연출(세계 사건·volley·produce·dash·build)만 따로 알린다.
    running: 늑대 세계 시계가 흐르는지(시작 화면·쉬기만 멈춤). 0.9에서 reward 단계가 생겨, 3D는 phase 목록 대신 이 값을 보면 된다. */
 window.getVillageState=()=>({phase,paused,running:phase!=='start'&&phase!=='ending'&&!paused,village:state.run.village,bell:state.run.bell,shields:state.run.shields,level:state.level,power:state.power|0,streak:state.streak|0,chickens:state.chickens,fence:state.fence,farmers:state.farmers,farmersTotal:1+(state.farmers|0),nest:state.nest|0,flow:!!world.flow&&flowing(),repairAct:!!Combat.FLAGS.REPAIR_ACT,marketDown:state.marketDown|0,recommend:rec.glow||null,pond:state.pond,hall:staged()?world.hall|0:state.hall,feast:state.feast,wins:state.wins,world,radius:World.radius(world),stage:stageNow(),routes:World.routes(world),tries:round?round.tries:0,dash:!!(round&&round.dash>0),result:round?round.result:null});
-if(TEST){const s=document.createElement('script');s.src='testmode.js?v=0.14.1';document.body.append(s)}/* 0.14.1: ?test=1일 때만 테스트 모드 막대를 불러온다 */
-</script><script src="village.js?v=0.14.1" defer></script></body></html>
+if(TEST){const s=document.createElement('script');s.src='testmode.js?v=0.14.2';document.body.append(s)}/* 0.14.1: ?test=1일 때만 테스트 모드 막대를 불러온다 */
+</script><script src="village.js?v=0.14.2" defer></script></body></html>
