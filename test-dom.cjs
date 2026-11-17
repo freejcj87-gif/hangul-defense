@@ -1562,6 +1562,8 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
  stageLayout.push(L=>{
   const SIZE={coop:1.4,market:1.6,nursery:1,barn:1.6},d2=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]),seg=(p,[x0,z0,x1,z1])=>{const dx=x1-x0,dz=z1-z0,t=Math.max(0,Math.min(1,((p[0]-x0)*dx+(p[1]-z0)*dz)/(dx*dx+dz*dz)));return Math.hypot(p[0]-x0-dx*t,p[1]-z0-dz*t)};
   const things=[...L.COTTAGES.map((c,i)=>({name:'집 '+i,at:c.at,r:L.COTTAGE_R,stage:c.stage})),{name:'우물',at:L.WELL.at,r:L.WELL.r,stage:L.WELL.stage},{name:'물레방아',at:L.MILL.at,r:L.MILL.r,stage:L.MILL.stage}];
+  /* 0.15: 강을 끈 화면(?river=0)은 0.14 오두막(MILL0, 반지름 11.2)을 그대로 그리므로 그 자리도 같은 간격으로 본다(물레방아 0.15 자리와는 같이 서지 않음) */
+  {const m=L.MILL0;for(const p of W.ALL_SLOTS)ok(d2(m.at,p)>=1.2+m.r,'0.14 오두막: 타워 자리와 1.2 이상');for(const c of L.COTTAGES)ok(d2(m.at,c.at)>=m.r+L.COTTAGE_R+.15,'0.14 오두막: 집과 떨어짐')}
   eq([1,2,3,4,5].map(k=>L.COTTAGES.filter(c=>c.stage<=k).length),[2,4,6,10,22],'집은 단계마다 2 · 4 · 6 · 10 · 22채');
   const roads=W.STAGE.open[5].map(p=>{const a=(p+.5)*Math.PI/4;return [Math.cos(a)*5,Math.sin(a)*5,Math.cos(a)*60,Math.sin(a)*60]});
   for(const t of things){const tag=t.name+' ('+t.at+')';
@@ -1577,6 +1579,31 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   /* 성탑은 회관 뒤에 붙여 세운다(회관과는 일부러 겹침). 타워 자리·닭 자리·작은 닭장과는 떨어진다 */
   {const K=L.KEEP;for(const p of W.ALL_SLOTS)ok(d2(K.at,p)>=1.2+K.r,'성탑: 타워 자리와 1.2 이상');for(const p of W.HOMES)ok(d2(K.at,p)>=.9+K.r,'성탑: 닭 자리와 0.9 이상');ok(d2(K.at,W.PLACE.nursery)>=SIZE.nursery+K.r+.3&&d2(K.at,W.PLACE.coop)<2,'성탑: 회관 바로 뒤, 작은 닭장과는 떨어짐')}
   ok(L.ROAD.r0>W.STAGE.radius[0]&&L.ROAD.r0<W.STAGE.radius[1]-.4&&L.ROAD_MARK.out>0&&L.ROAD_MARK.side>L.ROAD.edge/2+.4,'늑대 길은 마을 가장자리 안쪽에서 시작하고, 길목 표시는 울타리 밖 · 길 양옆');
+  /* S-9-3 0.15 강 · 다리 · 수로(계획서 §3): 단계 3~5에서 */
+  {const RV=L.RIVER,band=RV.water/2+RV.bank,FENCE=.4;
+   eq([RV.dir,RV.dist,RV.water,RV.bank,RV.stage,RV.road],[280,1.3,1.8,.35,3,6],'강: 방향 280°(계획서 284°에서 7번 길 낙오 늑대를 피해 4° 돌림) · 반지름 + 1.3 · 물 1.8 · 둑 0.35 · 단계 3부터 · 다리는 6번 길');
+   eq([L.MILL.at,L.MILL.r,L.MILL.h],[[-4.52,-10.9],1.52,2.2],'물레방아 0.15 자리: 반지름 11.8 · 247.5°, 외접 1.52(watermill.glb), 높이 2.2');
+   for(const st of [3,4,5]){const R=W.STAGE.radius[st],tag='단계 '+st+'(반지름 '+R+')',gap=(x,z)=>Math.abs(L.riverOffset(R,x,z))-band;
+    /* 열린 길 가운데 늑대가 걷는 구간(반지름 − 1 ~ + 8, 축 ± 0.25rad)에서 강과 만나는 길은 6번뿐 */
+    const meets=W.STAGE.open[st].filter(p=>{for(let r=R-1;r<=R+8;r+=.1)for(let da=-.25;da<=.2501;da+=.05){const a=(p+.5)*Math.PI/4+da;if(gap(Math.cos(a)*r,Math.sin(a)*r)<=0)return true}return false});
+    eq(meets,[RV.road],tag+': 늑대가 걷는 구간에서 강을 건너는 열린 길은 6번뿐');
+    ok(R+RV.dist-band>=R-FENCE+.25,tag+': 안쪽 둑이 울타리 줄보다 0.25 이상 바깥');
+    for(const c of L.COTTAGES.filter(c=>c.stage<=st))ok(gap(...c.at)>=L.COTTAGE_R+.2,tag+': 집 ('+c.at+')이 강과 떨어짐');
+    const slots=W.towerSlots(C.FLAGS.STAGE_HALL.filter(s=>s<=st).length);   /* 그 단계 회관의 타워 자리(바깥 고리는 회관 3 = 성에서 열림) */
+    for(const p of slots)ok(gap(...p)>=1.2,tag+': 타워 자리 ('+p+')가 강과 1.2 이상');
+    if(st>=5)ok(gap(...L.KEEP.at)>=L.KEEP.r+.3,tag+': 성탑이 강과 떨어짐');
+    for(const p of W.STAGE.open[st])if(p!==RV.road)for(const sd of [-1,1]){const a=(p+.5)*Math.PI/4,r=R+L.ROAD_MARK.out,x=Math.cos(a)*r-Math.sin(a)*sd*L.ROAD_MARK.side,z=Math.sin(a)*r+Math.cos(a)*sd*L.ROAD_MARK.side;ok(gap(x,z)>=.4,tag+': '+p+'번 길 길목 표시가 강과 떨어짐')}
+    /* 다리: 6번 길 위, 물을 건너는 길이 ≤ 다리 길이 − 0.8, 안쪽 끝은 울타리 줄 + 0.15 바깥 */
+    const b=L.bridgeSpot(R);ok(Math.abs(Math.atan2(b.at[1],b.at[0])-((RV.road+.5)*Math.PI/4-Math.PI*2))<1e-9&&Math.abs(L.riverOffset(R,...b.at))<1e-9,tag+': 다리 가운데는 6번 길과 강 가운데 줄이 만나는 곳(반지름 + '+(b.r-R).toFixed(2)+')');
+    ok(b.cross<=L.BRIDGE.len-.8,tag+': 물을 건너는 길이 '+b.cross.toFixed(2)+' ≤ 다리 길이 − 0.8');ok(b.r-L.BRIDGE.len/2>=R-FENCE+.15,tag+': 다리 안쪽 끝이 울타리 줄 + 0.15 바깥');
+    /* 수로: 물레방아 바퀴에서 강 가운데 줄까지, 집과 0.3 · 타워 자리와 1.2 이상 */
+    const [x0,z0,x1,z1,w]=L.millRace(R),seg2=p=>{const dx=x1-x0,dz=z1-z0,t=Math.max(0,Math.min(1,((p[0]-x0)*dx+(p[1]-z0)*dz)/(dx*dx+dz*dz)));return Math.hypot(p[0]-x0-dx*t,p[1]-z0-dz*t)-w/2};
+    ok(Math.abs(L.riverOffset(R,x1,z1))<1e-3&&Math.abs(Math.hypot(x0,z0)-(11.8+.955))<1e-3,tag+': 수로는 바퀴(반지름 12.76)에서 강 가운데 줄까지(길이 '+Math.hypot(x1-x0,z1-z0).toFixed(1)+')');
+    for(const c of L.COTTAGES.filter(c=>c.stage<=st))ok(seg2(c.at)>=L.COTTAGE_R+.3,tag+': 수로가 집 ('+c.at+')과 0.3 이상');
+    for(const p of slots)ok(seg2(p)>=1.2,tag+': 수로가 타워 자리 ('+p+')와 1.2 이상');
+    ok(seg2(L.WELL.at)>=L.WELL.r+.3,tag+': 수로가 우물과 떨어짐')}
+   /* 다리 발판 높이: 가운데 0.469, 양 끝으로 낮아지고 1.97 밖은 땅 */
+   ok(Math.abs(L.deckY(0)-.469)<1e-9&&L.deckY(1.46)<L.deckY(.5)&&L.deckY(1.97)===0&&L.deckY(-1)===L.deckY(1),'다리 발판 높이(아치): 가운데 0.469, 끝으로 낮아짐, 대칭')}
  });
  /* ======================= S-9 0.15 강 · 다리(계획서 v015-plan §4 · §10, 프로듀서 결정 '26.11.17: 다리 길은 한 줄로, 물레방아는 저절로 서고 바퀴만) ======================= */
  /* S-9-1 손잡이: 기본 켬, 주소로 끔, 단계·길을 끄면 쓰지 않음 */

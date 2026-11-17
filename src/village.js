@@ -4,8 +4,8 @@ import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { SimplifyModifier } from 'three/addons/modifiers/SimplifyModifier.js';
 import { KIND_ORDER, RIG, GAIT, RIG_TIME, monsterGeometry, shadowGeometry, rigMaterial, rigDepthMaterial, rigMaterialAt, gaitPose, setRig } from './monsters.js';
 import { prep, fuse, solid, flat, merge } from './geo.js';
-import { POND, POND_R, HAY, GARDEN, ZONE, FARM_ZONE, FARM_HOME, PICK, DROP, MARKET_FRONT, MARKET_GATE, TENTS } from './layout.js';
-import { STOREY_H, storeyGeometry, basketGeometry, basketEggs, railGeometry, wallGeometry, marketExtras, STALL_OMIT, NESTS, NEST_MAX, nestSpots, villageProps, lanterns, LANTERN_TOP, drawHammer, trailGeometry, stageProps } from './props.js';
+import { POND, POND_R, HAY, GARDEN, ZONE, FARM_ZONE, FARM_HOME, PICK, DROP, MARKET_FRONT, MARKET_GATE, TENTS, MILL, RIVER, riverFrame, riverOffset, millRace, bridgeSpot, BRIDGE as BRIDGE_ART } from './layout.js';
+import { STOREY_H, storeyGeometry, basketGeometry, basketEggs, railGeometry, wallGeometry, marketExtras, STALL_OMIT, NESTS, NEST_MAX, nestSpots, villageProps, lanterns, LANTERN_TOP, drawHammer, trailGeometry, stageProps, riverGeometry, codeWheelGeometry } from './props.js';
 
 const host=document.querySelector('.scene');
 const motion=matchMedia('(prefers-reduced-motion: reduce)');
@@ -347,6 +347,11 @@ async function start(){
  const towerFoot=Math.max(...towerArt.map(a=>{a.main.geometry.computeBoundingBox();const b=a.main.geometry.boundingBox;return Math.max(b.max.x-b.min.x,b.max.z-b.min.z)}));
  G.storey=storeyGeometry(towerFoot*.5);
  G.props=[0,1,2,3].map(villageProps);
+ // 0.15 mill and bridge (계획서 §2-§3): the mill house goes into the stage props, its wheel turns on its own (MILL.wheel = its axle in the mill's frame);
+ // the bridge goes into the stage props at full size. A file that failed to load or bake leaves the code-drawn stand-ins (props.js).
+ const millArt=(()=>{if(!art15.watermill)return null;try{const b=bake(art15.watermill.scene,MILL.h,['WaterWheel']);if(!b.main||!b.WaterWheel)throw new Error('mill parts missing');return {house:b.main.geometry,wheel:b.WaterWheel.geometry,pivot:b.WaterWheel.pivot}}catch(error){art15.watermill=null;console.warn('0.15 mill model unavailable:',error.message);return null}})();
+ const bridgeArt=(()=>{if(!art15.bridge)return null;try{return bake(art15.bridge.scene,BRIDGE_ART.h).main.geometry}catch(error){art15.bridge=null;console.warn('0.15 bridge model unavailable:',error.message);return null}})();
+ G.wheel=millArt?millArt.wheel:codeWheelGeometry();
  const bakeMs=Math.round(performance.now()-bakeStart);
  const door=coopArt.anchors['Door dark opening']||new THREE.Box3(new V3(-.3,0,1),new V3(.3,1,1.3));
  const actors=[];
@@ -388,11 +393,12 @@ async function start(){
   if(Math.abs(R-decorR)<.01)return;decorR=R;const wide=curRoutes?.4:0;
   let nf=0,ng=0,nb=0,nr=0;
   const put=(mesh,i,t,scale)=>{dummy.position.set(t.x,0,t.z);dummy.rotation.set(0,t.ry,0);dummy.scale.setScalar(scale);dummy.updateMatrix();mesh.setMatrixAt(i,dummy.matrix)};
-  for(const t of DEC.tree){const d=t.r-R,lane=laneNow(t);
+  // 0.15: nothing grows in the river or the mill race (measured from the river built for riverR, not the animating radius, so nothing flickers)
+  for(const t of DEC.tree){const d=t.r-R,lane=laneNow(t);if(riverR&&riverGap(t.x,t.z)<.3+.22*t.s)continue;
    if(d>=FOREST){const dens=lane<1.7+wide?.12:lane<3.2+wide?.5:.9;if(t.u<dens)put(forest,nf++,t,t.s*easeOut(clamp((d-FOREST)/.9,.02,1)))}
    else if(d>1.4&&t.u<.09&&lane>1.5+wide&&ng<groveMax)put(grove,ng++,t,t.s*.95*easeOut(clamp((d-1.4)/.8,.02,1)))}
-  for(const t of DEC.bush){const d=t.r-R;if(d>.9&&t.u<.6&&laneNow(t)>1.2+wide)put(shrubs,nb++,t,t.s*easeOut(clamp((d-.9)/.6,.02,1)))}
-  for(const t of DEC.rock){const d=t.r-R;if(d>.5&&t.u<.65)put(stones,nr++,t,t.s*easeOut(clamp((d-.5)/.5,.02,1)))}
+  for(const t of DEC.bush){const d=t.r-R;if(d>.9&&t.u<.6&&laneNow(t)>1.2+wide&&(!riverR||riverGap(t.x,t.z)>.3+.35*t.s))put(shrubs,nb++,t,t.s*easeOut(clamp((d-.9)/.6,.02,1)))}
+  for(const t of DEC.rock){const d=t.r-R;if(d>.5&&t.u<.65&&(!riverR||riverGap(t.x,t.z)>.3+.3*t.s))put(stones,nr++,t,t.s*easeOut(clamp((d-.5)/.5,.02,1)))}
   forest.count=nf;grove.count=ng;shrubs.count=nb;stones.count=nr;
   for(const m of [forest,grove,shrubs,stones])m.instanceMatrix.needsUpdate=true;
  }
@@ -434,11 +440,29 @@ async function start(){
  const stageMesh=new THREE.Mesh(EMPTY,lit);stageMesh.castShadow=stageMesh.receiveShadow=true;stageMesh.visible=false;stageMesh.name='stage';world.add(stageMesh);
  const stageNew=actor(EMPTY,0,0);stageNew.obj.visible=false;stageNew.obj.name='stage-new';
  let stageShown=-1,stageKey='',stageInfo={houses:0,marks:0,spots:[]},stageRising=false;
- function setStage(st,R,routes,fx){
-  const key=st+':'+R+':'+(routes?routes.join(','):'');if(key===stageKey)return false;
-  const up=fx&&st>stageShown;stageKey=key;stageShown=st;
+ /* ----- 0.15 river (계획서 §3): one decal mesh per village radius, in its own frame (riverGeometry), shown from stage 3 while the page says river (stages,
+    roads and FLAGS.RIVER on). The mill wheel is its own actor at the mill's axle; the mill house and the bridge are in the stage props. ----- */
+ const riverCache=new Map(),riverMesh=new THREE.Mesh(EMPTY,lit);riverMesh.receiveShadow=true;riverMesh.visible=false;riverMesh.name='river';world.add(riverMesh);
+ let riverR=0,raceSeg=null;   // the radius the shown river was built for (0 = none) and its mill race: the forest steps aside from both (layoutDecor)
+ const wheel=actor(G.wheel,0,0,MILL.ry);wheel.obj.visible=false;wheel.obj.name='mill-wheel';
+ {const p=millArt?millArt.pivot:new V3(MILL.wheel.x,MILL.wheel.y,0),c=Math.cos(MILL.ry),s=Math.sin(MILL.ry);wheel.x=MILL.at[0]+p.x*c+p.z*s;wheel.z=MILL.at[1]-p.x*s+p.z*c;wheel.y=p.y}
+ function setRiver(R){
+  if(R===riverR)return false;riverR=R;decorR=-1;
+  if(!R){riverMesh.visible=false;wheel.obj.visible=false;raceSeg=null;return true}
+  if(!riverCache.has(R))riverCache.set(R,riverGeometry(R));const f=riverFrame(R);
+  riverMesh.geometry=riverCache.get(R);riverMesh.position.set(f.c[0],0,f.c[1]);riverMesh.rotation.y=Math.atan2(f.n[0],f.n[1]);riverMesh.scale.x=1;riverMesh.visible=true;
+  wheel.obj.visible=true;raceSeg=millRace(R);return true;
+ }
+ // ground distance from the river band / the race (0 inside): decor (trees, bushes, rocks) keeps out of both
+ const riverGap=(x,z)=>{if(!riverR)return 9;let d=Math.abs(riverOffset(riverR,x,z))-(RIVER.water/2+RIVER.bank);
+  const [x0,z0,x1,z1,w]=raceSeg,dx=x1-x0,dz=z1-z0,u=clamp(((x-x0)*dx+(z-z0)*dz)/(dx*dx+dz*dz),0,1);return Math.min(d,Math.hypot(x-x0-dx*u,z-z0-dz*u)-w/2-.12)};
+ function setStage(st,R,routes,fx,river){
+  const key=st+':'+R+':'+(routes?routes.join(','):'')+(river?':river':'');if(key===stageKey)return false;
+  const up=fx&&st>stageShown,on=!!river&&st>=RIVER.stage;stageKey=key;stageShown=st;
+  const riverNew=on&&!riverR;setRiver(on?R:0);
+  if(riverNew&&up&&!reduced())popIn(wheel,.18,.87);
   if(st<1){stageMesh.visible=stageNew.obj.visible=false;stageInfo={houses:0,marks:0,spots:[]};stageRising=false;return true}
-  if(!stageCache.has(key))stageCache.set(key,stageProps(st,R,routes));
+  if(!stageCache.has(key))stageCache.set(key,stageProps(st,R,routes,river?{river:true,house:millArt&&millArt.house,bridge:bridgeArt}:{}));
   const g=stageCache.get(key);stageInfo=g;
   const settle=()=>{if(stageKey!==key)return;stageMesh.geometry=g.all||EMPTY;stageMesh.visible=!!g.all;stageNew.obj.visible=false;stageRising=false;dirty=true};
   if(up&&g.fresh&&!reduced()){
@@ -679,7 +703,7 @@ async function start(){
  const stageOf=s=>Number.isInteger(s.stage)?clamp(s.stage,-1,5):-1,routesOf=s=>Array.isArray(s.routes)&&s.routes.length?s.routes.slice(0,8):null;
  function syncStage(s,fx=false){
   const routes=routesOf(s);let changed=setTrails(routes);
-  if(setStage(stageOf(s),radiusOf(s,s.world),routes,fx))changed=true;
+  if(setStage(stageOf(s),radiusOf(s,s.world),routes,fx,!!s.river))changed=true;
   return changed;
  }
  function buildStage(){             // a new stage: the new houses and gate posts rise with dust and stars, the new village edge lights up
@@ -1166,6 +1190,9 @@ async function start(){
     decor:{forest:forest.count,grove:grove.count,bushes:shrubs.count,rocks:stones.count},
     art15:Object.fromEntries(Object.keys(ART15).map(k=>[k,!!art15[k]])),   // 0.15 model loaded (and baked where it is used); false = that model keeps its 0.14 look
     monsterArt:{king:!!beast.king,fox:!!beast.fox},   // true = drawn from the 0.15 GLB, false = the 0.14 code model
+    river:(()=>{const o={on:riverR>0,radius:riverR,bridge:bridgeArt?'glb':'code'};if(!riverR)return o;const b=bridgeSpot(riverR),at=(f,y)=>{ndc.set(b.at[0]+b.u[0]*f,y,b.at[1]+b.u[1]*f).project(camera);return [+ndc.x.toFixed(3),+ndc.y.toFixed(3)]};
+     o.bridgeNdc=at(0,.5);o.bridgeFarNdc=at(BRIDGE_ART.len/2,.3);return o})(),   // where the bridge's middle and its far (forest) end are on screen (−1…1)
+    mill:{art:millArt?'glb':'code',shown:wheel.obj.visible},
     drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,builds:{...builds},effects:particles.length+anims.length,warnings:warns.length,blend:{t:+blendT.toFixed(3),dur:+blendDur.toFixed(3),ticks:blendTicks},shake:shakeNow,
     memory:{geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures}}}};
 
@@ -1194,10 +1221,20 @@ async function start(){
   yard.scale.set(Rd,1,Rd);layoutDecor(Rd);
   if(Math.abs(Rd-shadowR)>.05){shadowR=Rd;const S=Rd+6;Object.assign(sun.shadow.camera,{left:-S,right:S,top:S,bottom:-S});sun.shadow.camera.updateProjectionMatrix()}
  }
+ // 0.15 (계획서 §12): with the river on, the view leans toward the top of the screen so the bridge's far end stays below RIVER_TOP (screen height, −1…1),
+ // but only as far as the room under the village ring allows (portrait pads have room to spare and do not move). Follows the drawn radius, so it only
+ // changes while the village grows between questions. Returns the ground shift along the screen's up direction.
+ const RIVER_TOP=.86;
+ function riverLift(R,half){
+  if(!riverR)return 0;const b=bridgeSpot(riverR),fx=b.at[0]+b.u[0]*BRIDGE_ART.len/2,fz=b.at[1]+b.u[1]*BRIDGE_ART.len/2;
+  const top=(fx*fwdXZ.x+fz*fwdXZ.z)*upXZ+.3*upY,need=top-RIVER_TOP*half,room=.97*half-(R+.6)*upXZ;return Math.max(0,Math.min(need,room))/upXZ;
+ }
+ const viewAim=()=>{const kg=curS&&(curS.bell===1||curS.bell===2)&&curS.world&&curS.world.king,pull=kg?(curS.bell===2?KING_PULL:KING_WAIT_PULL):0;
+  if(kg)return [num(kg.x)*pull,num(kg.z)*pull];const lift=riverLift(Rd,viewHalf(Rd));return [fwdXZ.x*lift,fwdXZ.z*lift]};
  function updateView(dt,less){       // the camera pulls back (and the forest steps back) over about a second when the village grows
   const k=less?1:1-Math.exp(-dt*3.6);Rd+=(Rgoal-Rd)*k;if(Math.abs(Rgoal-Rd)<.004)Rd=Rgoal;
-  // finale camera: while the child is fighting the wolf king (bell 2) the view leans a little toward him; it eases back when he flees
-  if(!focusHalf){const kg=curS&&(curS.bell===1||curS.bell===2)&&curS.world&&curS.world.king,pull=kg?(curS.bell===2?KING_PULL:KING_WAIT_PULL):0,gx=kg?num(kg.x)*pull:0,gz=kg?num(kg.z)*pull:0,d=Math.abs(gx-FOCUS.x)+Math.abs(gz-FOCUS.z);
+  // finale camera: while the child is fighting the wolf king (bell 2) the view leans a little toward him; it eases back when he flees (0.15: otherwise toward the river)
+  if(!focusHalf){const [gx,gz]=viewAim(),d=Math.abs(gx-FOCUS.x)+Math.abs(gz-FOCUS.z);
    if(d>1e-4){const kk=less?1:1-Math.exp(-dt*2.2);FOCUS.x+=(gx-FOCUS.x)*kk;FOCUS.z+=(gz-FOCUS.z)*kk;if(Math.abs(gx-FOCUS.x)+Math.abs(gz-FOCUS.z)<.01){FOCUS.x=gx;FOCUS.z=gz}camera.position.copy(EYE).add(FOCUS);dirty=true}}
   applyView();
  }
@@ -1664,6 +1701,7 @@ async function start(){
  let last=0,wasLess=reduced(),curS=IDLE;
  const SUN_COLOR=sun.color.clone(),RED_LIGHT=new THREE.Color(0xff4a2a);
  {const s=read();curS=s;syncEconomy(s,true);syncPower(s,false);syncRecords(s);syncStage(s);updateNest(s);Rd=Rgoal;resize();const less=reduced();
+  {const kg=curS.world&&curS.world.king&&(curS.bell===1||curS.bell===2);if(!kg){const [gx,gz]=viewAim();FOCUS.set(gx,0,gz);camera.position.copy(EYE).add(FOCUS)}}   // a village loaded at stage 3+ starts with the river view (no pan on load); the king's lean eases in as in 0.14
   animateBuildings(0,0,less);updateFences(less);animateWolves(0,0,less);animateHens(0,0,less);animateArrows(less);for(const a of actors)pose(a,0);writeHens()}
  host.classList.add('is3d');host.dataset.renderer='three';
  // One step of the view: dt-driven; `still` freezes everything (paused, hidden tab), the world clock only runs in listen/ask/learn.
