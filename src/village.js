@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { SimplifyModifier } from 'three/addons/modifiers/SimplifyModifier.js';
-import { KIND_ORDER, RIG, GAIT, RIG_TIME, monsterGeometry, shadowGeometry, rigMaterial, rigDepthMaterial, rigMaterialAt, gaitPose } from './monsters.js';
+import { KIND_ORDER, RIG, GAIT, RIG_TIME, monsterGeometry, shadowGeometry, rigMaterial, rigDepthMaterial, rigMaterialAt, gaitPose, setRig } from './monsters.js';
 import { prep, fuse, solid, flat, merge } from './geo.js';
 import { POND, POND_R, HAY, GARDEN, ZONE, FARM_ZONE, FARM_HOME, PICK, DROP, MARKET_FRONT, MARKET_GATE, TENTS } from './layout.js';
 import { STOREY_H, storeyGeometry, basketGeometry, basketEggs, railGeometry, wallGeometry, marketExtras, STALL_OMIT, NESTS, NEST_MAX, nestSpots, villageProps, lanterns, LANTERN_TOP, drawHammer, trailGeometry, stageProps } from './props.js';
@@ -87,10 +87,12 @@ function simpler(geometry,keep){
 }
 // Bakes a GLB node to `height`, feet on y=0, centred on x/z. Children named in `split` come back as separate limbs with their pivots.
 // opt.omit drops children by name; opt.anchors returns the baked bounding box of named children (where to mount extra parts); opt.keep decimates.
+// opt.origin keeps the model's own x/z origin instead of centring its bounding box (0.15 animals: the origin is the body centre, the tail makes the box lopsided).
 function bake(node,height,split=[],opt={}){
  if(!node)throw new Error('Required model is missing');
  node.updateWorldMatrix(true,true);
  const box=new THREE.Box3().setFromObject(node),size=box.getSize(new V3()),c=box.getCenter(new V3()),k=height/size.y;
+ if(opt.origin)c.x=c.z=0;
  const frame=new THREE.Matrix4().makeScale(k,k,k).multiply(new THREE.Matrix4().makeTranslation(-c.x,-box.min.y,-c.z));
  const omit=(opt.omit||[]).map(norm);
  const groups=new Map([['main',{list:[],pivot:new V3()}]]);
@@ -471,7 +473,35 @@ async function start(){
   if(colors){for(let i=0;i<cap;i++)mesh.setColorAt(i,PLAIN);mesh.instanceColor.setUsage(THREE.DynamicDrawUsage)}
   world.add(mesh);return {mesh,pose,n:0,tris:(geometry.index?geometry.index.count:geometry.attributes.position.count)/3};
  }
- const herd={};for(const k of KIND_ORDER){const r=rigMesh(monsterGeometry(k),rigMaterial(k),WCAP,true);r.mesh.castShadow=false;r.mesh.receiveShadow=true;herd[k]=r}
+ /* 0.15 늑대 왕 · 도둑 여우 (계획서 §6): the GLB's seven parts are baked into one rigged mesh like the farmers (body 0, head 1, tail 3, legs 4-7 by
+    position: front/back × +x/−x, so the GLB's _L legs at −x are rig legs 5 and 7; no jaw). The GLB clip (Trot) is never played: the rig's gaits, attacks,
+    flinches and falls drive it. The model keeps its origin (body centre) with feet on y=0. A file that failed to load or bake keeps the 0.14 model. */
+ // h = the GLB's own height (scale 1: the pack was modelled at the 0.14 village scale). Side-by-side shots with the 0.14 models (v015-shots\lineup-*):
+ // at 1.57/1.47 (the code models' heights) the bigger-headed, longer GLB animals read about 1.3x larger; at scale 1 the king is as bulky as the
+ // grey ember king and the fox as tall as the orange wolf. Screen size multipliers (KIND_FALLBACK king 3.6 · fox 1.15) are unchanged.
+ // Gaits: the king trots at the art's Trot pace (0.96 s ≈ 1.04 Hz, diagonal pairs) instead of the ember prowl; the fox trots, gallops when running.
+ const BEAST={king:{h:1.405,gait:{walk:'trot',run:'trot',hz:{trot:1.04}}},fox:{h:1.424,gait:{walk:'trot',run:'gallop',hz:{trot:2.4,gallop:3.2}}}};
+ function beastRig(gl,h){
+  const art=bake(gl.scene,h,BEAST_PARTS,{origin:true}),P=n=>art[n].pivot;
+  if(!art.main||!BEAST_PARTS.every(n=>art[n]))throw new Error('animal parts missing');
+  const bone=n=>n==='main'?0:n==='Head'?1:n==='Tail'?3:4+(P(n).z<0?2:0)+(P(n).x<0?1:0),box=n=>{const g=art[n].geometry;g.computeBoundingBox();return g.boundingBox.clone().translate(P(n))};
+  const parts=Object.keys(art).filter(n=>n!=='anchors'),list=parts.map(n=>{const g=art[n].geometry.clone(),p=P(n),b=bone(n),c=g.attributes.position.count,R=new Float32Array(c*4);
+   g.translate(p.x,p.y,p.z);for(let i=0;i<c;i++){R[i*4]=p.x;R[i*4+1]=p.y;R[i*4+2]=p.z;R[i*4+3]=b}g.setAttribute('aRig',new THREE.BufferAttribute(R,4));return g});
+  const geometry=merge(list);for(const g of list)g.dispose();for(const n of parts)art[n].geometry.dispose();geometry.computeBoundingBox();geometry.computeBoundingSphere();
+  const legs=[4,5,6,7].map(b=>{const n=BEAST_PARTS.slice(2).find(n=>bone(n)===b);if(!n)throw new Error('animal legs');return P(n).toArray()});
+  const head=box('Head'),body=box('main'),H=P('Head').toArray();
+  // crown: the gold of the head part above the eyes (vertex colours), for the king's twinkles in place of the ember king's flames
+  const crown=[];{const g=geometry,c=g.attributes.color,q=g.attributes.position,r=g.attributes.aRig,b=new THREE.Box3(),v=new V3();
+   for(let i=0;i<q.count;i++)if(r.getW(i)===1&&q.getY(i)>H[1]+.2*h/1.4&&c.getX(i)>.6&&c.getY(i)>.3&&c.getY(i)<.6&&c.getZ(i)<.2)b.expandByPoint(v.fromBufferAttribute(q,i));
+   if(!b.isEmpty()){const m=b.getCenter(new V3());crown.push([b.min.x,b.max.y,m.z],[b.max.x,b.max.y,m.z],[m.x,b.max.y,b.min.z],[m.x,(b.min.y+b.max.y)/2,b.max.z])}}
+  // tp0: the GLB tail is modelled already raised, so the rig's tail lift (0.35 at rest, more when hunting) starts 0.35 lower (else it stands straight up)
+  const rig={H,J:H.slice(),T:P('Tail').toArray(),L:legs,M:[0,(head.min.y+H[1])/2,head.max.z-.04],top:[0,head.max.y+.15,H[2]],hip:legs[0][1],rear:legs[2][2],center:(body.min.y+body.max.y)/2,crown,tp0:-.35};
+  return {geometry,rig,size:geometry.boundingBox.getSize(new V3())};
+ }
+ const beast={};
+ for(const k of ['king','fox'])if(art15[k]){try{beast[k]=beastRig(art15[k],BEAST[k].h)}catch(error){art15[k]=null;console.warn('0.15 '+k+' model unavailable:',error.message)}}
+ const herd={};for(const k of KIND_ORDER){const b=beast[k];if(b)setRig(k,b.rig,BEAST[k].gait);
+  const r=rigMesh(b?b.geometry:monsterGeometry(k),b?rigMaterialAt(b.rig.H,.86):rigMaterial(k),WCAP,true);r.mesh.castShadow=false;r.mesh.receiveShadow=true;herd[k]=r}
  const shade=rigMesh(shadowGeometry(),herd.wolf.mesh.material,WCAP,false);shade.mesh.castShadow=true;shade.mesh.receiveShadow=false;shade.mesh.customDepthMaterial=rigDepthMaterial('wolf');
  // The stand-in only draws into the shadow map: in the main pass it has zero instances (no draw call).
  shade.mesh.onBeforeRender=function(){this.userData.n=this.count;this.count=0};shade.mesh.onAfterRender=function(){this.count=this.userData.n};
@@ -508,6 +538,8 @@ async function start(){
  const flowLv=()=>flowS&&flowS.boost&&num(flowS.boost.left)>0?clamp(flowS.boost.lv|0,0,2):0;
  const flowSlot=f=>flowS&&flowS.slots[f.k]&&typeof flowS.slots[f.k]==='object'?flowS.slots[f.k]:null;
  const SHADE_FIT={boar:new V3(1.12,.74,1.02)};   // the stand-in has wolf proportions; the boar is lower and wider
+ // 0.15 GLB animals: stretch the stand-in to the model's own bounding box (they are longer, with a bigger head, than the wolf it was made for)
+ {const g=shade.mesh.geometry;g.computeBoundingBox();const s=g.boundingBox.getSize(new V3());for(const k in beast)SHADE_FIT[k]=beast[k].size.clone().divide(s)}
  const arrowMesh=instanced(G.arrow,240,false);
  const malletGeo=solid([['cyl',0x9a6a3a,[0,.45,0],[.06,.9,.06]],['cyl',0xc98f52,[0,.95,0],[.2,.5,.2],[0,0,Math.PI/2]],['cyl',0x8a5a2e,[.26,.95,0],[.21,.04,.21],[0,0,Math.PI/2]],['cyl',0x8a5a2e,[-.26,.95,0],[.21,.04,.21],[0,0,Math.PI/2]]]);
  const mallets=[];
@@ -1133,6 +1165,7 @@ async function start(){
     pondVisible:pond.obj.visible,garlands:garlands.filter(g=>g.obj.visible).length,sale:!!sale||time<popUntil,
     decor:{forest:forest.count,grove:grove.count,bushes:shrubs.count,rocks:stones.count},
     art15:Object.fromEntries(Object.keys(ART15).map(k=>[k,!!art15[k]])),   // 0.15 model loaded (and baked where it is used); false = that model keeps its 0.14 look
+    monsterArt:{king:!!beast.king,fox:!!beast.fox},   // true = drawn from the 0.15 GLB, false = the 0.14 code model
     drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,builds:{...builds},effects:particles.length+anims.length,warnings:warns.length,blend:{t:+blendT.toFixed(3),dur:+blendDur.toFixed(3),ticks:blendTicks},shake:shakeNow,
     memory:{geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures}}}};
 
@@ -1351,7 +1384,7 @@ async function start(){
    rv.set(0,pivY*S,pivZ*S);rv2.copy(rv).applyAxisAngle(YAX,o.ry);rv.applyQuaternion(rq);
    rp.set(o.x+o.kx+Math.sin(o.ry)*fwd*S,P.y*S+o.ky+ay,o.z+o.kz+Math.cos(o.ry)*fwd*S).add(rv2).sub(rv);
    o.mat.compose(rp,rq,rs.set(S*P.sx,S*P.sy,S*P.sz));o.phy=P.hy;o.php=P.hp;o.phr=P.hr;
-   const Hd=herd[o.kind],i=Hd.n++;o.mat.toArray(Hd.mesh.instanceMatrix.array,i*16);writePose(Hd.pose,i,P,o);
+   const Hd=herd[o.kind],i=Hd.n++;o.mat.toArray(Hd.mesh.instanceMatrix.array,i*16);if(R.tp0){P.tp+=R.tp0;writePose(Hd.pose,i,P,o);P.tp-=R.tp0}else writePose(Hd.pose,i,P,o);
    Hd.mesh.setColorAt(i,o.hit>0?FLASH:st==='dead'?DEAD:lit&&!less&&Math.sin(time*9)>0?HL:PLAIN);
    if(!o.ghost)wolfKinds[o.kind]++;
    if(st!=='dead'||o.deadAge<.9){const j=shade.n++,fit=SHADE_FIT[o.kind];if(fit){rm.copy(o.mat).scale(fit);rm.toArray(shade.mesh.instanceMatrix.array,j*16)}else o.mat.toArray(shade.mesh.instanceMatrix.array,j*16);writePose(shade.pose,j,P,o)}
@@ -1590,7 +1623,11 @@ async function start(){
   if(less)for(const b of booms)if(time-b.t0<.6)decal(CELL.ring,b.x,b.z,b.r*2.5,ORANGE,.85,.5,.08);   // reduced motion: a still ring instead of the fireball
   for(const o of wolfVis.values()){
    if(o.state==='dead')continue;const s=o.size;
-   if(o.K.boss){const p=less?1:.85+.15*Math.sin(time*4);decal(CELL.glow,o.x,o.z,2.7*s*p,ORANGE,.45,.7);
+   const crown=beast[o.kind]&&RIG[o.kind].crown;
+   if(o.K.boss&&crown){const p=less?1:.85+.15*Math.sin(time*4);decal(CELL.glow,o.x,o.z,2.7*s*p,GOLD,.42,.7);   // 0.15 GLB wolf king: a golden floor glow and a twinkling crown instead of flames
+    for(let i=0;i<crown.length;i++){const [x,y,z]=crown[i],tw=less?.8:Math.max(0,Math.sin(time*4.2+i*1.9));if(tw<.05)continue;tv.set(x,y,z).applyMatrix4(o.mat);
+     sprite(CELL.glow,tv.x,tv.y,tv.z,.34*s*tw,.34*s*tw,GOLD,.45*tw,1);sprite(CELL.sparkle,tv.x,tv.y,tv.z,.26*s*tw,.26*s*tw,WHITE,.95*tw,.6,less?0:time*1.5+i)}}
+   else if(o.K.boss){const p=less?1:.85+.15*Math.sin(time*4);decal(CELL.glow,o.x,o.z,2.7*s*p,ORANGE,.45,.7);
     for(let i=0;i<KING_FLAMES.length;i++){const [x,y,z,f]=KING_FLAMES[i],fl=less?1:.82+.18*Math.sin(time*(13+i*2.3)+i*1.7);tv.set(x,y,z).applyMatrix4(o.mat);   // living fire on the mane, crest and tail
      sprite(CELL.flame,tv.x,tv.y+.2*f*s*fl,tv.z,.48*f*s,.9*f*s*fl,FLAME_TINT,.95,.8,less?0:Math.sin(time*7+i)*.15)}
     const age=time-o.bossAt;if(age<3.2){const k=Math.min(1,age/.3)*(age>2.4?1-(age-2.4)/.8:1),q=less?1:.7+.3*Math.sin(age*9);decal(CELL.glow,o.x,o.z,6*s*q,FIRE,.55*k,.9);decal(CELL.halo,o.x,o.z,(3.4+(less?0:age%1*2))*s,ORANGE,.7*k*(less?1:1-age%1),.7)}}

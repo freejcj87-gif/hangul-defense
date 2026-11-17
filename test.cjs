@@ -662,22 +662,37 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
    if(o.block)await page.route(o.block,r=>r.abort());if(o.swap)await page.route(o.swap[0],r=>r.fulfill({path:path.join(output,o.swap[1]),contentType:'model/gltf-binary'}));await page.goto(url+(o.query||''));await ready(page);await page.waitForFunction(()=>window.VillageView?.inspect().ready,{},{timeout:45000});return {ctx,page,errors,asked}};
   const insp=page=>page.evaluate(()=>window.VillageView.inspect());
   const ALL={watermill:true,bridge:true,king:true,fox:true},NONE={watermill:false,bridge:false,king:false,fox:false};
+  /* 늑대 왕 · 도둑 여우가 무엇으로 그려지는지: GLB면 삼각형 2,010 · 1,814, 0.14 코드 모델이면 1,400 · 1,136 */
+  const beasts=async page=>{const v=await insp(page),d=await page.evaluate(()=>window.VillageView.debug({}));return {art:v.monsterArt,tris:{king:d.monsterTris.king,fox:d.monsterTris.fox}}};
+  const GLB={art:{king:true,fox:true},tris:{king:2010,fox:1814}},CODE={art:{king:false,fox:false},tris:{king:1400,fox:1136}};
   {const {ctx,page,errors,asked}=await open();const v=await insp(page);
-   eq(await page.locator('.scene').getAttribute('data-renderer'),'three','art15: 3D');eq(v.art15,ALL,'art15: the four 0.15 models are loaded');
+   eq(await page.locator('.scene').getAttribute('data-renderer'),'three','art15: 3D');eq(v.art15,ALL,'art15: the four 0.15 models are loaded');eq(await beasts(page),GLB,'art15: the wolf king and the thief fox are drawn from the GLBs');
    eq([...new Set(asked)].sort(),['bridge','thief-fox','watermill','wolf-king'].map(n=>'/art-handoff/v015-v016/glb/'+n+'.glb'),'art15: the four GLBs are requested (the 0.16 castle pieces are not)');
    eq(errors,[],'art15 page errors');await ctx.close()}
   /* ?art15=0: 요청조차 하지 않는다 */
   {const {ctx,page,errors,asked}=await open({query:'/?art15=0'});const v=await insp(page);
-   eq([await page.locator('.scene').getAttribute('data-renderer'),v.art15,asked],['three',NONE,[]],'art15=0: 3D without the 0.15 models, nothing requested');eq(errors,[],'art15=0 page errors');await ctx.close()}
+   eq([await page.locator('.scene').getAttribute('data-renderer'),v.art15,asked],['three',NONE,[]],'art15=0: 3D without the 0.15 models, nothing requested');eq(await beasts(page),CODE,'art15=0: the 0.14 code-built king and fox');eq(errors,[],'art15=0 page errors');await ctx.close()}
   /* 네 파일이 모두 안 와도 3D는 그대로 */
   {const {ctx,page,errors}=await open({block:'**/art-handoff/v015-v016/**'});const v=await insp(page);
-   eq([await page.locator('.scene').getAttribute('data-renderer'),v.art15],['three',NONE],'art15 all blocked: still 3D, every model keeps its 0.14 look');eq(errors,[],'art15 blocked page errors');await ctx.close()}
+   eq([await page.locator('.scene').getAttribute('data-renderer'),v.art15],['three',NONE],'art15 all blocked: still 3D, every model keeps its 0.14 look');eq(await beasts(page),CODE,'art15 all blocked: the 0.14 king and fox');eq(errors,[],'art15 blocked page errors');await ctx.close()}
   /* 한 파일만 안 오면 그 모델만 */
   {const {ctx,page,errors}=await open({block:'**/wolf-king.glb*'});const v=await insp(page);
-   eq([await page.locator('.scene').getAttribute('data-renderer'),v.art15],['three',{...ALL,king:false}],'art15 one file blocked: only that model falls back');eq(errors,[],'art15 one blocked page errors');await ctx.close()}
+   eq([await page.locator('.scene').getAttribute('data-renderer'),v.art15],['three',{...ALL,king:false}],'art15 one file blocked: only that model falls back');eq(await beasts(page),{art:{king:false,fox:true},tris:{king:1400,fox:1814}},'art15 king blocked: 0.14 king, GLB fox');eq(errors,[],'art15 one blocked page errors');await ctx.close()}
   /* 받았지만 모양이 다른 파일(늑대 왕 자리에 다리 GLB: 머리·꼬리·다리 노드가 없음)도 실패로 보고 그 모델만 0.14 모습 */
   {const {ctx,page,errors}=await open({swap:['**/wolf-king.glb*','art-handoff/v015-v016/glb/bridge.glb']});const v=await insp(page);
-   eq([await page.locator('.scene').getAttribute('data-renderer'),v.art15],['three',{...ALL,king:false}],'art15 wrong file: a GLB without the expected nodes counts as failed');eq(errors,[],'art15 wrong file page errors');await ctx.close()}
+   eq([await page.locator('.scene').getAttribute('data-renderer'),v.art15],['three',{...ALL,king:false}],'art15 wrong file: a GLB without the expected nodes counts as failed');eq((await beasts(page)).art,{king:false,fox:true},'art15 wrong file: the king keeps the 0.14 model');eq(errors,[],'art15 wrong file page errors');await ctx.close()}
+  /* 결전 장면(?demo=3): 기다리는 늑대 왕과 도둑 여우가 GLB(기본)로도, 0.14 코드 모델(?art15=0)로도 그려지고 화면 크기 배수는 그대로(size > 3).
+     화면 시계는 debug hold로 세우고 advance로만 민다 */
+  for(const [label,q] of [['glb',''],['code','&art15=0']]){
+   const {ctx,page,errors}=await open({query:'/?demo=3&flow=0&stages=0'+q});await begin(page,{age:8});
+   await page.evaluate(()=>{window.VillageView.debug({hold:true});world.wolves=[];world.trickle=1e9;world.wave.arrive=1e9;world.wave.spawned=true;state.run.bell=1;syncKing(true);render()});
+   await tick(page,5);await page.evaluate(()=>window.VillageView.debug({advance:.5}));await frames(page,2);
+   let v=await insp(page);eq((await beasts(page)).art,label==='glb'?GLB.art:CODE.art,'art15 '+label+': finale models');
+   ok(v.king&&v.king.state==='wait'&&v.king.size>3&&v.wolfKinds.king===1,'art15 '+label+': the waiting wolf king is drawn, as big as before: '+JSON.stringify([v.king,v.wolfKinds]));
+   await page.evaluate(()=>{World.king(world,'none');state.run=Combat.freshRun();World.fox(world,state,400,{});render()});
+   for(let i=0;i<10;i++){await tick(page,30);await page.evaluate(()=>window.VillageView.debug({advance:.3}))}await frames(page,2);
+   v=await insp(page);ok(v.fox&&v.fox.state==='come'&&v.wolfKinds.fox===1&&!v.king,'art15 '+label+': the thief fox is drawn: '+JSON.stringify([v.fox,v.wolfKinds]));
+   await shot(page.locator('.scene'),'art15-'+label+'-fox');eq(errors,[],'art15 '+label+' finale page errors');await ctx.close()}
  }}finally{await artBrowser.close()}
  console.log((ONLY?'PARTIAL('+ONLY+') ':'')+'PASS '+checks+' browser assertions (Chromium/WebKit, desktop + mobile emulation, held clock + one real-clock run). Physical audio/device validation remains manual.');
  }finally{server.close()}
