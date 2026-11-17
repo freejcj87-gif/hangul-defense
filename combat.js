@@ -24,7 +24,8 @@
   const PACE={lo:50,hi:300,ema:.25,first:3,firstEma:.5};
   /* 0.10: 틀린 문제도 첫 고르기까지 걸린 시간으로 읽기 속도를 갱신하고(전에는 한 번에 맞힌 문제만이라 첫 정답 전 완충 0), 처음 first번은 firstEma로 빨리 따라간다 */
   /* 찍기 막기(0.10, 8세 점검: 읽기 모드에서 보기가 열리자마자 찍어도 금화를 그대로 받음): 한 번에 맞힌 금화 × clamp(floor, 1, 답한 시간 ÷ (필요 시간 × FAST_MIN)).
-     번개를 받을 수 있는 순간(필요 시간의 40%)부터는 언제나 1이라 보통·빠른 아이는 깎이지 않는다. 그보다 빨리 누르면 최소 floor(75%) */
+     번개를 받을 수 있는 순간(필요 시간의 40%)부터는 언제나 1이라 보통·빠른 아이는 깎이지 않는다. 그보다 빨리 누르면 최소 floor(75%).
+     단계를 켜면(0.14) 바닥과 기운 지수는 FLAGS.STAGE_GUARD를 쓴다(guardFloor · guardPow) */
   const GUARD={floor:.75};
 
   /* ---------- 0.12 손잡이(프로듀서 결정 A~F의 추천 기본값. 답이 바뀌면 여기만 고친다. 설계: ending-and-progression-v2.md §5, game-plan §11) ----------
@@ -56,10 +57,15 @@
     STAGES:true,              /* true = 마을 반지름·회관 승급·8번째 칸 진행 표시가 단계를 따른다 */
     ROUTES:true,              /* true = 1단계부터 늑대가 '열린 길'(World.STAGE.open)로만 온다. false = 전 단계 8방향(?routes=0) */
     STAGE_AT:[0,5,14,24,36,50],       /* 단계 문턱(이번 판 지은 수). 첫 문턱 5 = 시작 타워 1 + 네 번 삼(설계 초안 6은 8세 보통의 첫 전환이 3분에 걸려 5로) */
-    STAGE_AT_BY_AGE:{9:[0,4,11,19,29,40],10:[0,4,10,17,26,37]}, /* 9·10세: 글이 길어 문제당 시간이 길다(약 31·33초). 첫 문턱 4, 종을 내린 만큼 뒤 문턱도 당긴다 */
+    STAGE_AT_BY_AGE:{9:[0,4,11,19,29,40],10:[0,4,11,19,31,38]}, /* 9·10세: 글이 길어 문제당 시간이 길다(약 31·33초). 첫 문턱 4, 종을 내린 만큼 뒤 문턱도 당긴다.
+                                         10세는 0.14의 [0,4,10,17,26,37]이면 회관 2(성곽 마을)가 지은 수 26(0.13.2는 32)에 와서 '20분까지 울타리 부서짐'이 0.13.2의 1.7배가 됐다.
+                                         회관 1·2를 11·31로 늦춰 0.13.2(10·32) 수준으로 돌렸다(12판 22.3 → 12.9번, 0.13.2 13.2번. game-plan §14.9) */
     STAGE_HALL:[2,4,5],               /* 이 단계(0부터 셈: 장터 마을 · 성곽 마을 · 성)에 들어서면 회관 1·2·3단계. 8세 기준 지은 수 14·36·50(0.13.2는 10·32·54).
                                          설계 초안 [2,3,5](14·24·50)는 멧돼지·바위 늑대가 너무 일찍 와서 10세가 무너지는 판이 나와 한 단계 늦췄다(시뮬, game-plan §14) */
-    STAGE_BELL_BY_AGE:{9:50,10:46}    /* 단계를 켰을 때의 나이별 종 문턱(하나씩 사는 보통 아이도 한 판 30분 안쪽). 없는 나이는 BELL_BUILT(66) */
+    STAGE_BELL_BY_AGE:{9:50,10:46},   /* 단계를 켰을 때의 나이별 종 문턱(하나씩 사는 보통 아이도 한 판 30분 안쪽). 없는 나이는 BELL_BUILT(66) */
+    STAGE_GUARD:{floor:.75,pow:2}     /* 단계를 켰을 때의 찍기 막기: floor = 바닥 배수(GUARD.floor 자리), pow = 기운에 곱하는 지수(FLOW.guardPow 자리).
+                                         끄면 GUARD.floor .75 · FLOW.guardPow 1(0.13.2와 같음). 찍기 아이의 엔딩이 보통 아이의 3배가 안 돼(7세 2.6배 · 8세 3.0배) 지수를 2로(3.1 · 3.4배).
+                                         필요 시간의 40% 전에 답할 때만 듣고(정직하게 읽는 아이는 배수 1이라 그대로), 여유가 더 필요하면 floor .65(4.1 · 3.9배, 48판). game-plan §14.9 */
   };
   /* 흐르는 농장의 경제 쪽 상수(세계 쪽 상수는 world.js FLOW). 값은 scripts/sim-flow.cjs로 맞춤(2026-11-14, game-plan §13.2)
      beat: 박(틱) = 그 문제 필요 시간 × beat × max(paceFloor, pace)/100. 박 하나에 농부 한 명이 World.FLOW.carry알을 나른다
@@ -68,12 +74,16 @@
      boost: 신바람 단계 = 2(6연속 이상, 또는 3연속 + 번개) · 1(번개 또는 3연속 이상) · 0 */
   const FLOW={beat:1.3,paceFloor:60,credit:1,fast:.25,streak:.15,streakMax:.75,guardPow:1,boost1:3,boost2:6};
   const flowOn=s=>!!FLAGS.FLOW&&!(Array.isArray(FLAGS.FLOW_OFF_AGES)&&FLAGS.FLOW_OFF_AGES.includes(s&&s.age));
+  /* 찍기 막기 손잡이(0.14 밸런스): 단계를 켰으면 FLAGS.STAGE_GUARD, 아니면(또는 그 칸이 없으면) GUARD.floor · FLOW.guardPow(0.13.2) */
+  const stageGuard=k=>{const G=FLAGS.STAGES&&FLAGS.STAGE_GUARD;return G&&Number.isFinite(G[k])?G[k]:null};
+  const guardFloor=()=>{const v=stageGuard('floor');return v===null?GUARD.floor:v};
+  const guardPow=()=>{const v=stageGuard('pow');return v===null?FLOW.guardPow:v};
   /* 그 문제의 박(틱) */
   const beatTicks=(s,q)=>Math.max(10,Math.round(needSeconds(q)*FLOW.beat*Math.max(FLOW.paceFloor,Number(s&&s.pace)||100)/100/TICK));
   /* 한 번에 맞힌 정답이 주는 기운과 신바람 단계(streak = 이 정답까지의 연속 수, g = 찍기 막기 배수) */
   function flowGain(streak,fast,g){
     const n=streak|0,gg=Number.isFinite(g)?g:1;
-    return {credit:FLOW.credit*Math.pow(gg,FLOW.guardPow)*(1+(fast?FLOW.fast:0)+Math.min(FLOW.streakMax,FLOW.streak*Math.max(0,n-1))),boost:n>=FLOW.boost2||n>=FLOW.boost1&&fast?2:fast||n>=FLOW.boost1?1:0};
+    return {credit:FLOW.credit*Math.pow(gg,guardPow())*(1+(fast?FLOW.fast:0)+Math.min(FLOW.streakMax,FLOW.streak*Math.max(0,n-1))),boost:n>=FLOW.boost2||n>=FLOW.boost1&&fast?2:fast||n>=FLOW.boost1?1:0};
   }
   /* 농부가 알 n개를 매대에 내려놓음(World 'sold' 사건): 금화는 이때 생긴다. 매대가 부서져 있으면 반값(eggPrice) → 받은 금화 */
   function sellEggs(s,n){const g=Math.max(0,n|0)*eggPrice(s);s.gold+=g;return g}
@@ -220,7 +230,7 @@
   const basket=s=>PAY.basket*(1+(s.farmers|0));
   const eggPrice=s=>{const full=PAY.egg+PAY.hall*clamp(0,3,s.hall|0);return s.marketDown?Math.max(1,Math.floor(full/2)):full};
   /* 찍기 막기 배수(ticks = 풀이 시작부터 맞힐 때까지 틱, 없으면 1) */
-  const guard=(q,ticks)=>Number.isFinite(ticks)&&ticks>=0?clamp(GUARD.floor,1,(ticks+1e-6)*TICK/(needSeconds(q)*FAST_MIN)):1;
+  const guard=(q,ticks)=>Number.isFinite(ticks)&&ticks>=0?clamp(guardFloor(),1,(ticks+1e-6)*TICK/(needSeconds(q)*FAST_MIN)):1;
   function income(s,q,fast,ticks){
     const hens=Math.max(0,s.chickens|0),laid=Math.max(0,hens-(s.hidden|0)),nest=Math.max(0,s.nest|0),cap=basket(s);
     const sold=Math.min(nest+laid,cap),left=Math.min(hens,nest+laid-sold),eggValue=eggPrice(s);
@@ -523,7 +533,7 @@
   const api={API:4,SAVE_VERSION:3,STAGE_NAME,STAGE_MAX,stage,stageAt,stageCount,stageByCount,hallStage,stageInfo,FLAGS,FLOW,flowOn,beatTicks,flowGain,sellEggs,FINALE,FOX,MIGRATE,START_PACK,WOLF_MUL,VILLAGES,VILLAGE_NAME,villageOf,CAPS,FEAST,freshRun,freshMeta,builtNew,autoHall,bellBuilt,bellDue,grow,goldScale,track,lostHen,
     bellPrompted,ringBell,finaleNow,finaleSettle,stars,finish,keepPlaying,nextMul,nextRun,foxDue,foxTicks,foxScareOnly,foxCame,foxEnded,restoreRun,restoreMeta,TICK,SPEED,MIN_SEC,MAX_SEC,SLACK,FENCE,HELP,FAST,FAST_BONUS,FAST_MIN,isFast,STREAK,BOUNTY,combo,DASH,DASH_TICKS,MAX_WOLVES,PACE,PAY,REPAIR,CURVE,ITEMS,SHOP,ORDER,POWER_NOTE,THINK,LINES,REC,units,
     HENS_MAX,TOWERS_MAX,FARMERS_MAX,syl,fresh,max,count,needSeconds,baseSeconds,limit,reveal,LEARN,learnTicks,scale,picks,built,wolves,basket,eggPrice,income,raid,settle,price,open,canBuy,buy,shopKeys,shop,recommend,offers,restore,
-    GUARD,guard,trackPace};
+    GUARD,guard,guardFloor,guardPow,trackPace};
   if(typeof module!=='undefined')module.exports=api;
   else root.Combat=api;
 })(typeof window!=='undefined'?window:globalThis);

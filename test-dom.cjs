@@ -1436,7 +1436,8 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   eq([C.stage(C.fresh(8)),C.stageCount(C.fresh(8))],[0,1],'새 판은 농가(시작 타워 1개를 지은 수 1로 센다)');
   eq([4,5,13,14,23,24,35,36,49,50,62].map(n=>C.stage(built(n))),[0,1,1,2,2,3,3,4,4,5,5],'8세: 5 · 14 · 24 · 36 · 50에서 단계가 오름');
   eq([13,14,35,36,49,50].map(n=>built(n).hall),[0,1,1,2,2,3],'회관은 장터 마을(14) · 성곽 마을(36) · 성(50)에 들어설 때 오름');
-  eq([3,4,9,10,16,17,25,26,36,37].map(n=>C.stage(built(n,10))),[0,1,1,2,2,3,3,4,4,5],'10세: 4 · 10 · 17 · 26 · 37');
+  eq([3,4,10,11,18,19,30,31,37,38].map(n=>C.stage(built(n,10))),[0,1,1,2,2,3,3,4,4,5],'10세: 4 · 11 · 19 · 31 · 38(0.14 밸런스: 회관 2를 지은 수 26 → 31로 늦춤, game-plan §14.9)');
+  eq([10,11,30,31,37,38].map(n=>built(n,10).hall),[0,1,1,2,2,3],'10세 회관은 지은 수 11 · 31 · 38에서 오름(0.13.2는 10 · 32 · 54)');
   eq([3,4,10,11,18,19,28,29,39,40].map(n=>C.stage(built(n,9))),[0,1,1,2,2,3,3,4,4,5],'9세: 4 · 11 · 19 · 29 · 40');
   eq([7,8,9,10].map(a=>C.stageAt({age:a})[1]),[5,5,4,4],'첫 문턱: 7·8세 5, 9·10세 4');
   eq([7,8,9,10].map(a=>C.bellBuilt({age:a})),[66,66,50,46],'종 문턱: 7·8세 66, 9세 50, 10세 46');
@@ -1454,7 +1455,18 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   withFlags(OFF,()=>{const s=FS({level:9});eq([C.stage(s),C.stageInfo(s),s.hall],[-1,null,0],'끔: 단계 없음, 지은 수 9는 회관 0');const t=FS({level:10});eq([t.hall,C.bellBuilt({age:10})],[1,66],'끔: 회관은 지은 수 10에서, 종은 10세도 66')});
   eq(FS({level:10}).hall,0,'켬: 지은 수 10(< 14)은 회관 0');
   /* 저장에 단계 칸이 없다 */
-  ok(!('stage' in C.fresh(8))&&!('stage' in C.restore({version:3,...built(30)})),'경제 상태에 단계 칸을 두지 않음(지은 수에서 계산)');}
+  ok(!('stage' in C.fresh(8))&&!('stage' in C.restore({version:3,...built(30)})),'경제 상태에 단계 칸을 두지 않음(지은 수에서 계산)');
+  /* 찍기 막기(0.14 밸런스, game-plan §14.9): 단계를 켜면 기운 지수 2(바닥 0.75 그대로), 끄면 0.13.2(지수 1) */
+  {const q=Q.get(8,'story',0),need=C.needSeconds(q),at=Math.ceil(C.FAST_MIN*need/C.TICK);
+   eq(C.FLAGS.STAGE_GUARD,{floor:.75,pow:2},'단계를 켰을 때의 찍기 막기 손잡이');
+   eq([C.guardFloor(),C.guardPow(),C.guard(q,0),C.guard(q,at),C.guard(q,undefined)],[.75,2,.75,1,1],'켬: 바로 누르면 75%, 번개를 받을 수 있는 때부터 100%');
+   ok(Math.abs(C.flowGain(1,false,.75).credit-.5625)<1e-9&&C.flowGain(1,false,1).credit===1,'켬: 기운 = 찍기 막기 배수의 제곱(찍기 0.5625, 읽은 정답 1)');
+   ok(Math.abs(C.income(S({age:8,chickens:3}),q,false,0).flow.credit-.5625)<1e-9&&C.income(S({age:8,chickens:3}),q,false,at).flow.credit===1,'켬: 정답 정산에서도 찍기만 기운이 줄어듦');
+   withFlags(OFF,()=>{eq([C.guardFloor(),C.guardPow(),C.guard(q,0)],[C.GUARD.floor,C.FLOW.guardPow,C.GUARD.floor],'끔: 0.13.2 찍기 막기(바닥 0.75 · 지수 1)');ok(Math.abs(C.flowGain(1,false,.75).credit-.75)<1e-9,'끔: 기운 지수 1')});
+   withFlags({STAGE_GUARD:{floor:.65}},()=>eq([C.guardFloor(),C.guardPow(),C.guard(q,0)],[.65,C.FLOW.guardPow,.65],'칸이 빠지면 그 칸만 0.13.2 값'));
+   /* 정직하게 읽는 아이(필요 시간의 40%가 지난 뒤 답함)는 어느 나이든 깎이지 않는다 */
+   let honest=0;for(const a of Q.AGES)for(let i=0;i<60;i++){const qq=Q.at(a,'story',i,77),t=Math.ceil(C.FAST_MIN*C.needSeconds(qq)/C.TICK);if(C.guard(qq,t)===1&&C.income(S({age:a,chickens:3}),qq,false,t).flow.credit===1)honest++}
+   eq(honest,Q.AGES.length*60,'켬: 필요 시간의 40% 뒤에 답하면 금화·기운 모두 깎이지 않음(전 나이 240문제)')}}
  /* S-2 세계: 단계별 반지름 · 래치 · 보류(hold) · 사거리 */
  {const R=W.STAGE.radius;eq(R,[7,9,11.5,14.5,18,22],'단계별 반지름(0.14: 기준 기기가 패드·노트북이 되어 마지막을 19 → 22로)');ok(R[5]>W.RADIUS[3]&&R.every((v,i)=>i===0||v>R[i-1]),'단계마다 넓어지고 마지막은 0.13의 최대(16)보다 큼');
   const s=built(4),w=W.sync(W.create({seed:3}),s);eq([w.stage,W.radius(w),W.routes(w)],[0,7,null],'농가: 반지름 7, 길은 8방향 전부');
