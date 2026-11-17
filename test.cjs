@@ -2,7 +2,7 @@ const {chromium,webkit}=require('playwright');
 const assert=require('node:assert/strict'),http=require('node:http'),fs=require('node:fs'),path=require('node:path');
 const Questions=require('./questions.js'),Combat=require('./combat.js'),World=require('./world.js');
 const INTERIM=process.env.INTERIM_NO_3D_BUILD==='1',FULL_SHOTS=process.env.FULL_SHOTS==='1';
-const ONLY=process.env.ONLY||'',run=part=>!ONLY||ONLY.split(',').includes(part);/* ONLY=matrix,clock,feel,fallback,demo,flow,farm,stage 중 일부만 돌릴 때(개발용). CI는 전부 돌린다. */
+const ONLY=process.env.ONLY||'',run=part=>!ONLY||ONLY.split(',').includes(part);/* ONLY=matrix,clock,feel,fallback,demo,flow,farm,stage,testmode 중 일부만 돌릴 때(개발용). CI는 전부 돌린다. */
 /* 0.13: 아래 matrix·clock·feel·fallback·demo·flow 구간은 0.12 경제 회귀 검사라 주소에 flow=0을 붙여 연다(OLD). 흐르는 농장(기본 켬)은 맨 끝 farm 구간이 본다 */
 /* 0.14: 같은 까닭으로 그 구간들은 stages=0도 붙인다(단계를 끄면 0.13.2 화면·규칙 그대로라는 회귀 검사). 단계(기본 켬)는 맨 끝 stage 구간이 본다. farm 구간은 단계를 켠 채 돈다 */
 const OLD='/?flow=0&stages=0';Combat.FLAGS.FLOW=false;Combat.FLAGS.STAGES=false;Combat.FLAGS.ROUTES=false;/* 이 파일의 기대값 계산(Node 쪽 Combat)도 0.12 경제·단계 끔으로. farm·stage 구간은 상수만 읽는다 */
@@ -23,7 +23,7 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
  const output=path.join(__dirname,'.pages-build'),shots=path.join(__dirname,'test-results');
  const server=http.createServer((req,res)=>{
  const pathname=new URL(req.url,'http://localhost').pathname;
- const file=pathname==='/'?'index.html':['/combat.js','/world.js','/questions-gen.js','/questions.js','/village.js'].includes(pathname)?pathname.slice(1):pathname==='/art-handoff/coopnight/source-3d/models/environment-pack.glb'?pathname.slice(1):/^\/art-handoff\/coopnight\/browser\/[a-z/-]+[0-9a-z-]*\.png$/.test(pathname)?pathname.slice(1):null;
+ const file=pathname==='/'?'index.html':['/combat.js','/world.js','/questions-gen.js','/questions.js','/village.js','/testmode.js'].includes(pathname)?pathname.slice(1):pathname==='/art-handoff/coopnight/source-3d/models/environment-pack.glb'?pathname.slice(1):/^\/art-handoff\/coopnight\/browser\/[a-z/-]+[0-9a-z-]*\.png$/.test(pathname)?pathname.slice(1):null;
  if(!file||!fs.existsSync(path.join(output,file))){res.writeHead(404);return res.end()}
  res.setHeader('Content-Type',file.endsWith('.glb')?'model/gltf-binary':file.endsWith('.png')?'image/png':file.endsWith('.js')?'text/javascript; charset=utf-8':'text/html; charset=utf-8');
  res.end(fs.readFileSync(path.join(output,file)));
@@ -653,6 +653,44 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
    ok(!(await page.locator('#stageTag').isVisible()),'stages=0: no name tag');ok(!('stage' in (await stored(page)).world),'stages=0: no stage in the saved world');
    await shot(page.locator('.stage-card'),'stage-off');eq(errors,[],'stages=0 page errors');await ctx.close()}
  }}finally{await stageBrowser.close()}
+ /* ===== 0.14.1 프로듀서 테스트 모드(?test=1, testmode.js): test=1이 없으면 막대도 파일 요청도 없음 · 세 기준 화면(노트북 1366×768, 패드 1180×820 · 820×1180)에서
+    막대가 화면 아래에 있고 가게·보기와 겹치지 않음 · 다음 ▶ = 여러 프레임 빨리 감기 뒤 정답(게임이 그 시간에 푼 답으로 매김) · 틀리기 · 저장 분리.
+    3D와 무관해 GLB를 막아 그림 화면으로 돌린다. 움직임 줄이기(보기 맞춤 스크롤이 즉시)로 연다 ===== */
+ const tmBrowser=await chromium.launch({headless:true,args:SWIFT});
+ try{if(run('testmode')){
+  const open=async(q,w,h)=>{const ctx=await tmBrowser.newContext({viewport:{width:w,height:h},hasTouch:true,reducedMotion:'reduce'});await ctx.addInitScript(HOLD);await ctx.addInitScript(FAKE_TTS);
+   const page=await ctx.newPage(),errors=[],reqs=[];page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>reqs.push(new URL(r.url()).pathname));await page.route('**/environment-pack.glb',r=>r.abort());
+   await page.goto(url+q);await ready(page);if(q.includes('test=1'))await page.waitForFunction(()=>!!window.__testmode,{},{timeout:20000});return {ctx,page,errors,reqs}};
+  {const {ctx,page,errors,reqs}=await open('/',1366,768);
+   eq([await page.locator('#testBar').count(),await page.evaluate(()=>typeof window.__testmode),await page.locator('header small').textContent()],[0,'undefined','한글 디펜스 · 늑대가 오기 전에 읽어요 0.14.1'],'no test=1: no test bar, no hook, plain header');
+   ok(!reqs.includes('/testmode.js'),'no test=1: testmode.js is not even requested');eq(errors,[],'no test=1 page errors');await ctx.close()}
+  for(const [w,h] of [[1366,768],[1180,820],[820,1180]]){const tag='test mode '+w+'x'+h;
+   const {ctx,page,errors}=await open('/?test=1',w,h);
+   ok(await page.locator('#testBar').isVisible()&&(await page.locator('header .tm-head').textContent())==='🧪 테스트 모드',tag+': bar and header tag on the start screen');
+   await page.locator('#tmNext').click();await phaseIs(page,'ask');await page.evaluate(()=>{const g=window.__game();if(g.round.lock>0)window.__tick(g.round.lock)});
+   const b=await page.evaluate(()=>{const perfText=window.__testmode.perfNow(),r=id=>{const x=document.getElementById(id).getBoundingClientRect();return {top:x.top,bottom:x.bottom,left:x.left,right:x.right}};
+    return {bar:r('testBar'),shop:r('shopWrap'),answers:r('answers'),next:r('tmNext'),wrong:r('tmWrong'),perf:r('tmPerf'),perfText,h:innerHeight,w:innerWidth,sw:document.documentElement.scrollWidth}});
+   const apart=(p,q)=>p.right<=q.left+.5||q.right<=p.left+.5||p.bottom<=q.top+.5||q.bottom<=p.top+.5;
+   ok(b.perf.bottom<=b.bar.top+.5&&b.perf.left>=0&&b.perf.right<=b.w+.5&&apart(b.perf,b.shop)&&apart(b.perf,b.answers),tag+': performance chip above the bar, clear of the shop and answers');
+   ok(/^🎞 .+fps · 그림 화면 · 🏡 농가$/.test(b.perfText),tag+': performance chip (GLB blocked = picture view) '+b.perfText);
+   ok(b.bar.bottom<=b.h+.5&&b.bar.top>=b.h-80&&b.bar.left<=.5&&b.bar.right>=b.w-.5,tag+': one strip along the bottom (top '+Math.round(b.bar.top)+')');
+   ok(b.next.right<=b.w+.5&&b.next.bottom<=b.h+.5&&b.next.right-b.next.left>=100&&b.next.bottom-b.next.top>=44,tag+': next button at the bottom right, big enough');
+   ok(b.shop.bottom<=b.bar.top+.5,tag+': shop above the bar ('+Math.round(b.shop.bottom)+' <= '+Math.round(b.bar.top)+')');ok(b.answers.bottom<=b.bar.top+.5,tag+': answers above the bar ('+Math.round(b.answers.bottom)+')');
+   ok(b.sw<=b.w,tag+': no horizontal overflow');await shot(page,'testmode-'+w+'x'+h);eq(errors,[],tag+' page errors');await ctx.close()}
+  {const {ctx,page,errors}=await open('/?test=1',1366,768);await page.locator('#tmNext').click();await phaseIs(page,'ask');
+   const p0=await page.evaluate(()=>({...window.__testmode.plan(),need:Combat.needSeconds(round.q),lock:Math.max(3,Combat.reveal(round.q)),w:world.t}));
+   eq(p0.target,Math.max(p0.lock+4,Math.round(p0.need*10)),'test mode: reading time = max(lock + 0.4 s, need)');
+   await page.locator('#tmNext').click();const s=await page.evaluate(()=>{window.__testmode.frame();return {t:round.t,phase,w:world.t,job:!!window.__testmode.job,next:document.getElementById('tmNext').disabled}});
+   ok(s.job&&s.next&&s.phase==='ask'&&s.t>p0.t&&s.t<p0.target&&s.w>p0.w,'test mode: fast-forward runs over several frames, the world moves ('+s.t+'/'+p0.target+')');
+   const n=1+await page.evaluate(()=>window.__testmode.drain());const r=await page.evaluate(()=>({phase,last:window.__testmode.last,guard:round.info.guard,pace:state.pace,bar:document.getElementById('tmLast').textContent}));
+   eq([r.phase,r.last.t,r.last.result,r.guard],['reward',p0.target,'first',1],'test mode: next = answered at the reading time, no fast-answer penalty');ok(n>1&&n<=56&&r.bar.includes('감점 없음'),'test mode: '+n+' frames, bar says no penalty');
+   await page.evaluate(()=>{window.__testmode.next();window.__testmode.drain()});await phaseIs(page,'ask');
+   await page.locator('#tmWrong').click();await page.evaluate(()=>window.__testmode.drain());let g=await game(page);eq([g.phase,g.round.tries,g.state.streak],['ask',1,0],'test mode: wrong button picks a wrong choice after the reading time');
+   await page.locator('#tmNext').click();await page.evaluate(()=>window.__testmode.drain());g=await game(page);eq([g.phase,g.round.result],['learn','second'],'test mode: second try then learn');
+   await page.locator('#tmNext').click();await page.evaluate(()=>window.__testmode.drain());eq((await game(page)).phase,'ask','test mode: next leaves the learn step');
+   await page.evaluate(()=>save());eq(await page.evaluate(()=>localStorage.getItem('hangul-defense-v1')),null,'test mode never writes the child save');ok(await page.evaluate(()=>!!localStorage.getItem('hangul-defense-v1-test')),'test mode has its own save');
+   eq(errors,[],'test mode page errors');await ctx.close()}
+ }}finally{await tmBrowser.close()}
  console.log((ONLY?'PARTIAL('+ONLY+') ':'')+'PASS '+checks+' browser assertions (Chromium/WebKit, desktop + mobile emulation, held clock + one real-clock run). Physical audio/device validation remains manual.');
  }finally{server.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});
