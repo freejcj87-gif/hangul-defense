@@ -648,6 +648,37 @@ for(const a of Q.AGES)for(const s of [0,1]){
   const math=quizSeq(a,s,400).filter(q=>q.cat==='math'),k=quizAll(a).filter(q=>q.cat==='math').length,lap=math.slice(0,k).map(levelOf),third=Math.floor(k/3),avg=l=>l.reduce((x,y)=>x+y,0)/l.length;
   ok(avg(lap.slice(0,third))<avg(lap.slice(-third)),`${a}세 수학 seed ${s}: 앞쪽이 더 쉬움`);
 }
+/* 10-1. 보기 순서(2026-11-17 감사 후속): at()가 화면 순서를 정한다. 같은 정답 자리 4연속 없음, 자리는 고르게, 은행 문항과 같은 보기·같은 정답 */
+{const bank=new Map();for(const a of Q.AGES){for(const q of all(a,'story'))bank.set(q.id,q);for(const q of quizAll(a))bank.set(q.id,q)}
+ for(const a of Q.AGES){
+  const tally={};let worst=0,bad=0,moved=0,same=0;
+  for(const s of [0,1,2,3,5,7,42,99,123456,4294967295]){
+   let run=0,prev=-1;
+   for(let i=0;i<600;i++){
+    const q=Q.at(a,'story',i,s),o=bank.get(q.id);
+    if(q.choices.slice().sort().join('|')!==o.choices.slice().sort().join('|')||q.choices[q.answer]!==o.choices[o.answer])bad++;
+    run=q.answer===prev?run+1:1;prev=q.answer;worst=Math.max(worst,run);
+    const k=q.choices.length+':'+q.answer;tally[k]=(tally[k]||0)+1;
+    if(q.choices.join('|')!==o.choices.join('|'))moved++;else same++;
+   }
+  }
+  eq(bad,0,a+'세 at(): 보기 묶음과 정답 글은 은행 문항과 같음(순서만 다름)');
+  ok(worst<=3,a+'세 at(): 같은 정답 자리는 3번까지만 이어짐(최대 '+worst+', 씨앗 10개 × 600칸)');
+  for(const n of [3,4,5]){const ks=Object.keys(tally).filter(k=>k.startsWith(n+':'));if(!ks.length)continue;const tot=ks.reduce((x,k)=>x+tally[k],0);eq(ks.length,n,a+'세 '+n+'지선다: 모든 자리가 정답으로 나옴');ok(ks.every(k=>Math.abs(tally[k]/tot-1/n)<.04),a+'세 '+n+'지선다 정답 자리가 고름 '+ks.map(k=>k+'='+tally[k]).join(' '))}
+  ok(moved>same,a+'세 at(): 은행 순서와 다른 보기 순서가 대부분('+moved+'/'+(moved+same)+')');
+ }
+ /* 같은 문항이 다른 칸(다음 바퀴)에 다시 나오면 보기 순서가 달라질 수 있음: 8세 씨앗 3, 첫 두 바퀴 */
+ {const n=Q.count(8,'story'),seen=new Map();let diff=0,pairs=0;for(let i=0;i<n*2+80;i++){const q=Q.at(8,'story',i,3);if(q.mode==='quiz')continue;if(seen.has(q.id)){pairs++;if(seen.get(q.id)!==q.choices.join('|'))diff++}else seen.set(q.id,q.choices.join('|'))}
+  ok(pairs>=n-5&&diff>pairs/2,'같은 문항이 다시 나오면 보기 순서가 대부분 달라짐('+diff+'/'+pairs+')')}
+ /* 가장 큰·작은 수 문항은 화면에서도 크기순으로 늘어서지 않음 */
+ const num=c=>{const m=String(c).match(/^(\d+)분의 (\d+)$/);return m?+m[2]/+m[1]:Number(c)};
+ let checked=0;for(const a of Q.AGES)for(const s of [0,9,77])for(let i=0;i<400;i++){const q=Q.at(a,'story',i,s);if(!/가장 (큰|작은)/.test(q.prompt)||q.choices.some(c=>Number.isNaN(num(c))))continue;const v=q.choices.map(num);checked++;
+  ok(!(v.every((x,k)=>!k||x>v[k-1])||v.every((x,k)=>!k||x<v[k-1])),q.id+' (칸 '+i+'): 가장 큰·작은 수 보기가 크기순이 아님 '+q.choices.join(','))}
+ ok(checked>20,'가장 큰·작은 수 문항을 화면 순서로 확인('+checked+')');
+ /* 같은 (나이, 씨앗, 번호)면 몇 번을 불러도 같은 보기 순서(다른 호출을 섞어도) */
+ for(const a of Q.AGES){const ref=Array.from({length:50},(_,i)=>JSON.stringify(Q.at(a,'story',i*11,31)));for(let k=0;k<300;k++)Q.at(a,'story',k*7,k);eq(Array.from({length:50},(_,i)=>JSON.stringify(Q.at(a,'story',i*11,31))),ref,a+'세: 보기 순서도 결정적')}
+}
+
 /* slot(): 칸 정보 */
 {const t=Q.slot(9,'story',2,0);ok(!Q.isQuiz(9,2)&&Q.isQuiz(9,3)&&t.kind==='story'&&t.seq===2&&t.lap===0&&t.pos>=0&&t.size===Q.count(9,'story'),'slot: 읽기 칸(9세는 3번이 첫 퀴즈 칸)');
  eq(Q.slot(9,'sound',2,0),t,"slot: mode 'sound'도 읽기 칸");

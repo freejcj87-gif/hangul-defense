@@ -35,9 +35,9 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
 
  /* 화면에 나온 문제를 문제은행(Node 쪽 사본)과 대조한다. */
  async function shown(page){return page.locator('#answers').evaluate(n=>({qid:n.dataset.qid,age:Number(n.dataset.age),mode:n.dataset.mode,labels:[...n.children].map(b=>b.textContent),chip:document.getElementById('levelChip').textContent,prompt:document.getElementById('prompt').textContent,passage:document.getElementById('passage').textContent}))}
- /* 화면 문제 = 그 나이의 index번째(상식·수학·영어가 섞인 순서, Questions.at). mode는 언제나 'story'. 보기 순서는 바퀴(lap)마다 한 칸씩 돈다. */
+ /* 화면 문제 = 그 나이의 index번째(상식·수학·영어가 섞인 순서, Questions.at). mode는 언제나 'story'. 보기 순서는 at()가 정한 순서 그대로(2026-11-17부터 화면이 바퀴마다 돌리지 않음). */
  async function expectQuestion(page,age,mode,index,msg){
-  const s=await shown(page),seed=await page.evaluate(()=>window.__game().seed),q=Questions.at(age,mode,index,seed),n=q.choices.length,order=q.choices.map((_,k)=>q.choices[(k+(q.lap||0))%n]);
+  const s=await shown(page),seed=await page.evaluate(()=>window.__game().seed),q=Questions.at(age,mode,index,seed),order=q.choices.slice();
   eq(s.qid,q.id,msg+': question id');eq(s.age,age,msg+': age');eq(s.mode,q.mode,msg+': mode');eq(s.labels,order,msg+': choices');eq(s.prompt,q.prompt,msg+': prompt');eq(s.passage,q.passage||'',msg+': passage');
   if(q.mode==='quiz')ok(s.chip.startsWith(age+'세 · ')&&s.chip.endsWith(Questions.CATS[q.cat]),msg+': category chip '+s.chip);else{eq(s.chip,age+'세 · '+Questions.LEVELS[age][mode],msg+': level chip');eq(Questions.checkLevel(age,mode,q),[],msg+': level rules')}
   return q}
