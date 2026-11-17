@@ -4,7 +4,7 @@ import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { SimplifyModifier } from 'three/addons/modifiers/SimplifyModifier.js';
 import { KIND_ORDER, RIG, GAIT, RIG_TIME, monsterGeometry, shadowGeometry, rigMaterial, rigDepthMaterial, rigMaterialAt, gaitPose, setRig } from './monsters.js';
 import { prep, fuse, solid, flat, merge } from './geo.js';
-import { POND, POND_R, HAY, GARDEN, ZONE, FARM_ZONE, FARM_HOME, PICK, DROP, MARKET_FRONT, MARKET_GATE, TENTS, MILL, RIVER, riverFrame, riverOffset, millRace, bridgeSpot, BRIDGE as BRIDGE_ART } from './layout.js';
+import { POND, POND_R, HAY, GARDEN, ZONE, FARM_ZONE, FARM_HOME, PICK, DROP, MARKET_FRONT, MARKET_GATE, TENTS, MILL, RIVER, riverFrame, riverOffset, millRace, bridgeSpot, deckY, BRIDGE as BRIDGE_ART } from './layout.js';
 import { STOREY_H, storeyGeometry, basketGeometry, basketEggs, railGeometry, wallGeometry, marketExtras, STALL_OMIT, NESTS, NEST_MAX, nestSpots, villageProps, lanterns, LANTERN_TOP, drawHammer, trailGeometry, stageProps, riverGeometry, codeWheelGeometry } from './props.js';
 
 const host=document.querySelector('.scene');
@@ -446,12 +446,36 @@ async function start(){
  let riverR=0,raceSeg=null;   // the radius the shown river was built for (0 = none) and its mill race: the forest steps aside from both (layoutDecor)
  const wheel=actor(G.wheel,0,0,MILL.ry);wheel.obj.visible=false;wheel.obj.name='mill-wheel';
  {const p=millArt?millArt.pivot:new V3(MILL.wheel.x,MILL.wheel.y,0),c=Math.cos(MILL.ry),s=Math.sin(MILL.ry);wheel.x=MILL.at[0]+p.x*c+p.z*s;wheel.z=MILL.at[1]-p.x*s+p.z*c;wheel.y=p.y}
+ let bridgeNow=null;   // bridgeSpot(riverR): where wolves step up onto the deck
  function setRiver(R){
   if(R===riverR)return false;riverR=R;decorR=-1;
-  if(!R){riverMesh.visible=false;wheel.obj.visible=false;raceSeg=null;return true}
+  if(!R){riverMesh.visible=false;wheel.obj.visible=false;raceSeg=bridgeNow=null;return true}
   if(!riverCache.has(R))riverCache.set(R,riverGeometry(R));const f=riverFrame(R);
   riverMesh.geometry=riverCache.get(R);riverMesh.position.set(f.c[0],0,f.c[1]);riverMesh.rotation.y=Math.atan2(f.n[0],f.n[1]);riverMesh.scale.x=1;riverMesh.visible=true;
-  wheel.obj.visible=true;raceSeg=millRace(R);return true;
+  wheel.obj.visible=true;raceSeg=millRace(R);bridgeNow=bridgeSpot(R);return true;
+ }
+ /* 0.15 mill wheel (계획서 §5, 프로듀서 결정: 금화 없음, 한 번에 맞힌 정답에만 힘차게 돈다): the page's cheer (flowing farm) / produce events come only for
+    a first-try right answer. Each gives the wheel a push (more with the 신바람 boost), it spins down on the effect clock (τ 0.7 s: about 90% of the turn
+    within the 1.6 s reward beat). No push for second tries, idling or reduced motion. The GLB clip (WheelTurn) is not used. */
+ const MILL_TAU=.7,MILL_MAX=2.5*Math.PI*2/MILL_TAU,millSpin={angle:0,vel:0,kicks:0};
+ function millKick(lv){
+  if(!riverR||reduced())return;millSpin.vel=Math.min(MILL_MAX,millSpin.vel+Math.PI*2/MILL_TAU*(1+.5*clamp(num(lv)|0,0,2)));millSpin.kicks++;
+  const [x0,z0]=raceSeg,b=bridgeNow;ringWave(x0,z0,2.2,WHITE,.6,.05,CELL.ring,.35,.06);ringWave(x0,z0,3.2,SKY,.7,.25,CELL.halo,.3,.06);   // ripples under the wheel and by the bridge
+  for(let i=0;i<2;i++)ringWave(b.at[0]+b.u[1]*(i?1.6:-1.6),b.at[1]-b.u[0]*(i?1.6:-1.6),2.4,WHITE,.7,.15+i*.2,CELL.ring,.3,.06);
+ }
+ function millStep(fdt){if(millSpin.vel<=0)return;millSpin.angle+=millSpin.vel*fdt;millSpin.vel*=Math.exp(-fdt/MILL_TAU);if(millSpin.vel<.02)millSpin.vel=0}
+ /* 0.15 wolves at the river (looks only, the rule never reads it): up on the bridge deck (deckY along the bridge), a little lower in the water with a splash
+    now and then. Counts distinct wolves seen over the water on the bridge (bridged) and off it (waded; wadedIn = coming in), from the blended world position. */
+ const crossed={bridged:new Set(),waded:new Set(),wadedIn:new Set(),splashes:0};let splashBudget=0;   // splashes per frame (own budget: a crowd's dust and footfalls use up fxBudget first)
+ function wadeSplash(x,z,s){crossed.splashes++;for(let i=0;i<4;i++)emit({cell:CELL.dot,x:x+span(-.2,.2),y:.15,z:z+span(-.2,.2),vx:span(-.9,.9),vy:span(1.3,2.2),vz:span(-.9,.9),gravity:8,life:span(.35,.5),size:.11*s,end:.04,color:SKY,alpha:.95,fade:.5,pop:0,abs:true});
+  ringWave(x,z,1.3*s,WHITE,.5,0,CELL.ring,.3,.06)}
+ function riverStep(o,st,wdt,less){
+  if(!riverR)return 0;const off=riverOffset(riverR,o.x,o.z);if(Math.abs(off)>RIVER.water/2+RIVER.bank+1)return 0;
+  const b=bridgeNow,dx=o.x-b.at[0],dz=o.z-b.at[1],along=dx*b.u[0]+dz*b.u[1],side=Math.abs(dx*b.u[1]-dz*b.u[0]),wet=Math.abs(off)<=RIVER.water/2,live=st!=='dead'&&!o.ghost;
+  if(side<=BRIDGE_ART.width/2&&Math.abs(along)<=BRIDGE_ART.deck.half+.3){if(wet&&live)crossed.bridged.add(o.id);return deckY(along)}
+  if(!wet)return 0;if(live){crossed.waded.add(o.id);if(st==='walk'||st==='hunt')crossed.wadedIn.add(o.id)}
+  if(live&&!less&&wdt>0&&(o.splashT=(o.splashT||0)-wdt)<=0&&splashBudget>0&&onView(o.x,.2,o.z)){o.splashT=.45;splashBudget--;wadeSplash(o.x,o.z,Math.min(1.6,o.size))}
+  return -.15;
  }
  // ground distance from the river band / the race (0 inside): decor (trees, bushes, rocks) keeps out of both
  const riverGap=(x,z)=>{if(!riverR)return 9;let d=Math.abs(riverOffset(riverR,x,z))-(RIVER.water/2+RIVER.bank);
@@ -460,7 +484,7 @@ async function start(){
   const key=st+':'+R+':'+(routes?routes.join(','):'')+(river?':river':'');if(key===stageKey)return false;
   const up=fx&&st>stageShown,on=!!river&&st>=RIVER.stage;stageKey=key;stageShown=st;
   const riverNew=on&&!riverR;setRiver(on?R:0);
-  if(riverNew&&up&&!reduced())popIn(wheel,.18,.87);
+  if(riverNew&&up&&!reduced()){popIn(wheel,.18,.87);riverMesh.scale.x=.001;tween(.05,.9,u=>{riverMesh.scale.x=Math.max(.001,easeInOut(u))},()=>{riverMesh.scale.x=1})}   // the river flows in along its length (0.9 s, inside the 1.6 s beat)
   if(st<1){stageMesh.visible=stageNew.obj.visible=false;stageInfo={houses:0,marks:0,spots:[]};stageRising=false;return true}
   if(!stageCache.has(key))stageCache.set(key,stageProps(st,R,routes,river?{river:true,house:millArt&&millArt.house,bridge:bridgeArt}:{}));
   const g=stageCache.get(key);stageInfo=g;
@@ -1099,10 +1123,10 @@ async function start(){
    const wolf=wolfVis.get(e.wolf);
    switch(e.type){
     // 0.13 flowing farm: a right answer makes every hen hop (the first egg drops at once), a fish leaps to the market; eggs then come one by one
-    case 'cheer':cheerFx(e);break;
+    case 'cheer':cheerFx(e);millKick(e.boost);break;
     case 'laid':{const c=Number.isInteger(e.slot)&&e.slot>=0?henSlots[e.slot]:null;if(c&&c.on&&!reduced()){const a=c.a;tween(0,.4,(u,tt)=>{const q=Math.sin(Math.min(1,tt/.16)*Math.PI);a.sy*=1-.28*q;a.sx*=1+.18*q;if(tt>.16)a.lift+=.2*Math.sin((tt-.16)/.24*Math.PI)});flashAt(a.x,.35,a.z,.55,CREAM,.14)}break}
     case 'sold':{const f=farmers[e.slot|0];if(f&&f.on&&!reduced()){const mk=marketShift(),x=DROP[f.k][0]+mk.x,z=DROP[f.k][1]+mk.z;coinPop(x,1.5,z,span(-.4,.4),span(3,3.8),span(-.3,.3),0,.7);sparkles(x,1.4,z,2,.25,GOLD,0,.2);if(time-(market.soldAt||-9)>.5){market.soldAt=time;wobble(market.a,.035)}}break}
-    case 'produce':if(reduced()){popUntil=time+1.4;lastLeft=count(e.left??0,NEST_MAX)}else produceFx(e);break;
+    case 'produce':if(reduced()){popUntil=time+1.4;lastLeft=count(e.left??0,NEST_MAX)}else produceFx(e);millKick(0);break;
     case 'shoot':towerFire(towerById.get(e.tower),false,false,!!e.splash);break;
     case 'volley':for(const t of towers)towerFire(t,true,!!e.fast);shake(e.fast?.07:.05);break;   // the arrows themselves come from the pull (marked as a volley above)
     case 'hit':if(wolf){wolf.hit=.14;wolf.hitT=time;const [dx,dz]=hitFrom(wolf);knock(wolf,dx,dz,2.4);flashAt(wolf.x,.85*wolf.size,wolf.z,.8);
@@ -1190,9 +1214,9 @@ async function start(){
     decor:{forest:forest.count,grove:grove.count,bushes:shrubs.count,rocks:stones.count},
     art15:Object.fromEntries(Object.keys(ART15).map(k=>[k,!!art15[k]])),   // 0.15 model loaded (and baked where it is used); false = that model keeps its 0.14 look
     monsterArt:{king:!!beast.king,fox:!!beast.fox},   // true = drawn from the 0.15 GLB, false = the 0.14 code model
-    river:(()=>{const o={on:riverR>0,radius:riverR,bridge:bridgeArt?'glb':'code'};if(!riverR)return o;const b=bridgeSpot(riverR),at=(f,y)=>{ndc.set(b.at[0]+b.u[0]*f,y,b.at[1]+b.u[1]*f).project(camera);return [+ndc.x.toFixed(3),+ndc.y.toFixed(3)]};
+    river:(()=>{const o={on:riverR>0,radius:riverR,bridge:bridgeArt?'glb':'code',bridged:crossed.bridged.size,waded:crossed.waded.size,wadedIn:crossed.wadedIn.size,splashes:crossed.splashes,flow:+riverMesh.scale.x.toFixed(3)};if(!riverR)return o;const b=bridgeSpot(riverR),at=(f,y)=>{ndc.set(b.at[0]+b.u[0]*f,y,b.at[1]+b.u[1]*f).project(camera);return [+ndc.x.toFixed(3),+ndc.y.toFixed(3)]};
      o.bridgeNdc=at(0,.5);o.bridgeFarNdc=at(BRIDGE_ART.len/2,.3);return o})(),   // where the bridge's middle and its far (forest) end are on screen (−1…1)
-    mill:{art:millArt?'glb':'code',shown:wheel.obj.visible},
+    mill:{art:millArt?'glb':'code',shown:wheel.obj.visible,turns:Math.round(millSpin.angle/(Math.PI*2)*100)/100,spinning:millSpin.vel>0,kicks:millSpin.kicks},
     drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,builds:{...builds},effects:particles.length+anims.length,warnings:warns.length,blend:{t:+blendT.toFixed(3),dur:+blendDur.toFixed(3),ticks:blendTicks},shake:shakeNow,
     memory:{geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures}}}};
 
@@ -1318,7 +1342,7 @@ async function start(){
   c[k]=o.legs[3];c[k+1]=P.hr;c[k+2]=o.seed*20;c[k+3]=0;d[k]=o.lift[0];d[k+1]=o.lift[1];d[k+2]=o.lift[2];d[k+3]=o.lift[3]}
  function animateWolves(dt,wdt,less){
   const e=tickBlend(less);
-  for(const k of KIND_ORDER){herd[k].n=0;wolfKinds[k]=0}shade.n=0;fxBudget=less?0:5;
+  for(const k of KIND_ORDER){herd[k].n=0;wolfKinds[k]=0}shade.n=0;fxBudget=less?0:5;splashBudget=less?0:2;
   henSpots.length=0;for(const c of henSlots)if(c.on&&c.h&&(c.h.state==='yard'||c.h.state==='home'||c.h.state==='flee'))henSpots.push(c.a);
   for(const o of wolfVis.values()){
    const px=o.x,pz=o.z;if(!o.ghost){o.x=o.fx+(o.tx-o.fx)*e;o.z=o.fz+(o.tz-o.fz)*e}
@@ -1402,6 +1426,7 @@ async function start(){
    if(lit&&!less&&st!=='dead')P.y+=.3*Math.abs(Math.sin((hlEnd-time)*5.6));
    // leaping back over an intact fence on the way out
    if((st==='carry'||st==='leave')&&!less){const r=Math.hypot(o.x,o.z),Rf=Rd-FENCE_IN,d=Math.abs(r-Rf);if(d<.75){const side=sides[Math.floor(((Math.atan2(o.z,o.x)+Math.PI*2)%(Math.PI*2))/(Math.PI/3))%6];if(side&&side.on&&side.b&&!side.b.broken){const q=d/.75;ay+=.85*(1-q*q);P.pitch-=.25*(1-q)}}}
+   ay+=riverStep(o,st,wdt,less);   // 0.15: on the bridge deck / a little lower in the water
    // falling: knocked up and over, lands in a poof, lies a moment, sinks away
    if(st==='dead'){
     const D=boss?.8:.55,H=boss?1.1:.65,t=less?9:o.deadAge,c=R.center,u=Math.min(1,t/D),k2=Math.min(1,u*2);pivY=c;
@@ -1717,6 +1742,7 @@ async function start(){
    sunDim+=((insideWolves>0?1:0)-sunDim)*(less?1:Math.min(1,fdt*2));sun.intensity=2.8-.7*sunDim;
    redPulse=Math.max(0,redPulse-fdt*.8);sun.color.copy(SUN_COLOR).lerp(RED_LIGHT,redPulse*.6);
    RIG_TIME.value=time;updateNest(curS);
+   millStep(fdt);wheel.pitch=-millSpin.angle;   // 0.15 mill wheel (its axle is the model's x axis: pitch turns it)
    for(const a of actors)pose(a,fdt);writeHens();dirty=false;
   }
  }

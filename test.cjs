@@ -617,6 +617,9 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
      let dirs=[];for(let n=0;n<240&&(n<60||!dirs.length);n++){await roll(page,1);dirs=await seen()}
      ok(dirs.length>=1&&dirs.every(a=>World.STAGE.open[k].some(p=>{let d=Math.abs(a-(p+.5)*Math.PI/4)%(Math.PI*2);if(d>Math.PI)d=Math.PI*2-d;return d<=.26})),'stage '+k+': every wolf came down an open road ('+dirs.length+' wolves)')}
     await shot(page.locator('.stage-card'),'stage-390-'+k);if(k===5)geo5=v.memory.geometries;}
+   /* 0.15 캐시가 새지 않는지: 6단계를 지나온 장면의 지오메트리 수 ≤ 성으로 바로 불러온 장면 + 단계당 캐시(소품 3 · 강 1 · 길 1)만큼 */
+   {const fresh=await (async()=>{await page.reload();await ready(page);await page.waitForFunction(()=>window.VillageView?.inspect().ready,{},{timeout:45000});return (await insp(page)).memory.geometries})();
+    ok(geo5<=fresh+5*5,'stage tour: no geometry leak across the six stages: '+geo5+' after the tour, '+fresh+' loaded straight at the castle')}
    eq(errors,[],'stage tour page errors');await ctx.close()}
   /* 전환: 읽는 중에 다섯 번째를 사면 화면은 그대로('곧!'), 답한 순간 넓어지고 띠 알림 */
   {const {ctx,page,errors}=await open();await seed(page,{age:8,index:0,level:2,fence:1,chickens:2,gold:300});await page.waitForFunction(()=>window.VillageView?.inspect().ready,{},{timeout:45000});
@@ -658,6 +661,36 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
    ok(v.stage===k&&v.river.on&&Math.abs(b[0])<=.95&&b[1]<=.92&&b[1]>=-.95&&f[1]<=.98,'river '+w+'x'+h+' stage '+k+': the bridge is on screen: '+JSON.stringify(v.river));
    ok(v.drawCalls<=52&&v.triangles<=520000,'river '+w+'x'+h+' stage '+k+': draw budget: '+v.drawCalls+' calls, '+v.triangles+' triangles');ok(await noOverflow(page),'river '+w+'x'+h+' stage '+k+': no overflow');
    await shot(page.locator('.stage-card'),'river-'+w+'x'+h+'-stage'+k);eq(errors,[],'river '+w+'x'+h+' stage '+k+' page errors');await ctx.close()}
+  /* 0.15 물레방아 바퀴(프로듀서 결정 '26.11.17: 금화 없음, 한 번에 맞힌 정답에만 힘차게 돈다): 화면 시계를 세우고(debug hold) advance로만 본다 */
+  {const {ctx,page,errors}=await open({width:1366,height:768});await seed(page,{age:8,index:0,wins:0,gold:300,farmers:0,power:0,pond:0,hall:0,...VILLAGE[3]});await page.waitForFunction(()=>window.VillageView?.inspect().ready,{},{timeout:45000});
+   await begin(page,{age:8},true);await page.evaluate(()=>{window.VillageView.debug({hold:true});world.wolves=[];world.trickle=1e9;world.wave.arrive=1e9;world.wave.spawned=true});await view(page,.2);
+   let m=(await insp(page)).mill;eq([m.shown,m.turns,m.spinning,m.kicks],[true,0,false,0],'mill: the wheel stands still before any answer');
+   await answer(page,true,true);await view(page,.5);m=(await insp(page)).mill;ok(m.kicks===1&&m.spinning&&m.turns>.05,'mill: a first-try right answer turns the wheel: '+JSON.stringify(m));
+   await view(page,6);m=(await insp(page)).mill;const t1=m.turns;ok(!m.spinning&&t1>=.9&&t1<=2.6,'mill: it spins down by itself (one push = 1 to 2.5 turns): '+JSON.stringify(m));
+   await settle(page);await answer(page,false,true);await tick(page,Combat.DASH_TICKS+2);await answer(page,true,true);await view(page,2);m=(await insp(page)).mill;
+   eq([m.turns,m.kicks,m.spinning],[t1,1,false],'mill: a second-try right answer does not turn it');
+   await tick(page,3000);await view(page,1);m=(await insp(page)).mill;eq([m.turns,m.kicks],[t1,1],'mill: 3,000 ticks without an answer: it stays still (no idle reward)');
+   await shot(page.locator('.stage-card'),'mill-1366-after');eq(errors,[],'mill page errors');await ctx.close()}
+  {const {ctx,page,errors}=await open({width:1366,height:768,calm:true});await seed(page,{age:8,index:0,wins:0,gold:300,farmers:0,power:0,pond:0,hall:0,...VILLAGE[3]});await page.waitForFunction(()=>window.VillageView?.inspect().ready,{},{timeout:45000});
+   await begin(page,{age:8},true);await page.evaluate(()=>{world.wolves=[];world.trickle=1e9});await answer(page,true,true);await frames(page,3);const m=(await insp(page)).mill;
+   eq([m.turns,m.kicks],[0,0],'mill: reduced motion: the wheel does not turn');eq(errors,[],'mill reduced page errors');await ctx.close()}
+  /* 0.15 다리 길(프로듀서 결정: 다리로 한 줄로): 물레방아 마을에서 6번 길 늑대는 다리로만 건너온다(들어오는 늑대 중 물을 건넌 수 0).
+     ?bridge=0이면 넓게 와서 물을 건너고 물보라가 인다. 한 순간이 아니라 도는 동안 모은 누적 수로 본다(늑대마다 한 번) */
+  for(const [label,query] of [['bridge',''],['wade','/?bridge=0']]){
+   const {ctx,page,errors}=await open({width:1366,height:768,query});await seed(page,{age:8,index:0,wins:0,gold:300,farmers:0,power:0,pond:0,hall:0,...VILLAGE[3]});await page.waitForFunction(()=>window.VillageView?.inspect().ready,{},{timeout:45000});
+   await begin(page,{age:8},true);await page.evaluate(()=>{window.VillageView.debug({hold:true});world.wolves=[]});let r=null;
+   for(let i=0;i<150;i++){await page.evaluate(()=>{world.trickle=Math.min(world.trickle,world.t+1)});await roll(page,1);r=(await insp(page)).river;if(label==='bridge'?r.bridged>=3:(r.waded>=2&&r.splashes>=1))break}
+   if(label==='bridge')ok(r.bridged>=3&&r.wadedIn===0,'bridge: road-6 wolves cross on the bridge, none wades in: '+JSON.stringify(r));
+   else ok(r.waded>=1&&r.splashes>=1,'bridge=0: wolves wade across with splashes: '+JSON.stringify(r));
+   await shot(page.locator('.stage-card'),'river-'+label);eq(errors,[],'river '+label+' page errors');await ctx.close()}
+  /* 0.15 전환: 장터 마을 → 물레방아 마을이 되는 정답 뒤 강이 길이 방향으로 흘러들고(0.9초) 바퀴가 집과 함께 솟는다. 정답 연출(1.6초) 안에 끝난다 */
+  {const {ctx,page,errors}=await open({width:1366,height:768});await seed(page,{age:8,index:0,wins:0,gold:900,farmers:0,power:0,pond:0,hall:0,level:19,fence:4,chickens:1});await page.waitForFunction(()=>window.VillageView?.inspect().ready,{},{timeout:45000});
+   await begin(page,{age:8},true);await page.evaluate(()=>{world.wolves=[];world.peace=-1;window.VillageView.debug({hold:true})});await roll(page,2);
+   let v=await insp(page);eq([v.stage,v.river.on],[2,false],'river shift: (the market village, no river yet)');
+   await buy(page,'fence',true);await answer(page,true,true);await view(page,.35);v=await insp(page);
+   ok(v.stage===3&&v.river.on&&v.river.flow>0&&v.river.flow<1&&v.stageRising,'river shift: the river flows in after the answer: '+JSON.stringify([v.stage,v.river.flow,v.stageRising]));
+   await shot(page.locator('.stage-card'),'river-shift-flowing');await view(page,1.3);v=await insp(page);eq([v.river.flow,v.stageRising,v.mill.shown],[1,false,true],'river shift: settled within the reward beat');
+   eq(errors,[],'river shift page errors');await ctx.close()}
   /* 주소 ?river=0: 0.14 화면(강 · 다리 · 바퀴 없음, 길목 표시 0.14 개수, 0.14 오두막). ?art15=0: 강은 있고 물레방아 · 다리는 코드 도형 */
   {const {ctx,page,errors}=await open({query:'/?river=0'});await seed(page,{age:8,index:0,gold:300,...VILLAGE[5]});await page.waitForFunction(()=>window.VillageView?.inspect().ready,{},{timeout:45000});
    await begin(page,{age:8},true);await frames(page,3);const v=await insp(page),vs=await page.evaluate(()=>getVillageState());
