@@ -1581,6 +1581,35 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   {const K=L.KEEP;for(const p of W.ALL_SLOTS)ok(d2(K.at,p)>=1.2+K.r,'성탑: 타워 자리와 1.2 이상');for(const p of W.HOMES)ok(d2(K.at,p)>=.9+K.r,'성탑: 닭 자리와 0.9 이상');ok(d2(K.at,W.PLACE.nursery)>=SIZE.nursery+K.r+.3&&d2(K.at,W.PLACE.coop)<2,'성탑: 회관 바로 뒤, 작은 닭장과는 떨어짐')}
   ok(L.ROAD.r0>W.STAGE.radius[0]&&L.ROAD.r0<W.STAGE.radius[1]-.4&&L.ROAD_MARK.out>0&&L.ROAD_MARK.side>L.ROAD.edge/2+.4,'늑대 길은 마을 가장자리 안쪽에서 시작하고, 길목 표시는 울타리 밖 · 길 양옆');
  });
+ /* ---------- 0.14.2 리뷰 수정(work\verification-20261113\review-v014\report.md 1·3·5·7·10번) ---------- */
+ const towersOf=w=>w.buildings.filter(b=>b.kind==='tower').map(b=>[b.slot,b.floor]).sort((p,q)=>p[0]-q[0]);
+ const ring=(n,f)=>Array.from({length:n},(_,i)=>[i,f?f(i):1]);
+ /* R-1 보류 중에 산 타워가 회관 승급을 부르면 안쪽 타워의 층이 되지 않고, 보류를 풀 때 새 바깥 자리에 선다(재현: 8세, 지은 수 13, 타워 6개 = 0단계 자리 6개가 다 참, 읽는 중 타워 구매) */
+ {const a=seed({age:8,level:5,fence:4,chickens:5,gold:900,seed:5},{view:true});a.go();calmWorld(a);
+  let g=a.game();eq([g.stage.now,g.state.hall,towersOf(a.api.world)],[1,0,ring(6)],'(8세 지은 수 13 = 마을, 타워 6개로 0단계 자리가 다 참)');
+  a.tick(5);a.buy('tower');g=a.game();
+  eq([a.api.phase,g.stage.rule,g.stage.now,g.stage.due,g.state.level,g.state.hall,g.stage.hall],['ask',2,1,true,6,1,0],'(읽는 중에 7번째 타워: 규칙은 장터 마을·회관 1, 세계는 보류)');
+  eq(towersOf(a.api.world),ring(6),'보류 중: 안쪽 타워의 층을 올리지 않고 기다림');
+  /* R-10 그림 화면(3D를 못 쓰는 기기)의 회관도 보류를 지킨다 */
+  const art=()=>{const gd=a.n.garden.children;return [a.n.houseArt.src.split('/').pop(),a.n.villageExtra.children.some(e=>e.alt==='가게'),gd[gd.length-1].textContent.match(/회관 \d단계/)[0]]};
+  eq(art(),['home-01.png',false,'회관 0단계'],'그림 화면: 보류 중에는 회관 그림·가게·이름이 그대로(3D의 world.hall과 같음)');
+  let floors=0;for(let i=0;i<20;i++){a.tick(1);floors+=a.api.world.buildings.filter(b=>b.kind==='tower'&&b.floor>1).length}eq(floors,0,'보류가 이어지는 20틱 동안 층이 오른 타워 0');
+  a.unlock();a.right();g=a.game();eq([a.api.phase,g.stage.now,g.stage.hall,g.world.radius],['reward',2,1,11.5],'(답한 순간 장터 마을)');
+  const held=towersOf(a.api.world);eq(held,ring(7),'보류를 풀면 새 바깥 자리(6번)에 타워가 서고 층은 모두 1');eq(W.towerUnits(a.api.world),1+a.api.state.level,'층의 합 = 1 + level');
+  {const t=a.api.world.buildings.find(b=>b.kind==='tower'&&b.slot===6);ok(Math.hypot(t.x,t.z)<=W.radius(a.api.world)-1.4,'6번 자리('+t.x+','+t.z+')는 넓어진 울타리 안쪽')}
+  eq(art(),['home-02.png',true,'회관 1단계'],'그림 화면: 답한 순간 회관 그림·가게·이름이 바뀜');
+  /* 문제 사이(정답 연출 중)에 산 것과 같은 배치 */
+  const b=seed({age:8,level:5,fence:4,chickens:5,gold:900,seed:5});b.go();calmWorld(b);b.unlock();b.right();b.tick(5);b.buy('tower');eq(towersOf(b.api.world),held,'읽는 중에 산 것 = 문제 사이에 산 것(같은 타워 배치)');
+  /* 보류 중 이어하기: 저장된 세계는 층이 모자란 채이고, 불러오면 바로 새 자리에 */
+  const c=seed({age:8,level:5,fence:4,chickens:5,gold:900,seed:5});c.go();calmWorld(c);c.tick(5);c.buy('tower');c.unload();eq(towersOf(JSON.parse(saved[KEY]).world),ring(6),'(보류 중 저장: 타워 6개)');
+  const d=boot();eq([d.game().stage.now,towersOf(d.api.world)],[2,ring(7)],'보류 중에 나갔다 오면 장터 마을, 새 자리에 타워')}
+ /* R-1 세계 규칙: 보류 중 회관이 오를 참이면 층을 미루고(여러 단계를 한꺼번에 넘어도), 회관이 그대로인 보류는 0.14처럼 바로 층을 올린다 */
+ {const w=W.sync(W.create({seed:3}),built(4));eq([w.stage,w.hall,towersOf(w)],[0,0,ring(5)],'(농가, 타워 5개)');
+  const s=built(14);eq([s.hall,s.level+1],[1,15],'(지은 수 14 = 장터 마을, 회관 1, 타워 15개)');
+  W.sync(w,s,{hold:true});eq([w.stage,w.hall,towersOf(w)],[0,0,ring(6)],'농가 → 장터 마을을 한 문제에 넘는 보류: 빈 자리만 채우고 층은 미룸');
+  W.sync(w,s);eq([w.stage,w.hall,towersOf(w)],[2,1,ring(10,i=>i<5?2:1)],'풀면 새 자리 4곳을 먼저 채우고, 남은 5개는 층(0.14 규칙 그대로)');eq(W.towerUnits(w),15,'층의 합 = 15');
+  const v=W.sync(W.create({seed:3}),built(4)),t=built(7);eq([C.stage(t),t.hall],[1,0],'(지은 수 7 = 마을, 회관 0)');W.sync(v,t,{hold:true});
+  eq([v.stage,towersOf(v),W.towerUnits(v)],[0,ring(6,i=>i<2?2:1),8],'회관이 그대로인 보류(농가 → 마을)는 자리가 늘지 않으니 바로 층을 올림(0.14와 같음)')}
 }
 
 /* ======================= 0.14.1 프로듀서 테스트 모드(주소 ?test=1, testmode.js) ======================= */
