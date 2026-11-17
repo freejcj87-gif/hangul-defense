@@ -698,6 +698,33 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
   {const {ctx,page,errors}=await open({query:'/?art15=0'});await seed(page,{age:8,index:0,gold:300,...VILLAGE[3]});await page.waitForFunction(()=>window.VillageView?.inspect().ready,{},{timeout:45000});
    await begin(page,{age:8},true);await frames(page,3);const v=await insp(page);
    eq([v.stage,v.river.on,v.mill.shown,v.mill.art,v.river.bridge,v.roadMarks],[3,true,true,'code','code',2*World.STAGE.open[3].length-2],'art15=0: the river with the code-drawn mill and bridge');await shot(page.locator('.stage-card'),'river-art15-0-stage3');eq(errors,[],'art15=0 river page errors');await ctx.close()}
+  /* 0.15 그림 화면(3D 실패: environment-pack.glb를 막음). 0.14 한계(이름표 · 8번째 칸만)를 메워 열린 길(흙길 띠, 농가는 점선 8갈래)과 단계별 집을 그리고,
+     물레방아 마을부터 강 띠 · 다리 · 물레방아 그림, 늑대 왕 · 도둑 여우는 새 그림. 그림이 받아질 때까지 조건으로 기다린다.
+     ?river=0이면 강 · 다리 · 물레방아가 없고, ?art15=0이면 새 그림(다리 · 물레방아 · 왕 · 여우)을 쓰지 않는다 */
+  for(const [k,query] of [[0,''],[3,''],[5,''],[3,'/?river=0'],[3,'/?art15=0']]){
+   const ctx=await stageBrowser.newContext({viewport:{width:1366,height:768},hasTouch:true,reducedMotion:'reduce'});await ctx.addInitScript(HOLD);await ctx.addInitScript(FAKE_TTS);
+   const page=await ctx.newPage(),errors=[],tag='fallback stage '+k+(query||'');page.on('pageerror',e=>errors.push(e.message));await page.route('**/environment-pack.glb',r=>r.abort());await page.goto(url+query);await ready(page);
+   await seed(page,{age:8,index:0,wins:0,gold:300,farmers:0,power:0,pond:0,hall:0,...VILLAGE[k]});eq(await page.locator('.scene').getAttribute('data-renderer'),'fallback',tag+': the picture screen');await begin(page,{age:8},true);
+   await page.waitForFunction(()=>document.querySelectorAll('#stageArt .lane').length>0,{},{timeout:20000});
+   const river=k>=3&&query!=='/?river=0',art=query!=='/?art15=0';
+   if(river&&art)await page.waitForFunction(()=>['bridgeArt','millArt'].every(id=>{const e=document.getElementById(id);return e.complete&&e.naturalWidth>0}),{},{timeout:20000});
+   const a=await page.evaluate(()=>{const s=document.getElementById('scene').getBoundingClientRect(),shown=e=>!e.classList.contains('hidden')&&getComputedStyle(e).display!=='none',inside=e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0&&r.right>s.left&&r.left<s.right&&r.bottom>s.top&&r.top<s.bottom};
+    const lanes=[...document.querySelectorAll('#stageArt .lane')],houses=[...document.querySelectorAll('#stageArt img.cottage')];
+    return {lanes:lanes.map(e=>Number(e.dataset.road)).sort((x,y)=>x-y),trail:lanes.every(e=>e.classList.contains('trail')),lanesIn:lanes.every(inside),houses:houses.length,housesIn:houses.every(inside),
+     river:shown(document.getElementById('river'))&&inside(document.getElementById('river')),bridge:shown(document.getElementById('bridgeArt'))&&inside(document.getElementById('bridgeArt')),mill:shown(document.getElementById('millArt'))&&inside(document.getElementById('millArt'))}});
+   eq([a.lanes,a.trail,a.lanesIn,a.houses,a.housesIn],[k?World.STAGE.open[k]:[0,1,2,3,4,5,6,7],!k,true,HOUSES[k],true],tag+': open roads (a dotted trail per direction on the farm) and the stage cottages are drawn: '+JSON.stringify(a));
+   eq([a.river,a.bridge,a.mill],[river,river&&art,river&&art],tag+': river strip, bridge and mill pictures');
+   if(k===3){await page.evaluate(()=>{world.wolves=[];world.trickle=1e9;state.run.bell=1;syncKing(true);render()});await page.waitForFunction(()=>{const e=document.querySelector('#enemies .enemy[data-kind="king"] img');return e&&e.complete&&e.naturalWidth>0},{},{timeout:20000});
+    const king=await page.evaluate(()=>{const e=document.querySelector('#enemies .enemy[data-kind="king"]');return {src:e.querySelector('img').getAttribute('src'),art:e.dataset.art||null}});
+    eq(king,art?{src:'art-handoff/v015-v016/png/wolf-king.png',art:'15'}:{src:'art-handoff/coopnight/browser/wolves/wolf.png',art:null},tag+': the wolf king picture')}
+   await shot(page.locator('.scene'),'fallback-stage'+k+(query?'-'+query.replace(/\W+/g,''):''));eq(errors,[],tag+' page errors');await ctx.close()}
+  /* 새 그림이 오지 않으면(막음) 그 자리만 0.14 그림(늑대 그림 + 필터) */
+  {const ctx=await stageBrowser.newContext({viewport:{width:1366,height:768},hasTouch:true,reducedMotion:'reduce'});await ctx.addInitScript(HOLD);await ctx.addInitScript(FAKE_TTS);
+   const page=await ctx.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.route('**/environment-pack.glb',r=>r.abort());await page.route('**/art-handoff/v015-v016/**',r=>r.abort());await page.goto(url);await ready(page);
+   await seed(page,{age:8,index:0,wins:0,gold:300,farmers:0,power:0,pond:0,hall:0,...VILLAGE[3]});await begin(page,{age:8},true);
+   await page.evaluate(()=>{world.wolves=[];world.trickle=1e9;state.run.bell=1;syncKing(true);render()});
+   await page.waitForFunction(()=>{const e=document.querySelector('#enemies .enemy[data-kind="king"]');return e&&!e.dataset.art&&e.querySelector('img').getAttribute('src').endsWith('wolves/wolf.png')},{},{timeout:20000});
+   eq(await page.evaluate(()=>{const e=document.querySelector('#enemies .enemy[data-kind="king"]');return [e.querySelector('img').getAttribute('src'),e.dataset.art||null,document.getElementById('bridgeArt').naturalWidth]}),['art-handoff/coopnight/browser/wolves/wolf.png',null,0],'fallback: a missing 0.15 picture falls back to the 0.14 wolf picture (filter look)');eq(errors,[],'fallback blocked art page errors');await ctx.close()}
   /* 주소 ?stages=0: 0.13.2 모습(반지름은 회관 단계, 발자국 길 8갈래, 이름표·단계 소품 없음, 8번째 칸은 회관 점) */
   {const {ctx,page,errors}=await open({query:'/?stages=0'});await seed(page,{age:8,index:0,gold:300,...VILLAGE[5]});await page.waitForFunction(()=>window.VillageView?.inspect().ready,{},{timeout:45000});
    await begin(page,{age:8},true);await frames(page,3);const g=await game(page),v=await insp(page),c=await cell(page);

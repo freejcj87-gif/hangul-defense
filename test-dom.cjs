@@ -1602,6 +1602,13 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
     for(const c of L.COTTAGES.filter(c=>c.stage<=st))ok(seg2(c.at)>=L.COTTAGE_R+.3,tag+': 수로가 집 ('+c.at+')과 0.3 이상');
     for(const p of slots)ok(seg2(p)>=1.2,tag+': 수로가 타워 자리 ('+p+')와 1.2 이상');
     ok(seg2(L.WELL.at)>=L.WELL.r+.3,tag+': 수로가 우물과 떨어짐')}
+   /* S-9-4 그림 화면(index.html, ES 모듈을 못 읽어 수를 옮겨 적음)이 layout.js와 같은 자리에 그린다 */
+   {const m=/const FALLBACK_RIVER=(\{[^}]*\});/.exec(src),F=m&&new Function('return '+m[1])();
+    eq(F&&[F.dir,F.dist,F.water,F.bank,F.road,F.mill,F.bridge],[RV.dir,RV.dist,RV.water,RV.bank,RV.road,L.MILL.at,L.BRIDGE.len],'그림 화면 FALLBACK_RIVER = layout.js RIVER · MILL · BRIDGE');
+    const B=require('./scripts/build-pages.cjs'),png=[...src.matchAll(/'(art-handoff\/v015-v016\/png\/[a-z-]+\.png)'/g)].map(x=>x[1]).sort();
+    eq(png,['bridge','thief-fox','watermill','wolf-king'].map(n=>'art-handoff/v015-v016/png/'+n+'.png'),'그림 화면이 쓰는 0.15 그림 4개');ok(png.every(p=>B.files.includes(p)),'그림 화면의 0.15 그림은 배포 묶음에 있음');
+    ok(/\[\?&\]art15=0\\b/.test(src),'그림 화면도 ?art15=0이면 새 그림을 쓰지 않음');
+    const c=/const FALLBACK_COTTAGES=(\[[^;]*\]);/.exec(src);eq(c&&JSON.parse(c[1]),L.COTTAGES.map(k=>[...k.at,k.stage].map(v=>v+0)),'그림 화면 집 자리 FALLBACK_COTTAGES = layout.js COTTAGES(단계별 2 · 4 · 6 · 10 · 22채)')}
    /* 다리 발판 높이: 가운데 0.469, 양 끝으로 낮아지고 1.97 밖은 땅 */
    ok(Math.abs(L.deckY(0)-.469)<1e-9&&L.deckY(1.46)<L.deckY(.5)&&L.deckY(1.97)===0&&L.deckY(-1)===L.deckY(1),'다리 발판 높이(아치): 가운데 0.469, 끝으로 낮아짐, 대칭')}
  });
