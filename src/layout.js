@@ -73,12 +73,21 @@ export const COTTAGES=[
  {at:polar(11.6,72),stage:3,roof:0x4f86c6},{at:polar(11.4,60),stage:3,roof:0xd9a441},
  {at:polar(13.6,64),stage:4,roof:0xc8553a},{at:polar(13.9,240),stage:4,roof:0x5aa05a},{at:polar(14.2,125),stage:4,roof:0x4f86c6},{at:polar(14.2,325),stage:4,roof:0xd9a441},
  {at:polar(16.6,70),stage:5,roof:0x5aa05a},{at:polar(16.4,252),stage:5,roof:0x4f86c6},{at:polar(16.8,145),stage:5,roof:0xc8553a},{at:polar(16.8,305),stage:5,roof:0x5aa05a},
- {at:polar(16.9,10),stage:5,roof:0xd9a441},{at:polar(16.9,190),stage:5,roof:0xc8553a}];
+ {at:polar(16.9,10),stage:5,roof:0xd9a441},{at:polar(16.9,190),stage:5,roof:0xc8553a},
+ // the castle's outer ring (radius 22): between the six open roads, outside the last tower ring (14.5)
+ {at:polar(19.6,45),stage:5,roof:0x4f86c6},{at:polar(19.6,90),stage:5,roof:0xc8553a},{at:polar(19.6,135),stage:5,roof:0xd9a441},
+ {at:polar(19.6,180),stage:5,roof:0x5aa05a},{at:polar(19.6,270),stage:5,roof:0x4f86c6},{at:polar(19.6,315),stage:5,roof:0xc8553a}];
 export const WELL={at:polar(8.9,71),r:.5,stage:2};
+/* ---- placeholders the 0.15 / 0.16 art replaces (outputs\art-v015-v016-20261117, not used in 0.14) ----
+   Each slot gives the ground position 'at', the footprint radius 'r' the clearances were checked with, the height 'h' the code shape is drawn at,
+   and which model goes there. A model dropped in at 'at', scaled to 'h' and turned to face the village centre fits without moving anything else:
+   MILL → watermill.glb + waterwheel.glb (0.15) · KEEP → castle-hall.glb (0.16, it also takes over the hall) ·
+   ROAD_MARK (two per open road, outside the edge) → castle-gate.glb across the road or watchtower.glb on each side (0.16) ·
+   the fence ring's third layer (stone wall, world.js fence layer 3) → wall-segment.glb (0.16). */
 // 0.14 stand-in for the mill village: a hut with a (still) water wheel. The river, the bridge and the working mill come in 0.15.
-export const MILL={at:polar(11.2,247.5),r:1,stage:3};
+export const MILL={at:polar(11.2,247.5),r:1,h:2.2,stage:3,art:'watermill'};
 // The castle keep rises behind the hall (it overlaps the hall's back corner on purpose: the hall becomes the castle).
-export const KEEP={at:[-1.8,-3.9],r:.7,stage:5};
+export const KEEP={at:[-1.8,-3.9],r:.92,h:6.5,stage:5,art:'castle-hall'};
 // Road-entrance markers stand outside the village edge on both sides of every open wolf road: [distance beyond the radius, lateral offset]
-export const ROAD_MARK={out:.55,side:1.75};
+export const ROAD_MARK={out:.55,side:1.75,h:[0,1.2,2.3,2.7,3.8],art:'castle-gate'};   // h: height of the marker per tier (1 lamp stake · 2 flag pole · 3 stone post · 4 tall post with banner)
 export const ROAD={r0:7.9,r1:50,edge:2.0,width:1.45};   // an open wolf road (dirt), from inside the village edge out into the forest

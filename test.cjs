@@ -588,7 +588,7 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
   const tagBox=page=>page.evaluate(()=>{const s=document.getElementById('scene').getBoundingClientRect(),e=document.getElementById('stageTag'),r=e.getBoundingClientRect(),y=document.getElementById('yardEggs').getBoundingClientRect();return {text:e.textContent,inside:r.width>0&&r.left>=s.left&&r.right<=s.right&&r.top>=s.top&&r.bottom<=s.bottom,clearOfEggs:r.right<=y.left}});
   /* 단계별 마을(8세 문턱 0·5·14·24·36·50). 회관은 불러올 때 규칙이 정한다 */
   const VILLAGE=[{level:1,fence:1,chickens:2},{level:3,fence:3,chickens:4},{level:5,fence:6,chickens:6,farmers:1},{level:7,fence:8,chickens:9,farmers:2,power:2},{level:10,fence:12,chickens:12,farmers:4,power:3,pond:1},{level:14,fence:16,chickens:16,farmers:6,power:5,pond:2}];
-  const NAME=['🏡 농가','🏘️ 마을','🏪 장터 마을','💧 물레방아 마을','🧱 성곽 마을','🏰 성'],HALL=[0,0,1,1,2,3],HOUSES=[0,2,4,6,10,16],ROADS=['all','0,2','0,2,4','0,2,4,6','0,2,3,4,6','0,2,3,4,6,7'];
+  const NAME=['🏡 농가','🏘️ 마을','🏪 장터 마을','💧 물레방아 마을','🧱 성곽 마을','🏰 성'],HALL=[0,0,1,1,2,3],HOUSES=[0,2,4,6,10,22],ROADS=['all','0,2','0,2,4','0,2,4,6','0,2,3,4,6','0,2,3,4,6,7'];
   {const {ctx,page,errors}=await open();let lastHalf=0,geo5=0;
    for(let k=0;k<6;k++){
     await seed(page,{age:8,index:0,wins:0,gold:300,farmers:0,power:0,pond:0,hall:0,...VILLAGE[k]});await page.waitForFunction(()=>window.VillageView?.inspect().ready,{},{timeout:45000});
@@ -597,7 +597,7 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
     eq([g.stage.now,g.state.hall,g.world.radius,g.stage.tag],[k,HALL[k],R,NAME[k]],'stage '+k+': stage, hall, radius and name tag');
     eq([v.stage,v.roads,v.stageHouses,v.roadMarks,v.radius,v.hall],[k,ROADS[k],HOUSES[k],k?2*World.STAGE.open[k].length:0,R,HALL[k]],'stage '+k+': the 3D village shows the stage (roads, houses, road marks, radius)');
     ok(Math.abs(v.radiusShown-R)<.05,'stage '+k+': the view has settled on the new radius: '+v.radiusShown);ok(v.cameraHalf>=lastHalf-.01&&(k===0||v.cameraHalf>lastHalf+.3),'stage '+k+': the camera is further back than at stage '+(k-1)+': '+v.cameraHalf.toFixed(2)+' > '+lastHalf.toFixed(2));lastHalf=v.cameraHalf;
-    ok(v.drawCalls<=52&&v.triangles<=420000,'stage '+k+': draw budget: '+v.drawCalls+' calls, '+v.triangles+' triangles');
+    ok(v.drawCalls<=52&&v.triangles<=520000,'stage '+k+': draw budget(0.14: 기준 기기가 패드·노트북이 되어 삼각형 상한을 42만 → 52만으로): '+v.drawCalls+' calls, '+v.triangles+' triangles');
     const c=await cell(page);eq([c.key,c.state,c.stage,c.fits],['hall','auto',String(k),true],'stage '+k+': the 8th slot shows the stage and fits');ok(/^(\d+개 더|🔔\d+개)$/.test(c.pr),'stage '+k+': progress text: '+c.pr);
     const t=await tagBox(page);ok(t.inside&&t.clearOfEggs,'stage '+k+': name tag inside the scene, clear of the egg counter: '+JSON.stringify(t));
     ok(await noOverflow(page),'stage '+k+': no overflow');ok(await shopFits(page),'stage '+k+': shop fits');
@@ -633,7 +633,7 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
   /* 320×568, 움직임 줄이기: 성(가장 넓은 마을)에서도 배치가 깨지지 않고, 전환은 연출 없이 바로 */
   {const {ctx,page,errors}=await open({width:320,height:568,calm:true});await seed(page,{age:8,index:0,gold:900,...VILLAGE[5]});await page.waitForFunction(()=>window.VillageView?.inspect().ready,{},{timeout:45000});
    await begin(page,{age:8},true);await frames(page,3);
-   let v=await insp(page),c=await cell(page),t=await tagBox(page);eq([v.stage,v.radius,v.stageHouses],[5,19,16],'stage 320: the castle');ok(c.fits&&/^🔔\d+개$/.test(c.pr),'stage 320: the 8th slot fits: '+c.pr);ok(t.inside&&t.clearOfEggs,'stage 320: name tag fits: '+JSON.stringify(t));
+   let v=await insp(page),c=await cell(page),t=await tagBox(page);eq([v.stage,v.radius,v.stageHouses],[5,22,22],'stage 320: the castle');ok(c.fits&&/^🔔\d+개$/.test(c.pr),'stage 320: the 8th slot fits: '+c.pr);ok(t.inside&&t.clearOfEggs,'stage 320: name tag fits: '+JSON.stringify(t));
    ok(await noOverflow(page),'stage 320: no overflow');ok(await shopFits(page),'stage 320: shop fits');ok(await pillsFit(page),'stage 320: pills fit');await shot(page,'stage-320x568-castle');
    /* 새 세계로(세계는 단계를 래치하므로 성이던 세계를 그대로 두면 농가로 돌아가지 않는다) */
    await page.evaluate(()=>{Object.assign(state,Combat.fresh(8),{level:2,fence:1,chickens:2,gold:300,seed:state.seed});state.run.t0=Date.now();world=freshWorld();save()});await page.reload();await ready(page);await page.waitForFunction(()=>window.VillageView?.inspect().ready,{},{timeout:45000});

@@ -354,7 +354,7 @@ async function start(){
   for(let gx=-64;gx<=64;gx+=2.3)for(let gz=-64;gz<=64;gz+=2.3){
    const x=gx+span(-1,1),z=gz+span(-1,1),r=Math.hypot(x,z),sx=x*camRight.x+z*camRight.z,sy=x*fwdXZ.x+z*fwdXZ.z;
    const kind=rnd(),item={x,z,r,a:Math.atan2(z,x),u:rnd(),lane:laneOf(x,z),ry:span(0,6.283),s:1};
-   if(r<8.2||Math.abs(sx)>46||sy>34||sy<-28)continue;   // beyond the widest view at full zoom-out
+   if(r<8.2||Math.abs(sx)>58||sy>42||sy<-38)continue;   // beyond the widest view at full zoom-out (0.14: castle radius 22)
    if(kind<.1){item.s=span(.7,1.4);DEC.rock.push(item)}else if(kind<.22){item.s=span(.8,1.3);DEC.bush.push(item)}else{item.s=span(3.1,4.3);DEC.tree.push(item)}
   }
   seed=keep}

@@ -1456,19 +1456,19 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   /* 저장에 단계 칸이 없다 */
   ok(!('stage' in C.fresh(8))&&!('stage' in C.restore({version:3,...built(30)})),'경제 상태에 단계 칸을 두지 않음(지은 수에서 계산)');}
  /* S-2 세계: 단계별 반지름 · 래치 · 보류(hold) · 사거리 */
- {const R=W.STAGE.radius;eq(R,[7,9,11,13.5,16,19],'단계별 반지름');ok(R[5]>W.RADIUS[3]&&R.every((v,i)=>i===0||v>R[i-1]),'단계마다 넓어지고 마지막은 0.13의 최대(16)보다 큼');
+ {const R=W.STAGE.radius;eq(R,[7,9,11.5,14.5,18,22],'단계별 반지름(0.14: 기준 기기가 패드·노트북이 되어 마지막을 19 → 22로)');ok(R[5]>W.RADIUS[3]&&R.every((v,i)=>i===0||v>R[i-1]),'단계마다 넓어지고 마지막은 0.13의 최대(16)보다 큼');
   const s=built(4),w=W.sync(W.create({seed:3}),s);eq([w.stage,W.radius(w),W.routes(w)],[0,7,null],'농가: 반지름 7, 길은 8방향 전부');
   const s2=built(14);W.sync(w,s2,{hold:true});eq([w.stage,w.hall,W.radius(w)],[0,0,7],'보류(hold): 단계·회관·반지름을 세계에 아직 넣지 않음');
   ok(!w.buildings.some(b=>b.kind==='nursery')&&w.buildings.filter(b=>b.kind==='tower').every(b=>b.slot<6),'보류 중: 새 건물·바깥 타워 자리도 아직');
-  W.sync(w,s2);eq([w.stage,w.hall,W.radius(w),W.routes(w)],[2,1,11,[0,2,4]],'보류를 풀면 장터 마을: 반지름 11, 길 3갈래');ok(w.buildings.some(b=>b.kind==='nursery'),'회관 1 → 작은 닭장');
-  for(const b of w.buildings)if(b.kind==='fence')ok(Math.abs(Math.hypot(b.x,b.z)-11)<1e-9,'울타리가 새 반지름으로 옮겨 섬');
-  W.sync(w,built(4));eq([w.stage,W.radius(w)],[2,11],'지은 수가 줄어도 세계의 단계는 내려가지 않음(래치)');
+  W.sync(w,s2);eq([w.stage,w.hall,W.radius(w),W.routes(w)],[2,1,11.5,[0,2,4]],'보류를 풀면 장터 마을: 반지름 11.5, 길 3갈래');ok(w.buildings.some(b=>b.kind==='nursery'),'회관 1 → 작은 닭장');
+  for(const b of w.buildings)if(b.kind==='fence')ok(Math.abs(Math.hypot(b.x,b.z)-11.5)<1e-9,'울타리가 새 반지름으로 옮겨 섬');
+  W.sync(w,built(4));eq([w.stage,W.radius(w)],[2,11.5],'지은 수가 줄어도 세계의 단계는 내려가지 않음(래치)');
   const fresh2=W.sync(W.create({seed:3}),built(4),{hold:true});eq(fresh2.stage,0,'처음 맞추는 세계는 hold여도 단계를 정함');
   /* 회관이 오르는 단계의 반지름은 그 회관의 타워 고리보다 넉넉히 크다 */
   for(let h=1;h<=3;h++){const st=C.FLAGS.STAGE_HALL[h-1];W.towerSlots(h).forEach((p,i)=>ok(Math.hypot(p[0],p[1])<=R[st]-(i<6?.6:1.4),'회관 '+h+'(단계 '+st+')의 타워 자리 ('+p+')는 울타리 안쪽'))}
-  /* 사거리: 영역 덤 = (반지름 − 7) × 0.75. 끄면 회관 덤 */
-  eq(W.STAGE.range,R.map(r=>(r-7)*.75),'사거리 덤 표');
-  {const s=built(40),w=W.sync(W.create({seed:1}),s);eq([w.stage,s.hall],[4,2],'(성곽 마을)');eq(W.range(s,w),W.TOWER.range+.4*5+6.75,'단계 사거리 = 기본 + 타워 + 6.75');eq(W.range(s),W.TOWER.range+.4*5+W.TOWER.hallRange*2,'세계 없이 부르면 0.13.2 식(회관 덤)')}
+  /* 사거리: 영역 덤 = (반지름 − 7) × 0.9(마지막 반지름 22에서 울타리 부서짐을 반지름 19 때 수준으로, game-plan §14.8). 끄면 회관 덤 */
+  eq(W.STAGE.range,R.map(r=>(r-7)*.9),'사거리 덤 표');
+  {const s=built(40),w=W.sync(W.create({seed:1}),s);eq([w.stage,s.hall],[4,2],'(성곽 마을)');eq(W.range(s,w),W.TOWER.range+.4*5+9.9,'단계 사거리 = 기본 + 타워 + 9.9');eq(W.range(s),W.TOWER.range+.4*5+W.TOWER.hallRange*2,'세계 없이 부르면 0.13.2 식(회관 덤)')}
   /* 울타리 줄에 화살이 닿는 둘레: 그 단계의 흔한 타워 수에서 90% 이상 */
   const cover=(n,units)=>{const s=built(n);s.level=units-1;s.fence=0;const w=W.create({seed:1});w.stage=C.stage(built(n));W.sync(w,s);const T=w.buildings.filter(b=>b.kind==='tower'),RR=W.radius(w)+.3;let hit=0;
    for(let i=0;i<360;i++){const a=i*Math.PI/180,x=Math.cos(a)*RR,z=Math.sin(a)*RR;if(T.some(b=>Math.hypot(b.x-x,b.z-z)<=W.towerRange(s,b,w)))hit++}return hit/360};
@@ -1484,7 +1484,7 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   for(const n of [5,14,24,36,50]){const s=built(n),st=C.stage(s),r=walk(s,null,2400);ok(r.pts.length>=2&&r.pts.every(p=>O[st].includes(p)),'지은 수 '+n+'('+C.STAGE_NAME[st]+'): 출현 지점 '+r.pts+' ⊂ 열린 길 '+O[st]);
    ok(r.ang.every(a=>O[st].some(p=>{let d=Math.abs(a-(p+.5)*Math.PI/4)%(Math.PI*2);if(d>Math.PI)d=Math.PI*2-d;return d<=.26})),'늑대가 나온 방향이 모두 열린 길 둘레(±0.25 rad)');
    ok(r.pts.length===O[st].length,'열린 길 '+O[st].length+'곳 모두에서 나옴')}
-  {const r=walk(built(14),{ROUTES:false},2400);ok(r.pts.some(p=>!O[2].includes(p)),'ROUTES를 끄면 전 단계 8방향(출현 지점 '+r.pts+')');eq(W.radius(r.w),11,'ROUTES만 꺼도 반지름은 단계를 따름')}
+  {const r=walk(built(14),{ROUTES:false},2400);ok(r.pts.some(p=>!O[2].includes(p)),'ROUTES를 끄면 전 단계 8방향(출현 지점 '+r.pts+')');eq(W.radius(r.w),11.5,'ROUTES만 꺼도 반지름은 단계를 따름')}
   {const a=walk(built(24),null,900).w,b=walk(built(24),null,900).w;eq(JSON.stringify(a),JSON.stringify(b),'같은 씨앗 · 같은 입력 → 같은 세계(결정적)')}
   /* 여우도 열린 길로 */
   {const s=built(24),w=W.sync(W.create({seed:5}),s);for(let i=0;i<12;i++){w.fox=null;const f=W.fox(w,s,50,{});ok(O[3].includes(f.point),'여우 출현 지점 '+f.point+'는 열린 길')}}
@@ -1498,7 +1498,7 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
  {const s=built(36),w=W.sync(W.create({seed:8,interval:150}),s);for(let i=0;i<400;i++)W.step(w,s);
   const raw=JSON.parse(JSON.stringify({...w,events:[]})),back=W.restore(raw);eq(JSON.stringify({...back,events:[]}),JSON.stringify(raw),'단계가 있는 세계: 저장 → 복원 뒤에도 같은 세계');eq([back.v,back.stage],[2,4],'세계 형식은 v2 그대로, stage 4');
   for(const bad of [7,-1,2.5,'3',null]){const r=W.restore({...raw,stage:bad});ok(!('stage' in r),'틀린 stage('+JSON.stringify(bad)+')는 버림');W.sync(r,s);eq(r.stage,4,'다음 맞추기에서 다시 정함')}}
- /* S-5 0.13.2 저장 이어하기: 회관 1~3 마을(반지름 10·13·16)을 불러와도 깨지지 않는다 */
+ /* S-5 0.13.2 저장 이어하기: 회관 1~3 마을(반지름 10·13·16 → 11.5·18·22)을 불러와도 깨지지 않는다 */
  for(const [old,stage] of [[{level:4,fence:4,chickens:4},2],[{level:10,fence:10,chickens:9,farmers:3,power:2},4],[{level:15,fence:16,chickens:16,farmers:6,power:5,pond:2},5]]){
   const pack=withFlags(OFF,()=>{const s=FS({...old,gold:500,seed:5});const w=W.sync(W.create({seed:21,interval:150}),s);for(let i=0;i<260;i++)W.step(w,s);return {s:JSON.parse(JSON.stringify(s)),w:JSON.parse(JSON.stringify({...w,events:[]}))}});
   const h0=pack.s.hall,R0=W.RADIUS[h0],towers0=pack.w.buildings.filter(b=>b.kind==='tower').map(b=>[b.slot,b.floor]),hens0=pack.w.hens.length;
@@ -1533,7 +1533,7 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   a.tick(17);eq(a.api.phase,'ask','다음 문제로');a.tick(40);eq(a.fx('banner').length,0,'띠 알림은 3.3초 뒤 사라짐');
   /* 문제 사이(정답 연출 중)에 사면 바로 */
   const b=seed({age:8,level:5,fence:4,chickens:5,gold:900,seed:5},{view:true});b.go();calmWorld(b);eq(b.game().stage.now,1,'(지은 수 13 = 마을)');b.unlock();b.right();b.tick(5);eq(b.api.phase,'reward','(정답 연출 중)');
-  b.buy('tower');g=b.game();eq([g.stage.now,g.state.hall,g.stage.hall,g.world.radius,g.stage.routes],[2,1,1,11,[0,2,4]],'문제 사이에 사면 바로 장터 마을(회관 1, 반지름 11, 길 3갈래)');
+  b.buy('tower');g=b.game();eq([g.stage.now,g.state.hall,g.stage.hall,g.world.radius,g.stage.routes],[2,1,1,11.5,[0,2,4]],'문제 사이에 사면 바로 장터 마을(회관 1, 반지름 11.5, 길 3갈래)');
   ok(b.built.includes('stage')&&b.built.includes('hall'),'3D에 회관과 단계 전환을 알림');eq(b.fx('banner')[0].textContent,'🏪장터 마을이 되었어요!늑대는 길 3곳으로 와요 · 알값 +1 · 새 상품: 강화','띠 알림: 길 · 알값 · 새 상품');
   eq(b.row('power').state,'buy','강화가 열림');
   /* 두 번 틀려 정답을 배우는 동안도 문제 사이 */
@@ -1547,7 +1547,7 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   for(let i=0;i<4;i++){k.tick(5);k.buy(i%2?'tower':'fence')}eq([k.api.state.run.bell,k.slots()[7].dataset.key],[1,'bell'],'4개를 더 지으면 종이 열리고 8번째 칸은 종');ok(!('stage' in k.slots()[7].dataset),'종 칸에는 단계 표시가 남지 않음');
   /* 나이를 바꾸면 그 나이 문턱으로 다시 맞춘다(오르기만) */
   const y=seed({age:8,level:10,fence:12,chickens:12,farmers:4,power:3,pond:1,gold:300,seed:5});eq([y.game().stage.now,y.api.state.hall],[4,2],'(8세 지은 수 41 = 성곽 마을)');
-  y.n.ageRow.children.find(x=>x.dataset.age==='10').click();eq([y.api.state.age,y.game().stage.now,y.api.state.hall,y.game().world.radius,y.api.state.run.bell],[10,5,3,19,0],'시작 화면에서 10세로: 성(10세 문턱 37), 종은 아직(44 < 46)');
+  y.n.ageRow.children.find(x=>x.dataset.age==='10').click();eq([y.api.state.age,y.game().stage.now,y.api.state.hall,y.game().world.radius,y.api.state.run.bell],[10,5,3,22,0],'시작 화면에서 10세로: 성(10세 문턱 37), 종은 아직(44 < 46)');
   const z=seed({age:8,level:10,fence:12,chickens:12,farmers:6,power:3,pond:1,gold:300,seed:5});z.n.ageRow.children.find(x=>x.dataset.age==='10').click();eq([z.api.state.run.bell,z.api.world.king&&z.api.world.king.state],[1,'wait'],'10세 종 문턱(46)을 넘은 마을은 나이를 바꾸는 순간 종이 열리고 늑대 왕이 기다림');z.go();z.tick(30);eq(badNum(z.game(),'game'),null,'그대로 이어서 할 수 있음');}
  /* S-7 끄면(주소 ?stages=0) 0.13.2 화면: 이름표 없음, 8번째 칸은 회관 점, 사는 순간 회관 승급 */
  withFlags(OFF,()=>{const a=seed({age:8,level:5,fence:2,chickens:3,gold:900,seed:5},{view:true});a.go();calmWorld(a);const g=a.game();
@@ -1562,7 +1562,7 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
  stageLayout.push(L=>{
   const SIZE={coop:1.4,market:1.6,nursery:1,barn:1.6},d2=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]),seg=(p,[x0,z0,x1,z1])=>{const dx=x1-x0,dz=z1-z0,t=Math.max(0,Math.min(1,((p[0]-x0)*dx+(p[1]-z0)*dz)/(dx*dx+dz*dz)));return Math.hypot(p[0]-x0-dx*t,p[1]-z0-dz*t)};
   const things=[...L.COTTAGES.map((c,i)=>({name:'집 '+i,at:c.at,r:L.COTTAGE_R,stage:c.stage})),{name:'우물',at:L.WELL.at,r:L.WELL.r,stage:L.WELL.stage},{name:'물레방아',at:L.MILL.at,r:L.MILL.r,stage:L.MILL.stage}];
-  eq([1,2,3,4,5].map(k=>L.COTTAGES.filter(c=>c.stage<=k).length),[2,4,6,10,16],'집은 단계마다 2 · 4 · 6 · 10 · 16채');
+  eq([1,2,3,4,5].map(k=>L.COTTAGES.filter(c=>c.stage<=k).length),[2,4,6,10,22],'집은 단계마다 2 · 4 · 6 · 10 · 22채');
   const roads=W.STAGE.open[5].map(p=>{const a=(p+.5)*Math.PI/4;return [Math.cos(a)*5,Math.sin(a)*5,Math.cos(a)*60,Math.sin(a)*60]});
   for(const t of things){const tag=t.name+' ('+t.at+')';
    ok(Math.hypot(t.at[0],t.at[1])+t.r<=W.STAGE.radius[t.stage]-.4-.3,tag+': 나타나는 단계('+t.stage+')의 울타리 안쪽');
