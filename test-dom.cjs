@@ -670,8 +670,8 @@ a.tick(30);eq(a.api.round,null,'시작 화면에서는 문제 없음');eq(a.api.
 for(const id of ['battle','next','shield','combatInfo','buildPrompt','buyChicken','buyFence','timebar','timeFill','wolfHead','timeTag','choices','cards','skip','gainLine','gainParts'])ok(!html.includes('id="'+id+'"'),'없앤 요소: '+id);
 ok(!html.includes('소리 도움말'),'정답을 글자로 보여 주던 소리 도움말 제거');ok(!src.includes('다음 무리')&&!src.includes('barLeft')&&!src.includes('secondsLeft'),'늑대 시간 표시(초·막대) 코드 없음');
 ok(!src.includes('enterPick')&&!src.includes('picks')&&!src.includes('offers('),'카드 고르기 단계 코드 없음');
-ok(html.includes('src="combat.js?v=0.14"')&&html.includes('src="world.js?v=0.14"')&&html.includes('src="questions.js?v=0.14"')&&html.includes('src="village.js?v=0.14"')&&!html.includes('?v=0.12'),'캐시 갱신용 ?v=0.13');
-ok(html.indexOf('src="questions-gen.js?v=0.14"')>0&&html.indexOf('src="questions-gen.js?v=0.14"')<html.indexOf('src="questions.js?v=0.14"'),'생성 문항 파일을 questions.js보다 먼저 불러옴');
+ok(html.includes('src="combat.js?v=0.15"')&&html.includes('src="world.js?v=0.15"')&&html.includes('src="questions.js?v=0.15"')&&html.includes('src="village.js?v=0.15"')&&!html.includes('?v=0.14'),'캐시 갱신용 ?v=0.13');
+ok(html.indexOf('src="questions-gen.js?v=0.15"')>0&&html.indexOf('src="questions-gen.js?v=0.15"')<html.indexOf('src="questions.js?v=0.15"'),'생성 문항 파일을 questions.js보다 먼저 불러옴');
 /* 0.11: 듣고 고르기 모드 폐쇄. 시작 화면·설정에 모드 고르기가 없고, 스크립트에 소리 모드 분기가 없다 */
 for(const id of ['startSound','startStory','mode'])ok(!html.includes('id="'+id+'"'),'없앤 모드 버튼: '+id);
 ok(!html.includes('mode-row')&&!html.replace(/<script>[\s\S]*?<\/script>/,'').includes('듣고 고르기'),'화면에 모드 고르기·듣고 고르기 문구 없음');
@@ -1557,7 +1557,7 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   const vs=a.window.getVillageState();eq([vs.stage,vs.routes,vs.hall],[-1,null,1],'끔: 3D에는 단계·길을 넘기지 않음(8갈래 발자국 길)');
   a.unload();const again=JSON.parse(saved[KEY]);ok(!('stage' in again.world)&&!('stage' in again),'끔: 저장에 단계 칸 없음')});
  ok(/\[\?&\]stages=0\\b/.test(src)&&/\[\?&\]routes=0\\b/.test(src),'주소 ?stages=0 · ?routes=0으로 끄는 손잡이');
- ok(html.includes('늑대가 오기 전에 읽어요 0.14')&&!html.includes('?v=0.13'),'머리글과 캐시 문자열이 0.14');
+ ok(html.includes('늑대가 오기 전에 읽어요 0.15')&&!html.includes('?v=0.14'),'머리글과 캐시 문자열이 0.15');
  /* S-8 3D 단계 소품 자리(src/layout.js): 맨 끝에서 모듈을 불러 확인 */
  stageLayout.push(L=>{
   const SIZE={coop:1.4,market:1.6,nursery:1,barn:1.6},d2=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]),seg=(p,[x0,z0,x1,z1])=>{const dx=x1-x0,dz=z1-z0,t=Math.max(0,Math.min(1,((p[0]-x0)*dx+(p[1]-z0)*dz)/(dx*dx+dz*dz)));return Math.hypot(p[0]-x0-dx*t,p[1]-z0-dz*t)};

@@ -55,7 +55,22 @@
 
 ## 실제 규칙과 한계
 
-### 0.14 (현재)
+### 0.15 (현재)
+
+강 · 다리 · 물레방아와 늑대 왕 · 도둑 여우 새 모델입니다(브랜치 `claude/v015-river`, worktree `work\claude-v013`, main 0.14 `11fca3c` 기준). 정본은 [docs/game-plan.md](docs/game-plan.md) §15, 구현 계획서는 저장소 밖 `work\verification-20261113\design\v015-plan.md`, 커밋별 기록은 [docs/v015-progress.md](docs/v015-progress.md)입니다. 병합 · 배포 전입니다.
+
+- 프로듀서 결정('26.11.17): 물레방아는 물레방아 마을이 되면 저절로 서고 한 번에 맞힌 정답에만 바퀴가 돈다(금화 없음). 다리 길(6번, 화면 위) 늑대는 다리로 한 줄로 온다(`FLAGS.BRIDGE`, 시뮬 통과).
+- 아트: `art-handoff/v015-v016/`(원본 `outputs\art-v015-v016-20261117`을 그대로 복사, test-dom이 SHA-256을 manifest와 대조). 배포 묶음은 물레방아 · 다리 · 늑대 왕 · 도둑 여우 GLB · PNG 4쌍(`scripts/build-pages.cjs` `art15`). 소스에 적은 아트 경로가 묶음에 없으면 빌드가 멈춘다. 0.16 아트(성 · 성벽 · 성문 · 성탑)는 저장소에만 있다.
+- 규칙(`combat.js` · `world.js`): `FLAGS.RIVER`(그림) · `FLAGS.BRIDGE`(규칙), `World.BRIDGE` · `bridgeAt`. 단계 3 이상 6번 길 출현 각도 흔들림만 ±0.03rad, 난수 호출 수 그대로. 끄면 0.14와 한 글자도 다르지 않다(시뮬 끔 = 0.14 최종).
+- 화면(`index.html`): 주소 `?river=0`(둘 다 끔) · `?bridge=0`(규칙만), `rivered()`, `getVillageState().river · bridge`, 단계 3 띠 알림 한 줄. 그림 화면: `drawRiver`(강 띠 · 다리 · 물레방아), `drawStageArt`(열린 길 · 단계별 집), `wolfLook`(왕 · 여우 새 그림, 실패하면 0.14 그림), 모두 그림 화면에서만. `FALLBACK_RIVER` · `FALLBACK_COTTAGES`는 `layout.js`와 test-dom이 대조.
+- 3D(`src/geo.js` · `src/layout.js` · `src/props.js` · `src/monsters.js` · `src/village.js`): `prep`이 glTF `COLOR_0`를 씀, `loadArt15()`(파일마다 실패 허용, `?art15=0`), 늑대 왕 · 여우 GLB를 리그 한 장으로(`setRig`), `RIVER` · `bridgeSpot` · `deckY` · `millRace` · `MILL`(0.14 자리 `MILL0`), `riverGeometry` · `stageProps(…,{river})`, 강 메시 · 바퀴 배우 · 숲 비키기 · `riverLift`(시야 위로) · `millKick` · `riverStep`(다리 위 높이 · 물보라 · 누적 카운터). `inspect()`에 `art15` · `monsterArt` · `river` · `mill`.
+- 시뮬: `scripts/sim-flow.cjs` 맨 끝 두 열(20분까지 울타리 면별 부서짐, 다리 길 유입 %). 0.14 기준선은 `'{"FLAGS":{"BRIDGE":false}}'`.
+- 검사: test-dom S-9(손잡이 · 세계 · 배치 · 그림 화면 수 · 띠 알림)와 "0.15 아트 들여오기" 절, test.cjs `art` 구간(로더 · 실패 · 왕 · 여우)과 `stage` 구간의 강 덩어리(둘러보기 · 기준 화면 3개 × 단계 3 · 5 · 바퀴 · 다리 건너기 · 전환 · `?river=0` · `?art15=0` · 그림 화면).
+- 결정적 시계: 바퀴 · 물결 · 강이 흘러드는 연출 · 다리 높이 · 물보라는 화면 시계로만. 검사는 `debug({hold})` + `advance`와 누적 카운터(`river.bridged · waded · wadedIn · splashes`, `mill.kicks · turns`)로 본다.
+- 계획서와 다른 점: 강 방향 280°(284°는 성 단계 7번 길 낙오 늑대가 물에 닿음), 시야 위로 기울임을 세 기준 화면 모두에, 물보라 따로 예산, 왕 · 여우는 GLB 원래 크기.
+- 남은 것 · 한계(§15.8): 4번 면 쏠림(8세 3개씩 +26%, 전체 +1%), 돌아가는 늑대 · 성 단계 7번 길 큰 무리 꼬리는 물을 건넘(물보라), 패드 세로 좌우 길 늑대가 늦게 보임(화면을 25% 더 물려야 해 그대로), 실기기 · 실제 아이 확인 없음.
+
+### 0.14 (참고)
 
 보이는 단계 6개 · 넓어지는 영역 · 길입니다(브랜치 `claude/v014-stages`, worktree `work\claude-v013`, main 0.13.2 `b5c9ae5` 기준). 정본은 [docs/game-plan.md](docs/game-plan.md) §14, 설계 근거는 저장소 밖 `work\verification-20261113\design\v014-scale-design.md`(§9 프로듀서 결정이 본문보다 우선)입니다. 병합·배포 전입니다.
 
@@ -313,6 +328,14 @@ Playwright 시스템 의존성 설치는 WSL/Ubuntu 환경에 맞춰 수행하�
   - 화면: `playtest\v014-stages.cjs pad`(창 모드 Chromium)로 노트북 1366×768 · 패드 가로 1180×820 · 패드 세로 820×1180의 6단계와 폰 390×844 성 단계를 캡처(`v014-shots\laptop-*` · `pad-*` · `phone-*`, 성 단계는 `-stage5-scene.png` 장면만, 10세 가장 긴 지문은 `-stage5-long10.png`). 세 기준 화면 모두 6단계 전부에서 가게 2줄 · 문제 · 보기가 스크롤 없이 한 화면(패드 세로의 긴 글은 기존 보기 맞춤 스크롤로 장면·가게 카드가 위에 붙은 채). 페이지 오류 0(창 모드의 `favicon.ico` 404 한 줄은 페이지에 아이콘 지정이 없어 브라우저가 요청한 것).
   - 간헐 실패: "3D wolves visible" · "3D wolves move"는 실행 시각 씨앗 때문에 한 순간 늑대 0마리 · 모두 서 있음이 생기는 검사였다(Node 근사 재현 390 경로 3.5% · 0.45%, `v014-sim\flake-mc.cjs`). 검사를 걷는/있는 늑대가 나올 때까지 기다리게 고쳤다(게임 코드는 그대로). 고친 뒤 `ONLY=matrix node test.cjs` 4번 모두 PASS 1,265(`v014-sim\flake-matrix-after*.log`).
   - 검사(로컬): `node test-questions.cjs` PASS 44,208, `SOFT=1 node test-dom.cjs` PASS 12,092, `node scripts/build-pages.cjs` 성공(31개 파일), `node test.cjs` 전체 PASS 1,745(검사 1건 추가, 3,702초, 로그 `v014-sim\test-cjs-run7-final.log`). 이 단계 시작 때 앞 담당이 띄운 전체 실행(반지름 22 · 0.75배, 검사 수정 전)도 PASS 1,744(`test-cjs-run6.log`).
+
+### 0.15 (2026-11-17)
+
+- 브랜치 `claude/v015-river`(worktree `work\claude-v013`, main 0.14 `11fca3c` 기준). push · PR · 병합 · 배포 전입니다(리드가 합침). 커밋별 내용과 검사는 [docs/v015-progress.md](docs/v015-progress.md).
+- 검사(로컬): `node test-questions.cjs` PASS 44,208, `SOFT=1 node test-dom.cjs` PASS 12,452(0.14 12,092 + 0.15 아트 들여오기 절 · S-9), `node scripts/build-pages.cjs` 성공(39개 파일). 개발 중 부분 실행: `ONLY=art,demo` PASS 47, `ONLY=stage,art` PASS 160(배치 커밋), `ONLY=stage` PASS 150(움직임 커밋), 그림 화면 덩어리 따로 PASS 25.
+- 시뮬: 다리 길 규칙 켬 · 끔(12판 전 나이 · 전 아이, 48판 8 · 9 · 10세, 8판 요청 형식, 하나씩 · 3개씩). 끔은 0.14 최종과 같고, 켬은 통과선 안(기획서 §15.3 · §15.4). 원자료 저장소 밖 `work\verification-20261113\v015-sim\`.
+- 화면: 저장소 밖 `work\verification-20261113\playtest\v015-art.cjs`(세계는 `__HOLD_CLOCK`, 3D 화면 시계는 requestAnimationFrame 시각을 가짜 시계로 바꿔 결정적으로 찍음, 창 모드 Chromium)로 `work\verification-20261113\v015-shots\`에 캡처: 최종 기준 화면 3개 × 단계 3~5(`final-laptop|pad-*-stage3|4|5.png`), 늑대 왕 · 여우 GLB 대 0.14(`beasts-*`, 나란히 정면 `lineup-*`), 그림 화면(`fallback-*`), 0.14 빌드와 픽셀 비교(`same-*`: `?river=0&art15=0`은 기준 화면 3개 × 단계 0 · 3 · 5 · 기다리는 왕 12장 모두 PNG 바이트까지 같음). 다리 가운데 화면 높이 0.79~0.81 · 먼 끝 0.86, 그리기 호출 29 · 31 · 33, 삼각형 27~32만(늑대 없음, 상한 52 · 52만). 배속 영상은 찍지 않았다(프로듀서 요청 시).
+- 확인하지 못한 것: 실기기(패드 · 노트북) 프레임, 실제 아이, 패드 세로 좌우 길 늑대가 늦게 보이는 0.14 한계(계산만, 기획서 §15.8).
 
 ## 자동 배포와 협업
 
