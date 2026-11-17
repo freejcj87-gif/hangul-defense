@@ -652,6 +652,18 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
    eq([g.stage.on,g.state.hall,g.world.radius,v.stage,v.roads,v.stageHouses,v.roadMarks,v.radius],[false,3,16,-1,'all',0,0,16],'stages=0: the 0.13.2 village');eq([c.nm,c.pr,c.stage],['회관','●●●',undefined],'stages=0: the 8th slot shows the hall dots');
    ok(!(await page.locator('#stageTag').isVisible()),'stages=0: no name tag');ok(!('stage' in (await stored(page)).world),'stages=0: no stage in the saved world');
    await shot(page.locator('.stage-card'),'stage-off');eq(errors,[],'stages=0 page errors');await ctx.close()}
+  /* 0.14.1 기준 화면 배치(기획서 §14.9): 노트북 실제 창 1366×640(높이 700 이하 규칙), 패드 가로 1180×820, 패드 세로 820×1180.
+     장면과 가게 2줄이 스크롤 없이 한 화면에 들고, 가로 넘침·겹침이 없고, 아이가 읽는 작은 글이 14px 이상, 패드 가로 문제 칸 안쪽이 370px 이상. 한 페이지에서 창 크기만 바꾼다 */
+  {const {ctx,page,errors}=await open({width:1366,height:640});await begin(page,{age:8},true);
+   for(const [width,height] of [[1366,640],[1180,820],[820,1180]]){
+    await page.setViewportSize({width,height});await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+    const tag='layout '+width+'x'+height,m=await page.evaluate(()=>{const slots=[...document.querySelectorAll('#shop .slot')].map(b=>b.getBoundingClientRect()),px=s=>parseFloat(getComputedStyle(document.querySelector(s)).fontSize),l=document.querySelector('.lesson'),c=getComputedStyle(l);
+     return {shopBottom:Math.round(Math.max(...slots.map(r=>r.bottom))),h:innerHeight,scene:Math.round(document.getElementById('scene').getBoundingClientRect().height),column:Math.round(l.clientWidth-parseFloat(c.paddingLeft)-parseFloat(c.paddingRight)),small:Math.min(px('.slot .nm'),px('.slot .pr'),px('.pill'),px('#stageTag'),px('#villageStatus'))}});
+    ok(m.shopBottom<=m.h&&m.scene>=300,tag+': the scene and both shop rows fit on one screen: '+JSON.stringify(m));
+    ok(await noOverflow(page),tag+': no horizontal overflow');ok(await shopFits(page),tag+': shop fits');ok(await pillsFit(page),tag+': pills fit');
+    ok(m.small>=14,tag+': the small text the child reads is 14px or more: '+m.small);
+    if(width===1180)ok(m.column>=370,tag+': the question column holds a sentence a line like the laptop: '+m.column)}
+   eq(errors,[],'layout page errors');await ctx.close()}
  }}finally{await stageBrowser.close()}
  console.log((ONLY?'PARTIAL('+ONLY+') ':'')+'PASS '+checks+' browser assertions (Chromium/WebKit, desktop + mobile emulation, held clock + one real-clock run). Physical audio/device validation remains manual.');
  }finally{server.close()}
