@@ -2,6 +2,7 @@
    0.11: 듣고 고르기 폐쇄로 sound 문항 947개를 이 파일에서 직접 지웠다(생성 스크립트는 그대로라 다시 만들면 sound가 되살아나고, questions.js는 그 묶음을 읽지 않는다).
    0.12: 읽기(story) 문항은 work/verification-20261113/questions/bank-v012/gen-read.cjs가 만든다(note = 문항 유형). 7세 수학 가운데 글을 읽어야만 풀리던 틀(다음 수·앞의 수·사이의 수·모양)은 같은 스크립트가 수 줄·그림으로 바꿨다(export-v010.cjs를 다시 돌리면 예전 꼴로 돌아간다).
    2026-11-17 문제은행 감사: 17문항(정답이 둘로 읽히는 보기 4·주어만 다른 같은 문항 6·수만 자리를 바꾼 수학 3·띄어쓰기 3·세는 말 1)을 이 파일에서 직접 고쳤다(id·level·정답 자리·문항 수는 그대로라 출제 순서와 저장 진도는 같음). 생성 스크립트에는 넣지 않았으므로 다시 만들면 되돌아가고, test-questions.cjs 9-3이 그것을 잡는다.
+   2026-11-18 감사 후속: 정답·보기 묶음이 같은 수학 9문항(8~10세)과 이름·동물만 다른 8세 지문 8문항도 같은 방식(내용만, id·level·정답 자리 그대로)으로 고쳤다.
    형태: {나이: {story, quiz}}, 항목은 questions.js 은행 항목과 같은 형식(+level 1~3). node는 module.exports, 브라우저는 window.QUESTIONS_GEN */
 (function(root){
 const DATA={
@@ -263,19 +264,19 @@ const DATA={
   story:[
    {"id":"a8-story-g001","age":8,"mode":"story","prompt":"누가 사과를 주었나요?","passage":"참새가 부엉이에게 사과를 주었어요.","speak":"참새가 부엉이에게 사과를 주었어요.","choices":["꼬꼬","참새","부엉이"],"answer":1,"note":"누가(주고받기)","level":2},
    {"id":"a8-story-g002","age":8,"mode":"story","prompt":"누가 장갑을 받았나요?","passage":"다람쥐가 늑대에게 장갑을 주었어요.","speak":"다람쥐가 늑대에게 장갑을 주었어요.","choices":["염소","다람쥐","늑대"],"answer":2,"note":"누가(주고받기)","level":2},
-   {"id":"a8-story-g003","age":8,"mode":"story","prompt":"누가 사과를 주었나요?","passage":"사슴이 두리에게 사과를 주었어요.","speak":"사슴이 두리에게 사과를 주었어요.","choices":["사슴","두리","너구리"],"answer":0,"note":"누가(주고받기)","level":2},
+   {"id":"a8-story-g003","age":8,"mode":"story","prompt":"누가 귤을 주었나요?","passage":"사슴이 두리에게 귤을 주었어요.","speak":"사슴이 두리에게 귤을 주었어요.","choices":["사슴","두리","너구리"],"answer":0,"note":"누가(주고받기)","level":2},
    {"id":"a8-story-g004","age":8,"mode":"story","prompt":"누가 풍선을 받았나요?","passage":"강아지가 거북이에게 풍선을 주었어요.","speak":"강아지가 거북이에게 풍선을 주었어요.","choices":["부엉이","거북이","강아지"],"answer":1,"note":"누가(주고받기)","level":2},
    {"id":"a8-story-g005","age":8,"mode":"story","prompt":"누가 모자를 주었나요?","passage":"병아리가 솔이에게 모자를 주었어요.","speak":"병아리가 솔이에게 모자를 주었어요.","choices":["병아리","부엉이","솔이"],"answer":0,"note":"누가(주고받기)","level":2},
    {"id":"a8-story-g006","age":8,"mode":"story","prompt":"누가 우산을 받았나요?","passage":"꼬꼬가 곰에게 우산을 주었어요.","speak":"꼬꼬가 곰에게 우산을 주었어요.","choices":["늑대","꼬꼬","곰"],"answer":2,"note":"누가(주고받기)","level":2},
    {"id":"a8-story-g007","age":8,"mode":"story","prompt":"누가 빵을 주었나요?","passage":"개구리가 고양이에게 빵을 주었어요.","speak":"개구리가 고양이에게 빵을 주었어요.","choices":["개구리","고양이","염소"],"answer":0,"note":"누가(주고받기)","level":2},
    {"id":"a8-story-g008","age":8,"mode":"story","prompt":"누가 연필을 받았나요?","passage":"염소가 하늘이에게 연필을 주었어요.","speak":"염소가 하늘이에게 연필을 주었어요.","choices":["염소","오리","하늘이"],"answer":2,"note":"누가(주고받기)","level":2},
    {"id":"a8-story-g009","age":8,"mode":"story","prompt":"누가 공을 주었나요?","passage":"다온이가 마루에게 공을 주었어요.","speak":"다온이가 마루에게 공을 주었어요.","choices":["염소","다온이","마루"],"answer":1,"note":"누가(주고받기)","level":2},
-   {"id":"a8-story-g010","age":8,"mode":"story","prompt":"누가 공을 받았나요?","passage":"토끼가 너구리에게 공을 주었어요.","speak":"토끼가 너구리에게 공을 주었어요.","choices":["너구리","토끼","참새"],"answer":0,"note":"누가(주고받기)","level":2},
+   {"id":"a8-story-g010","age":8,"mode":"story","prompt":"누가 편지를 받았나요?","passage":"토끼가 너구리에게 편지를 주었어요.","speak":"토끼가 너구리에게 편지를 주었어요.","choices":["너구리","토끼","참새"],"answer":0,"note":"누가(주고받기)","level":2},
    {"id":"a8-story-g011","age":8,"mode":"story","prompt":"누가 감자를 주었나요?","passage":"나래가 오리에게 감자를 주었어요.","speak":"나래가 오리에게 감자를 주었어요.","choices":["개구리","오리","나래"],"answer":2,"note":"누가(주고받기)","level":2},
-   {"id":"a8-story-g012","age":8,"mode":"story","prompt":"누가 공을 받았나요?","passage":"돼지가 여우에게 공을 주었어요.","speak":"돼지가 여우에게 공을 주었어요.","choices":["돼지","여우","참새"],"answer":1,"note":"누가(주고받기)","level":2},
-   {"id":"a8-story-g013","age":8,"mode":"story","prompt":"누가 모자를 주었나요?","passage":"돼지가 하늘이에게 모자를 주었어요.","speak":"돼지가 하늘이에게 모자를 주었어요.","choices":["하늘이","곰","돼지"],"answer":2,"note":"누가(주고받기)","level":2},
-   {"id":"a8-story-g014","age":8,"mode":"story","prompt":"누가 모자를 받았나요?","passage":"개구리가 솔이에게 모자를 주었어요.","speak":"개구리가 솔이에게 모자를 주었어요.","choices":["솔이","다람쥐","개구리"],"answer":0,"note":"누가(주고받기)","level":2},
-   {"id":"a8-story-g015","age":8,"mode":"story","prompt":"누가 사과를 주었나요?","passage":"강아지가 오리에게 사과를 주었어요.","speak":"강아지가 오리에게 사과를 주었어요.","choices":["오리","강아지","다람쥐"],"answer":1,"note":"누가(주고받기)","level":2},
+   {"id":"a8-story-g012","age":8,"mode":"story","prompt":"누가 바구니를 받았나요?","passage":"돼지가 여우에게 바구니를 주었어요.","speak":"돼지가 여우에게 바구니를 주었어요.","choices":["돼지","여우","참새"],"answer":1,"note":"누가(주고받기)","level":2},
+   {"id":"a8-story-g013","age":8,"mode":"story","prompt":"누가 꽃을 주었나요?","passage":"돼지가 하늘이에게 꽃을 주었어요.","speak":"돼지가 하늘이에게 꽃을 주었어요.","choices":["하늘이","곰","돼지"],"answer":2,"note":"누가(주고받기)","level":2},
+   {"id":"a8-story-g014","age":8,"mode":"story","prompt":"누가 인형을 받았나요?","passage":"개구리가 솔이에게 인형을 주었어요.","speak":"개구리가 솔이에게 인형을 주었어요.","choices":["솔이","다람쥐","개구리"],"answer":0,"note":"누가(주고받기)","level":2},
+   {"id":"a8-story-g015","age":8,"mode":"story","prompt":"누가 책을 주었나요?","passage":"강아지가 오리에게 책을 주었어요.","speak":"강아지가 오리에게 책을 주었어요.","choices":["오리","강아지","다람쥐"],"answer":1,"note":"누가(주고받기)","level":2},
    {"id":"a8-story-g016","age":8,"mode":"story","prompt":"두리가 더 좋아하는 것은 무엇인가요?","passage":"두리는 배추보다 고구마를 좋아해요.","speak":"두리는 배추보다 고구마를 좋아해요.","choices":["고구마","귤","배추"],"answer":0,"note":"무엇(견주기)","level":3},
    {"id":"a8-story-g017","age":8,"mode":"story","prompt":"염소가 더 좋아하는 것은 무엇인가요?","passage":"염소는 노래보다 춤을 좋아해요.","speak":"염소는 노래보다 춤을 좋아해요.","choices":["낚시","노래","춤"],"answer":2,"note":"무엇(견주기)","level":3},
    {"id":"a8-story-g018","age":8,"mode":"story","prompt":"사슴이 더 좋아하는 것은 무엇인가요?","passage":"사슴은 옥수수보다 오이를 좋아해요.","speak":"사슴은 옥수수보다 오이를 좋아해요.","choices":["오이","옥수수","사과"],"answer":0,"note":"무엇(견주기)","level":3},
@@ -314,7 +315,7 @@ const DATA={
    {"id":"a8-story-g051","age":8,"mode":"story","prompt":"고양이는 어디에서 출발했나요?","passage":"고양이가 도서관에서 연못으로 걸어갔어요.","speak":"고양이가 도서관에서 연못으로 걸어갔어요.","choices":["밭","연못","도서관"],"answer":2,"note":"어디(옮겨 가기)","level":2},
    {"id":"a8-story-g052","age":8,"mode":"story","prompt":"토끼는 어디로 갔나요?","passage":"토끼가 놀이터에서 학교로 달려갔어요.","speak":"토끼가 놀이터에서 학교로 달려갔어요.","choices":["밭","놀이터","학교"],"answer":2,"note":"어디(옮겨 가기)","level":2},
    {"id":"a8-story-g053","age":8,"mode":"story","prompt":"늑대는 어디에서 출발했나요?","passage":"늑대가 바닷가에서 연못으로 뛰어갔어요.","speak":"늑대가 바닷가에서 연못으로 뛰어갔어요.","choices":["바닷가","꽃밭","연못"],"answer":0,"note":"어디(옮겨 가기)","level":2},
-   {"id":"a8-story-g054","age":8,"mode":"story","prompt":"곰은 어디로 갔나요?","passage":"곰이 바닷가에서 연못으로 뛰어갔어요.","speak":"곰이 바닷가에서 연못으로 뛰어갔어요.","choices":["시장","연못","바닷가"],"answer":1,"note":"어디(옮겨 가기)","level":2},
+   {"id":"a8-story-g054","age":8,"mode":"story","prompt":"곰은 어디로 갔나요?","passage":"곰이 꽃밭에서 우물로 뛰어갔어요.","speak":"곰이 꽃밭에서 우물로 뛰어갔어요.","choices":["시장","우물","꽃밭"],"answer":1,"note":"어디(옮겨 가기)","level":2},
    {"id":"a8-story-g055","age":8,"mode":"story","prompt":"강아지는 어디에서 출발했나요?","passage":"강아지가 집에서 공원으로 뛰어갔어요.","speak":"강아지가 집에서 공원으로 뛰어갔어요.","choices":["밭","공원","집"],"answer":2,"note":"어디(옮겨 가기)","level":2},
    {"id":"a8-story-g056","age":8,"mode":"story","prompt":"마루는 어디로 갔나요?","passage":"마루가 연못에서 시장으로 뛰어갔어요.","speak":"마루가 연못에서 시장으로 뛰어갔어요.","choices":["연못","시장","언덕"],"answer":1,"note":"어디(옮겨 가기)","level":2},
    {"id":"a8-story-g057","age":8,"mode":"story","prompt":"하늘이는 어디에서 출발했나요?","passage":"하늘이가 연못에서 놀이터로 뛰어갔어요.","speak":"하늘이가 연못에서 놀이터로 뛰어갔어요.","choices":["연못","마당","놀이터"],"answer":0,"note":"어디(옮겨 가기)","level":2},
@@ -379,7 +380,7 @@ const DATA={
    {"id":"a8-story-g116","age":8,"mode":"story","prompt":"거북이가 읽은 것은 무엇인가요?","passage":"거북이는 신문을 읽고 편지를 썼어요.","speak":"거북이는 신문을 읽고 편지를 썼어요.","choices":["신문","편지","동화책"],"answer":0,"note":"무엇(두 가지 일)","level":3},
    {"id":"a8-story-g117","age":8,"mode":"story","prompt":"사슴이 남긴 것은 무엇인가요?","passage":"사슴은 떡을 먹고 빵을 남겼어요.","speak":"사슴은 떡을 먹고 빵을 남겼어요.","choices":["떡","빵","감자"],"answer":1,"note":"무엇(두 가지 일)","level":3},
    {"id":"a8-story-g118","age":8,"mode":"story","prompt":"늑대가 산 것은 무엇인가요?","passage":"늑대는 사과를 사고 모자를 팔았어요.","speak":"늑대는 사과를 사고 모자를 팔았어요.","choices":["공","사과","모자"],"answer":1,"note":"무엇(두 가지 일)","level":3},
-   {"id":"a8-story-g119","age":8,"mode":"story","prompt":"병아리가 캔 것은 무엇인가요?","passage":"병아리는 감자를 심고 양파를 캤어요.","speak":"병아리는 감자를 심고 양파를 캤어요.","choices":["양파","땅콩","감자"],"answer":0,"note":"무엇(두 가지 일)","level":3},
+   {"id":"a8-story-g119","age":8,"mode":"story","prompt":"병아리가 캔 것은 무엇인가요?","passage":"병아리는 콩을 심고 고구마를 캤어요.","speak":"병아리는 콩을 심고 고구마를 캤어요.","choices":["고구마","마늘","콩"],"answer":0,"note":"무엇(두 가지 일)","level":3},
    {"id":"a8-story-g120","age":8,"mode":"story","prompt":"마루가 씻은 것은 무엇인가요?","passage":"마루는 접시를 씻고 식탁을 닦았어요.","speak":"마루는 접시를 씻고 식탁을 닦았어요.","choices":["냄비","식탁","접시"],"answer":2,"note":"무엇(두 가지 일)","level":3},
    {"id":"a8-story-g121","age":8,"mode":"story","prompt":"다온이가 쓴 것은 무엇인가요?","passage":"다온이는 만화책을 읽고 동시를 썼어요.","speak":"다온이는 만화책을 읽고 동시를 썼어요.","choices":["만화책","동시","일기"],"answer":1,"note":"무엇(두 가지 일)","level":3},
    {"id":"a8-story-g122","age":8,"mode":"story","prompt":"돼지가 먹은 것은 무엇인가요?","passage":"돼지는 감자를 먹고 빵을 남겼어요.","speak":"돼지는 감자를 먹고 빵을 남겼어요.","choices":["빵","죽","감자"],"answer":2,"note":"무엇(두 가지 일)","level":3},

@@ -548,6 +548,8 @@ for(const a of [9,10]){
  /* 2026-11-18 후속: 같은 나이 수학에서 정답과 보기 묶음이 모두 같은 문항 금지(식이 달라도 한 판에서 답을 외워 풂) */
  /* 7세는 1~10을 세는 그림·수 줄 문항이라 '5 (4·5·6)' 같은 묶음이 겹칠 수밖에 없어 뺀다 */
  for(const a of [8,9,10]){const seen=new Map();for(const q of quizAll(a).filter(q=>q.cat==='math')){const k=q.choices[q.answer]+'|'+q.choices.slice().sort().join(',');ok(!seen.has(k),q.id+': 정답·보기 묶음이 '+seen.get(k)+'와 같음 '+k);seen.set(k,q.id)}}
+ /* 2026-11-18 후속: 이름·동물(주는 쪽·받는 쪽 모두)을 X로 바꾸면 똑같아지는 서로 다른 지문 금지. 같은 지문의 다른 질문은 grp로 띄우지만, 이름만 다른 지문은 grp가 달라 연달아 나올 수 있음 */
+ for(const a of [8,9,10]){const seen=new Map();for(const q of all(a,'story')){const k=unsubj(q.passage);if(seen.has(k)&&seen.get(k).passage!==q.passage)ok(false,q.id+': 이름·동물만 다른 지문('+seen.get(k).id+') '+k);else{ok(true,'');if(!seen.has(k))seen.set(k,q)}}}
  /* 그림 → 영어 낱말: 정답의 상위어(오리 그림에 bird)를 오답으로 두지 않음 */
  const HYPER={bird:['duck','chicken','owl','chick','swan'],fruit:['apple','grape','banana','strawberry','cherry','peach'],animal:['dog','cat','cow','pig','duck','bear','lion','tiger','fox','horse','monkey','rabbit'],vegetable:['potato','carrot','onion'],color:['red','blue','yellow','green','black','white','pink','brown']};
  for(const a of Q.AGES)for(const q of quizAll(a).filter(q=>q.cat==='english')){const ans=q.choices[q.answer];for(const [h,kids] of Object.entries(HYPER))if(kids.includes(ans))ok(!q.choices.includes(h),q.id+': 정답 '+ans+'의 상위어 '+h+'가 오답에 있음')}
