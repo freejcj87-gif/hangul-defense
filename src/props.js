@@ -3,7 +3,7 @@
 // what each hall stage adds (dirt roads, lanterns, hay, feast flags). Positions live in layout.js. Everything is vertex-coloured.
 import * as THREE from 'three';
 import { prep, solid, flat, merge } from './geo.js';
-import { MARKET_NEAR, TENTS, STREET_FLAGS, STREET_CRATES, GATE, PATHS, lanterns, LANTERN_BOX, FLAGS3, HAY3, NESTS } from './layout.js';
+import { MARKET_NEAR, TENTS, STREET_FLAGS, STREET_CRATES, GATE, PATHS, lanterns, LANTERN_BOX, FLAGS3, HAY3, NESTS, COTTAGES, WELL, MILL, KEEP, ROAD_MARK, ROAD } from './layout.js';
 
 const V3=THREE.Vector3;
 const rot=(x,y,z)=>[x,y,z];
@@ -128,4 +128,91 @@ export function drawHammer(ctx,h,inner){
  ctx.fillStyle='#5b6068';ctx.beginPath();ctx.roundRect(-34,-30,68,26,7);ctx.fill();
  ctx.fillStyle='#9aa2ad';ctx.beginPath();ctx.roundRect(-30,-27,60,8,4);ctx.fill();
  ctx.restore();
+}
+
+/* ---------- 0.14 visible stages: wolf roads, cottages, the well, the mill hut, road-entrance markers, the castle keep ----------
+   All code shapes, no art files. world.js STAGE gives the radius and the open roads; layout.js the places. */
+const SPAWN_STEP=Math.PI/4,spawnAngle=p=>(p+.5)*SPAWN_STEP;
+// Wolf trails. routes = null: the eight faint tracks of 0.13 (stage 0, or stages switched off). Otherwise only the open roads, as proper dirt roads.
+export function trailGeometry(routes){
+ const parts=[];
+ if(!routes){const trail=0xb9b07a,edge=0xa9a670;
+  for(let p=0;p<8;p++){const a=spawnAngle(p),r0=7.6,r1=46,mid=(r0+r1)/2;
+   parts.push(flat('plane',edge,Math.cos(a)*mid,Math.sin(a)*mid,r1-r0,1.5,.009,-a),flat('plane',trail,Math.cos(a)*mid,Math.sin(a)*mid,r1-r0,1.05,.011,-a));
+   for(let i=0;i<14;i++){const r=r0+1+i*2.7+Math.sin(i*5.1+p)*.4,side=i%2?.85:-.85,x=Math.cos(a)*r-Math.sin(a)*side,z=Math.sin(a)*r+Math.cos(a)*side;parts.push(['sphere',i%3?0xbfb59c:0xa9a28e,[x,.03,z],[.18+.05*Math.sin(i*2.2),.07,.13]])}}
+  return solid(parts)}
+ const {r0,r1,edge,width}=ROAD,mid=(r0+r1)/2;
+ for(const p of routes){const a=spawnAngle(p),c=Math.cos(a),s=Math.sin(a);
+  parts.push(flat('plane',0xb89a5e,c*mid,s*mid,r1-r0,edge,.009,-a),flat('plane',0xd9bd84,c*mid,s*mid,r1-r0,width,.011,-a),flat('disc',0xd9bd84,c*r0,s*r0,width*.5,width*.5,.011));
+  // wheel ruts and stones along the edge
+  for(const side of [-.32,.32])parts.push(flat('plane',0xc4a66e,c*mid-s*side,s*mid+c*side,r1-r0,.11,.013,-a));
+  for(let i=0;i<16;i++){const r=r0+.8+i*2.6+Math.sin(i*5.1+p)*.4,side=(i%2?1:-1)*(edge/2+.12),x=c*r-s*side,z=s*r+c*side;parts.push(['sphere',i%3?0xbfb59c:0xa9a28e,[x,.04,z],[.2+.05*Math.sin(i*2.2),.08,.15]])}}
+ return solid(parts);
+}
+const toCentre=(x,z)=>Math.atan2(-x,-z);                      // yaw that turns a prop's front (+z) to the village centre
+const fwd=(x,z,ry,f,side=0)=>[x+Math.sin(ry)*f+Math.cos(ry)*side,z+Math.cos(ry)*f-Math.sin(ry)*side];
+function cottage(x,z,roof,k=0){
+ const ry=toCentre(x,z)+(k%2?.25:-.2),W_=.98,H=.78,D_=.84,wall=k%3===1?0xf7ecd2:0xf1e2c0,parts=[
+  ['box',0xb7a98a,[x,.05,z],[W_+.1,.1,D_+.1],rot(0,ry,0)],['box',wall,[x,.1+H/2,z],[W_,H,D_],rot(0,ry,0)],
+  ['cone',roof,[x,.1+H+.3,z],[W_*.86,.62,D_*.86],rot(0,ry+Math.PI/6,0)],['box',0x8a5a2e,[x,.1+H+.02,z],[W_+.12,.06,D_+.12],rot(0,ry,0)]];
+ const [dx,dz]=fwd(x,z,ry,D_/2,-.12),[wx,wz]=fwd(x,z,ry,D_/2,.27),[cx,cz]=fwd(x,z,ry,-.12,.26);
+ parts.push(['box',0x7a4a24,[dx,.36,dz],[.24,.5,.05],rot(0,ry,0)],['box',0xffe9a8,[wx,.52,wz],[.2,.2,.05],rot(0,ry,0)],['box',0x8a5a2e,[wx,.52,wz],[.24,.03,.06],rot(0,ry,0)],
+  ['box',0xb3ab98,[cx,.1+H+.42,cz],[.15,.36,.15],rot(0,ry,0)]);
+ return parts;
+}
+function well(x,z){
+ const parts=[['cyl',0xb3ab98,[x,.22,z],[.4,.44,.4]],['cyl',0xd8d1c0,[x,.44,z],[.43,.07,.43]],['cyl',0x4fa3d6,[x,.46,z],[.3,.05,.3]],
+  ['box',0x8a5a2e,[x-.36,.78,z],[.07,.9,.07]],['box',0x8a5a2e,[x+.36,.78,z],[.07,.9,.07]],['box',0x6b4a2e,[x,1.14,z],[.8,.06,.08]],['cone',0xc8553a,[x,1.4,z],[.6,.42,.6]],
+  ['cyl6',0x9c6a34,[x+.08,.86,z],[.09,.13,.09]],['box',0x6b4a2e,[x+.08,1.0,z],[.02,.24,.02]]];
+ return parts;
+}
+// The mill hut: plank walls, a steep roof and a (still) water wheel standing in a little trough on the side that faces the village.
+function mill(x,z){
+ const ry=toCentre(x,z),parts=[['box',0xb7a98a,[x,.06,z],[1.5,.12,1.25],rot(0,ry,0)],['box',0xe7d3a6,[x,.72,z],[1.36,1.2,1.1],rot(0,ry,0)],
+  ['box',0x9a6634,[x,1.34,z],[1.5,.07,1.24],rot(0,ry,0)],['cone',0x8a4f33,[x,1.78,z],[1.12,.86,.94],rot(0,ry+Math.PI/6,0)]];
+ const [dx,dz]=fwd(x,z,ry,.55,.38);parts.push(['box',0x7a4a24,[dx,.42,dz],[.3,.6,.05],rot(0,ry,0)]);
+ const [wx,wz]=fwd(x,z,ry,.2,-.84),R=.62;   // wheel on the hut's left side, its axle along the hut's width
+ parts.push(['ring',0x7c5028,[wx,R+.06,wz],[R,R,.5],rot(0,ry+Math.PI/2,0)],['cyl6',0x5c3a1c,[wx,R+.06,wz],[.09,.3,.09],rot(0,ry,Math.PI/2)]);
+ for(let i=0;i<4;i++)parts.push(['box',0x9a6634,[wx,R+.06,wz],[.05,R*1.9,.05],rot(i*Math.PI/4,ry,0)]);
+ for(let i=0;i<8;i++){const a=i*Math.PI/4,py=R+.06+Math.cos(a)*R,off=Math.sin(a)*R,[px,pz]=[wx+Math.sin(ry)*off,wz+Math.cos(ry)*off];parts.push(['box',0xc79a5c,[px,py,pz],[.3,.05,.2],rot(a,ry,0)])}
+ const [tx,tz]=fwd(x,z,ry,.2,-.84);parts.push(flat('disc',0xcdb681,tx,tz,.95,.62,.017,-ry),flat('disc',0x7fc6e6,tx,tz,.8,.48,.027,-ry),flat('disc',0xd2f1fa,tx+.15,tz-.1,.22,.08,.035,-ry));
+ return parts;
+}
+// A marker beside an open road at the village edge. tier 1: a stake with a lamp · 2: a blue flag pole · 3: a stone gate post with a flag · 4: a taller post with a red banner.
+function roadMark(x,z,tier,k){
+ if(tier<=1)return [['cyl6',0x6b4a2e,[x,.45,z],[.07,.9,.07]],['box',0x3a2c22,[x,.98,z],[.2,.22,.2]],['box',0xffd66a,[x,.98,z],[.15,.17,.22]],['cone',0x3a2c22,[x,1.16,z],[.17,.14,.17]]];
+ if(tier===2)return flagPole(x,z,2.3,k%2?0x6fd3ff:0x3a8fd6);
+ const h=tier>=4?2.3:1.6,r=tier>=4?.44:.38,stone=0xd9cfb6,dark=0xb7ab8f,parts=[['cyl8',dark,[x,.08,z],[r*1.25,.16,r*1.25]],['taper',stone,[x,h/2,z],[r,h,r],rot(Math.PI,0,0)],['cyl8',dark,[x,h+.06,z],[r*1.2,.12,r*1.2]]];
+ for(let i=0;i<4;i++){const a=i*Math.PI/2+Math.PI/4;parts.push(['box',stone,[x+Math.cos(a)*r*.8,h+.22,z+Math.sin(a)*r*.8],[.2,.22,.2],rot(0,-a,0)])}
+ for(let i=0;i<4;i++){const a=i*1.57+.5;parts.push(['box',i%2?0xe6dcc3:0xc9bea2,[x+Math.sin(a)*r*.93,h*(.3+.18*(i%3)),z+Math.cos(a)*r*.93],[r*.5,h*.1,.05],rot(0,a,0)])}
+ const top=h+(tier>=4?1.5:1.1),col=tier>=4?0xe2332a:0x3a8fd6;
+ parts.push(['cyl6',0xf4efe4,[x,(h+top)/2,z],[.035,top-h,.035]],['sphere',0xffd24a,[x,top+.05,z],.07],['box',col,[x+.22,top-.2,z],[.4,.3,.02]],['cone',col,[x+.46,top-.2,z],[.12,.16,.02],rot(0,0,-Math.PI/2)]);
+ if(tier>=4)parts.push(['box',0xffd24a,[x+.22,top-.2,z+.002],[.4,.05,.024]]);
+ return parts;
+}
+// The castle keep: a tall round stone tower with battlements, arrow slits, a pointed roof and a long banner.
+function keep(x,z){
+ const H=5.3,r=.92,stone=0xd9cfb6,dark=0xb7ab8f,parts=[['cyl8',dark,[x,.12,z],[r*1.22,.24,r*1.22]],['taper',stone,[x,H/2,z],[r,H,r],rot(Math.PI,0,0)],
+  ['cyl8',dark,[x,H+.08,z],[r*1.28,.18,r*1.28]],['cyl8',0xefe6d2,[x,H+.18,z],[r*1.05,.03,r*1.05]]];
+ for(let i=0;i<8;i++){const a=i*Math.PI/4;parts.push(['box',stone,[x+Math.cos(a)*r*1.05,H+.36,z+Math.sin(a)*r*1.05],[.26,.36,.22],rot(0,-a,0)])}
+ for(let i=0;i<9;i++){const a=i*.7+.2,y=H*(.16+.09*(i%8));parts.push(['box',i%2?0xe6dcc3:0xc9bea2,[x+Math.sin(a)*r*.93,y,z+Math.cos(a)*r*.93],[r*.42,.2,.06],rot(0,a,0)])}
+ for(const a of [.6,2.4,4.3])parts.push(['box',0x3a2c22,[x+Math.sin(a)*r*.9,H*.68,z+Math.cos(a)*r*.9],[.13,.5,.08],rot(0,a,0)]);
+ parts.push(['cone8',0xb5372c,[x,H+.95,z],[r*.8,1.2,r*.8]],['cyl6',0xf4efe4,[x,H+2.0,z],[.04,1.1,.04]],['sphere',0xffd24a,[x,H+2.58,z],.09],
+  ['box',0xe2332a,[x+.4,H+2.25,z],[.76,.44,.03]],['cone',0xe2332a,[x+.86,H+2.25,z],[.18,.2,.03],rot(0,0,-Math.PI/2)],['box',0xffd24a,[x+.4,H+2.25,z+.003],[.76,.07,.034]]);
+ return parts;
+}
+// What stands at 'stage' (0-5) for a village of 'radius' with the open 'routes' (array of spawn points, or null).
+// → {all, old, fresh}: geometries (null when empty) of everything, of what was already there at the stage before, and of what this stage adds
+//   (the road-entrance markers move out with the edge, so they are always fresh), plus spots [[x,z,height],…] of the fresh things for the effects.
+export function stageProps(stage,radius,routes){
+ const old=[],fresh=[],spots=[],put=(at,parts,h,st)=>{if(st===stage){fresh.push(...parts);spots.push([at[0],at[1],h])}else old.push(...parts)};
+ COTTAGES.forEach((c,k)=>{if(stage>=c.stage)put(c.at,cottage(c.at[0],c.at[1],c.roof,k),1.5,c.stage)});
+ if(stage>=WELL.stage)put(WELL.at,well(...WELL.at),1.5,WELL.stage);
+ if(stage>=MILL.stage)put(MILL.at,mill(...MILL.at),2.2,MILL.stage);
+ if(stage>=KEEP.stage)put(KEEP.at,keep(...KEEP.at),5,KEEP.stage);
+ let marks=0;
+ if(stage>=1&&routes)for(const p of routes){const a=spawnAngle(p),r=radius+ROAD_MARK.out,tier=stage<=2?1:stage-1;
+  [-1,1].forEach((sd,i)=>{const x=Math.cos(a)*r-Math.sin(a)*sd*ROAD_MARK.side,z=Math.sin(a)*r+Math.cos(a)*sd*ROAD_MARK.side;fresh.push(...roadMark(x,z,tier,i));marks++;if(tier>=3)spots.push([x,z,tier>=4?2.6:1.9])})}
+ const geo=list=>list.length?solid(list):null;
+ return {all:geo([...old,...fresh]),old:geo(old),fresh:geo(fresh),spots,houses:COTTAGES.filter(c=>stage>=c.stage).length,marks};
 }

@@ -49,7 +49,17 @@
     FLOW:true,                /* true = 정답이 닭에게 기운을 주고, 닭·농부가 그 기운을 실제 시간에 걸쳐 쓴다(금화는 알이 매대에 닿을 때). false = 0.12 그대로(정답 순간 한꺼번에 판다) */
     FLOW_OFF_AGES:[],         /* 결정 질문 4: 이 나이는 흐름을 끄고 0.12 경제로 둔다(예: [7]). 7세가 길어지는 원인을 찾아(봇이 정답마다 하나만 삼) 기본은 전 나이 켬 */
     BUBBLE_BUY:true,          /* 결정 질문 5: 추천 말풍선을 누르면 그 상품을 바로 산다 */
-    REPAIR_ACT:true           /* 결정 질문 3: 부서진 울타리로 쉬는 농부가 가서 망치질하는 연출(규칙은 0.12 자동 복구 그대로) */
+    REPAIR_ACT:true,          /* 결정 질문 3: 부서진 울타리로 쉬는 농부가 가서 망치질하는 연출(규칙은 0.12 자동 복구 그대로) */
+    /* ---------- 0.14 보이는 단계 6개 · 넓어지는 영역 · 길(설계: v014-scale-design.md §9, game-plan §14) ----------
+       단계(0~5) = 농가 · 마을 · 장터 마을 · 물레방아 마을 · 성곽 마을 · 성. 저장하지 않고 이번 판 지은 수(회관·시작 꾸러미 제외)에서 계산한다(stage).
+       STAGES를 끄면(주소 ?stages=0) 0.13.2와 한 글자도 다르지 않다: 회관은 HALL_AUTO, 반지름은 회관 단계, 늑대는 8방향, 종은 BELL_BUILT */
+    STAGES:true,              /* true = 마을 반지름·회관 승급·8번째 칸 진행 표시가 단계를 따른다 */
+    ROUTES:true,              /* true = 1단계부터 늑대가 '열린 길'(World.STAGE.open)로만 온다. false = 전 단계 8방향(?routes=0) */
+    STAGE_AT:[0,5,14,24,36,50],       /* 단계 문턱(이번 판 지은 수). 첫 문턱 5 = 시작 타워 1 + 네 번 삼(설계 초안 6은 8세 보통의 첫 전환이 3분에 걸려 5로) */
+    STAGE_AT_BY_AGE:{9:[0,4,11,19,29,40],10:[0,4,10,17,26,37]}, /* 9·10세: 글이 길어 문제당 시간이 길다(약 31·33초). 첫 문턱 4, 종을 내린 만큼 뒤 문턱도 당긴다 */
+    STAGE_HALL:[2,4,5],               /* 이 단계(0부터 셈: 장터 마을 · 성곽 마을 · 성)에 들어서면 회관 1·2·3단계. 8세 기준 지은 수 14·36·50(0.13.2는 10·32·54).
+                                         설계 초안 [2,3,5](14·24·50)는 멧돼지·바위 늑대가 너무 일찍 와서 10세가 무너지는 판이 나와 한 단계 늦췄다(시뮬, game-plan §14) */
+    STAGE_BELL_BY_AGE:{9:50,10:46}    /* 단계를 켰을 때의 나이별 종 문턱(하나씩 사는 보통 아이도 한 판 30분 안쪽). 없는 나이는 BELL_BUILT(66) */
   };
   /* 흐르는 농장의 경제 쪽 상수(세계 쪽 상수는 world.js FLOW). 값은 scripts/sim-flow.cjs로 맞춤(2026-11-14, game-plan §13.2)
      beat: 박(틱) = 그 문제 필요 시간 × beat × max(paceFloor, pace)/100. 박 하나에 농부 한 명이 World.FLOW.carry알을 나른다
@@ -178,8 +188,25 @@
   const builtNew=s=>built(s)-(FLAGS.BELL_COUNTS_PACK?0:runOf(s).built0|0);
   /* 회관 자동 승급(결정 C): 회관을 뺀 지은 수가 HALL_AUTO[h]에 이르면 h+1단계. 내려가지 않는다 */
   const hallSteps=s=>FLAGS.HALL_AUTO_BY_AGE&&FLAGS.HALL_AUTO_BY_AGE[s.age]||FLAGS.HALL_AUTO;
-  function autoHall(s){if(FLAGS.HALL_MODE!=='auto')return s.hall|0;const b=built(s)-(s.hall|0),A=hallSteps(s);let h=0;while(h<3&&b>=A[h])h++;return Math.max(s.hall|0,h)}
-  const bellBuilt=s=>FLAGS.BELL_BUILT_BY_AGE&&FLAGS.BELL_BUILT_BY_AGE[s.age]||FLAGS.BELL_BUILT;
+  /* ---------- 0.14 단계 ----------
+     stageCount = 이번 판에 지은 수(회관과 시작 꾸러미는 빼고 센다. 닭을 잃으면 줄지만, 단계는 세계가 래치한다: World.sync의 w.stage)
+     stage(s) = max(지은 수로 본 단계, 회관 단계가 뜻하는 단계). 회관은 내려가지 않으므로 0.13.2 저장(회관 1~3)도 그 회관에 맞는 단계에서 이어 간다. 꺼져 있으면 −1 */
+  const STAGE_NAME=['농가','마을','장터 마을','물레방아 마을','성곽 마을','성'],STAGE_MAX=STAGE_NAME.length-1;
+  const stageAt=s=>{const B=FLAGS.STAGE_AT_BY_AGE&&FLAGS.STAGE_AT_BY_AGE[s&&s.age];return Array.isArray(B)&&B.length>STAGE_MAX?B:FLAGS.STAGE_AT};
+  const stageCount=s=>Math.max(0,built(s)-(s.hall|0)-((s.run&&s.run.built0)|0));
+  const stageByCount=s=>{const A=stageAt(s),n=stageCount(s);let k=0;while(k<STAGE_MAX&&n>=A[k+1])k++;return k};
+  const hallStage=h=>{const H=clamp(0,3,h|0);return H>0?FLAGS.STAGE_HALL[H-1]|0:0};
+  const stage=s=>FLAGS.STAGES?clamp(0,STAGE_MAX,Math.max(stageByCount(s),hallStage(s.hall))):-1;
+  /* 8번째 칸 진행 표시: 지금 단계(cur: 세계가 래치한 단계가 더 높으면 그것)와 다음 단계까지 더 지을 수. 마지막 단계에서는 종까지 남은 수(toBell). 꺼져 있으면 null */
+  function stageInfo(s,cur){
+    if(!FLAGS.STAGES)return null;
+    const k=clamp(0,STAGE_MAX,Math.max(stage(s),cur|0)),A=stageAt(s),top=k>=STAGE_MAX;
+    return {stage:k,name:STAGE_NAME[k],next:top?null:STAGE_NAME[k+1],left:top?Math.max(0,bellBuilt(s)-builtNew(s)):Math.max(1,A[k+1]-stageCount(s)),toBell:top};
+  }
+  function autoHall(s){if(FLAGS.HALL_MODE!=='auto')return s.hall|0;
+    if(FLAGS.STAGES){const k=stageByCount(s),H=FLAGS.STAGE_HALL;let h=0;while(h<3&&k>=H[h])h++;return Math.max(s.hall|0,h)}
+    const b=built(s)-(s.hall|0),A=hallSteps(s);let h=0;while(h<3&&b>=A[h])h++;return Math.max(s.hall|0,h)}
+  const bellBuilt=s=>FLAGS.STAGES&&FLAGS.STAGE_BELL_BY_AGE&&FLAGS.STAGE_BELL_BY_AGE[s.age]||FLAGS.BELL_BUILT_BY_AGE&&FLAGS.BELL_BUILT_BY_AGE[s.age]||FLAGS.BELL_BUILT;
   const bellDue=s=>runOf(s).bell===0&&(builtNew(s)>=bellBuilt(s)||!!FLAGS.BELL_WINS_CAP&&runOf(s).first>=FLAGS.BELL_WINS_CAP);
   /* 지은 수가 바뀐 뒤의 진행 갱신(buy·settle·restore가 부른다): 회관 자동 승급 + 종 래치. → {hall: 오른 단계 수, bell: 방금 열렸는가}
      종은 한 번 열리면(run.bell ≥ 1) 닭을 잃어 지은 수가 내려가도 닫히지 않는다 */
@@ -493,7 +520,7 @@
     return s;
   }
 
-  const api={API:4,SAVE_VERSION:3,FLAGS,FLOW,flowOn,beatTicks,flowGain,sellEggs,FINALE,FOX,MIGRATE,START_PACK,WOLF_MUL,VILLAGES,VILLAGE_NAME,villageOf,CAPS,FEAST,freshRun,freshMeta,builtNew,autoHall,bellBuilt,bellDue,grow,goldScale,track,lostHen,
+  const api={API:4,SAVE_VERSION:3,STAGE_NAME,STAGE_MAX,stage,stageAt,stageCount,stageByCount,hallStage,stageInfo,FLAGS,FLOW,flowOn,beatTicks,flowGain,sellEggs,FINALE,FOX,MIGRATE,START_PACK,WOLF_MUL,VILLAGES,VILLAGE_NAME,villageOf,CAPS,FEAST,freshRun,freshMeta,builtNew,autoHall,bellBuilt,bellDue,grow,goldScale,track,lostHen,
     bellPrompted,ringBell,finaleNow,finaleSettle,stars,finish,keepPlaying,nextMul,nextRun,foxDue,foxTicks,foxScareOnly,foxCame,foxEnded,restoreRun,restoreMeta,TICK,SPEED,MIN_SEC,MAX_SEC,SLACK,FENCE,HELP,FAST,FAST_BONUS,FAST_MIN,isFast,STREAK,BOUNTY,combo,DASH,DASH_TICKS,MAX_WOLVES,PACE,PAY,REPAIR,CURVE,ITEMS,SHOP,ORDER,POWER_NOTE,THINK,LINES,REC,units,
     HENS_MAX,TOWERS_MAX,FARMERS_MAX,syl,fresh,max,count,needSeconds,baseSeconds,limit,reveal,LEARN,learnTicks,scale,picks,built,wolves,basket,eggPrice,income,raid,settle,price,open,canBuy,buy,shopKeys,shop,recommend,offers,restore,
     GUARD,guard,trackPace};

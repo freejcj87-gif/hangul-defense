@@ -5,7 +5,7 @@ import { SimplifyModifier } from 'three/addons/modifiers/SimplifyModifier.js';
 import { KIND_ORDER, RIG, GAIT, RIG_TIME, monsterGeometry, shadowGeometry, rigMaterial, rigDepthMaterial, rigMaterialAt, gaitPose } from './monsters.js';
 import { prep, fuse, solid, flat, merge } from './geo.js';
 import { POND, POND_R, HAY, GARDEN, ZONE, FARM_ZONE, FARM_HOME, PICK, DROP, MARKET_FRONT, MARKET_GATE, TENTS } from './layout.js';
-import { STOREY_H, storeyGeometry, basketGeometry, basketEggs, railGeometry, wallGeometry, marketExtras, STALL_OMIT, NESTS, NEST_MAX, nestSpots, villageProps, lanterns, LANTERN_TOP, drawHammer } from './props.js';
+import { STOREY_H, storeyGeometry, basketGeometry, basketEggs, railGeometry, wallGeometry, marketExtras, STALL_OMIT, NESTS, NEST_MAX, nestSpots, villageProps, lanterns, LANTERN_TOP, drawHammer, trailGeometry, stageProps } from './props.js';
 
 const host=document.querySelector('.scene');
 const motion=matchMedia('(prefers-reduced-motion: reduce)');
@@ -201,13 +201,10 @@ const spawnAngle=p=>(p+.5)*Math.PI*2/W('SPAWNS');
 // lateral distance from the nearest wolf trail (the eight spawn directions)
 function laneOf(x,z){const n=W('SPAWNS'),a=Math.atan2(z,x),r=Math.hypot(x,z);let best=9;for(let p=0;p<n;p++){let d=Math.abs(a-spawnAngle(p))%(Math.PI*2);if(d>Math.PI)d=Math.PI*2-d;if(d<Math.PI/2)best=Math.min(best,r*Math.sin(d))}return best*1}
 function groundDecor(){
- const pad=0xdcc793,trail=0xb9b07a,edge=0xa9a670,parts=[
+ const pad=0xdcc793,parts=[
   flat('disc',pad,-2.8,-2.3,2.6,2.3,.016),flat('disc',pad,4.2,-1.4,3.1,2.5,.016),flat('disc',pad,.6,-3.3,1.9,1.7,.016),
   flat('plane',pad,.6,-.6,7.6,1.0,.018,-.17),flat('plane',pad,-.9,-2.9,3.4,.8,.017,.25)];
- // Wolf trails: eight dirt tracks from deep in the forest to the village (the spawn directions).
- for(let p=0;p<8;p++){const a=spawnAngle(p),r0=7.6,r1=46,mid=(r0+r1)/2;
-  parts.push(flat('plane',edge,Math.cos(a)*mid,Math.sin(a)*mid,r1-r0,1.5,.009,-a),flat('plane',trail,Math.cos(a)*mid,Math.sin(a)*mid,r1-r0,1.05,.011,-a));
-  for(let i=0;i<14;i++){const r=r0+1+i*2.7+Math.sin(i*5.1+p)*.4,side=i%2?.85:-.85,x=Math.cos(a)*r-Math.sin(a)*side,z=Math.sin(a)*r+Math.cos(a)*side;parts.push(['sphere',i%3?0xbfb59c:0xa9a28e,[x,.03,z],[.18+.05*Math.sin(i*2.2),.07,.13]])}}
+ // 0.14: the wolf trails are their own mesh now (props.js trailGeometry): all eight at stage 0, only the open roads later.
  const petals=[0xffffff,0xffe27a,0xff9fb6,0xfff6d8];
  for(let i=0;i<420;i++){
   const x=Math.sin(i*12.9898)*44,z=Math.cos(i*7.233)*40;
@@ -302,6 +299,14 @@ async function start(){
  const land=new THREE.Mesh(meadow,new THREE.MeshStandardMaterial({map:grass,vertexColors:true,color:0xe9f0cf,roughness:1}));land.rotation.x=-Math.PI/2;land.receiveShadow=true;world.add(land);
  const yard=new THREE.Mesh(yardGeometry(),new THREE.MeshBasicMaterial({vertexColors:true,transparent:true,depthWrite:false,side:THREE.DoubleSide}));yard.position.y=.006;yard.renderOrder=1;world.add(yard);
  const decor=new THREE.Mesh(groundDecor(),lit);decor.receiveShadow=true;world.add(decor);
+ /* ----- 0.14 wolf roads: at stage 0 (or with stages off) the eight faint trails of 0.13; from stage 1 only the open roads, drawn as dirt roads.
+    The forest closes over the directions that are not open (layoutDecor reads curRoutes). ----- */
+ const trailCache=new Map();let trailKey='',curRoutes=null;
+ const trails=new THREE.Mesh(new THREE.BufferGeometry(),lit);trails.receiveShadow=true;trails.name='trails';world.add(trails);
+ function setTrails(routes){
+  const key=routes?routes.join(','):'all';if(key===trailKey)return false;trailKey=key;curRoutes=routes;
+  if(!trailCache.has(key))trailCache.set(key,trailGeometry(routes));trails.geometry=trailCache.get(key);decorR=-1;return true;
+ }
 
  /* ----- models ----- */
  const bakeStart=performance.now();   // model baking time (incl. decimation) is reported by debug().bakeMs
@@ -348,8 +353,8 @@ async function start(){
  {const keep=seed;seed=4242;
   for(let gx=-64;gx<=64;gx+=2.3)for(let gz=-64;gz<=64;gz+=2.3){
    const x=gx+span(-1,1),z=gz+span(-1,1),r=Math.hypot(x,z),sx=x*camRight.x+z*camRight.z,sy=x*fwdXZ.x+z*fwdXZ.z;
-   const kind=rnd(),item={x,z,r,u:rnd(),lane:laneOf(x,z),ry:span(0,6.283),s:1};
-   if(r<8.2||Math.abs(sx)>46||sy>34||sy<-28)continue;   // beyond the widest view at full zoom-out
+   const kind=rnd(),item={x,z,r,a:Math.atan2(z,x),u:rnd(),lane:laneOf(x,z),ry:span(0,6.283),s:1};
+   if(r<8.2||Math.abs(sx)>58||sy>42||sy<-38)continue;   // beyond the widest view at full zoom-out (0.14: castle radius 22)
    if(kind<.1){item.s=span(.7,1.4);DEC.rock.push(item)}else if(kind<.22){item.s=span(.8,1.3);DEC.bush.push(item)}else{item.s=span(3.1,4.3);DEC.tree.push(item)}
   }
   seed=keep}
@@ -358,14 +363,16 @@ async function start(){
  const garden=[instanced(G.lowBush,GARDEN.bush.length,false),instanced(G.rock,GARDEN.rock.length,false),shadowOnly(G.lowBush,GARDEN.bush.length)];   // low-poly bushes (5k -> 0.4k triangles each), like the meadow shrubs
  [GARDEN.bush,GARDEN.rock,GARDEN.bush].forEach((list,k)=>{list.forEach(([x,z,s],i)=>{dummy.position.set(x,0,z);dummy.rotation.set(0,i*1.7,0);dummy.scale.setScalar(s);dummy.updateMatrix();garden[k].setMatrixAt(i,dummy.matrix)});garden[k].count=list.length;garden[k].instanceMatrix.needsUpdate=true});
  let decorR=-1;
+ // lateral distance from the nearest wolf road that is open now (all eight trails when curRoutes is null)
+ const laneNow=t=>{if(!curRoutes)return t.lane;let best=9;for(const p of curRoutes){let d=Math.abs(t.a-spawnAngle(p))%(Math.PI*2);if(d>Math.PI)d=Math.PI*2-d;if(d<Math.PI/2)best=Math.min(best,t.r*Math.sin(d))}return best};
  function layoutDecor(R){
-  if(Math.abs(R-decorR)<.01)return;decorR=R;
+  if(Math.abs(R-decorR)<.01)return;decorR=R;const wide=curRoutes?.4:0;
   let nf=0,ng=0,nb=0,nr=0;
   const put=(mesh,i,t,scale)=>{dummy.position.set(t.x,0,t.z);dummy.rotation.set(0,t.ry,0);dummy.scale.setScalar(scale);dummy.updateMatrix();mesh.setMatrixAt(i,dummy.matrix)};
-  for(const t of DEC.tree){const d=t.r-R;
-   if(d>=FOREST){const dens=t.lane<1.7?.12:t.lane<3.2?.5:.9;if(t.u<dens)put(forest,nf++,t,t.s*easeOut(clamp((d-FOREST)/.9,.02,1)))}
-   else if(d>1.4&&t.u<.09&&t.lane>1.5&&ng<groveMax)put(grove,ng++,t,t.s*.95*easeOut(clamp((d-1.4)/.8,.02,1)))}
-  for(const t of DEC.bush){const d=t.r-R;if(d>.9&&t.u<.6&&t.lane>1.2)put(shrubs,nb++,t,t.s*easeOut(clamp((d-.9)/.6,.02,1)))}
+  for(const t of DEC.tree){const d=t.r-R,lane=laneNow(t);
+   if(d>=FOREST){const dens=lane<1.7+wide?.12:lane<3.2+wide?.5:.9;if(t.u<dens)put(forest,nf++,t,t.s*easeOut(clamp((d-FOREST)/.9,.02,1)))}
+   else if(d>1.4&&t.u<.09&&lane>1.5+wide&&ng<groveMax)put(grove,ng++,t,t.s*.95*easeOut(clamp((d-1.4)/.8,.02,1)))}
+  for(const t of DEC.bush){const d=t.r-R;if(d>.9&&t.u<.6&&laneNow(t)>1.2+wide)put(shrubs,nb++,t,t.s*easeOut(clamp((d-.9)/.6,.02,1)))}
   for(const t of DEC.rock){const d=t.r-R;if(d>.5&&t.u<.65)put(stones,nr++,t,t.s*easeOut(clamp((d-.5)/.5,.02,1)))}
   forest.count=nf;grove.count=ng;shrubs.count=nb;stones.count=nr;
   for(const m of [forest,grove,shrubs,stones])m.instanceMatrix.needsUpdate=true;
@@ -402,6 +409,25 @@ async function start(){
  // What each hall stage adds (egg nests from the start; dirt paths, lanterns, hay and feast flags later): one mesh, swapped per stage.
  const props=new THREE.Mesh(G.props[0],lit);props.castShadow=props.receiveShadow=true;world.add(props);let propsStage=0;
  const NEST_SPOTS=nestSpots();
+ /* ----- 0.14 stage props (cottages, well, mill hut, road-entrance markers, castle keep): one merged mesh per stage;
+    while a new stage rises, what was there stays in stageMesh and the new things grow out of the ground in stageNew (then they are merged) ----- */
+ const EMPTY=new THREE.BufferGeometry(),stageCache=new Map();
+ const stageMesh=new THREE.Mesh(EMPTY,lit);stageMesh.castShadow=stageMesh.receiveShadow=true;stageMesh.visible=false;stageMesh.name='stage';world.add(stageMesh);
+ const stageNew=actor(EMPTY,0,0);stageNew.obj.visible=false;stageNew.obj.name='stage-new';
+ let stageShown=-1,stageKey='',stageInfo={houses:0,marks:0,spots:[]},stageRising=false;
+ function setStage(st,R,routes,fx){
+  const key=st+':'+R+':'+(routes?routes.join(','):'');if(key===stageKey)return false;
+  const up=fx&&st>stageShown;stageKey=key;stageShown=st;
+  if(st<1){stageMesh.visible=stageNew.obj.visible=false;stageInfo={houses:0,marks:0,spots:[]};stageRising=false;return true}
+  if(!stageCache.has(key))stageCache.set(key,stageProps(st,R,routes));
+  const g=stageCache.get(key);stageInfo=g;
+  const settle=()=>{if(stageKey!==key)return;stageMesh.geometry=g.all||EMPTY;stageMesh.visible=!!g.all;stageNew.obj.visible=false;stageRising=false;dirty=true};
+  if(up&&g.fresh&&!reduced()){
+   stageMesh.geometry=g.old||EMPTY;stageMesh.visible=!!g.old;stageNew.obj.geometry=g.fresh;stageNew.obj.visible=true;stageRising=true;
+   tween(0,1.05,(u,t)=>{const T=.18;stageNew.sy*=t<T?.001:Math.max(.001,springy(t-T))},settle);
+  }else settle();
+  return true;
+ }
  const hay=actor(solid([['cyl',0xe9c75a,[-.33,.3,0],[.3,.62,.3],[Math.PI/2,0,0]],['cyl',0xe9c75a,[.33,.3,0],[.3,.62,.3],[Math.PI/2,0,0]],['cyl',0xf4d877,[0,.82,0],[.3,.62,.3],[Math.PI/2,0,0]],
   ['cyl',0xc79a3a,[-.33,.3,0],[.31,.09,.31],[Math.PI/2,0,0]],['cyl',0xc79a3a,[.33,.3,0],[.31,.09,.31],[Math.PI/2,0,0]],['cyl',0xc79a3a,[0,.82,0],[.31,.09,.31],[Math.PI/2,0,0]]]),HAY.x,HAY.z,-.35);
  hay.obj.visible=false;
@@ -576,7 +602,7 @@ async function start(){
  let frames=0,dirty=true,lastRepair=null,sunDim=0;
  // Economy-only parts (not in the world simulation): hired farmers, pond, hall decor, feast bunting.
  const KEYS={farmer:'farmers',pond:'pond',hall:'hall',feast:'feast'},ECON={farmers:MAXF-1,pond:3,hall:3,feast:99};
- const shown={farmers:0,pond:0,hall:0,feast:0},silent={},builds={tower:0,fence:0,chicken:0,farmer:0,pond:0,hall:0,feast:0,repair:0,power:0};
+ const shown={farmers:0,pond:0,hall:0,feast:0},silent={},builds={tower:0,fence:0,chicken:0,farmer:0,pond:0,hall:0,feast:0,repair:0,power:0,stage:0};
  let powerShown=-1,powerAt=-9;   // tower power tier on the crossbows (0-3) and when it last went up
  const pending={tower:-9,fence:-9,chicken:-9,hall:-9};
  // Market by hall stage: 0 stall · 1 roofed shop · 2 tent market · 3 big market (heights/sizes for effects and the repair hint)
@@ -598,6 +624,20 @@ async function start(){
   if(drop)clearEffects();
   for(const key in APPLY){const v=next[key];if(first||v!==shown[key]){silent[key]=!first&&v===shown[key]+1?time:-9;shown[key]=v;APPLY[key](v)}}
   return true;
+ }
+ // 0.14 stage and open roads (pulled like the economy numbers; the page calls build('stage') right after a stage went up to play the rise).
+ // Without a stage in the state (stages switched off, or an old page) nothing is shown and the eight 0.13 trails stay.
+ const stageOf=s=>Number.isInteger(s.stage)?clamp(s.stage,-1,5):-1,routesOf=s=>Array.isArray(s.routes)&&s.routes.length?s.routes.slice(0,8):null;
+ function syncStage(s,fx=false){
+  const routes=routesOf(s);let changed=setTrails(routes);
+  if(setStage(stageOf(s),radiusOf(s,s.world),routes,fx))changed=true;
+  return changed;
+ }
+ function buildStage(){             // a new stage: the new houses and gate posts rise with dust and stars, the new village edge lights up
+  const R=radiusOf(curS,curS.world);
+  stageInfo.spots.forEach(([x,z,h],i)=>{const d=.18+Math.min(.5,i*.05);after(d,()=>{dustBurst(x,z,8,1);starBurst(x,h,z,8,.8,[GOLD,WHITE,SKY])});after(d+.25,()=>sparkles(x,h*.7,z,5,.6,GOLD,0,.4))});
+  after(.15,()=>{shake(.08);ringWave(0,0,R*2.5,GOLD,.9,0,CELL.halo,.45,.08,true);ringWave(0,0,R*2.45,WHITE,.7,.1,CELL.ring,.3,.08,true)});
+  yardHens().forEach((c,i)=>hop(c.a,.3,.2+i*.03,.34));
  }
  // Tower power tier: swaps the crossbow model (brazier, pennant, triple bow). The flare plays only for a bought upgrade.
  function syncPower(s,fx){
@@ -894,6 +934,7 @@ async function start(){
   const s=read();syncRecords(s);
   let sl=null;
   if(kind==='tower'||kind==='fence'||kind==='chicken')sl=buildWorld(kind);
+  else if(kind==='stage'){curS=s;if(syncStage(s,true))buildStage();dirty=true;const v=new V3(0,2.2,0).project(camera);return {x:clamp((v.x+1)/2,0,1),y:clamp((1-v.y)/2,0,1)}}
   else if(kind==='repair'){if(!(lastRepair&&time-lastRepair.t<2.5))wobble(home.a,.05)}
   else if(kind==='power'){syncPower(s,true)}
   else{
@@ -1071,7 +1112,7 @@ async function start(){
     hall:shown.hall,farmers:shown.farmers,pond:shown.pond,feast:shown.feast,farmerActors:farmers.filter(f=>f.on).length,
     towerFloors:towers.reduce((n,t)=>n+(t.on?t.floors:0),0),farmersVisible:farmersDrawn,farmersCarrying:farmers.filter(f=>f.on&&f.eggs>0).length,basketEggs:basketDrawn,nestEggs:nestShown,flow:!!flowS,yardEggs:yardDrawn,farmersRunning:runners,repairers,boost:flowLv(),
     fenceLayers:(()=>{const o={1:0,2:0,3:0};for(const sd of sides)if(sd.on)o[sd.layer]++;return o})(),wallSegments:walls.count,railSegments:rails.count,
-    marketTier:market.mtier,marketDown:market.on&&isBroken(market),hammers:hammersDrawn,propsStage,lanterns:lanterns(propsStage).length,
+    stage:stageShown,roads:trailKey,stageHouses:stageInfo.houses|0,roadMarks:stageInfo.marks|0,stageRising,marketTier:market.mtier,marketDown:market.on&&isBroken(market),hammers:hammersDrawn,propsStage,lanterns:lanterns(propsStage).length,
     pondVisible:pond.obj.visible,garlands:garlands.filter(g=>g.obj.visible).length,sale:!!sale||time<popUntil,
     decor:{forest:forest.count,grove:grove.count,bushes:shrubs.count,rocks:stones.count},
     drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,builds:{...builds},effects:particles.length+anims.length,warnings:warns.length,blend:{t:+blendT.toFixed(3),dur:+blendDur.toFixed(3),ticks:blendTicks},shake:shakeNow,
@@ -1567,7 +1608,7 @@ async function start(){
  garlands.forEach(g=>{g.obj.name='garland'});
  let last=0,wasLess=reduced(),curS=IDLE;
  const SUN_COLOR=sun.color.clone(),RED_LIGHT=new THREE.Color(0xff4a2a);
- {const s=read();curS=s;syncEconomy(s,true);syncPower(s,false);syncRecords(s);updateNest(s);Rd=Rgoal;resize();const less=reduced();
+ {const s=read();curS=s;syncEconomy(s,true);syncPower(s,false);syncRecords(s);syncStage(s);updateNest(s);Rd=Rgoal;resize();const less=reduced();
   animateBuildings(0,0,less);updateFences(less);animateWolves(0,0,less);animateHens(0,0,less);animateArrows(less);for(const a of actors)pose(a,0);writeHens()}
  host.classList.add('is3d');host.dataset.renderer='three';
  // One step of the view: dt-driven; `still` freezes everything (paused, hidden tab), the world clock only runs in listen/ask/learn.
@@ -1594,7 +1635,7 @@ async function start(){
   if(less&&!wasLess){clearEffects();dirty=true}wasLess=less;
   if(syncEconomy(s))dirty=true;
   if(syncPower(s,false))dirty=true;
-  syncRecords(s);curS=s;{const nb=nestShown;updateNest(s);if(nestShown!==nb)dirty=true}
+  syncRecords(s);curS=s;if(syncStage(s))dirty=true;{const nb=nestShown;updateNest(s);if(nestShown!==nb)dirty=true}
   if(hold){let n=0;while(advance>1e-6&&n<300){const h=Math.min(1/30,advance);advance-=h;n++;step(h,still,less,running)}if(!n&&dirty)step(0,true,less,false)}   // test-only frozen view
   else step(dt,still,less,running);
   flatPool.begin();airPool.begin();animateArrows(less);ambient(less);drawParticles();flatPool.end();airPool.end();

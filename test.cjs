@@ -2,9 +2,10 @@ const {chromium,webkit}=require('playwright');
 const assert=require('node:assert/strict'),http=require('node:http'),fs=require('node:fs'),path=require('node:path');
 const Questions=require('./questions.js'),Combat=require('./combat.js'),World=require('./world.js');
 const INTERIM=process.env.INTERIM_NO_3D_BUILD==='1',FULL_SHOTS=process.env.FULL_SHOTS==='1';
-const ONLY=process.env.ONLY||'',run=part=>!ONLY||ONLY.split(',').includes(part);/* ONLY=matrix,clock,feel,fallback,demo,flow,farm 중 일부만 돌릴 때(개발용). CI는 전부 돌린다. */
+const ONLY=process.env.ONLY||'',run=part=>!ONLY||ONLY.split(',').includes(part);/* ONLY=matrix,clock,feel,fallback,demo,flow,farm,stage 중 일부만 돌릴 때(개발용). CI는 전부 돌린다. */
 /* 0.13: 아래 matrix·clock·feel·fallback·demo·flow 구간은 0.12 경제 회귀 검사라 주소에 flow=0을 붙여 연다(OLD). 흐르는 농장(기본 켬)은 맨 끝 farm 구간이 본다 */
-const OLD='/?flow=0';Combat.FLAGS.FLOW=false;/* 이 파일의 기대값 계산(Node 쪽 Combat)도 0.12 경제로. farm 구간은 상수만 읽는다 */
+/* 0.14: 같은 까닭으로 그 구간들은 stages=0도 붙인다(단계를 끄면 0.13.2 화면·규칙 그대로라는 회귀 검사). 단계(기본 켬)는 맨 끝 stage 구간이 본다. farm 구간은 단계를 켠 채 돈다 */
+const OLD='/?flow=0&stages=0';Combat.FLAGS.FLOW=false;Combat.FLAGS.STAGES=false;Combat.FLAGS.ROUTES=false;/* 이 파일의 기대값 계산(Node 쪽 Combat)도 0.12 경제·단계 끔으로. farm·stage 구간은 상수만 읽는다 */
 const KEY='hangul-defense-v1',SWIFT=['--enable-webgl','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader'];
 /* 검사 기본: 시계를 세우고(__HOLD_CLOCK) 틱을 직접 돌린다. CI의 SwiftShader는 프레임 간격이 200ms를 넘기도 해서 벽시계 대기는 쓰지 않는다.
    0.11: 게임은 읽어 주는 음성(음성 합성)을 쓰지 않는다. speechSynthesis를 감시용으로 바꿔, 부르면 window.__said에 남긴다(언제나 비어 있어야 함). */
@@ -224,7 +225,10 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
   ok(walked,'wolves walk toward the village: '+JSON.stringify(seen))}
  /* 🐺 알약은 틱마다 세계를 따라간다 */
  {let miss=0;for(let k=0;k<5;k++){await tick(page,7);const [txt,n]=await page.evaluate(()=>[document.getElementById('level').textContent,window.__game().world.wolves]);if(!txt.endsWith('🐺'+n))miss++}eq(miss,0,'🐺 pill follows the world every tick')}
- if(three&&!INTERIM){await frames(page,3);const i=await page.evaluate(()=>window.VillageView.inspect());ok(i.wolvesVisible>=1,'3D wolves visible: '+i.wolvesVisible);eq(i.wolvesVisible,await notGone(page),'3D wolf count = simulated wolves (incl. falling ones)')}
+ /* 0.14: 세계 씨앗이 실행 시각(index.html freshWorld의 Date.now)이라 판마다 세계가 다르고, 이 순간 늑대가 모두 쓰러져 0마리일 때가 있었다(게임 버그 아님: 0마리는 정상 상태).
+    390 폭은 위에서 세 번째 타워를 사서 무리가 일찍 쓰러진다. 같은 순서를 Node(World)로 2,000개 씨앗에 근사 재현하면 390 경로만 3.5%가 0마리(1366·320은 0%),
+    기다리면 길어도 85틱 안에 다음 낙오 늑대가 나왔다. 그래서 늑대가 없으면 나올 때까지(최대 300틱) 틱을 돌린 뒤 본다 */
+ if(three&&!INTERIM){for(let k=0;k<60&&!(await notGone(page));k++)await tick(page,5);await frames(page,3);const i=await page.evaluate(()=>window.VillageView.inspect());ok(i.wolvesVisible>=1,'3D wolves visible: '+i.wolvesVisible);eq(i.wolvesVisible,await notGone(page),'3D wolf count = simulated wolves (incl. falling ones)')}
  if(name==='chromium'&&(width===390||width===1366))await shot(page.locator('.scene'),'pack-'+width);
  ok(await noOverflow(page),'no overflow after a few rounds');
  await page.screenshot({path:path.join(shots,name+'-'+width+'x'+height+'.png'),fullPage:true});
@@ -233,7 +237,11 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
   if(three&&!INTERIM){
    /* 세계가 흐르면 3D 늑대가 움직이고, 쉬기에서는 멈춘다 */
    await page.emulateMedia({reducedMotion:'no-preference'});
-   await page.evaluate(()=>{const g=window.__game();if(!world.wolves.some(v=>v.state!=='dead'&&v.state!=='gone'))window.__tick(Math.max(1,g.world.wave.arrive-g.world.t-60))});
+   /* 0.14: 위와 같은 까닭(실행 시각 씨앗)으로, 이 순간 보이는 늑대가 모두 서 있으면(타워·울타리를 부수는 중, 닭을 무는 중, 쓰러지는 중, 한 마리도 없음) 위치가 안 바뀌어 실패했다
+      (main CI 0.13.2에서 한 번. Node 근사 재현 2,000개 씨앗 중 9개 = 0.45%). 전에는 산 늑대가 없을 때만 무리 직전까지 돌렸는데, 무리가 60틱 안이면 1틱만 돌고 끝났다.
+      보이는 앞 8마리(wolfPos) 가운데 걷는 늑대가 나올 때까지 틱을 돌린 뒤 잰다 */
+   const walking=()=>page.evaluate(()=>world.wolves.filter(v=>v.state!=='gone').slice(0,8).some(v=>['walk','hunt','carry','leave'].includes(v.state)));
+   for(let k=0;k<60&&!(await walking());k++)await tick(page,5);ok(await walking(),'a walking wolf is on the map before the 3D move check');
    const wp=async()=>(await page.evaluate(()=>window.VillageView.inspect())).wolfPos;
    await frames(page,3);const p0=await wp();await tick(page,10);await frames(page,6);const p1=await wp();
    assert.notDeepEqual(p1,p0,'3D wolves move when the world ticks');checks++;
@@ -366,7 +374,7 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
  const demoBrowser=await chromium.launch({headless:true,args:SWIFT});
  try{if(run('demo')){
   const ctx=await demoBrowser.newContext({viewport:{width:390,height:844},hasTouch:true,reducedMotion:'no-preference'});await ctx.addInitScript(HOLD);await ctx.addInitScript(FAKE_TTS);
-  const page=await ctx.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(url+'/?demo=3&flow=0');await ready(page);
+  const page=await ctx.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(url+'/?demo=3&flow=0&stages=0');await ready(page);
   ok((await page.locator('header small').textContent()).includes('체험: 마을회관 3단계'),'demo label');
   const is3d=await page.locator('.scene').getAttribute('data-renderer')==='three';ok(is3d,'demo runs in 3D');
   await begin(page,{age:8},true);let g=await game(page);eq([g.state.hall,g.state.level,g.state.power,g.world.radius],[3,5,2,16],'demo starts with a grown village');
@@ -400,7 +408,7 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
  try{if(run('flow')){
   const BANNERS=()=>{window.__banners=[];document.addEventListener('DOMContentLoaded',()=>{new MutationObserver(m=>m.forEach(r=>r.addedNodes.forEach(n=>{if(n.classList&&n.classList.contains('banner'))window.__banners.push(n.textContent)}))).observe(document.getElementById('effects'),{childList:true})})};
   const open=async(o={})=>{const ctx=await flowBrowser.newContext({viewport:{width:o.width||390,height:o.height||844},hasTouch:true,reducedMotion:o.motion?'no-preference':'reduce'});await ctx.addInitScript(HOLD);await ctx.addInitScript(FAKE_TTS);await ctx.addInitScript(BANNERS);
-   const page=await ctx.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.route('**/environment-pack.glb',r=>r.abort());await page.goto(url+(o.query?o.query+'&flow=0':OLD));await ready(page);return {ctx,page,errors}};
+   const page=await ctx.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.route('**/environment-pack.glb',r=>r.abort());await page.goto(url+(o.query?o.query+'&flow=0&stages=0':OLD));await ready(page);return {ctx,page,errors}};
   const bannerBoxes=page=>page.evaluate(()=>{const s=document.getElementById('scene').getBoundingClientRect();
    return [...document.querySelectorAll('#effects .banner')].map(b=>{const r=b.getBoundingClientRect(),cs=getComputedStyle(b);return {text:b.textContent,shown:cs.display!=='none',opacity:cs.opacity,anim:cs.animationName,inside:r.left>=s.left-.5&&r.right<=s.right+.5&&r.top>=s.top-.5&&r.bottom<=s.bottom+.5,w:Math.round(r.width),sceneW:Math.round(s.width)}})});
 
@@ -473,7 +481,8 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
    const three=(await page.locator('.scene').getAttribute('data-renderer'))==='three';
    eq((await slotStates(page))[7],'hall:auto','ending: 65 built, the 8th slot is still the hall picture');
    await buy(page,'farmer',true);let g=await game(page);eq([g.state.run.bell,(await slotStates(page))[7],g.king&&g.king.state],[1,'bell:buy','wait'],'ending: 66 built opens the free bell and the wolf king waits at the forest edge');
-   eq(await page.locator('#shop .slot[data-key="bell"] .pr').textContent(),'울려요','bell slot: no price');ok(await shopFits(page),'shop fits with the bell slot');
+   eq(await page.locator('#shop .slot[data-key="bell"] .pr').textContent(),'울려요','bell slot: no price');/* 0.14: 열린 종 칸은 1.5초 동안 통통 튄다(recBounce −7px, 줄 간격 5~6px). 튀는 순간에 재면 윗줄 칸과 1~2px 겹쳐 가끔 실패했다 → 끝이 있는 애니메이션이 끝난 뒤에 잰다 */
+   await page.evaluate(()=>Promise.all([...document.querySelectorAll('#shop .slot')].flatMap(b=>b.getAnimations()).filter(a=>{try{return Number.isFinite(a.effect.getComputedTiming().endTime)}catch{return false}}).map(a=>a.finished.catch(()=>{}))));ok(await shopFits(page),'shop fits with the bell slot');
    if(three){await tick(page,60);await frames(page,6);const i=await page.evaluate(()=>window.VillageView.inspect());ok(i.king&&i.king.size>3,'3D draws the wolf king (grey ember-king model, twice the size): '+JSON.stringify(i.king));await shot(page.locator('.scene'),'ending-king-wait-390')}
    await buy(page,'bell',true);g=await game(page);eq([g.state.run.bell,g.state.run.fpick.length,(await slotStates(page))[7]],[2,6,'bell:fight'],'ending: ringing the bell starts the finale (six questions fixed)');
    await answer(page,true,true);await settle(page);/* 풀던 문제는 그대로 끝내고, 다음 문제부터 결전 */
@@ -491,7 +500,7 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
 
   /* 체험 초기화: 체험 마을로 돌아가고, 원래 저장은 그대로 */
   {const {ctx,page,errors}=await open();await seed(page,{gold:777,wins:5,index:9,age:8});
-   await page.goto(url+'/?demo=2&flow=0');await ready(page);const real=await page.evaluate(()=>localStorage.getItem('hangul-defense-v1'));
+   await page.goto(url+'/?demo=2&flow=0&stages=0');await ready(page);const real=await page.evaluate(()=>localStorage.getItem('hangul-defense-v1'));
    ok((await page.locator('header .demo-tag').textContent())==='체험: 마을회관 2단계','demo 2 label');
    await begin(page,{age:8},true);await answer(page,true,true);await phaseIs(page,'reward');await settle(page);
    let g=await game(page);ok(g.state.wins===1&&g.state.index===1&&g.state.gold!==450,'progress inside the demo');
@@ -572,6 +581,78 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
    await shot(page,'farm-320x568');
    eq(errors,[],'farm 320 page errors');await ctx.close()}
  }}finally{await farmBrowser.close()}
+ /* ---------- 0.14 단계(FLAGS.STAGES·ROUTES 기본 켬, 3D): 6단계마다 영역(반지름)·열린 길·집 수가 다르고, 읽는 중에 산 것은 답한 뒤에 넓어지며(그동안 화면은 가만히),
+    8번째 칸이 다음 단계까지 남은 수를 보여 준다. 390·320 배치, 주소 ?stages=0이면 0.13.2 모습 ---------- */
+ const stageBrowser=await chromium.launch({headless:true,args:SWIFT});
+ try{if(run('stage')){
+  const open=async(o={})=>{const ctx=await stageBrowser.newContext({viewport:{width:o.width||390,height:o.height||844},hasTouch:true,reducedMotion:o.calm?'reduce':'no-preference'});await ctx.addInitScript(HOLD);await ctx.addInitScript(FAKE_TTS);
+   const page=await ctx.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(url+(o.query||''));await ready(page);return {ctx,page,errors}};
+  const insp=page=>page.evaluate(()=>window.VillageView.inspect());
+  const roll=async(page,n)=>{for(let i=0;i<n;i++){await page.evaluate(()=>{window.__tick(2);window.VillageView.debug({advance:.2})});await frames(page,1)}};
+  const view=async(page,sec)=>{await page.evaluate(s=>window.VillageView.debug({advance:s}),sec);await frames(page,2)};   /* 틱 없이 화면 시간만 */
+  const cell=page=>page.locator('#shop .slot[data-slot="7"]').evaluate(b=>({key:b.dataset.key,state:b.dataset.state,stage:b.dataset.stage,nm:b.querySelector('.nm').textContent,pr:b.querySelector('.pr').textContent,fits:b.querySelector('.pr').getBoundingClientRect().right<=b.getBoundingClientRect().right+.5&&b.querySelector('.pr').getBoundingClientRect().left>=b.getBoundingClientRect().left-.5}));
+  const tagBox=page=>page.evaluate(()=>{const s=document.getElementById('scene').getBoundingClientRect(),e=document.getElementById('stageTag'),r=e.getBoundingClientRect(),y=document.getElementById('yardEggs').getBoundingClientRect();return {text:e.textContent,inside:r.width>0&&r.left>=s.left&&r.right<=s.right&&r.top>=s.top&&r.bottom<=s.bottom,clearOfEggs:r.right<=y.left}});
+  /* 단계별 마을(8세 문턱 0·5·14·24·36·50). 회관은 불러올 때 규칙이 정한다 */
+  const VILLAGE=[{level:1,fence:1,chickens:2},{level:3,fence:3,chickens:4},{level:5,fence:6,chickens:6,farmers:1},{level:7,fence:8,chickens:9,farmers:2,power:2},{level:10,fence:12,chickens:12,farmers:4,power:3,pond:1},{level:14,fence:16,chickens:16,farmers:6,power:5,pond:2}];
+  const NAME=['🏡 농가','🏘️ 마을','🏪 장터 마을','💧 물레방아 마을','🧱 성곽 마을','🏰 성'],HALL=[0,0,1,1,2,3],HOUSES=[0,2,4,6,10,22],ROADS=['all','0,2','0,2,4','0,2,4,6','0,2,3,4,6','0,2,3,4,6,7'];
+  {const {ctx,page,errors}=await open();let lastHalf=0,geo5=0;
+   for(let k=0;k<6;k++){
+    await seed(page,{age:8,index:0,wins:0,gold:300,farmers:0,power:0,pond:0,hall:0,...VILLAGE[k]});await page.waitForFunction(()=>window.VillageView?.inspect().ready,{},{timeout:45000});
+    await begin(page,{age:8},true);await page.evaluate(()=>window.VillageView.debug({hold:true}));await roll(page,6);
+    const g=await game(page),v=await insp(page),R=World.STAGE.radius[k];
+    eq([g.stage.now,g.state.hall,g.world.radius,g.stage.tag],[k,HALL[k],R,NAME[k]],'stage '+k+': stage, hall, radius and name tag');
+    eq([v.stage,v.roads,v.stageHouses,v.roadMarks,v.radius,v.hall],[k,ROADS[k],HOUSES[k],k?2*World.STAGE.open[k].length:0,R,HALL[k]],'stage '+k+': the 3D village shows the stage (roads, houses, road marks, radius)');
+    ok(Math.abs(v.radiusShown-R)<.05,'stage '+k+': the view has settled on the new radius: '+v.radiusShown);ok(v.cameraHalf>=lastHalf-.01&&(k===0||v.cameraHalf>lastHalf+.3),'stage '+k+': the camera is further back than at stage '+(k-1)+': '+v.cameraHalf.toFixed(2)+' > '+lastHalf.toFixed(2));lastHalf=v.cameraHalf;
+    ok(v.drawCalls<=52&&v.triangles<=520000,'stage '+k+': draw budget(0.14: 기준 기기가 패드·노트북이 되어 삼각형 상한을 42만 → 52만으로): '+v.drawCalls+' calls, '+v.triangles+' triangles');
+    const c=await cell(page);eq([c.key,c.state,c.stage,c.fits],['hall','auto',String(k),true],'stage '+k+': the 8th slot shows the stage and fits');ok(/^(\d+개 더|🔔\d+개)$/.test(c.pr),'stage '+k+': progress text: '+c.pr);
+    const t=await tagBox(page);ok(t.inside&&t.clearOfEggs,'stage '+k+': name tag inside the scene, clear of the egg counter: '+JSON.stringify(t));
+    ok(await noOverflow(page),'stage '+k+': no overflow');ok(await shopFits(page),'stage '+k+': shop fits');
+    /* 늑대는 열린 길로만 온다: 300틱 동안 나온 늑대의 출현 방향 */
+    /* 한 순간만 보면 타워가 다 쓰러뜨려 0마리일 때가 있다 → 도는 동안 나온 늑대를 모두(id별 출현 방향) 모으고, 한 마리도 없으면 더 돌린다 */
+    if(k){await page.evaluate(()=>{world.calm=0;world.wolves=[];window.__seenDir={}});/* 앞 단계에서 이미 오던 늑대(같은 세계를 이어 쓴다)는 치우고 새로 나오는 늑대만 본다 */
+     const seen=()=>page.evaluate(()=>{for(const w of world.wolves)window.__seenDir[w.id]=(Math.atan2(w.sz,w.sx)+Math.PI*2)%(Math.PI*2);return Object.values(window.__seenDir)});
+     let dirs=[];for(let n=0;n<240&&(n<60||!dirs.length);n++){await roll(page,1);dirs=await seen()}
+     ok(dirs.length>=1&&dirs.every(a=>World.STAGE.open[k].some(p=>{let d=Math.abs(a-(p+.5)*Math.PI/4)%(Math.PI*2);if(d>Math.PI)d=Math.PI*2-d;return d<=.26})),'stage '+k+': every wolf came down an open road ('+dirs.length+' wolves)')}
+    await shot(page.locator('.stage-card'),'stage-390-'+k);if(k===5)geo5=v.memory.geometries;}
+   eq(errors,[],'stage tour page errors');await ctx.close()}
+  /* 전환: 읽는 중에 다섯 번째를 사면 화면은 그대로('곧!'), 답한 순간 넓어지고 띠 알림 */
+  {const {ctx,page,errors}=await open();await seed(page,{age:8,index:0,level:2,fence:1,chickens:2,gold:300});await page.waitForFunction(()=>window.VillageView?.inspect().ready,{},{timeout:45000});
+   await begin(page,{age:8},true);await page.evaluate(()=>{world.wolves=[];world.peace=-1;window.VillageView.debug({hold:true})});await roll(page,4);
+   const v0=await insp(page);eq([v0.stage,v0.radius,v0.roads],[0,7,'all'],'shift: starts as a farm');
+   await buy(page,'chicken',true);await roll(page,8);let g=await game(page),v=await insp(page);
+   eq([g.phase,g.stage.rule,g.stage.now,g.stage.due,v.stage,v.radius,v.roads,v.stageHouses],['ask',1,0,true,0,7,'all',0],'shift: bought while reading, so the scene stays as it was');
+   ok(Math.abs(v.cameraHalf-v0.cameraHalf)<1e-6&&v.cameraFocus[0]===v0.cameraFocus[0]&&v.cameraFocus[1]===v0.cameraFocus[1],'shift: the camera does not move while the child reads');
+   let c=await cell(page);eq([c.nm,c.pr],['마을','✨ 곧!'],'shift: the 8th slot says it is about to grow');eq(await page.locator('#stageTag').textContent(),'🏡 농가','shift: the name tag is still the farm');
+   await page.locator('#shop .slot[data-slot="7"]').tap();eq(await page.locator('#shopTip').textContent(),'✨ 이 문제를 풀면 마을이 돼요!','shift: tapping the slot explains');
+   await shot(page.locator('.stage-card'),'stage-shift-1-held');
+   await answer(page,true,true);g=await game(page);eq([g.phase,g.stage.now,g.world.radius,g.stage.routes,g.round.wait],['reward',1,9,[0,2],16],'shift: answering widens the village (between questions)');
+   const bn=await page.locator('.banner').evaluate(e=>({text:e.textContent,later:e.classList.contains('later'),box:(()=>{const r=e.getBoundingClientRect(),s=document.getElementById('scene').getBoundingClientRect();return r.left>=s.left-.5&&r.right<=s.right+.5})()}));
+   eq([bn.text,bn.later,bn.box],['🏘️마을이 되었어요!땅이 넓어졌어요 · 늑대는 길 2곳으로 와요',false,true],'shift: the banner says what the village became and what got better');
+   await view(page,.35);v=await insp(page);ok(v.stageRising&&v.stage===1&&v.roads==='0,2'&&v.stageHouses===2,'shift: new houses and road marks rise: '+JSON.stringify([v.stageRising,v.stage,v.roads,v.stageHouses]));ok(v.effects>0,'shift: effects play');
+   await shot(page.locator('.stage-card'),'stage-shift-2-rising');
+   await view(page,1.4);v=await insp(page);ok(!v.stageRising&&Math.abs(v.radiusShown-9)<.1&&v.cameraHalf>v0.cameraHalf+.5,'shift: within the reward beat (1.6 s) the view has pulled back and the props are settled: '+v.radiusShown.toFixed(2)+', '+v.cameraHalf.toFixed(2));
+   eq(v.builds.stage,1,'shift: one stage build effect');eq((await game(page)).sfx.stage,1,'shift: one stage jingle');
+   await shot(page.locator('.stage-card'),'stage-shift-3-village');
+   await settle(page);const half=(await insp(page)).cameraHalf;await roll(page,10);ok(Math.abs((await insp(page)).cameraHalf-half)<1e-6,'shift: the camera is still again during the next question');
+   eq(await page.locator('#stageTag').textContent(),'🏘️ 마을','shift: name tag updated');c=await cell(page);eq([c.nm,c.pr],['마을','9개 더'],'shift: the 8th slot counts to the next stage');
+   eq(errors,[],'shift page errors');await ctx.close()}
+  /* 320×568, 움직임 줄이기: 성(가장 넓은 마을)에서도 배치가 깨지지 않고, 전환은 연출 없이 바로 */
+  {const {ctx,page,errors}=await open({width:320,height:568,calm:true});await seed(page,{age:8,index:0,gold:900,...VILLAGE[5]});await page.waitForFunction(()=>window.VillageView?.inspect().ready,{},{timeout:45000});
+   await begin(page,{age:8},true);await frames(page,3);
+   let v=await insp(page),c=await cell(page),t=await tagBox(page);eq([v.stage,v.radius,v.stageHouses],[5,22,22],'stage 320: the castle');ok(c.fits&&/^🔔\d+개$/.test(c.pr),'stage 320: the 8th slot fits: '+c.pr);ok(t.inside&&t.clearOfEggs,'stage 320: name tag fits: '+JSON.stringify(t));
+   ok(await noOverflow(page),'stage 320: no overflow');ok(await shopFits(page),'stage 320: shop fits');ok(await pillsFit(page),'stage 320: pills fit');await shot(page,'stage-320x568-castle');
+   /* 새 세계로(세계는 단계를 래치하므로 성이던 세계를 그대로 두면 농가로 돌아가지 않는다) */
+   await page.evaluate(()=>{Object.assign(state,Combat.fresh(8),{level:2,fence:1,chickens:2,gold:300,seed:state.seed});state.run.t0=Date.now();world=freshWorld();save()});await page.reload();await ready(page);await page.waitForFunction(()=>window.VillageView?.inspect().ready,{},{timeout:45000});
+   await begin(page,{age:8},true);await buy(page,'chicken',true);await answer(page,true,true);await frames(page,3);v=await insp(page);
+   eq([v.stage,v.stageRising,v.radius,Math.abs(v.radiusShown-9)<.01],[1,false,9,true],'stage 320 reduced motion: the village is wider at once, nothing animates');
+   eq(errors,[],'stage 320 page errors');await ctx.close()}
+  /* 주소 ?stages=0: 0.13.2 모습(반지름은 회관 단계, 발자국 길 8갈래, 이름표·단계 소품 없음, 8번째 칸은 회관 점) */
+  {const {ctx,page,errors}=await open({query:'/?stages=0'});await seed(page,{age:8,index:0,gold:300,...VILLAGE[5]});await page.waitForFunction(()=>window.VillageView?.inspect().ready,{},{timeout:45000});
+   await begin(page,{age:8},true);await frames(page,3);const g=await game(page),v=await insp(page),c=await cell(page);
+   eq([g.stage.on,g.state.hall,g.world.radius,v.stage,v.roads,v.stageHouses,v.roadMarks,v.radius],[false,3,16,-1,'all',0,0,16],'stages=0: the 0.13.2 village');eq([c.nm,c.pr,c.stage],['회관','●●●',undefined],'stages=0: the 8th slot shows the hall dots');
+   ok(!(await page.locator('#stageTag').isVisible()),'stages=0: no name tag');ok(!('stage' in (await stored(page)).world),'stages=0: no stage in the saved world');
+   await shot(page.locator('.stage-card'),'stage-off');eq(errors,[],'stages=0 page errors');await ctx.close()}
+ }}finally{await stageBrowser.close()}
  console.log((ONLY?'PARTIAL('+ONLY+') ':'')+'PASS '+checks+' browser assertions (Chromium/WebKit, desktop + mobile emulation, held clock + one real-clock run). Physical audio/device validation remains manual.');
  }finally{server.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});

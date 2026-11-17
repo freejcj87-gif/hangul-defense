@@ -1,6 +1,6 @@
 # Claude Code 작업 인계
 
-기준일: 2026-11-13. 0.12(엔딩·경제 개편, 브랜치 `claude/ending-economy`, worktree `work\claude-v012-ending`) 기준으로 갱신했습니다. 0.11은 듣고 고르기 폐쇄·읽어 주기 삭제(브랜치 `claude/no-sound`)입니다. 0.9는 상점·알 경제(브랜치 `claude/shop-economy`)입니다. 0.8은 PR #9(main `4700136`), 0.7은 PR #7(main `08e8ec7`)입니다. 0.6은 PR #5(main `d8d95f5`), 0.5는 [PR #3](https://github.com/freejcj87-gif/hangul-defense/pull/3)(main `965ad4e`)입니다. 0.4 인계 시점의 기록은 main `800f3f9` 기준이며 아래 “확인된 검증과 배포”에 그대로 남겼습니다. 문서 커밋 자체는 이후 이력에서 확인하세요.
+기준일: 2026-11-17. 지금 작업은 0.14(보이는 단계 6개 · 넓어지는 영역 · 길, 브랜치 `claude/v014-stages`, worktree `work\claude-v013`)이고 아래 "실제 규칙과 한계 → 0.14"와 "확인된 검증과 배포 → 0.14"가 최신입니다. 그 뒤 문장은 2026-11-13 기준입니다. 0.12(엔딩·경제 개편, 브랜치 `claude/ending-economy`, worktree `work\claude-v012-ending`) 기준으로 갱신했습니다. 0.11은 듣고 고르기 폐쇄·읽어 주기 삭제(브랜치 `claude/no-sound`)입니다. 0.9는 상점·알 경제(브랜치 `claude/shop-economy`)입니다. 0.8은 PR #9(main `4700136`), 0.7은 PR #7(main `08e8ec7`)입니다. 0.6은 PR #5(main `d8d95f5`), 0.5는 [PR #3](https://github.com/freejcj87-gif/hangul-defense/pull/3)(main `965ad4e`)입니다. 0.4 인계 시점의 기록은 main `800f3f9` 기준이며 아래 “확인된 검증과 배포”에 그대로 남겼습니다. 문서 커밋 자체는 이후 이력에서 확인하세요.
 
 ## 먼저 알아야 할 것
 
@@ -55,7 +55,21 @@
 
 ## 실제 규칙과 한계
 
-### 0.13 (현재)
+### 0.14 (현재)
+
+보이는 단계 6개 · 넓어지는 영역 · 길입니다(브랜치 `claude/v014-stages`, worktree `work\claude-v013`, main 0.13.2 `b5c9ae5` 기준). 정본은 [docs/game-plan.md](docs/game-plan.md) §14, 설계 근거는 저장소 밖 `work\verification-20261113\design\v014-scale-design.md`(§9 프로듀서 결정이 본문보다 우선)입니다. 병합·배포 전입니다.
+
+- 규칙(`combat.js`): `FLAGS.STAGES` · `ROUTES` · `STAGE_AT` · `STAGE_AT_BY_AGE` · `STAGE_HALL` · `STAGE_BELL_BY_AGE`. `stage(s)`는 이번 판 지은 수(회관·시작 꾸러미 제외, `stageCount`)에서 계산하고 저장하지 않습니다. 회관은 단계 2·4·5에 들어설 때 오릅니다(`autoHall`). `stageInfo(s, cur)`가 8번째 칸의 "n개 더"를 줍니다. 끄면 −1 / null이고 0.13.2 규칙입니다.
+- 세계(`world.js`): `STAGE.radius` · `open` · `range`. 선택 칸 `w.stage`(0~5, 래치)가 있으면 반지름·열린 길·사거리 덤을 단계에서 읽고, 없으면 0.13.2와 한 글자도 다르지 않습니다. `sync(w, s, {hold:true})`는 단계·회관 승급을 세계에 넣지 않습니다(읽는 중 구매). 세계는 `Combat`을 직접 읽습니다(브라우저는 `window.Combat`, Node는 `require('./combat.js')`).
+- 화면(`index.html`): `staged` · `stageNow`(= `world.stage`) · `stageDue`, `stageRelease`(정답 연출·정답 배우기에 들어갈 때 보류를 풂) → `stageUp`(띠 알림 · 3D `build('stage')` · 이름표). `stageCell`이 8번째 칸, `stageHud`가 이름표(`#stageTag`), `regrow`가 나이를 바꿨을 때 문턱을 다시 맞춥니다. `__game().stage`로 검사합니다. 주소 `?stages=0` · `?routes=0`.
+- 3D(`src/layout.js` · `src/props.js` · `src/village.js`): `trailGeometry(routes)`(열린 길만 흙길, null이면 0.13의 발자국 길 8갈래), `stageProps(stage, 반지름, routes)`(집 · 우물 · 물레방아 오두막 · 길목 표시 · 성탑). `syncStage`가 상태의 `stage` · `routes`를 끌어오고, `buildStage`가 솟는 연출을 냅니다. 숲은 열린 길만 비킵니다(`laneNow`). `inspect()`에 `stage` · `roads` · `stageHouses` · `roadMarks` · `stageRising`.
+- 시뮬: `node scripts/sim-flow.cjs end 12 7,8,9,10 typ,slow,fast,guess [덮어쓰기]`. 단계 보류를 화면과 같은 때(답한 순간)에 풉니다. 0.13.2 기준선은 `'{"FLAGS":{"STAGES":false,"ROUTES":false}}'`.
+- 검사: `test-dom.cjs` · `test.cjs`의 기존 검사는 단계를 끄고(`STAGES=false`, 주소 `stages=0`) 돕니다 = 끄면 0.13.2와 같다는 회귀 검사. 단계는 `test-dom.cjs` 맨 끝 "0.14 단계" 절과 `test.cjs`의 stage 구간(`ONLY=stage`)이 봅니다.
+- 주의: 세계가 단계를 붙잡으므로, 검사·디버그에서 지은 수를 줄여 다시 불러와도 같은 세계면 단계가 내려가지 않습니다(새 세계 `freshWorld()`로 바꿔야 함). 타워 자리 번호·울타리 면 순서는 건드리지 않았습니다.
+- 기준 기기는 패드·노트북입니다(프로듀서 2026-11-17, 기획서 §14.8): 노트북 1366×768, 패드 가로 1180×820, 세로 820×1180. 폰은 깨지지 않는지만 봅니다. 그래서 마지막 반지름을 19 → 22(`STAGE.radius` [7,9,11.5,14.5,18,22])로 넓히고, 울타리 부서짐을 반지름 19 때 수준으로 되돌리려 사거리 덤을 (반지름 − 7) × 0.75 → × 0.9로 올렸습니다. `index.html`은 넓은 화면에서 장면이 화면 높이를 따라 커지고(`clamp(380px, 100svh − 318px, 760px)`), 패드 세로는 한 기둥입니다.
+- 통과선에 못 미친 것(§14.4): 찍기 엔딩 7세 2.6배 · 8세 2.97배(3배 미만, 0.13.2에서 물려받음), 10세의 20분까지 울타리 부서짐 13 → 22번(0.13.2 대비. 반지름 19 때보다는 +5%). 확인하지 못한 것: 실기기(패드·노트북 포함), 실제 아이, 그림 화면의 길 표시(없음).
+
+### 0.13 (참고)
 
 흐르는 농장과 신바람입니다(브랜치 `claude/flow-farm`, worktree `work\claude-v013`, 0.12 main `3fb318f` 기준). 정본은 [docs/game-plan.md](docs/game-plan.md) §13, 설계 근거는 저장소 밖 `work\verification-20261113\design\v013-design.md`입니다. 결정 질문 5개는 추천 기본값이고 `combat.js`의 `FLAGS.FLOW`·`FLOW_OFF_AGES`·`BUBBLE_BUY`·`REPAIR_ACT`와 `Combat.FLOW`·`World.FLOW`로 바꿉니다(§13.4 표).
 
@@ -284,6 +298,21 @@ Playwright 시스템 의존성 설치는 WSL/Ubuntu 환경에 맞춰 수행하�
 
 - 프로듀서 질문 "타워 업그레이드(펑) 하면 울타리도 데미지를 받는 것 같다": 규칙상 펑(`World.burst`)은 늑대만 맞히고 울타리·건물 체력은 그대로입니다(같은 늑대 8마리가 울타리를 부술 때 강화 0이면 부서지고 세 갈래면 체력 56/70 남음, 검사 추가). 타워가 울타리를 부수는 늑대를 먼저 쏘아 펑과 검은 그을음 자국이 울타리 위에 생기던 것이 원인으로 보여, 울타리 줄 둘레에는 그을음을 남기지 않게 했습니다(`src/village.js` `boom`). 강화를 사면 무리가 단계마다 약 1마리 느는 것은 그대로입니다(위협 점수).
 - 캐시 버전 `?v=0.10.1`.
+
+### 0.14 (2026-11-17)
+
+- 브랜치 `claude/v014-stages`(worktree `work\claude-v013`, main 0.13.2 `b5c9ae5` 기준). push·PR·병합·배포 전입니다.
+- 검사(로컬): `node test-questions.cjs` PASS 44,208(문항 파일은 고치지 않음). `SOFT=1 node test-dom.cjs` PASS 11,330(기존 9,203은 단계를 끄고 도는 회귀 검사, 0.14 절 2,127 추가: 단계 계산·열린 길·반지름·보류·끔 = 0.13.2 동일·0.13.2 저장 복원·소품 자리). `node scripts/build-pages.cjs` 성공(31개 파일).
+- `node test.cjs`(Playwright, Chromium SwiftShader + WebKit): 1차 실행은 matrix 구간(주소 `stages=0`, 0.13.2 회귀)의 "3D wolves visible: 0" 1건에서 멈췄고, 2차 실행은 전체 PASS 1,744(기존 구간 `flow=0&stages=0` 회귀 + farm + stage 구간). 1차의 실패 지점은 세계 씨앗이 실행 시각이라 그 순간 살아 있는 늑대가 0마리일 수 있는 검사입니다(0.14가 바꾸지 않은 줄). matrix 구간만 다시 돌린 결과는 아래 "matrix 재실행" 줄을 보세요. 로그는 저장소 밖 `work\verification-20261113\v014-sim\test-cjs-run*.log`.
+- 시뮬: `node scripts/sim-flow.cjs end 8 7,8,10 typ,slow,fast,guess`(와 `'{"buys":3}'`), 12판 4개 나이. 표는 기획서 §14.3, 원자료는 `work\verification-20261113\v014-sim\`. 단계를 끈 시뮬은 0.13.2 커밋에서 잰 값과 같습니다(대조함).
+- 화면: `work\verification-20261113\playtest\v014-stages.cjs`로 로컬 빌드를 열어 캡처했습니다(저장소 밖 `work\verification-20261113\v014-shots\`). 390×844 6단계(`390x844-stage0~5.png`, 장면만 `scene-stage0~5.png`), 전환(`390x844-shift-1-held` · `1b-tip` · `2-rising` · `3-rising` · `4-banner`), 320×568(`320x568-stage1` · `3` · `5`), 단계 끔(`390x844-stages-off`). 페이지 오류 0(헤드리스 오디오 장치 경고 2줄은 환경 문제).
+- 눈으로 본 것: 단계마다 영역이 넓어지고 길 수·집 수·길목 표시가 달라 구분된다. 성 단계는 돌담 고리·길목 돌기둥·붉은 깃발·성탑으로 읽힌다. 390에서 성 단계의 닭은 몇 px 크기다. 320×568은 장면이 125px 높이라 성 단계의 집·닭이 점에 가깝다(이름표와 8번째 칸으로 단계를 안다). 알림 띠의 오른쪽 끝이 알 숫자와 조금 겹친다(0.13부터 있던 겹침).
+- 남은 것: 실기기·실제 아이 확인, 그림 화면의 길·집, 찍기 3배 미달(7세 2.6배 · 8세 2.97배), 10세 울타리 부서짐 증가, 10세 종 46에 대한 프로듀서 확인.
+- **오후: 패드·노트북 기준(기획서 §14.8)**. 커밋 `c44a5ec`(반지름 22 · 사거리 0.9배 · 바깥 고리 집), `25bb810`(넓은 화면 배치), `bcef76a`(검사 안정화), 문서.
+  - 시뮬: 반지름 19 대 22를 같은 코드에서 비교(19는 `STAGE` 덮어쓰기). 0.75배 그대로면 20분까지 울타리 부서짐이 8세 +45% · 10세 +23%(8판)로 통과선(+15%)을 넘어 사거리 덤을 0.9배로 올렸다. 최종: 엔딩 시간·잃은 닭은 19와 같고 울타리 −7% ~ +9%(8판) · −12% ~ +5%(12판), 10분 붕괴 0, 방치 금화 0. 단계를 끈 시뮬은 0.13.2 기준선과 같다. 원자료 `work\verification-20261113\v014-sim\`(`r19-*` · `r22-*` · `final-v2-*` · `tune\`).
+  - 화면: `playtest\v014-stages.cjs pad`(창 모드 Chromium)로 노트북 1366×768 · 패드 가로 1180×820 · 패드 세로 820×1180의 6단계와 폰 390×844 성 단계를 캡처(`v014-shots\laptop-*` · `pad-*` · `phone-*`, 성 단계는 `-stage5-scene.png` 장면만, 10세 가장 긴 지문은 `-stage5-long10.png`). 세 기준 화면 모두 6단계 전부에서 가게 2줄 · 문제 · 보기가 스크롤 없이 한 화면(패드 세로의 긴 글은 기존 보기 맞춤 스크롤로 장면·가게 카드가 위에 붙은 채). 페이지 오류 0(창 모드의 `favicon.ico` 404 한 줄은 페이지에 아이콘 지정이 없어 브라우저가 요청한 것).
+  - 간헐 실패: "3D wolves visible" · "3D wolves move"는 실행 시각 씨앗 때문에 한 순간 늑대 0마리 · 모두 서 있음이 생기는 검사였다(Node 근사 재현 390 경로 3.5% · 0.45%, `v014-sim\flake-mc.cjs`). 검사를 걷는/있는 늑대가 나올 때까지 기다리게 고쳤다(게임 코드는 그대로). 고친 뒤 `ONLY=matrix node test.cjs` 4번 모두 PASS 1,265(`v014-sim\flake-matrix-after*.log`).
+  - 검사(로컬): `node test-questions.cjs` PASS 44,208, `SOFT=1 node test-dom.cjs` PASS 12,092, `node scripts/build-pages.cjs` 성공(31개 파일), `node test.cjs` 전체 PASS 1,745(검사 1건 추가, 3,702초, 로그 `v014-sim\test-cjs-run7-final.log`). 이 단계 시작 때 앞 담당이 띄운 전체 실행(반지름 22 · 0.75배, 검사 수정 전)도 PASS 1,744(`test-cjs-run6.log`).
 
 ## 자동 배포와 협업
 
