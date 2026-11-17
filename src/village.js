@@ -18,6 +18,14 @@ const count=(v,max)=>clamp(Math.floor(Number(v)||0),0,max);
 const num=v=>{const n=Number(v);return Number.isFinite(n)?n:0};
 const ART='art-handoff/coopnight/browser/';
 const V3=THREE.Vector3;
+// 0.15 art (art-handoff/v015-v016, 계획서 §2): each model is loaded on its own and may fail on its own; the 3D village stays and only that model
+// keeps its 0.14 code-drawn look. ?art15=0 skips them all. Paths stay whole strings: scripts/build-pages.cjs checks they are in the Pages package.
+const ART15={watermill:'art-handoff/v015-v016/glb/watermill.glb',bridge:'art-handoff/v015-v016/glb/bridge.glb',king:'art-handoff/v015-v016/glb/wolf-king.glb',fox:'art-handoff/v015-v016/glb/thief-fox.glb'};
+const ART15_V='?v=0.15';   // cache buster (the files may change in a later version under the same name)
+const BEAST_PARTS=['Head','Tail','FrontFoot_L','FrontFoot_R','RearFoot_L','RearFoot_R'];
+const ART15_NODES={watermill:['WaterWheel'],bridge:['Timber_Bridge'],king:BEAST_PARTS,fox:BEAST_PARTS};   // a file without these nodes counts as failed
+const ART15_GRACE=8000;   // ms to wait for them once the core assets are in (a stalled request must not hold the whole 3D village back)
+const art15Off=(()=>{try{return /[?&]art15=0\b/.test(location.search)}catch{return false}})();
 // Until the 3D village is ready (or when it falls back) the page still gets a safe API.
 const stubView=()=>({events(){},reward(){},build(){return null},upgrade(){return null},marketScreen(){return null},focus(){return null},inspect(){return {ready:false}}});
 window.VillageView=stubView();
@@ -266,6 +274,14 @@ function bunting(points,sag,masts=[]){
  return {geometry:solid(parts),center:c};
 }
 
+// The 0.15 models, each its own request: a failed (or stalled, or malformed) file resolves to null instead of failing start(). Everything is settled
+// before the scene first shows (renderer='three'), so a model never swaps in later. `core` = the assets start() cannot do without.
+function loadArt15(loader,core){
+ const keys=Object.keys(ART15);if(art15Off)return Promise.resolve(Object.fromEntries(keys.map(k=>[k,null])));
+ const late=core.then(()=>new Promise(done=>setTimeout(done,ART15_GRACE)),()=>{}).then(()=>null);
+ const one=k=>loader.loadAsync(ART15[k]+ART15_V).then(g=>ART15_NODES[k].every(n=>g.scene.getObjectByName(n))?g:null);
+ return Promise.all(keys.map(k=>Promise.race([one(k),late]).catch(()=>null))).then(list=>Object.fromEntries(keys.map((k,i)=>[k,list[i]])));
+}
 async function start(){
  const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'low-power'});
  renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));renderer.setClearColor(0x9fbf7c);renderer.outputColorSpace=THREE.SRGBColorSpace;
@@ -289,7 +305,8 @@ async function start(){
  const VIEW_PULL=.7,ringHalf=R=>{const rho=R+1.4;return Math.max(rho*upXZ+.5,R*upXZ+3.2*upY+.4,rho/aspect*1.02,5.6)};
  const viewHalf=R=>{const base=fitHalf(7);return Math.max(ringHalf(R),base+(fitHalf(R)-base)*VIEW_PULL)};
  const resize=()=>{viewW=host.clientWidth||1;const h=host.clientHeight||1;aspect=viewW/h;camHalf=-1;renderer.setSize(viewW,h,false);applyView()};
- const [grass,pack,atlas]=await Promise.all([new THREE.TextureLoader().loadAsync(ART+'backgrounds/grass.png'),new GLTFLoader().loadAsync('art-handoff/coopnight/source-3d/models/environment-pack.glb'),makeAtlas()]);
+ const gltf=new GLTFLoader(),core=Promise.all([new THREE.TextureLoader().loadAsync(ART+'backgrounds/grass.png'),gltf.loadAsync('art-handoff/coopnight/source-3d/models/environment-pack.glb'),makeAtlas()]);
+ const [[grass,pack,atlas],art15]=await Promise.all([core,loadArt15(gltf,core)]);
 
  /* ----- ground: big tiled meadow, the village yard tint, one merged decal mesh (paths, wolf trails, flowers) ----- */
  const MAP=150,SEG=100;
@@ -1115,6 +1132,7 @@ async function start(){
     stage:stageShown,roads:trailKey,stageHouses:stageInfo.houses|0,roadMarks:stageInfo.marks|0,stageRising,marketTier:market.mtier,marketDown:market.on&&isBroken(market),hammers:hammersDrawn,propsStage,lanterns:lanterns(propsStage).length,
     pondVisible:pond.obj.visible,garlands:garlands.filter(g=>g.obj.visible).length,sale:!!sale||time<popUntil,
     decor:{forest:forest.count,grove:grove.count,bushes:shrubs.count,rocks:stones.count},
+    art15:Object.fromEntries(Object.keys(ART15).map(k=>[k,!!art15[k]])),   // 0.15 model loaded (and baked where it is used); false = that model keeps its 0.14 look
     drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,builds:{...builds},effects:particles.length+anims.length,warnings:warns.length,blend:{t:+blendT.toFixed(3),dur:+blendDur.toFixed(3),ticks:blendTicks},shake:shakeNow,
     memory:{geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures}}}};
 

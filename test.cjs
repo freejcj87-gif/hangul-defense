@@ -2,7 +2,7 @@ const {chromium,webkit}=require('playwright');
 const assert=require('node:assert/strict'),http=require('node:http'),fs=require('node:fs'),path=require('node:path');
 const Questions=require('./questions.js'),Combat=require('./combat.js'),World=require('./world.js');
 const INTERIM=process.env.INTERIM_NO_3D_BUILD==='1',FULL_SHOTS=process.env.FULL_SHOTS==='1';
-const ONLY=process.env.ONLY||'',run=part=>!ONLY||ONLY.split(',').includes(part);/* ONLY=matrix,clock,feel,fallback,demo,flow,farm,stage 중 일부만 돌릴 때(개발용). CI는 전부 돌린다. */
+const ONLY=process.env.ONLY||'',run=part=>!ONLY||ONLY.split(',').includes(part);/* ONLY=matrix,clock,feel,fallback,demo,flow,farm,stage,art 중 일부만 돌릴 때(개발용). CI는 전부 돌린다. */
 /* 0.13: 아래 matrix·clock·feel·fallback·demo·flow 구간은 0.12 경제 회귀 검사라 주소에 flow=0을 붙여 연다(OLD). 흐르는 농장(기본 켬)은 맨 끝 farm 구간이 본다 */
 /* 0.14: 같은 까닭으로 그 구간들은 stages=0도 붙인다(단계를 끄면 0.13.2 화면·규칙 그대로라는 회귀 검사). 단계(기본 켬)는 맨 끝 stage 구간이 본다. farm 구간은 단계를 켠 채 돈다 */
 const OLD='/?flow=0&stages=0';Combat.FLAGS.FLOW=false;Combat.FLAGS.STAGES=false;Combat.FLAGS.ROUTES=false;/* 이 파일의 기대값 계산(Node 쪽 Combat)도 0.12 경제·단계 끔으로. farm·stage 구간은 상수만 읽는다 */
@@ -23,7 +23,7 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
  const output=path.join(__dirname,'.pages-build'),shots=path.join(__dirname,'test-results');
  const server=http.createServer((req,res)=>{
  const pathname=new URL(req.url,'http://localhost').pathname;
- const file=pathname==='/'?'index.html':['/combat.js','/world.js','/questions-gen.js','/questions.js','/village.js'].includes(pathname)?pathname.slice(1):pathname==='/art-handoff/coopnight/source-3d/models/environment-pack.glb'?pathname.slice(1):/^\/art-handoff\/coopnight\/browser\/[a-z/-]+[0-9a-z-]*\.png$/.test(pathname)?pathname.slice(1):null;
+ const file=pathname==='/'?'index.html':['/combat.js','/world.js','/questions-gen.js','/questions.js','/village.js'].includes(pathname)?pathname.slice(1):pathname==='/art-handoff/coopnight/source-3d/models/environment-pack.glb'?pathname.slice(1):/^\/art-handoff\/coopnight\/browser\/[a-z/-]+[0-9a-z-]*\.png$/.test(pathname)?pathname.slice(1):/^\/art-handoff\/v015-v016\/(glb\/[a-z-]+\.glb|png\/[a-z-]+\.png)$/.test(pathname)?pathname.slice(1):null;
  if(!file||!fs.existsSync(path.join(output,file))){res.writeHead(404);return res.end()}
  res.setHeader('Content-Type',file.endsWith('.glb')?'model/gltf-binary':file.endsWith('.png')?'image/png':file.endsWith('.js')?'text/javascript; charset=utf-8':'text/html; charset=utf-8');
  res.end(fs.readFileSync(path.join(output,file)));
@@ -653,6 +653,32 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
    ok(!(await page.locator('#stageTag').isVisible()),'stages=0: no name tag');ok(!('stage' in (await stored(page)).world),'stages=0: no stage in the saved world');
    await shot(page.locator('.stage-card'),'stage-off');eq(errors,[],'stages=0 page errors');await ctx.close()}
  }}finally{await stageBrowser.close()}
+ /* ---------- 0.15 새 아트(art-handoff/v015-v016, 계획서 §2·§10-6): 모델마다 따로 불러와 하나가 실패해도 3D는 그대로이고 그 모델만 0.14 모습,
+    주소 ?art15=0이면 아예 불러오지 않는다. 모두 3D 장면이 처음 보이기 전에 정해진다(늦게 모델이 바뀌지 않음) ---------- */
+ const artBrowser=await chromium.launch({headless:true,args:SWIFT});
+ try{if(run('art')){
+  const open=async(o={})=>{const ctx=await artBrowser.newContext({viewport:{width:o.width||1366,height:o.height||768},reducedMotion:'no-preference'});await ctx.addInitScript(HOLD);await ctx.addInitScript(FAKE_TTS);
+   const page=await ctx.newPage(),errors=[],asked=[];page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{const p=new URL(r.url()).pathname;if(p.startsWith('/art-handoff/v015-v016/'))asked.push(p)});
+   if(o.block)await page.route(o.block,r=>r.abort());if(o.swap)await page.route(o.swap[0],r=>r.fulfill({path:path.join(output,o.swap[1]),contentType:'model/gltf-binary'}));await page.goto(url+(o.query||''));await ready(page);await page.waitForFunction(()=>window.VillageView?.inspect().ready,{},{timeout:45000});return {ctx,page,errors,asked}};
+  const insp=page=>page.evaluate(()=>window.VillageView.inspect());
+  const ALL={watermill:true,bridge:true,king:true,fox:true},NONE={watermill:false,bridge:false,king:false,fox:false};
+  {const {ctx,page,errors,asked}=await open();const v=await insp(page);
+   eq(await page.locator('.scene').getAttribute('data-renderer'),'three','art15: 3D');eq(v.art15,ALL,'art15: the four 0.15 models are loaded');
+   eq([...new Set(asked)].sort(),['bridge','thief-fox','watermill','wolf-king'].map(n=>'/art-handoff/v015-v016/glb/'+n+'.glb'),'art15: the four GLBs are requested (the 0.16 castle pieces are not)');
+   eq(errors,[],'art15 page errors');await ctx.close()}
+  /* ?art15=0: 요청조차 하지 않는다 */
+  {const {ctx,page,errors,asked}=await open({query:'/?art15=0'});const v=await insp(page);
+   eq([await page.locator('.scene').getAttribute('data-renderer'),v.art15,asked],['three',NONE,[]],'art15=0: 3D without the 0.15 models, nothing requested');eq(errors,[],'art15=0 page errors');await ctx.close()}
+  /* 네 파일이 모두 안 와도 3D는 그대로 */
+  {const {ctx,page,errors}=await open({block:'**/art-handoff/v015-v016/**'});const v=await insp(page);
+   eq([await page.locator('.scene').getAttribute('data-renderer'),v.art15],['three',NONE],'art15 all blocked: still 3D, every model keeps its 0.14 look');eq(errors,[],'art15 blocked page errors');await ctx.close()}
+  /* 한 파일만 안 오면 그 모델만 */
+  {const {ctx,page,errors}=await open({block:'**/wolf-king.glb*'});const v=await insp(page);
+   eq([await page.locator('.scene').getAttribute('data-renderer'),v.art15],['three',{...ALL,king:false}],'art15 one file blocked: only that model falls back');eq(errors,[],'art15 one blocked page errors');await ctx.close()}
+  /* 받았지만 모양이 다른 파일(늑대 왕 자리에 다리 GLB: 머리·꼬리·다리 노드가 없음)도 실패로 보고 그 모델만 0.14 모습 */
+  {const {ctx,page,errors}=await open({swap:['**/wolf-king.glb*','art-handoff/v015-v016/glb/bridge.glb']});const v=await insp(page);
+   eq([await page.locator('.scene').getAttribute('data-renderer'),v.art15],['three',{...ALL,king:false}],'art15 wrong file: a GLB without the expected nodes counts as failed');eq(errors,[],'art15 wrong file page errors');await ctx.close()}
+ }}finally{await artBrowser.close()}
  console.log((ONLY?'PARTIAL('+ONLY+') ':'')+'PASS '+checks+' browser assertions (Chromium/WebKit, desktop + mobile emulation, held clock + one real-clock run). Physical audio/device validation remains manual.');
  }finally{server.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});
