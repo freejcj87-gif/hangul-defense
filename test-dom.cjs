@@ -1610,6 +1610,32 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   W.sync(w,s);eq([w.stage,w.hall,towersOf(w)],[2,1,ring(10,i=>i<5?2:1)],'풀면 새 자리 4곳을 먼저 채우고, 남은 5개는 층(0.14 규칙 그대로)');eq(W.towerUnits(w),15,'층의 합 = 15');
   const v=W.sync(W.create({seed:3}),built(4)),t=built(7);eq([C.stage(t),t.hall],[1,0],'(지은 수 7 = 마을, 회관 0)');W.sync(v,t,{hold:true});
   eq([v.stage,towersOf(v),W.towerUnits(v)],[0,ring(6,i=>i<2?2:1),8],'회관이 그대로인 보류(농가 → 마을)는 자리가 늘지 않으니 바로 층을 올림(0.14와 같음)')}
+ /* R-3 보류 중에 종이 열림(10세: 성 37 + 회관 3 = 40, 종 46). 종이 열리는 순간 미뤄 둔 성 전환을 풀어 왕이 넓어진 울타리 밖에 서고, 결전 중에는 전환이 없다.
+    재현: 10세 성곽 마을에서 읽는 중 7번 구매 → 종 → 답. 왕과 울타리 사이 거리는 한 순간이 아니라 종이 열린 뒤 내내 잰다 */
+ {const a=seed({age:10,level:10,fence:12,chickens:9,farmers:4,power:2,gold:30000,seed:5},{view:true});a.go();calmWorld(a);a.api.world.fox=null;/* 첫 문제의 여우가 닭을 물어 가면 지은 수가 줄어 종 문턱이 흔들린다 */
+  let g=a.game();eq([g.stage.now,g.state.hall,g.world.radius,g.state.run.bell,C.builtNew(g.state)],[4,2,18,0,38],'(10세 지은 수 36 + 회관 2 = 성곽 마을)');
+  a.tick(5);a.buy('tower');g=a.game();eq([a.api.phase,g.stage.rule,g.stage.now,g.stage.due,g.world.radius],['ask',5,4,true,18],'(읽는 중 1번째 구매: 규칙은 성, 세계는 보류)');
+  for(let i=1;i<7;i++){a.tick(5);a.buy(i%2?'fence':'tower')}g=a.game();
+  eq([a.api.phase,a.api.round.tries,g.state.run.bell,C.builtNew(g.state)],['ask',0,1,46],'(같은 문제를 읽는 중 7번째 구매에 종이 열림: 지은 수 46)');
+  eq([g.stage.now,g.stage.due,g.world.radius,g.king&&g.king.state],[5,false,22,'wait'],'종이 열리는 순간 미뤄 둔 성 전환을 풂(반지름 22), 늑대 왕은 그 둘레 숲에서 기다림');
+  {const bn=a.fx('banner').map(e=>e.textContent);ok(bn.length===1&&bn[0].startsWith('🏰성이 되었어요!'),'띠 알림: 성 전환이 먼저(늑대 왕 띠는 그다음 차례) '+JSON.stringify(bn))}eq(a.game().sfx.stage|0,1,'단계 효과음 1번');
+  let minGap=Infinity,back=0,prev=null;const radii=new Set();
+  const watch=()=>{const k=a.api.world.king,R=W.radius(a.api.world);radii.add(R);if(k){minGap=Math.min(minGap,k.r-R);if(prev!==null&&a.api.state.run.bell===2&&k.r>prev+1e-9)back++;prev=k.r}};
+  for(let i=0;i<5;i++){a.tick(1);watch()}
+  a.buy('bell');g=a.game();eq([g.state.run.bell,g.king.state,a.api.phase,a.api.round.tries],[2,'come','ask',0],'(종을 울림: 결전, 풀던 문제는 그대로)');
+  for(let i=0;i<80;i++){a.tick(1);watch()}eq(a.api.world.king.state,'stand','(왕이 멈춤 지점에 섬)');
+  const stageSfx=a.game().sfx.stage|0;a.unlock();a.right();g=a.game();watch();
+  eq([a.api.phase,g.stage.now,g.stage.due,g.world.radius,a.api.round.wait],['reward',5,false,22,12],'답한 순간: 단계 전환 없음(정답 연출은 평소 1.2초)');
+  ok(!a.fx('banner').some(e=>e.textContent.includes('되었어요'))&&(a.game().sfx.stage|0)===stageSfx,'결전 중 답에서 단계 띠 알림·효과음 없음');
+  for(let i=0;i<60;i++){a.tick(1);watch()}
+  ok(minGap>=W.KING.stop-3*W.KING.step-1e-9,'종이 열린 뒤 내내 왕은 울타리 밖(왕 거리 − 반지름 최소 '+minGap.toFixed(2)+' ≥ 0.6)');eq([back,[...radii]],[0,[22]],'결전 중 왕이 뒷걸음친 틱 0, 영역은 반지름 22 그대로')}
+ /* R-3 결전 중에 미뤄진 단계가 풀리면(보통은 종이 열릴 때 풀려 생기지 않음. 망가진 저장 등) 띠 알림·효과음·전환 연출 없이 영역만 세계를 따름 */
+ {const run={...C.freshRun(),bell:2,shields:0,fpick:[-1,-1,-1,-1,-1,-1]},a=seed({age:10,level:14,fence:16,chickens:12,farmers:4,power:3,gold:500,seed:5,index:40,run},{view:true});
+  a.go();calmWorld(a);a.api.world.fox=null;let g=a.game();eq([g.state.run.bell,!!a.api.round.fin,g.stage.now,g.world.radius],[2,true,5,22],'(결전 문제, 성)');
+  a.api.world.stage=4;eq(a.game().stage.due,true,'(세계 단계를 4로 되돌려 미뤄진 전환을 만듦)');
+  const n0=a.built.length;a.unlock();a.right();g=a.game();
+  eq([a.api.phase,g.stage.now,g.world.radius,g.state.run.shields],['reward',5,22,1],'결전 중 답: 영역은 성으로(반지름 22), 방패 하나 깸');
+  ok(!a.fx('banner').some(e=>e.textContent.includes('되었어요'))&&(g.sfx.stage|0)===0&&!a.built.slice(n0).includes('stage'),'결전 중에는 단계 띠 알림·효과음·전환 연출 없음')}
 }
 
 /* ======================= 0.14.1 프로듀서 테스트 모드(주소 ?test=1, testmode.js) ======================= */
