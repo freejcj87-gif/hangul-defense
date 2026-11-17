@@ -225,7 +225,9 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
   ok(walked,'wolves walk toward the village: '+JSON.stringify(seen))}
  /* 🐺 알약은 틱마다 세계를 따라간다 */
  {let miss=0;for(let k=0;k<5;k++){await tick(page,7);const [txt,n]=await page.evaluate(()=>[document.getElementById('level').textContent,window.__game().world.wolves]);if(!txt.endsWith('🐺'+n))miss++}eq(miss,0,'🐺 pill follows the world every tick')}
- /* 0.14: 세계 씨앗이 실행 시각이라 이 순간 늑대가 모두 쓰러져 0마리일 때가 있었다(0.13.2에서도 WebKit 390에서 재현). 늑대가 없으면 다음 낙오 늑대가 나올 때까지 틱을 돌린 뒤 본다 */
+ /* 0.14: 세계 씨앗이 실행 시각(index.html freshWorld의 Date.now)이라 판마다 세계가 다르고, 이 순간 늑대가 모두 쓰러져 0마리일 때가 있었다(게임 버그 아님: 0마리는 정상 상태).
+    390 폭은 위에서 세 번째 타워를 사서 무리가 일찍 쓰러진다. 같은 순서를 Node(World)로 2,000개 씨앗에 근사 재현하면 390 경로만 3.5%가 0마리(1366·320은 0%),
+    기다리면 길어도 85틱 안에 다음 낙오 늑대가 나왔다. 그래서 늑대가 없으면 나올 때까지(최대 300틱) 틱을 돌린 뒤 본다 */
  if(three&&!INTERIM){for(let k=0;k<60&&!(await notGone(page));k++)await tick(page,5);await frames(page,3);const i=await page.evaluate(()=>window.VillageView.inspect());ok(i.wolvesVisible>=1,'3D wolves visible: '+i.wolvesVisible);eq(i.wolvesVisible,await notGone(page),'3D wolf count = simulated wolves (incl. falling ones)')}
  if(name==='chromium'&&(width===390||width===1366))await shot(page.locator('.scene'),'pack-'+width);
  ok(await noOverflow(page),'no overflow after a few rounds');
@@ -235,7 +237,11 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
   if(three&&!INTERIM){
    /* 세계가 흐르면 3D 늑대가 움직이고, 쉬기에서는 멈춘다 */
    await page.emulateMedia({reducedMotion:'no-preference'});
-   await page.evaluate(()=>{const g=window.__game();if(!world.wolves.some(v=>v.state!=='dead'&&v.state!=='gone'))window.__tick(Math.max(1,g.world.wave.arrive-g.world.t-60))});
+   /* 0.14: 위와 같은 까닭(실행 시각 씨앗)으로, 이 순간 보이는 늑대가 모두 서 있으면(타워·울타리를 부수는 중, 닭을 무는 중, 쓰러지는 중, 한 마리도 없음) 위치가 안 바뀌어 실패했다
+      (main CI 0.13.2에서 한 번. Node 근사 재현 2,000개 씨앗 중 9개 = 0.45%). 전에는 산 늑대가 없을 때만 무리 직전까지 돌렸는데, 무리가 60틱 안이면 1틱만 돌고 끝났다.
+      보이는 앞 8마리(wolfPos) 가운데 걷는 늑대가 나올 때까지 틱을 돌린 뒤 잰다 */
+   const walking=()=>page.evaluate(()=>world.wolves.filter(v=>v.state!=='gone').slice(0,8).some(v=>['walk','hunt','carry','leave'].includes(v.state)));
+   for(let k=0;k<60&&!(await walking());k++)await tick(page,5);ok(await walking(),'a walking wolf is on the map before the 3D move check');
    const wp=async()=>(await page.evaluate(()=>window.VillageView.inspect())).wolfPos;
    await frames(page,3);const p0=await wp();await tick(page,10);await frames(page,6);const p1=await wp();
    assert.notDeepEqual(p1,p0,'3D wolves move when the world ticks');checks++;
