@@ -1636,6 +1636,20 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   const n0=a.built.length;a.unlock();a.right();g=a.game();
   eq([a.api.phase,g.stage.now,g.world.radius,g.state.run.shields],['reward',5,22,1],'결전 중 답: 영역은 성으로(반지름 22), 방패 하나 깸');
   ok(!a.fx('banner').some(e=>e.textContent.includes('되었어요'))&&(g.sfx.stage|0)===0&&!a.built.slice(n0).includes('stage'),'결전 중에는 단계 띠 알림·효과음·전환 연출 없음')}
+ /* R-5 단계를 켠 채 설정의 나이(#age)를 바꿈: 문제 사이(정답 연출·정답 배우기)면 바로 넓히고, 읽는 중(ask)이면 그 문제를 답할 때 넓힌다.
+    8세 지은 수 26 = 물레방아 마을 → 10세 문턱(26)이면 성곽 마을 */
+ {const S26={age:8,level:8,fence:10,chickens:6,farmers:3,gold:300,seed:5},to10=x=>{x.n.age.value='10';x.n.age.onchange()};
+  const start=o=>{const x=seed(S26,o);x.go();calmWorld(x);x.api.world.fox=null;return x};
+  const a=start({view:true});let g=a.game();eq([g.stage.now,g.state.hall,g.world.radius],[3,1,14.5],'(8세 지은 수 26 = 물레방아 마을)');
+  a.unlock();a.right();eq(a.api.phase,'reward','(정답 연출 중)');to10(a);g=a.game();
+  eq([a.api.phase,g.state.age,g.stage.rule,g.stage.now,g.stage.due,g.state.hall,g.stage.hall,g.world.radius,a.api.round.wait],['reward',10,4,4,false,2,2,18,16],'정답 연출 중 10세로: 바로 성곽 마을(반지름 18, 회관 2), 화면이 물러나는 1.6초 동안 다음 문제를 띄우지 않음');
+  ok(a.built.includes('stage')&&a.fx('banner').some(e=>e.textContent.startsWith('🧱성곽 마을이 되었어요!')),'정답 연출 중: 전환 장면과 띠 알림');
+  const b=start();b.unlock();b.wrong();b.tick(C.DASH_TICKS+2);b.wrong(1);eq(b.api.phase,'learn','(두 번 틀려 정답 배우기)');to10(b);g=b.game();
+  eq([b.api.phase,g.stage.now,g.stage.due,g.world.radius],['learn',4,false,18],'정답 배우기 중 10세로: 바로 성곽 마을');
+  const c=start();c.tick(5);to10(c);g=c.game();
+  eq([c.api.phase,g.state.age,g.stage.rule,g.stage.now,g.stage.due,g.world.radius,g.stage.cell.pr],['ask',10,4,3,true,14.5,'✨ 곧!'],'읽는 중 10세로: 영역은 그대로, 8번째 칸은 "곧!"');
+  let grew=0;for(let i=0;i<30;i++){c.tick(1);if(W.radius(c.api.world)!==14.5)grew++}eq(grew,0,'읽는 동안 30틱 내내 넓어지지 않음');
+  c.unlock();c.right();g=c.game();eq([c.api.phase,g.stage.now,g.world.radius],['reward',4,18],'그 문제를 답한 순간 성곽 마을(다음 답까지 밀리지 않음)')}
 }
 
 /* ======================= 0.14.1 프로듀서 테스트 모드(주소 ?test=1, testmode.js) ======================= */
