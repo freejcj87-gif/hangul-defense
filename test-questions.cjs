@@ -545,6 +545,9 @@ for(const a of [9,10]){
  for(const a of [8,9,10]){const seen=new Map();for(const q of all(a,'story')){const k=unsubj(q.passage)+'|'+unsubj(q.prompt)+'|'+q.choices[q.answer];ok(!seen.has(k),q.id+': 주어만 다른 같은 문항('+seen.get(k)+') '+k);seen.set(k,q.id)}}
  /* 같은 나이 수학: 같은 틀에 같은 수들(순서만 다름, 3 + 4와 4 + 3)이면 같은 문항 */
  for(const a of Q.AGES){const seen=new Map();for(const q of quizAll(a).filter(q=>q.cat==='math')){const n=(q.passage+' '+q.prompt).match(/\d+/g);if(!n)continue;const k=q.passage.replace(/\d+/g,'n')+'|'+q.prompt.replace(/\d+/g,'n')+'|'+n.slice().sort().join(',');ok(!seen.has(k),q.id+': 수만 자리를 바꾼 같은 수학 문항('+seen.get(k)+')');seen.set(k,q.id)}}
+ /* 2026-11-18 후속: 같은 나이 수학에서 정답과 보기 묶음이 모두 같은 문항 금지(식이 달라도 한 판에서 답을 외워 풂) */
+ /* 7세는 1~10을 세는 그림·수 줄 문항이라 '5 (4·5·6)' 같은 묶음이 겹칠 수밖에 없어 뺀다 */
+ for(const a of [8,9,10]){const seen=new Map();for(const q of quizAll(a).filter(q=>q.cat==='math')){const k=q.choices[q.answer]+'|'+q.choices.slice().sort().join(',');ok(!seen.has(k),q.id+': 정답·보기 묶음이 '+seen.get(k)+'와 같음 '+k);seen.set(k,q.id)}}
  /* 그림 → 영어 낱말: 정답의 상위어(오리 그림에 bird)를 오답으로 두지 않음 */
  const HYPER={bird:['duck','chicken','owl','chick','swan'],fruit:['apple','grape','banana','strawberry','cherry','peach'],animal:['dog','cat','cow','pig','duck','bear','lion','tiger','fox','horse','monkey','rabbit'],vegetable:['potato','carrot','onion'],color:['red','blue','yellow','green','black','white','pink','brown']};
  for(const a of Q.AGES)for(const q of quizAll(a).filter(q=>q.cat==='english')){const ans=q.choices[q.answer];for(const [h,kids] of Object.entries(HYPER))if(kids.includes(ans))ok(!q.choices.includes(h),q.id+': 정답 '+ans+'의 상위어 '+h+'가 오답에 있음')}
