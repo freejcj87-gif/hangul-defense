@@ -13,6 +13,11 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
+        <!-- WebView 자체 통신 끄기(이 앱은 앱 안 파일만 연다. 근거: developer.android.com/develop/ui/views/layout/webapps/managing-webview).
+             MetricsOptOut: WebView 익명 진단 자료 올리기에서 이 앱을 뺀다. EnableSafeBrowsing false: 주소 안전 검사(Google 조회)를 하지 않는다. -->
+        <meta-data android:name="android.webkit.WebView.MetricsOptOut" android:value="true" />
+        <meta-data android:name="android.webkit.WebView.EnableSafeBrowsing" android:value="false" />
+
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
             android:name=".MainActivity"

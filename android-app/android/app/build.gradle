@@ -51,6 +51,13 @@ android {
             applicationIdSuffix '.qa'
             versionNameSuffix '-qa'
         }
+        // 시험용: INTERNET 권한을 뺀 QA 빌드(src/nonet/AndroidManifest.xml). 이 APK로 게임이 끝까지 돌면 출시 빌드에서도 권한을 뺀다(launch\android\02 문서 6절).
+        nonet {
+            initWith debug
+            applicationIdSuffix '.nonet'
+            versionNameSuffix '-nonet'
+            matchingFallbacks = ['debug']
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'

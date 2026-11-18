@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='utf-8'?>
+<!-- 시험용 빌드(INTERNET 권한 없음)의 이름 -->
+<resources>
+    <string name="app_name">꼬꼬마을 권한시험</string>
+    <string name="title_activity_main">꼬꼬마을 권한시험</string>
+</resources>

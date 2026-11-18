@@ -42,8 +42,8 @@ jobs:
     env:
       HD_BUILD_NUMBER: ${{ github.event.inputs.build_number || '0' }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
@@ -60,7 +60,7 @@ jobs:
       - name: Version rule self-test
         working-directory: android-app
         run: npm run check
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '21'
@@ -77,11 +77,14 @@ jobs:
       - name: QA - check start path
         run: |
           grep -q '"appStartPath": "/?test=1"' android-app/android/app/src/main/assets/capacitor.config.json
-      - name: QA - build debug APK
+      - name: QA - build debug APK and no-INTERNET test APK
         working-directory: android-app/android
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug assembleNonet
+          nonet=$(find app/build/intermediates -path '*nonet*' -name AndroidManifest.xml | head -n 1)
+          echo "No-INTERNET test build manifest: $nonet"
+          if grep -q 'android.permission.INTERNET' "$nonet"; then echo 'INTERNET permission is still in the nonet build'; exit 1; fi
 
       - name: Release - package the web game
         working-directory: android-app
@@ -137,11 +140,12 @@ jobs:
           cp "$RUNNER_TEMP/release-dependencies.txt" "$RUNNER_TEMP/release-permissions.txt" app/build/outputs/
       - name: List outputs
         run: ls -la android-app/android/app/build/outputs/apk/debug/ android-app/android/app/build/outputs/bundle/release/
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: hangul-defense-android
           path: |
             android-app/android/app/build/outputs/apk/debug/*.apk
+            android-app/android/app/build/outputs/apk/nonet/*.apk
             android-app/android/app/build/outputs/bundle/release/*.aab
             android-app/android/app/hd-version.properties
             android-app/android/app/build/outputs/release-*.txt

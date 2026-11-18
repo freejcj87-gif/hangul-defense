@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 시험용 빌드: INTERNET 권한 없이 Capacitor의 앱 안 파일 제공(https://localhost 가로채기)이 되는지 기기에서 확인한다. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
+</manifest>
