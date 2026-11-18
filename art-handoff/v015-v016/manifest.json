@@ -1,0 +1,498 @@
+[
+  {
+    "asset": "watermill",
+    "glb": "glb/watermill.glb",
+    "png": "png/watermill.png",
+    "triangles": 2528,
+    "draw_calls": 2,
+    "world_bounds_min": [
+      -1.415,
+      0.0,
+      -0.925
+    ],
+    "world_bounds_max": [
+      1.047,
+      2.25,
+      0.972
+    ],
+    "png_origin_xy": [
+      206.0,
+      279.6
+    ],
+    "png_alpha_bbox_xyxy": [
+      23,
+      20,
+      361,
+      364
+    ],
+    "png_size": [
+      384,
+      384
+    ],
+    "nodes": {
+      "Watermill_House": [
+        0,
+        0,
+        0
+      ],
+      "WaterWheel": [
+        -1.16,
+        0.92,
+        0
+      ]
+    },
+    "animations": {
+      "WheelTurn": 6
+    },
+    "sha256": {
+      "glb": "23e230e6d75ce0cb5b825a0544cd0f63e33713f1b89627984ca68a486e4711d3",
+      "png": "ad68399abd8ba2ef45546e45ba0d4001940da12e609bfa1371cf86fd91750be8"
+    },
+    "bytes": {
+      "glb": 146200,
+      "png": 79360
+    }
+  },
+  {
+    "asset": "waterwheel",
+    "glb": "glb/waterwheel.glb",
+    "png": "png/waterwheel.png",
+    "triangles": 880,
+    "draw_calls": 1,
+    "world_bounds_min": [
+      -0.255,
+      -0.869,
+      -0.869
+    ],
+    "world_bounds_max": [
+      0.227,
+      0.869,
+      0.869
+    ],
+    "png_origin_xy": [
+      192.0,
+      192.0
+    ],
+    "png_alpha_bbox_xyxy": [
+      27,
+      20,
+      357,
+      364
+    ],
+    "png_size": [
+      384,
+      384
+    ],
+    "nodes": {
+      "WaterWheel": [
+        0,
+        0,
+        0
+      ]
+    },
+    "animations": {
+      "WheelTurn": 6
+    },
+    "sha256": {
+      "glb": "24531ee3cc62c0f89e711b15a31b92921ce602edc89e414f8228252c3e704018",
+      "png": "b5e501c95df8003305a8786aeab39c79b801da2c86b3430742d491a3abc548a6"
+    },
+    "bytes": {
+      "glb": 53660,
+      "png": 70250
+    }
+  },
+  {
+    "asset": "bridge",
+    "glb": "glb/bridge.glb",
+    "png": "png/bridge.png",
+    "triangles": 1788,
+    "draw_calls": 1,
+    "world_bounds_min": [
+      -0.817,
+      0.036,
+      -1.67
+    ],
+    "world_bounds_max": [
+      0.817,
+      1.033,
+      1.67
+    ],
+    "png_origin_xy": [
+      192.0,
+      227.3
+    ],
+    "png_alpha_bbox_xyxy": [
+      20,
+      33,
+      364,
+      351
+    ],
+    "png_size": [
+      384,
+      384
+    ],
+    "nodes": {
+      "Timber_Bridge": [
+        0,
+        0,
+        0
+      ]
+    },
+    "animations": {},
+    "sha256": {
+      "glb": "194c12d9ddf6f501c28e2971e95bb45fc23a570e07f18f0953225f46b19cfbc4",
+      "png": "0d986e3a476e53da101cb1d666d8e46f3684259445c93aff36b82ec2499519ba"
+    },
+    "bytes": {
+      "glb": 102628,
+      "png": 56052
+    }
+  },
+  {
+    "asset": "castle-hall",
+    "glb": "glb/castle-hall.glb",
+    "png": "png/castle-hall.png",
+    "triangles": 3434,
+    "draw_calls": 1,
+    "world_bounds_min": [
+      -1.937,
+      0.0,
+      -1.382
+    ],
+    "world_bounds_max": [
+      1.874,
+      4.13,
+      1.3
+    ],
+    "png_origin_xy": [
+      192.0,
+      277.4
+    ],
+    "png_alpha_bbox_xyxy": [
+      33,
+      20,
+      351,
+      364
+    ],
+    "png_size": [
+      384,
+      384
+    ],
+    "nodes": {
+      "Castle_Hall": [
+        0,
+        0,
+        0
+      ]
+    },
+    "animations": {},
+    "sha256": {
+      "glb": "f6aef7608a828d242d328986f7e6b65e3695935437b81f418ece1c9756a52bd3",
+      "png": "333ebb9a8cd32e797591a682271d1d9e031989b4dcf180bfe246651e14c0a434"
+    },
+    "bytes": {
+      "glb": 192620,
+      "png": 73318
+    }
+  },
+  {
+    "asset": "wall-segment",
+    "glb": "glb/wall-segment.glb",
+    "png": "png/wall-segment.png",
+    "triangles": 568,
+    "draw_calls": 1,
+    "world_bounds_min": [
+      -1.0,
+      0.0,
+      -0.285
+    ],
+    "world_bounds_max": [
+      1.0,
+      1.405,
+      0.285
+    ],
+    "png_origin_xy": [
+      192.0,
+      286.7
+    ],
+    "png_alpha_bbox_xyxy": [
+      20,
+      26,
+      364,
+      358
+    ],
+    "png_size": [
+      384,
+      384
+    ],
+    "nodes": {
+      "Wall_Segment": [
+        0,
+        0,
+        0
+      ]
+    },
+    "animations": {},
+    "sha256": {
+      "glb": "61ccf23bc8ac16a8adb7bddfd8543431af669ea105640bc5cefd31d80f8899bf",
+      "png": "a11132ef8bf44685bbaad5d2846d6d847fc7bc1ecca383cf997b28c24092a8d0"
+    },
+    "bytes": {
+      "glb": 32308,
+      "png": 25149
+    }
+  },
+  {
+    "asset": "castle-gate",
+    "glb": "glb/castle-gate.glb",
+    "png": "png/castle-gate.png",
+    "triangles": 1892,
+    "draw_calls": 1,
+    "world_bounds_min": [
+      -1.59,
+      0.0,
+      -0.46
+    ],
+    "world_bounds_max": [
+      1.59,
+      2.73,
+      0.537
+    ],
+    "png_origin_xy": [
+      192.0,
+      293.6
+    ],
+    "png_alpha_bbox_xyxy": [
+      30,
+      20,
+      354,
+      364
+    ],
+    "png_size": [
+      384,
+      384
+    ],
+    "nodes": {
+      "Gatehouse": [
+        0,
+        0,
+        0
+      ]
+    },
+    "animations": {},
+    "sha256": {
+      "glb": "90bc39e112f79de43005568e35731a124300914c8ae1b9f2c56f384ead411fc8",
+      "png": "3b936293297450242ed3b35aec20c4509d99470e41ccd67e63551d9201827ad6"
+    },
+    "bytes": {
+      "glb": 110504,
+      "png": 55056
+    }
+  },
+  {
+    "asset": "watchtower",
+    "glb": "glb/watchtower.glb",
+    "png": "png/watchtower.png",
+    "triangles": 1412,
+    "draw_calls": 1,
+    "world_bounds_min": [
+      -0.787,
+      0.0,
+      -0.78
+    ],
+    "world_bounds_max": [
+      0.787,
+      3.32,
+      0.822
+    ],
+    "png_origin_xy": [
+      192.0,
+      304.4
+    ],
+    "png_alpha_bbox_xyxy": [
+      91,
+      20,
+      293,
+      364
+    ],
+    "png_size": [
+      384,
+      384
+    ],
+    "nodes": {
+      "Watchtower": [
+        0,
+        0,
+        0
+      ]
+    },
+    "animations": {},
+    "sha256": {
+      "glb": "081edb4d21ede4dc352f91fd38ccf1fd7fd72d02c89429adb2ef684d8f27666e",
+      "png": "a9375f8d0ef7c6ef3dda049cfdebc3bbd24310a92793ca52496a77a208cddb26"
+    },
+    "bytes": {
+      "glb": 79456,
+      "png": 41167
+    }
+  },
+  {
+    "asset": "wolf-king",
+    "glb": "glb/wolf-king.glb",
+    "png": "png/wolf-king.png",
+    "triangles": 2010,
+    "draw_calls": 7,
+    "world_bounds_min": [
+      -0.375,
+      0.0,
+      -1.348
+    ],
+    "world_bounds_max": [
+      0.45,
+      1.405,
+      0.997
+    ],
+    "png_origin_xy": [
+      180.1,
+      314.2
+    ],
+    "png_alpha_bbox_xyxy": [
+      93,
+      20,
+      291,
+      364
+    ],
+    "png_size": [
+      384,
+      384
+    ],
+    "nodes": {
+      "WolfKing_Body": [
+        0,
+        0,
+        0
+      ],
+      "Head": [
+        0,
+        0.94,
+        0.49
+      ],
+      "Tail": [
+        0,
+        0.63,
+        -0.54
+      ],
+      "FrontFoot_L": [
+        -0.19,
+        0.52,
+        0.28
+      ],
+      "FrontFoot_R": [
+        0.19,
+        0.52,
+        0.28
+      ],
+      "RearFoot_L": [
+        -0.19,
+        0.52,
+        -0.43
+      ],
+      "RearFoot_R": [
+        0.19,
+        0.52,
+        -0.43
+      ]
+    },
+    "animations": {
+      "Trot": 0.96
+    },
+    "sha256": {
+      "glb": "cbecddc55ea65d9ca3c27fafd5e237844f5020f25cf5860b0cdbb54f9c45cc76",
+      "png": "5de4f92e15f2a5bdfbdaf0306532b7ec6ef6419e5d27eb140a510d924d94e7a0"
+    },
+    "bytes": {
+      "glb": 126560,
+      "png": 41413
+    }
+  },
+  {
+    "asset": "thief-fox",
+    "glb": "glb/thief-fox.glb",
+    "png": "png/thief-fox.png",
+    "triangles": 1814,
+    "draw_calls": 7,
+    "world_bounds_min": [
+      -0.424,
+      0.0,
+      -1.348
+    ],
+    "world_bounds_max": [
+      0.45,
+      1.424,
+      0.997
+    ],
+    "png_origin_xy": [
+      180.1,
+      314.2
+    ],
+    "png_alpha_bbox_xyxy": [
+      93,
+      20,
+      291,
+      364
+    ],
+    "png_size": [
+      384,
+      384
+    ],
+    "nodes": {
+      "Fox_Body": [
+        0,
+        0,
+        0
+      ],
+      "Head": [
+        0,
+        0.94,
+        0.49
+      ],
+      "Tail": [
+        0,
+        0.63,
+        -0.54
+      ],
+      "FrontFoot_L": [
+        -0.19,
+        0.52,
+        0.28
+      ],
+      "FrontFoot_R": [
+        0.19,
+        0.52,
+        0.28
+      ],
+      "RearFoot_L": [
+        -0.19,
+        0.52,
+        -0.43
+      ],
+      "RearFoot_R": [
+        0.19,
+        0.52,
+        -0.43
+      ]
+    },
+    "animations": {
+      "Trot": 0.96
+    },
+    "sha256": {
+      "glb": "1a60815858bfb515d29143d3dda2a0870fa4bdeb0b09ac10d51a245f139e0a1a",
+      "png": "467283c119ec64c6861814579c149d173df96c9efbc4478d962b300c4a2963be"
+    },
+    "bytes": {
+      "glb": 114952,
+      "png": 40976
+    }
+  }
+]

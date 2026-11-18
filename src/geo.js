@@ -4,15 +4,19 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const V3=THREE.Vector3;
+// 0.15: a source with its own vertex colours (glTF COLOR_0: the v015-v016 art has one white "Matte paint" material and every colour in the
+// vertices, already linear) keeps them: vertex rgb × material colour, alpha ignored. Without one (environment-pack.glb, primitives) every
+// vertex gets the material colour, exactly as before.
 export function prep(source,matrix,color){
- const pos=source.attributes.position,nor=source.attributes.normal,index=source.index,n=index?index.count:pos.count;
+ const pos=source.attributes.position,nor=source.attributes.normal,col=source.attributes.color,index=source.index,n=index?index.count:pos.count;
  const P=new Float32Array(n*3),N=new Float32Array(n*3),C=new Float32Array(n*3);
  const v=new V3(),normalMatrix=new THREE.Matrix3().getNormalMatrix(matrix),flip=matrix.determinant()<0;
  for(let i=0;i<n;i++){
   const corner=i%3,k=flip&&corner?i-corner+(3-corner):i,src=index?index.getX(k):k;
   v.fromBufferAttribute(pos,src).applyMatrix4(matrix);P[i*3]=v.x;P[i*3+1]=v.y;P[i*3+2]=v.z;
   if(nor){v.fromBufferAttribute(nor,src).applyMatrix3(normalMatrix).normalize();N[i*3]=v.x;N[i*3+1]=v.y;N[i*3+2]=v.z}
-  C[i*3]=color.r;C[i*3+1]=color.g;C[i*3+2]=color.b;
+  if(col){C[i*3]=col.getX(src)*color.r;C[i*3+1]=col.getY(src)*color.g;C[i*3+2]=col.getZ(src)*color.b}
+  else{C[i*3]=color.r;C[i*3+1]=color.g;C[i*3+2]=color.b}
  }
  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(P,3));g.setAttribute('normal',new THREE.BufferAttribute(N,3));g.setAttribute('color',new THREE.BufferAttribute(C,3));
  if(!nor)g.computeVertexNormals();

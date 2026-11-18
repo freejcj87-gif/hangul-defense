@@ -2,10 +2,10 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { SimplifyModifier } from 'three/addons/modifiers/SimplifyModifier.js';
-import { KIND_ORDER, RIG, GAIT, RIG_TIME, monsterGeometry, shadowGeometry, rigMaterial, rigDepthMaterial, rigMaterialAt, gaitPose } from './monsters.js';
+import { KIND_ORDER, RIG, GAIT, RIG_TIME, monsterGeometry, shadowGeometry, rigMaterial, rigDepthMaterial, rigMaterialAt, gaitPose, setRig } from './monsters.js';
 import { prep, fuse, solid, flat, merge } from './geo.js';
-import { POND, POND_R, HAY, GARDEN, ZONE, FARM_ZONE, FARM_HOME, PICK, DROP, MARKET_FRONT, MARKET_GATE, TENTS } from './layout.js';
-import { STOREY_H, storeyGeometry, basketGeometry, basketEggs, railGeometry, wallGeometry, marketExtras, STALL_OMIT, NESTS, NEST_MAX, nestSpots, villageProps, lanterns, LANTERN_TOP, drawHammer, trailGeometry, stageProps } from './props.js';
+import { POND, POND_R, HAY, GARDEN, ZONE, FARM_ZONE, FARM_HOME, PICK, DROP, MARKET_FRONT, MARKET_GATE, TENTS, MILL, RIVER, riverFrame, riverOffset, millRace, bridgeSpot, deckY, BRIDGE as BRIDGE_ART } from './layout.js';
+import { STOREY_H, storeyGeometry, basketGeometry, basketEggs, railGeometry, wallGeometry, marketExtras, STALL_OMIT, NESTS, NEST_MAX, nestSpots, villageProps, lanterns, LANTERN_TOP, drawHammer, trailGeometry, stageProps, riverGeometry, codeWheelGeometry } from './props.js';
 
 const host=document.querySelector('.scene');
 const motion=matchMedia('(prefers-reduced-motion: reduce)');
@@ -18,6 +18,14 @@ const count=(v,max)=>clamp(Math.floor(Number(v)||0),0,max);
 const num=v=>{const n=Number(v);return Number.isFinite(n)?n:0};
 const ART='art-handoff/coopnight/browser/';
 const V3=THREE.Vector3;
+// 0.15 art (art-handoff/v015-v016, 계획서 §2): each model is loaded on its own and may fail on its own; the 3D village stays and only that model
+// keeps its 0.14 code-drawn look. ?art15=0 skips them all. Paths stay whole strings: scripts/build-pages.cjs checks they are in the Pages package.
+const ART15={watermill:'art-handoff/v015-v016/glb/watermill.glb',bridge:'art-handoff/v015-v016/glb/bridge.glb',king:'art-handoff/v015-v016/glb/wolf-king.glb',fox:'art-handoff/v015-v016/glb/thief-fox.glb'};
+const ART15_V='?v=0.15';   // cache buster (the files may change in a later version under the same name)
+const BEAST_PARTS=['Head','Tail','FrontFoot_L','FrontFoot_R','RearFoot_L','RearFoot_R'];
+const ART15_NODES={watermill:['WaterWheel'],bridge:['Timber_Bridge'],king:BEAST_PARTS,fox:BEAST_PARTS};   // a file without these nodes counts as failed
+const ART15_GRACE=8000;   // ms to wait for them once the core assets are in (a stalled request must not hold the whole 3D village back)
+const art15Off=(()=>{try{return /[?&]art15=0\b/.test(location.search)}catch{return false}})();
 // Until the 3D village is ready (or when it falls back) the page still gets a safe API.
 const stubView=()=>({events(){},reward(){},build(){return null},upgrade(){return null},marketScreen(){return null},focus(){return null},inspect(){return {ready:false}}});
 window.VillageView=stubView();
@@ -79,10 +87,12 @@ function simpler(geometry,keep){
 }
 // Bakes a GLB node to `height`, feet on y=0, centred on x/z. Children named in `split` come back as separate limbs with their pivots.
 // opt.omit drops children by name; opt.anchors returns the baked bounding box of named children (where to mount extra parts); opt.keep decimates.
+// opt.origin keeps the model's own x/z origin instead of centring its bounding box (0.15 animals: the origin is the body centre, the tail makes the box lopsided).
 function bake(node,height,split=[],opt={}){
  if(!node)throw new Error('Required model is missing');
  node.updateWorldMatrix(true,true);
  const box=new THREE.Box3().setFromObject(node),size=box.getSize(new V3()),c=box.getCenter(new V3()),k=height/size.y;
+ if(opt.origin)c.x=c.z=0;
  const frame=new THREE.Matrix4().makeScale(k,k,k).multiply(new THREE.Matrix4().makeTranslation(-c.x,-box.min.y,-c.z));
  const omit=(opt.omit||[]).map(norm);
  const groups=new Map([['main',{list:[],pivot:new V3()}]]);
@@ -266,6 +276,14 @@ function bunting(points,sag,masts=[]){
  return {geometry:solid(parts),center:c};
 }
 
+// The 0.15 models, each its own request: a failed (or stalled, or malformed) file resolves to null instead of failing start(). Everything is settled
+// before the scene first shows (renderer='three'), so a model never swaps in later. `core` = the assets start() cannot do without.
+function loadArt15(loader,core){
+ const keys=Object.keys(ART15);if(art15Off)return Promise.resolve(Object.fromEntries(keys.map(k=>[k,null])));
+ const late=core.then(()=>new Promise(done=>setTimeout(done,ART15_GRACE)),()=>{}).then(()=>null);
+ const one=k=>loader.loadAsync(ART15[k]+ART15_V).then(g=>ART15_NODES[k].every(n=>g.scene.getObjectByName(n))?g:null);
+ return Promise.all(keys.map(k=>Promise.race([one(k),late]).catch(()=>null))).then(list=>Object.fromEntries(keys.map((k,i)=>[k,list[i]])));
+}
 async function start(){
  const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'low-power'});
  renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));renderer.setClearColor(0x9fbf7c);renderer.outputColorSpace=THREE.SRGBColorSpace;
@@ -289,7 +307,8 @@ async function start(){
  const VIEW_PULL=.7,ringHalf=R=>{const rho=R+1.4;return Math.max(rho*upXZ+.5,R*upXZ+3.2*upY+.4,rho/aspect*1.02,5.6)};
  const viewHalf=R=>{const base=fitHalf(7);return Math.max(ringHalf(R),base+(fitHalf(R)-base)*VIEW_PULL)};
  const resize=()=>{viewW=host.clientWidth||1;const h=host.clientHeight||1;aspect=viewW/h;camHalf=-1;renderer.setSize(viewW,h,false);applyView()};
- const [grass,pack,atlas]=await Promise.all([new THREE.TextureLoader().loadAsync(ART+'backgrounds/grass.png'),new GLTFLoader().loadAsync('art-handoff/coopnight/source-3d/models/environment-pack.glb'),makeAtlas()]);
+ const gltf=new GLTFLoader(),core=Promise.all([new THREE.TextureLoader().loadAsync(ART+'backgrounds/grass.png'),gltf.loadAsync('art-handoff/coopnight/source-3d/models/environment-pack.glb'),makeAtlas()]);
+ const [[grass,pack,atlas],art15]=await Promise.all([core,loadArt15(gltf,core)]);
 
  /* ----- ground: big tiled meadow, the village yard tint, one merged decal mesh (paths, wolf trails, flowers) ----- */
  const MAP=150,SEG=100;
@@ -328,6 +347,11 @@ async function start(){
  const towerFoot=Math.max(...towerArt.map(a=>{a.main.geometry.computeBoundingBox();const b=a.main.geometry.boundingBox;return Math.max(b.max.x-b.min.x,b.max.z-b.min.z)}));
  G.storey=storeyGeometry(towerFoot*.5);
  G.props=[0,1,2,3].map(villageProps);
+ // 0.15 mill and bridge (계획서 §2-§3): the mill house goes into the stage props, its wheel turns on its own (MILL.wheel = its axle in the mill's frame);
+ // the bridge goes into the stage props at full size. A file that failed to load or bake leaves the code-drawn stand-ins (props.js).
+ const millArt=(()=>{if(!art15.watermill)return null;try{const b=bake(art15.watermill.scene,MILL.h,['WaterWheel']);if(!b.main||!b.WaterWheel)throw new Error('mill parts missing');return {house:b.main.geometry,wheel:b.WaterWheel.geometry,pivot:b.WaterWheel.pivot}}catch(error){art15.watermill=null;console.warn('0.15 mill model unavailable:',error.message);return null}})();
+ const bridgeArt=(()=>{if(!art15.bridge)return null;try{return bake(art15.bridge.scene,BRIDGE_ART.h).main.geometry}catch(error){art15.bridge=null;console.warn('0.15 bridge model unavailable:',error.message);return null}})();
+ G.wheel=millArt?millArt.wheel:codeWheelGeometry();
  const bakeMs=Math.round(performance.now()-bakeStart);
  const door=coopArt.anchors['Door dark opening']||new THREE.Box3(new V3(-.3,0,1),new V3(.3,1,1.3));
  const actors=[];
@@ -369,11 +393,12 @@ async function start(){
   if(Math.abs(R-decorR)<.01)return;decorR=R;const wide=curRoutes?.4:0;
   let nf=0,ng=0,nb=0,nr=0;
   const put=(mesh,i,t,scale)=>{dummy.position.set(t.x,0,t.z);dummy.rotation.set(0,t.ry,0);dummy.scale.setScalar(scale);dummy.updateMatrix();mesh.setMatrixAt(i,dummy.matrix)};
-  for(const t of DEC.tree){const d=t.r-R,lane=laneNow(t);
+  // 0.15: nothing grows in the river or the mill race (measured from the river built for riverR, not the animating radius, so nothing flickers)
+  for(const t of DEC.tree){const d=t.r-R,lane=laneNow(t);if(riverR&&riverGap(t.x,t.z)<.3+.22*t.s)continue;
    if(d>=FOREST){const dens=lane<1.7+wide?.12:lane<3.2+wide?.5:.9;if(t.u<dens)put(forest,nf++,t,t.s*easeOut(clamp((d-FOREST)/.9,.02,1)))}
    else if(d>1.4&&t.u<.09&&lane>1.5+wide&&ng<groveMax)put(grove,ng++,t,t.s*.95*easeOut(clamp((d-1.4)/.8,.02,1)))}
-  for(const t of DEC.bush){const d=t.r-R;if(d>.9&&t.u<.6&&laneNow(t)>1.2+wide)put(shrubs,nb++,t,t.s*easeOut(clamp((d-.9)/.6,.02,1)))}
-  for(const t of DEC.rock){const d=t.r-R;if(d>.5&&t.u<.65)put(stones,nr++,t,t.s*easeOut(clamp((d-.5)/.5,.02,1)))}
+  for(const t of DEC.bush){const d=t.r-R;if(d>.9&&t.u<.6&&laneNow(t)>1.2+wide&&(!riverR||riverGap(t.x,t.z)>.3+.35*t.s))put(shrubs,nb++,t,t.s*easeOut(clamp((d-.9)/.6,.02,1)))}
+  for(const t of DEC.rock){const d=t.r-R;if(d>.5&&t.u<.65&&(!riverR||riverGap(t.x,t.z)>.3+.3*t.s))put(stones,nr++,t,t.s*easeOut(clamp((d-.5)/.5,.02,1)))}
   forest.count=nf;grove.count=ng;shrubs.count=nb;stones.count=nr;
   for(const m of [forest,grove,shrubs,stones])m.instanceMatrix.needsUpdate=true;
  }
@@ -415,11 +440,53 @@ async function start(){
  const stageMesh=new THREE.Mesh(EMPTY,lit);stageMesh.castShadow=stageMesh.receiveShadow=true;stageMesh.visible=false;stageMesh.name='stage';world.add(stageMesh);
  const stageNew=actor(EMPTY,0,0);stageNew.obj.visible=false;stageNew.obj.name='stage-new';
  let stageShown=-1,stageKey='',stageInfo={houses:0,marks:0,spots:[]},stageRising=false;
- function setStage(st,R,routes,fx){
-  const key=st+':'+R+':'+(routes?routes.join(','):'');if(key===stageKey)return false;
-  const up=fx&&st>stageShown;stageKey=key;stageShown=st;
+ /* ----- 0.15 river (계획서 §3): one decal mesh per village radius, in its own frame (riverGeometry), shown from stage 3 while the page says river (stages,
+    roads and FLAGS.RIVER on). The mill wheel is its own actor at the mill's axle; the mill house and the bridge are in the stage props. ----- */
+ const riverCache=new Map(),riverMesh=new THREE.Mesh(EMPTY,lit);riverMesh.receiveShadow=true;riverMesh.visible=false;riverMesh.name='river';world.add(riverMesh);
+ let riverR=0,raceSeg=null;   // the radius the shown river was built for (0 = none) and its mill race: the forest steps aside from both (layoutDecor)
+ const wheel=actor(G.wheel,0,0,MILL.ry);wheel.obj.visible=false;wheel.obj.name='mill-wheel';
+ {const p=millArt?millArt.pivot:new V3(MILL.wheel.x,MILL.wheel.y,0),c=Math.cos(MILL.ry),s=Math.sin(MILL.ry);wheel.x=MILL.at[0]+p.x*c+p.z*s;wheel.z=MILL.at[1]-p.x*s+p.z*c;wheel.y=p.y}
+ let bridgeNow=null;   // bridgeSpot(riverR): where wolves step up onto the deck
+ function setRiver(R){
+  if(R===riverR)return false;riverR=R;decorR=-1;
+  if(!R){riverMesh.visible=false;wheel.obj.visible=false;raceSeg=bridgeNow=null;return true}
+  if(!riverCache.has(R))riverCache.set(R,riverGeometry(R));const f=riverFrame(R);
+  riverMesh.geometry=riverCache.get(R);riverMesh.position.set(f.c[0],0,f.c[1]);riverMesh.rotation.y=Math.atan2(f.n[0],f.n[1]);riverMesh.scale.x=1;riverMesh.visible=true;
+  wheel.obj.visible=true;raceSeg=millRace(R);bridgeNow=bridgeSpot(R);return true;
+ }
+ /* 0.15 mill wheel (계획서 §5, 프로듀서 결정: 금화 없음, 한 번에 맞힌 정답에만 힘차게 돈다): the page's cheer (flowing farm) / produce events come only for
+    a first-try right answer. Each gives the wheel a push (more with the 신바람 boost), it spins down on the effect clock (τ 0.7 s: about 90% of the turn
+    within the 1.6 s reward beat). No push for second tries, idling or reduced motion. The GLB clip (WheelTurn) is not used. */
+ const MILL_TAU=.7,MILL_MAX=2.5*Math.PI*2/MILL_TAU,millSpin={angle:0,vel:0,kicks:0};
+ function millKick(lv){
+  if(!riverR||reduced())return;millSpin.vel=Math.min(MILL_MAX,millSpin.vel+Math.PI*2/MILL_TAU*(1+.5*clamp(num(lv)|0,0,2)));millSpin.kicks++;
+  const [x0,z0]=raceSeg,b=bridgeNow;ringWave(x0,z0,2.2,WHITE,.6,.05,CELL.ring,.35,.06);ringWave(x0,z0,3.2,SKY,.7,.25,CELL.halo,.3,.06);   // ripples under the wheel and by the bridge
+  for(let i=0;i<2;i++)ringWave(b.at[0]+b.u[1]*(i?1.6:-1.6),b.at[1]-b.u[0]*(i?1.6:-1.6),2.4,WHITE,.7,.15+i*.2,CELL.ring,.3,.06);
+ }
+ function millStep(fdt){if(millSpin.vel<=0)return;millSpin.angle+=millSpin.vel*fdt;millSpin.vel*=Math.exp(-fdt/MILL_TAU);if(millSpin.vel<.02)millSpin.vel=0}
+ /* 0.15 wolves at the river (looks only, the rule never reads it): up on the bridge deck (deckY along the bridge), a little lower in the water with a splash
+    now and then. Counts distinct wolves seen over the water on the bridge (bridged) and off it (waded; wadedIn = coming in), from the blended world position. */
+ const crossed={bridged:new Set(),waded:new Set(),wadedIn:new Set(),splashes:0};let splashBudget=0;   // splashes per frame (own budget: a crowd's dust and footfalls use up fxBudget first)
+ function wadeSplash(x,z,s){crossed.splashes++;for(let i=0;i<4;i++)emit({cell:CELL.dot,x:x+span(-.2,.2),y:.15,z:z+span(-.2,.2),vx:span(-.9,.9),vy:span(1.3,2.2),vz:span(-.9,.9),gravity:8,life:span(.35,.5),size:.11*s,end:.04,color:SKY,alpha:.95,fade:.5,pop:0,abs:true});
+  ringWave(x,z,1.3*s,WHITE,.5,0,CELL.ring,.3,.06)}
+ function riverStep(o,st,wdt,less){
+  if(!riverR)return 0;const off=riverOffset(riverR,o.x,o.z);if(Math.abs(off)>RIVER.water/2+RIVER.bank+1)return 0;
+  const b=bridgeNow,dx=o.x-b.at[0],dz=o.z-b.at[1],along=dx*b.u[0]+dz*b.u[1],side=Math.abs(dx*b.u[1]-dz*b.u[0]),wet=Math.abs(off)<=RIVER.water/2,live=st!=='dead'&&!o.ghost;
+  if(side<=BRIDGE_ART.width/2&&Math.abs(along)<=BRIDGE_ART.deck.half+.3){if(wet&&live)crossed.bridged.add(o.id);return deckY(along)}
+  if(!wet)return 0;if(live){crossed.waded.add(o.id);if(st==='walk'||st==='hunt')crossed.wadedIn.add(o.id)}
+  if(live&&!less&&wdt>0&&(o.splashT=(o.splashT||0)-wdt)<=0&&splashBudget>0&&onView(o.x,.2,o.z)){o.splashT=.45;splashBudget--;wadeSplash(o.x,o.z,Math.min(1.6,o.size))}
+  return -.15;
+ }
+ // ground distance from the river band / the race (0 inside): decor (trees, bushes, rocks) keeps out of both
+ const riverGap=(x,z)=>{if(!riverR)return 9;let d=Math.abs(riverOffset(riverR,x,z))-(RIVER.water/2+RIVER.bank);
+  const [x0,z0,x1,z1,w]=raceSeg,dx=x1-x0,dz=z1-z0,u=clamp(((x-x0)*dx+(z-z0)*dz)/(dx*dx+dz*dz),0,1);return Math.min(d,Math.hypot(x-x0-dx*u,z-z0-dz*u)-w/2-.12)};
+ function setStage(st,R,routes,fx,river){
+  const key=st+':'+R+':'+(routes?routes.join(','):'')+(river?':river':'');if(key===stageKey)return false;
+  const up=fx&&st>stageShown,on=!!river&&st>=RIVER.stage;stageKey=key;stageShown=st;
+  const riverNew=on&&!riverR;setRiver(on?R:0);
+  if(riverNew&&up&&!reduced()){popIn(wheel,.18,.87);riverMesh.scale.x=.001;tween(.05,.9,u=>{riverMesh.scale.x=Math.max(.001,easeInOut(u))},()=>{riverMesh.scale.x=1})}   // the river flows in along its length (0.9 s, inside the 1.6 s beat)
   if(st<1){stageMesh.visible=stageNew.obj.visible=false;stageInfo={houses:0,marks:0,spots:[]};stageRising=false;return true}
-  if(!stageCache.has(key))stageCache.set(key,stageProps(st,R,routes));
+  if(!stageCache.has(key))stageCache.set(key,stageProps(st,R,routes,river?{river:true,house:millArt&&millArt.house,bridge:bridgeArt}:{}));
   const g=stageCache.get(key);stageInfo=g;
   const settle=()=>{if(stageKey!==key)return;stageMesh.geometry=g.all||EMPTY;stageMesh.visible=!!g.all;stageNew.obj.visible=false;stageRising=false;dirty=true};
   if(up&&g.fresh&&!reduced()){
@@ -454,7 +521,35 @@ async function start(){
   if(colors){for(let i=0;i<cap;i++)mesh.setColorAt(i,PLAIN);mesh.instanceColor.setUsage(THREE.DynamicDrawUsage)}
   world.add(mesh);return {mesh,pose,n:0,tris:(geometry.index?geometry.index.count:geometry.attributes.position.count)/3};
  }
- const herd={};for(const k of KIND_ORDER){const r=rigMesh(monsterGeometry(k),rigMaterial(k),WCAP,true);r.mesh.castShadow=false;r.mesh.receiveShadow=true;herd[k]=r}
+ /* 0.15 늑대 왕 · 도둑 여우 (계획서 §6): the GLB's seven parts are baked into one rigged mesh like the farmers (body 0, head 1, tail 3, legs 4-7 by
+    position: front/back × +x/−x, so the GLB's _L legs at −x are rig legs 5 and 7; no jaw). The GLB clip (Trot) is never played: the rig's gaits, attacks,
+    flinches and falls drive it. The model keeps its origin (body centre) with feet on y=0. A file that failed to load or bake keeps the 0.14 model. */
+ // h = the GLB's own height (scale 1: the pack was modelled at the 0.14 village scale). Side-by-side shots with the 0.14 models (v015-shots\lineup-*):
+ // at 1.57/1.47 (the code models' heights) the bigger-headed, longer GLB animals read about 1.3x larger; at scale 1 the king is as bulky as the
+ // grey ember king and the fox as tall as the orange wolf. Screen size multipliers (KIND_FALLBACK king 3.6 · fox 1.15) are unchanged.
+ // Gaits: the king trots at the art's Trot pace (0.96 s ≈ 1.04 Hz, diagonal pairs) instead of the ember prowl; the fox trots, gallops when running.
+ const BEAST={king:{h:1.405,gait:{walk:'trot',run:'trot',hz:{trot:1.04}}},fox:{h:1.424,gait:{walk:'trot',run:'gallop',hz:{trot:2.4,gallop:3.2}}}};
+ function beastRig(gl,h){
+  const art=bake(gl.scene,h,BEAST_PARTS,{origin:true}),P=n=>art[n].pivot;
+  if(!art.main||!BEAST_PARTS.every(n=>art[n]))throw new Error('animal parts missing');
+  const bone=n=>n==='main'?0:n==='Head'?1:n==='Tail'?3:4+(P(n).z<0?2:0)+(P(n).x<0?1:0),box=n=>{const g=art[n].geometry;g.computeBoundingBox();return g.boundingBox.clone().translate(P(n))};
+  const parts=Object.keys(art).filter(n=>n!=='anchors'),list=parts.map(n=>{const g=art[n].geometry.clone(),p=P(n),b=bone(n),c=g.attributes.position.count,R=new Float32Array(c*4);
+   g.translate(p.x,p.y,p.z);for(let i=0;i<c;i++){R[i*4]=p.x;R[i*4+1]=p.y;R[i*4+2]=p.z;R[i*4+3]=b}g.setAttribute('aRig',new THREE.BufferAttribute(R,4));return g});
+  const geometry=merge(list);for(const g of list)g.dispose();for(const n of parts)art[n].geometry.dispose();geometry.computeBoundingBox();geometry.computeBoundingSphere();
+  const legs=[4,5,6,7].map(b=>{const n=BEAST_PARTS.slice(2).find(n=>bone(n)===b);if(!n)throw new Error('animal legs');return P(n).toArray()});
+  const head=box('Head'),body=box('main'),H=P('Head').toArray();
+  // crown: the gold of the head part above the eyes (vertex colours), for the king's twinkles in place of the ember king's flames
+  const crown=[];{const g=geometry,c=g.attributes.color,q=g.attributes.position,r=g.attributes.aRig,b=new THREE.Box3(),v=new V3();
+   for(let i=0;i<q.count;i++)if(r.getW(i)===1&&q.getY(i)>H[1]+.2*h/1.4&&c.getX(i)>.6&&c.getY(i)>.3&&c.getY(i)<.6&&c.getZ(i)<.2)b.expandByPoint(v.fromBufferAttribute(q,i));
+   if(!b.isEmpty()){const m=b.getCenter(new V3());crown.push([b.min.x,b.max.y,m.z],[b.max.x,b.max.y,m.z],[m.x,b.max.y,b.min.z],[m.x,(b.min.y+b.max.y)/2,b.max.z])}}
+  // tp0: the GLB tail is modelled already raised, so the rig's tail lift (0.35 at rest, more when hunting) starts 0.35 lower (else it stands straight up)
+  const rig={H,J:H.slice(),T:P('Tail').toArray(),L:legs,M:[0,(head.min.y+H[1])/2,head.max.z-.04],top:[0,head.max.y+.15,H[2]],hip:legs[0][1],rear:legs[2][2],center:(body.min.y+body.max.y)/2,crown,tp0:-.35};
+  return {geometry,rig,size:geometry.boundingBox.getSize(new V3())};
+ }
+ const beast={};
+ for(const k of ['king','fox'])if(art15[k]){try{beast[k]=beastRig(art15[k],BEAST[k].h)}catch(error){art15[k]=null;console.warn('0.15 '+k+' model unavailable:',error.message)}}
+ const herd={};for(const k of KIND_ORDER){const b=beast[k];if(b)setRig(k,b.rig,BEAST[k].gait);
+  const r=rigMesh(b?b.geometry:monsterGeometry(k),b?rigMaterialAt(b.rig.H,.86):rigMaterial(k),WCAP,true);r.mesh.castShadow=false;r.mesh.receiveShadow=true;herd[k]=r}
  const shade=rigMesh(shadowGeometry(),herd.wolf.mesh.material,WCAP,false);shade.mesh.castShadow=true;shade.mesh.receiveShadow=false;shade.mesh.customDepthMaterial=rigDepthMaterial('wolf');
  // The stand-in only draws into the shadow map: in the main pass it has zero instances (no draw call).
  shade.mesh.onBeforeRender=function(){this.userData.n=this.count;this.count=0};shade.mesh.onAfterRender=function(){this.count=this.userData.n};
@@ -491,6 +586,8 @@ async function start(){
  const flowLv=()=>flowS&&flowS.boost&&num(flowS.boost.left)>0?clamp(flowS.boost.lv|0,0,2):0;
  const flowSlot=f=>flowS&&flowS.slots[f.k]&&typeof flowS.slots[f.k]==='object'?flowS.slots[f.k]:null;
  const SHADE_FIT={boar:new V3(1.12,.74,1.02)};   // the stand-in has wolf proportions; the boar is lower and wider
+ // 0.15 GLB animals: stretch the stand-in to the model's own bounding box (they are longer, with a bigger head, than the wolf it was made for)
+ {const g=shade.mesh.geometry;g.computeBoundingBox();const s=g.boundingBox.getSize(new V3());for(const k in beast)SHADE_FIT[k]=beast[k].size.clone().divide(s)}
  const arrowMesh=instanced(G.arrow,240,false);
  const malletGeo=solid([['cyl',0x9a6a3a,[0,.45,0],[.06,.9,.06]],['cyl',0xc98f52,[0,.95,0],[.2,.5,.2],[0,0,Math.PI/2]],['cyl',0x8a5a2e,[.26,.95,0],[.21,.04,.21],[0,0,Math.PI/2]],['cyl',0x8a5a2e,[-.26,.95,0],[.21,.04,.21],[0,0,Math.PI/2]]]);
  const mallets=[];
@@ -630,7 +727,7 @@ async function start(){
  const stageOf=s=>Number.isInteger(s.stage)?clamp(s.stage,-1,5):-1,routesOf=s=>Array.isArray(s.routes)&&s.routes.length?s.routes.slice(0,8):null;
  function syncStage(s,fx=false){
   const routes=routesOf(s);let changed=setTrails(routes);
-  if(setStage(stageOf(s),radiusOf(s,s.world),routes,fx))changed=true;
+  if(setStage(stageOf(s),radiusOf(s,s.world),routes,fx,!!s.river))changed=true;
   return changed;
  }
  function buildStage(){             // a new stage: the new houses and gate posts rise with dust and stars, the new village edge lights up
@@ -1026,10 +1123,10 @@ async function start(){
    const wolf=wolfVis.get(e.wolf);
    switch(e.type){
     // 0.13 flowing farm: a right answer makes every hen hop (the first egg drops at once), a fish leaps to the market; eggs then come one by one
-    case 'cheer':cheerFx(e);break;
+    case 'cheer':cheerFx(e);millKick(e.boost);break;
     case 'laid':{const c=Number.isInteger(e.slot)&&e.slot>=0?henSlots[e.slot]:null;if(c&&c.on&&!reduced()){const a=c.a;tween(0,.4,(u,tt)=>{const q=Math.sin(Math.min(1,tt/.16)*Math.PI);a.sy*=1-.28*q;a.sx*=1+.18*q;if(tt>.16)a.lift+=.2*Math.sin((tt-.16)/.24*Math.PI)});flashAt(a.x,.35,a.z,.55,CREAM,.14)}break}
     case 'sold':{const f=farmers[e.slot|0];if(f&&f.on&&!reduced()){const mk=marketShift(),x=DROP[f.k][0]+mk.x,z=DROP[f.k][1]+mk.z;coinPop(x,1.5,z,span(-.4,.4),span(3,3.8),span(-.3,.3),0,.7);sparkles(x,1.4,z,2,.25,GOLD,0,.2);if(time-(market.soldAt||-9)>.5){market.soldAt=time;wobble(market.a,.035)}}break}
-    case 'produce':if(reduced()){popUntil=time+1.4;lastLeft=count(e.left??0,NEST_MAX)}else produceFx(e);break;
+    case 'produce':if(reduced()){popUntil=time+1.4;lastLeft=count(e.left??0,NEST_MAX)}else produceFx(e);millKick(0);break;
     case 'shoot':towerFire(towerById.get(e.tower),false,false,!!e.splash);break;
     case 'volley':for(const t of towers)towerFire(t,true,!!e.fast);shake(e.fast?.07:.05);break;   // the arrows themselves come from the pull (marked as a volley above)
     case 'hit':if(wolf){wolf.hit=.14;wolf.hitT=time;const [dx,dz]=hitFrom(wolf);knock(wolf,dx,dz,2.4);flashAt(wolf.x,.85*wolf.size,wolf.z,.8);
@@ -1115,6 +1212,11 @@ async function start(){
     stage:stageShown,roads:trailKey,stageHouses:stageInfo.houses|0,roadMarks:stageInfo.marks|0,stageRising,marketTier:market.mtier,marketDown:market.on&&isBroken(market),hammers:hammersDrawn,propsStage,lanterns:lanterns(propsStage).length,
     pondVisible:pond.obj.visible,garlands:garlands.filter(g=>g.obj.visible).length,sale:!!sale||time<popUntil,
     decor:{forest:forest.count,grove:grove.count,bushes:shrubs.count,rocks:stones.count},
+    art15:Object.fromEntries(Object.keys(ART15).map(k=>[k,!!art15[k]])),   // 0.15 model loaded (and baked where it is used); false = that model keeps its 0.14 look
+    monsterArt:{king:!!beast.king,fox:!!beast.fox},   // true = drawn from the 0.15 GLB, false = the 0.14 code model
+    river:(()=>{const o={on:riverR>0,radius:riverR,bridge:bridgeArt?'glb':'code',bridged:crossed.bridged.size,waded:crossed.waded.size,wadedIn:crossed.wadedIn.size,splashes:crossed.splashes,flow:+riverMesh.scale.x.toFixed(3)};if(!riverR)return o;const b=bridgeSpot(riverR),at=(f,y)=>{ndc.set(b.at[0]+b.u[0]*f,y,b.at[1]+b.u[1]*f).project(camera);return [+ndc.x.toFixed(3),+ndc.y.toFixed(3)]};
+     o.bridgeNdc=at(0,.5);o.bridgeFarNdc=at(BRIDGE_ART.len/2,.3);return o})(),   // where the bridge's middle and its far (forest) end are on screen (−1…1)
+    mill:{art:millArt?'glb':'code',shown:wheel.obj.visible,turns:Math.round(millSpin.angle/(Math.PI*2)*100)/100,spinning:millSpin.vel>0,kicks:millSpin.kicks},
     drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,builds:{...builds},effects:particles.length+anims.length,warnings:warns.length,blend:{t:+blendT.toFixed(3),dur:+blendDur.toFixed(3),ticks:blendTicks},shake:shakeNow,
     memory:{geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures}}}};
 
@@ -1143,10 +1245,20 @@ async function start(){
   yard.scale.set(Rd,1,Rd);layoutDecor(Rd);
   if(Math.abs(Rd-shadowR)>.05){shadowR=Rd;const S=Rd+6;Object.assign(sun.shadow.camera,{left:-S,right:S,top:S,bottom:-S});sun.shadow.camera.updateProjectionMatrix()}
  }
+ // 0.15 (계획서 §12): with the river on, the view leans toward the top of the screen so the bridge's far end stays below RIVER_TOP (screen height, −1…1),
+ // but only as far as the room under the village ring allows (portrait pads have room to spare and do not move). Follows the drawn radius, so it only
+ // changes while the village grows between questions. Returns the ground shift along the screen's up direction.
+ const RIVER_TOP=.86;
+ function riverLift(R,half){
+  if(!riverR)return 0;const b=bridgeSpot(riverR),fx=b.at[0]+b.u[0]*BRIDGE_ART.len/2,fz=b.at[1]+b.u[1]*BRIDGE_ART.len/2;
+  const top=(fx*fwdXZ.x+fz*fwdXZ.z)*upXZ+.3*upY,need=top-RIVER_TOP*half,room=.97*half-(R+.6)*upXZ;return Math.max(0,Math.min(need,room))/upXZ;
+ }
+ const viewAim=()=>{const kg=curS&&(curS.bell===1||curS.bell===2)&&curS.world&&curS.world.king,pull=kg?(curS.bell===2?KING_PULL:KING_WAIT_PULL):0;
+  if(kg)return [num(kg.x)*pull,num(kg.z)*pull];const lift=riverLift(Rd,viewHalf(Rd));return [fwdXZ.x*lift,fwdXZ.z*lift]};
  function updateView(dt,less){       // the camera pulls back (and the forest steps back) over about a second when the village grows
   const k=less?1:1-Math.exp(-dt*3.6);Rd+=(Rgoal-Rd)*k;if(Math.abs(Rgoal-Rd)<.004)Rd=Rgoal;
-  // finale camera: while the child is fighting the wolf king (bell 2) the view leans a little toward him; it eases back when he flees
-  if(!focusHalf){const kg=curS&&(curS.bell===1||curS.bell===2)&&curS.world&&curS.world.king,pull=kg?(curS.bell===2?KING_PULL:KING_WAIT_PULL):0,gx=kg?num(kg.x)*pull:0,gz=kg?num(kg.z)*pull:0,d=Math.abs(gx-FOCUS.x)+Math.abs(gz-FOCUS.z);
+  // finale camera: while the child is fighting the wolf king (bell 2) the view leans a little toward him; it eases back when he flees (0.15: otherwise toward the river)
+  if(!focusHalf){const [gx,gz]=viewAim(),d=Math.abs(gx-FOCUS.x)+Math.abs(gz-FOCUS.z);
    if(d>1e-4){const kk=less?1:1-Math.exp(-dt*2.2);FOCUS.x+=(gx-FOCUS.x)*kk;FOCUS.z+=(gz-FOCUS.z)*kk;if(Math.abs(gx-FOCUS.x)+Math.abs(gz-FOCUS.z)<.01){FOCUS.x=gx;FOCUS.z=gz}camera.position.copy(EYE).add(FOCUS);dirty=true}}
   applyView();
  }
@@ -1230,7 +1342,7 @@ async function start(){
   c[k]=o.legs[3];c[k+1]=P.hr;c[k+2]=o.seed*20;c[k+3]=0;d[k]=o.lift[0];d[k+1]=o.lift[1];d[k+2]=o.lift[2];d[k+3]=o.lift[3]}
  function animateWolves(dt,wdt,less){
   const e=tickBlend(less);
-  for(const k of KIND_ORDER){herd[k].n=0;wolfKinds[k]=0}shade.n=0;fxBudget=less?0:5;
+  for(const k of KIND_ORDER){herd[k].n=0;wolfKinds[k]=0}shade.n=0;fxBudget=less?0:5;splashBudget=less?0:2;
   henSpots.length=0;for(const c of henSlots)if(c.on&&c.h&&(c.h.state==='yard'||c.h.state==='home'||c.h.state==='flee'))henSpots.push(c.a);
   for(const o of wolfVis.values()){
    const px=o.x,pz=o.z;if(!o.ghost){o.x=o.fx+(o.tx-o.fx)*e;o.z=o.fz+(o.tz-o.fz)*e}
@@ -1314,6 +1426,7 @@ async function start(){
    if(lit&&!less&&st!=='dead')P.y+=.3*Math.abs(Math.sin((hlEnd-time)*5.6));
    // leaping back over an intact fence on the way out
    if((st==='carry'||st==='leave')&&!less){const r=Math.hypot(o.x,o.z),Rf=Rd-FENCE_IN,d=Math.abs(r-Rf);if(d<.75){const side=sides[Math.floor(((Math.atan2(o.z,o.x)+Math.PI*2)%(Math.PI*2))/(Math.PI/3))%6];if(side&&side.on&&side.b&&!side.b.broken){const q=d/.75;ay+=.85*(1-q*q);P.pitch-=.25*(1-q)}}}
+   ay+=riverStep(o,st,wdt,less);   // 0.15: on the bridge deck / a little lower in the water
    // falling: knocked up and over, lands in a poof, lies a moment, sinks away
    if(st==='dead'){
     const D=boss?.8:.55,H=boss?1.1:.65,t=less?9:o.deadAge,c=R.center,u=Math.min(1,t/D),k2=Math.min(1,u*2);pivY=c;
@@ -1333,7 +1446,7 @@ async function start(){
    rv.set(0,pivY*S,pivZ*S);rv2.copy(rv).applyAxisAngle(YAX,o.ry);rv.applyQuaternion(rq);
    rp.set(o.x+o.kx+Math.sin(o.ry)*fwd*S,P.y*S+o.ky+ay,o.z+o.kz+Math.cos(o.ry)*fwd*S).add(rv2).sub(rv);
    o.mat.compose(rp,rq,rs.set(S*P.sx,S*P.sy,S*P.sz));o.phy=P.hy;o.php=P.hp;o.phr=P.hr;
-   const Hd=herd[o.kind],i=Hd.n++;o.mat.toArray(Hd.mesh.instanceMatrix.array,i*16);writePose(Hd.pose,i,P,o);
+   const Hd=herd[o.kind],i=Hd.n++;o.mat.toArray(Hd.mesh.instanceMatrix.array,i*16);if(R.tp0){P.tp+=R.tp0;writePose(Hd.pose,i,P,o);P.tp-=R.tp0}else writePose(Hd.pose,i,P,o);
    Hd.mesh.setColorAt(i,o.hit>0?FLASH:st==='dead'?DEAD:lit&&!less&&Math.sin(time*9)>0?HL:PLAIN);
    if(!o.ghost)wolfKinds[o.kind]++;
    if(st!=='dead'||o.deadAge<.9){const j=shade.n++,fit=SHADE_FIT[o.kind];if(fit){rm.copy(o.mat).scale(fit);rm.toArray(shade.mesh.instanceMatrix.array,j*16)}else o.mat.toArray(shade.mesh.instanceMatrix.array,j*16);writePose(shade.pose,j,P,o)}
@@ -1572,7 +1685,11 @@ async function start(){
   if(less)for(const b of booms)if(time-b.t0<.6)decal(CELL.ring,b.x,b.z,b.r*2.5,ORANGE,.85,.5,.08);   // reduced motion: a still ring instead of the fireball
   for(const o of wolfVis.values()){
    if(o.state==='dead')continue;const s=o.size;
-   if(o.K.boss){const p=less?1:.85+.15*Math.sin(time*4);decal(CELL.glow,o.x,o.z,2.7*s*p,ORANGE,.45,.7);
+   const crown=beast[o.kind]&&RIG[o.kind].crown;
+   if(o.K.boss&&crown){const p=less?1:.85+.15*Math.sin(time*4);decal(CELL.glow,o.x,o.z,2.7*s*p,GOLD,.42,.7);   // 0.15 GLB wolf king: a golden floor glow and a twinkling crown instead of flames
+    for(let i=0;i<crown.length;i++){const [x,y,z]=crown[i],tw=less?.8:Math.max(0,Math.sin(time*4.2+i*1.9));if(tw<.05)continue;tv.set(x,y,z).applyMatrix4(o.mat);
+     sprite(CELL.glow,tv.x,tv.y,tv.z,.34*s*tw,.34*s*tw,GOLD,.45*tw,1);sprite(CELL.sparkle,tv.x,tv.y,tv.z,.26*s*tw,.26*s*tw,WHITE,.95*tw,.6,less?0:time*1.5+i)}}
+   else if(o.K.boss){const p=less?1:.85+.15*Math.sin(time*4);decal(CELL.glow,o.x,o.z,2.7*s*p,ORANGE,.45,.7);
     for(let i=0;i<KING_FLAMES.length;i++){const [x,y,z,f]=KING_FLAMES[i],fl=less?1:.82+.18*Math.sin(time*(13+i*2.3)+i*1.7);tv.set(x,y,z).applyMatrix4(o.mat);   // living fire on the mane, crest and tail
      sprite(CELL.flame,tv.x,tv.y+.2*f*s*fl,tv.z,.48*f*s,.9*f*s*fl,FLAME_TINT,.95,.8,less?0:Math.sin(time*7+i)*.15)}
     const age=time-o.bossAt;if(age<3.2){const k=Math.min(1,age/.3)*(age>2.4?1-(age-2.4)/.8:1),q=less?1:.7+.3*Math.sin(age*9);decal(CELL.glow,o.x,o.z,6*s*q,FIRE,.55*k,.9);decal(CELL.halo,o.x,o.z,(3.4+(less?0:age%1*2))*s,ORANGE,.7*k*(less?1:1-age%1),.7)}}
@@ -1609,6 +1726,7 @@ async function start(){
  let last=0,wasLess=reduced(),curS=IDLE;
  const SUN_COLOR=sun.color.clone(),RED_LIGHT=new THREE.Color(0xff4a2a);
  {const s=read();curS=s;syncEconomy(s,true);syncPower(s,false);syncRecords(s);syncStage(s);updateNest(s);Rd=Rgoal;resize();const less=reduced();
+  {const kg=curS.world&&curS.world.king&&(curS.bell===1||curS.bell===2);if(!kg){const [gx,gz]=viewAim();FOCUS.set(gx,0,gz);camera.position.copy(EYE).add(FOCUS)}}   // a village loaded at stage 3+ starts with the river view (no pan on load); the king's lean eases in as in 0.14
   animateBuildings(0,0,less);updateFences(less);animateWolves(0,0,less);animateHens(0,0,less);animateArrows(less);for(const a of actors)pose(a,0);writeHens()}
  host.classList.add('is3d');host.dataset.renderer='three';
  // One step of the view: dt-driven; `still` freezes everything (paused, hidden tab), the world clock only runs in listen/ask/learn.
@@ -1624,6 +1742,7 @@ async function start(){
    sunDim+=((insideWolves>0?1:0)-sunDim)*(less?1:Math.min(1,fdt*2));sun.intensity=2.8-.7*sunDim;
    redPulse=Math.max(0,redPulse-fdt*.8);sun.color.copy(SUN_COLOR).lerp(RED_LIGHT,redPulse*.6);
    RIG_TIME.value=time;updateNest(curS);
+   millStep(fdt);wheel.pitch=-millSpin.angle;   // 0.15 mill wheel (its axle is the model's x axis: pitch turns it)
    for(const a of actors)pose(a,fdt);writeHens();dirty=false;
   }
  }
