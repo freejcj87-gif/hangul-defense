@@ -2128,7 +2128,8 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   for(const [name,text] of Object.entries(files)){
    for(const w of ['fetch(','XMLHttpRequest','sendBeacon','WebSocket','EventSource','window.open','location.href','target="_blank"','<a href','.href=\'http','https://','http://'])ok(!text.includes(w),name+': '+w+' 없음(바깥 링크·외부 요청 없음)');
   }
-  ok(!/당첨|뽑기에|레어|가챠/.test(BOOKUI_SRC+files['index.html']),'화면 글에 뽑기·당첨 표현 없음');
+  ok(html.includes('<footer>게임 기록은 이 브라우저에 저장되고, 개발자에게 보내지 않아요.'),'웹판 바닥글은 저장 위치 기준 문장(앱 빌드는 포장 단계에서 "이 기기에"로)');
+ ok(!/당첨|뽑기에|레어|가챠/.test(BOOKUI_SRC+files['index.html']),'화면 글에 뽑기·당첨 표현 없음');
   ok(!/실력 향상|학습 효과|성적/.test(BOOKUI_SRC+files['index.html']),'화면 글에 효과 주장 없음');
   ok(Nt.PRIVACY.length>=13&&Nt.PRIVACY.every(([h,l])=>typeof h==='string'&&Array.isArray(l)&&l.every(t=>typeof t==='string'&&t.length>0)),'개인정보처리방침 본문 모양');
  }
