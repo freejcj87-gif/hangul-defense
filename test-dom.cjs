@@ -1443,7 +1443,8 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   eq([C.stage(C.fresh(8)),C.stageCount(C.fresh(8))],[0,1],'새 판은 농가(시작 타워 1개를 지은 수 1로 센다)');
   eq([4,5,13,14,23,24,35,36,49,50,62].map(n=>C.stage(built(n))),[0,1,1,2,2,3,3,4,4,5,5],'8세: 5 · 14 · 24 · 36 · 50에서 단계가 오름');
   eq([13,14,35,36,49,50].map(n=>built(n).hall),[0,1,1,2,2,3],'회관은 장터 마을(14) · 성곽 마을(36) · 성(50)에 들어설 때 오름');
-  eq([3,4,9,10,16,17,25,26,36,37].map(n=>C.stage(built(n,10))),[0,1,1,2,2,3,3,4,4,5],'10세: 4 · 10 · 17 · 26 · 37');
+  eq([3,4,10,11,18,19,30,31,37,38].map(n=>C.stage(built(n,10))),[0,1,1,2,2,3,3,4,4,5],'10세: 4 · 11 · 19 · 31 · 38(0.14 밸런스: 회관 2를 지은 수 26 → 31로 늦춤, game-plan §14.10)');
+  eq([10,11,30,31,37,38].map(n=>built(n,10).hall),[0,1,1,2,2,3],'10세 회관은 지은 수 11 · 31 · 38에서 오름(0.13.2는 10 · 32 · 54)');
   eq([3,4,10,11,18,19,28,29,39,40].map(n=>C.stage(built(n,9))),[0,1,1,2,2,3,3,4,4,5],'9세: 4 · 11 · 19 · 29 · 40');
   eq([7,8,9,10].map(a=>C.stageAt({age:a})[1]),[5,5,4,4],'첫 문턱: 7·8세 5, 9·10세 4');
   eq([7,8,9,10].map(a=>C.bellBuilt({age:a})),[66,66,50,46],'종 문턱: 7·8세 66, 9세 50, 10세 46');
@@ -1461,7 +1462,18 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   withFlags(OFF,()=>{const s=FS({level:9});eq([C.stage(s),C.stageInfo(s),s.hall],[-1,null,0],'끔: 단계 없음, 지은 수 9는 회관 0');const t=FS({level:10});eq([t.hall,C.bellBuilt({age:10})],[1,66],'끔: 회관은 지은 수 10에서, 종은 10세도 66')});
   eq(FS({level:10}).hall,0,'켬: 지은 수 10(< 14)은 회관 0');
   /* 저장에 단계 칸이 없다 */
-  ok(!('stage' in C.fresh(8))&&!('stage' in C.restore({version:3,...built(30)})),'경제 상태에 단계 칸을 두지 않음(지은 수에서 계산)');}
+  ok(!('stage' in C.fresh(8))&&!('stage' in C.restore({version:3,...built(30)})),'경제 상태에 단계 칸을 두지 않음(지은 수에서 계산)');
+  /* 찍기 막기(0.14 밸런스, game-plan §14.10): 단계를 켜면 기운 지수 2(바닥 0.75 그대로), 끄면 0.13.2(지수 1) */
+  {const q=Q.get(8,'story',0),need=C.needSeconds(q),at=Math.ceil(C.FAST_MIN*need/C.TICK);
+   eq(C.FLAGS.STAGE_GUARD,{floor:.75,pow:2},'단계를 켰을 때의 찍기 막기 손잡이');
+   eq([C.guardFloor(),C.guardPow(),C.guard(q,0),C.guard(q,at),C.guard(q,undefined)],[.75,2,.75,1,1],'켬: 바로 누르면 75%, 번개를 받을 수 있는 때부터 100%');
+   ok(Math.abs(C.flowGain(1,false,.75).credit-.5625)<1e-9&&C.flowGain(1,false,1).credit===1,'켬: 기운 = 찍기 막기 배수의 제곱(찍기 0.5625, 읽은 정답 1)');
+   ok(Math.abs(C.income(S({age:8,chickens:3}),q,false,0).flow.credit-.5625)<1e-9&&C.income(S({age:8,chickens:3}),q,false,at).flow.credit===1,'켬: 정답 정산에서도 찍기만 기운이 줄어듦');
+   withFlags(OFF,()=>{eq([C.guardFloor(),C.guardPow(),C.guard(q,0)],[C.GUARD.floor,C.FLOW.guardPow,C.GUARD.floor],'끔: 0.13.2 찍기 막기(바닥 0.75 · 지수 1)');ok(Math.abs(C.flowGain(1,false,.75).credit-.75)<1e-9,'끔: 기운 지수 1')});
+   withFlags({STAGE_GUARD:{floor:.65}},()=>eq([C.guardFloor(),C.guardPow(),C.guard(q,0)],[.65,C.FLOW.guardPow,.65],'칸이 빠지면 그 칸만 0.13.2 값'));
+   /* 정직하게 읽는 아이(필요 시간의 40%가 지난 뒤 답함)는 어느 나이든 깎이지 않는다 */
+   let honest=0;for(const a of Q.AGES)for(let i=0;i<60;i++){const qq=Q.at(a,'story',i,77),t=Math.ceil(C.FAST_MIN*C.needSeconds(qq)/C.TICK);if(C.guard(qq,t)===1&&C.income(S({age:a,chickens:3}),qq,false,t).flow.credit===1)honest++}
+   eq(honest,Q.AGES.length*60,'켬: 필요 시간의 40% 뒤에 답하면 금화·기운 모두 깎이지 않음(전 나이 240문제)')}}
  /* S-2 세계: 단계별 반지름 · 래치 · 보류(hold) · 사거리 */
  {const R=W.STAGE.radius;eq(R,[7,9,11.5,14.5,18,22],'단계별 반지름(0.14: 기준 기기가 패드·노트북이 되어 마지막을 19 → 22로)');ok(R[5]>W.RADIUS[3]&&R.every((v,i)=>i===0||v>R[i-1]),'단계마다 넓어지고 마지막은 0.13의 최대(16)보다 큼');
   const s=built(4),w=W.sync(W.create({seed:3}),s);eq([w.stage,W.radius(w),W.routes(w)],[0,7,null],'농가: 반지름 7, 길은 8방향 전부');
@@ -1686,11 +1698,11 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   eq([v.stage,towersOf(v),W.towerUnits(v)],[0,ring(6,i=>i<2?2:1),8],'회관이 그대로인 보류(농가 → 마을)는 자리가 늘지 않으니 바로 층을 올림(0.14와 같음)')}
  /* R-3 보류 중에 종이 열림(10세: 성 37 + 회관 3 = 40, 종 46). 종이 열리는 순간 미뤄 둔 성 전환을 풀어 왕이 넓어진 울타리 밖에 서고, 결전 중에는 전환이 없다.
     재현: 10세 성곽 마을에서 읽는 중 7번 구매 → 종 → 답. 왕과 울타리 사이 거리는 한 순간이 아니라 종이 열린 뒤 내내 잰다 */
- {const a=seed({age:10,level:10,fence:12,chickens:9,farmers:4,power:2,gold:30000,seed:5},{view:true});a.go();calmWorld(a);a.api.world.fox=null;/* 첫 문제의 여우가 닭을 물어 가면 지은 수가 줄어 종 문턱이 흔들린다 */
-  let g=a.game();eq([g.stage.now,g.state.hall,g.world.radius,g.state.run.bell,C.builtNew(g.state)],[4,2,18,0,38],'(10세 지은 수 36 + 회관 2 = 성곽 마을)');
+ {const a=seed({age:10,level:10,fence:12,chickens:10,farmers:4,power:2,gold:30000,seed:5},{view:true});a.go();calmWorld(a);a.api.world.fox=null;/* 첫 문제의 여우가 닭을 물어 가면 지은 수가 줄어 종 문턱이 흔들린다 */
+  let g=a.game();eq([g.stage.now,g.state.hall,g.world.radius,g.state.run.bell,C.builtNew(g.state)],[4,2,18,0,39],'(10세 지은 수 37 + 회관 2 = 성곽 마을. 0.15에 합친 밸런스 조정으로 10세 성 문턱 37 → 38이라 한 개 더 지은 마을에서 시작)');
   a.tick(5);a.buy('tower');g=a.game();eq([a.api.phase,g.stage.rule,g.stage.now,g.stage.due,g.world.radius],['ask',5,4,true,18],'(읽는 중 1번째 구매: 규칙은 성, 세계는 보류)');
-  for(let i=1;i<7;i++){a.tick(5);a.buy(i%2?'fence':'tower')}g=a.game();
-  eq([a.api.phase,a.api.round.tries,g.state.run.bell,C.builtNew(g.state)],['ask',0,1,46],'(같은 문제를 읽는 중 7번째 구매에 종이 열림: 지은 수 46)');
+  for(let i=1;i<6;i++){a.tick(5);a.buy(i%2?'fence':'tower')}g=a.game();
+  eq([a.api.phase,a.api.round.tries,g.state.run.bell,C.builtNew(g.state)],['ask',0,1,46],'(같은 문제를 읽는 중 6번째 구매에 종이 열림: 지은 수 46)');
   eq([g.stage.now,g.stage.due,g.world.radius,g.king&&g.king.state],[5,false,22,'wait'],'종이 열리는 순간 미뤄 둔 성 전환을 풂(반지름 22), 늑대 왕은 그 둘레 숲에서 기다림');
   {const bn=a.fx('banner').map(e=>e.textContent);ok(bn.length===1&&bn[0].startsWith('🏰성이 되었어요!'),'띠 알림: 성 전환이 먼저(늑대 왕 띠는 그다음 차례) '+JSON.stringify(bn))}eq(a.game().sfx.stage|0,1,'단계 효과음 1번');
   let minGap=Infinity,back=0,prev=null;const radii=new Set();
@@ -1712,9 +1724,9 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   ok(!a.fx('banner').some(e=>e.textContent.includes('되었어요'))&&(g.sfx.stage|0)===0&&!a.built.slice(n0).includes('stage'),'결전 중에는 단계 띠 알림·효과음·전환 연출 없음')}
  /* R-5 단계를 켠 채 설정의 나이(#age)를 바꿈: 문제 사이(정답 연출·정답 배우기)면 바로 넓히고, 읽는 중(ask)이면 그 문제를 답할 때 넓힌다.
     8세 지은 수 26 = 물레방아 마을 → 10세 문턱(26)이면 성곽 마을 */
- {const S26={age:8,level:8,fence:10,chickens:6,farmers:3,gold:300,seed:5},to10=x=>{x.n.age.value='10';x.n.age.onchange()};
+ {const S26={age:8,level:8,fence:10,chickens:11,farmers:3,gold:300,seed:5},to10=x=>{x.n.age.value='10';x.n.age.onchange()};
   const start=o=>{const x=seed(S26,o);x.go();calmWorld(x);x.api.world.fox=null;return x};
-  const a=start({view:true});let g=a.game();eq([g.stage.now,g.state.hall,g.world.radius],[3,1,14.5],'(8세 지은 수 26 = 물레방아 마을)');
+  const a=start({view:true});let g=a.game();eq([g.stage.now,g.state.hall,g.world.radius],[3,1,14.5],'(8세 지은 수 31 = 물레방아 마을. 밸런스 조정으로 10세 성곽 마을 문턱 26 → 31)');
   a.unlock();a.right();eq(a.api.phase,'reward','(정답 연출 중)');to10(a);g=a.game();
   eq([a.api.phase,g.state.age,g.stage.rule,g.stage.now,g.stage.due,g.state.hall,g.stage.hall,g.world.radius,a.api.round.wait],['reward',10,4,4,false,2,2,18,16],'정답 연출 중 10세로: 바로 성곽 마을(반지름 18, 회관 2), 화면이 물러나는 1.6초 동안 다음 문제를 띄우지 않음');
   ok(a.built.includes('stage')&&a.fx('banner').some(e=>e.textContent.startsWith('🧱성곽 마을이 되었어요!')),'정답 연출 중: 전환 장면과 띠 알림');
