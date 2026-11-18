@@ -75,7 +75,8 @@ jobs:
         working-directory: android-app
         run: npm run test:shell
       - name: QA - check start path
-        run: grep -q '"appStartPath": "/?test=1"' android-app/android/app/src/main/assets/capacitor.config.json
+        run: |
+          grep -q '"appStartPath": "/?test=1"' android-app/android/app/src/main/assets/capacitor.config.json
       - name: QA - build debug APK
         working-directory: android-app/android
         run: |
