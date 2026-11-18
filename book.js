@@ -27,7 +27,8 @@
     SHINY:{p:.25,pity:2,after:10,firsts:0},
     /* §3.5 기억 늑대: 칸 1 같은 놀이 delay문제 뒤, 칸 2 다음 놀이, 칸 3 세 놀이 뒤 */
     /* share: 한 놀이 문제 가운데 복습 비율 상한. 0.2 → 0.1(2026-11-19 시뮬: 0.2이면 엔딩까지 문제 +1.4~4.6%·분당 금화 −5~−6%로 통과선 +3%·±2%를 넘음) */
-    REVIEW:{share:.1,same:3,after:3,delay:[5,10],wait:[0,0,1,3],cap:200},
+    /* 0.1 → 0.07(2026-11-19 2차 시뮬: 복습 문제는 놓쳐도 연속을 끊지 않게 한 뒤에도 0.1이면 분당 금화 −2.0~−3.2%, 0.07이면 −1.2~−1.7%로 통과선 ±2% 안) */
+    REVIEW:{share:.07,same:3,after:3,delay:[5,10],wait:[0,0,1,3],cap:200},
     /* §3.3 훈장 문턱 [동, 은, 금] */
     MEDAL:{one:[50,300,1000],fresh:[30,100,200],again:[5,30,100],rush:[1,15,60],en:[5,25,80],quiz:[10,50,150],king:[1,5,15],fox:[3,15,40],arrow:[100,1000,5000],keeper:[1,5,15],star:[1,5,15],map:[1,2,4]},
     MEDAL_GROUP:{one:'read',fresh:'read',again:'read',rush:'read',en:'read',quiz:'read',king:'guard',fox:'guard',arrow:'guard',keeper:'guard',star:'town',map:'town'},

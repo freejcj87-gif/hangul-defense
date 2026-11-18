@@ -2007,6 +2007,11 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   nextAsk(a);a.unlock();a.wrong(0);a.tick(C.DASH_TICKS+2);a.unlock();a.wrong(1);
   const id=a.n.answers.dataset.qid;ok(bookOf(a).rv.some(e=>e.id===id&&e.box===1)&&a.game().state.run.miss.length===1,'평소 문제를 놓치면 기억 늑대 대기열에(판 기록은 지금 규칙 그대로)');
  }
+ {/* 기억 늑대 문제는 놓쳐도 연속(신바람)이 끊기지 않는다. 평소 문제는 끊긴다 */
+  const X=Q.get(8,'story',150);const a=bboot(b=>{b.pq=6;b.rv=[{id:X.id,box:1,due:0,dp:1,miss:1,seen:0}]},{index:9,streak:4});a.go();eq(a.n.answers.dataset.special,'review','복습 문제');
+  a.unlock();a.wrong(0);eq(a.game().state.streak,4,'복습 문제를 한 번 틀려도 연속 그대로');a.tick(C.DASH_TICKS+2);a.unlock();a.wrong(1);eq([a.api.phase,a.game().state.streak,bookOf(a).rv[0].miss],['learn',4,2],'두 번 틀려도 연속 그대로(대기열에는 다시 들어감)');
+  for(let i=0;i<120&&!a.api.round.ready;i++)a.tick();a.btn(a.api.round.q.answer).click();a.untilAsk();eq(a.n.answers.dataset.special,'','다음은 평소 문제');a.unlock();a.wrong(0);eq(a.game().state.streak,0,'평소 문제를 틀리면 연속이 끊김(지금 규칙 그대로)');
+  const s=C.fresh(8);s.streak=5;C.settle(s,X,'second',{keepStreak:true});eq(s.streak,5,'Combat.settle keepStreak');C.settle(s,X,'second');eq(s.streak,0,'keepStreak가 없으면 지금과 같음')}
  /* M-5 정답 화살 처치 → 발자국·훈장, 읽는 중에는 띠 없음(문제 사이에만) */
  {const a=bboot(b=>{Object.assign(b.mon.wolf,{foot:Date.now(),plays:2,last:1,kills:40,note:1})},{index:3},{view:true});a.go();quiet(a);
   const w=a.api.world,put=(hp,vh)=>{const v={id:w.nextId++,kind:'wolf',x:3,z:0,sx:20,sz:0,hp,max:hp,speed:.01,state:'walk',target:0,timer:0,inside:0,hen:0};if(vh)v.vh=1;w.wolves.push(v);return v};

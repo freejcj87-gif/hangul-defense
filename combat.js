@@ -279,7 +279,8 @@
       if(FLAGS.BELL_WINS_CAP)grow(s);
       return Object.assign({result,back},inc);
     }
-    s.streak=0;
+    /* opt.keepStreak(수첩 MVP): 기억 늑대가 다시 들고 온 글은 놓쳐도 연속(신바람)을 끊지 않는다. 한 번 놓친 글이라 또 놓치기 쉬운데, 그 때문에 평소 읽기의 신바람·금화가 줄지 않게(복습은 벌이 아니다) */
+    if(!o.keepStreak)s.streak=0;
     if(result==='second'){s.late=0;return {result}}
     const r=raid(s);s.hidden+=r.scared;s.misses++;
     if(o.timeout){s.late++;if(s.late>=2){s.help=Math.min(MAX_HELP,s.help+1);s.late=0}}else s.late=0;

@@ -182,7 +182,7 @@ eq(K.NOTE.need,{wolf:{plays:2,kills:30},bramble:{plays:2,kills:30},boar:{plays:2
 eq([K.NOTE.cap,K.NOTE.gap,K.NOTE.after,K.SPECIAL.gap],[1,10,5,3],'쪽지 빈도(§3.2, 놀이당 쪽지는 시뮬로 2 → 1)');
 eq([K.RIBBON.need,K.RIBBON.kills],[3,{wolf:10,bramble:10,boar:3,granite:3,frost:4,ember:1,fox:1,king:1}],'리본 조건(§3.1)');
 eq(K.SHINY,{p:.25,pity:2,after:10,firsts:0},'반짝 손님(§3.4, 프로듀서 결정 2026-11-19: 연속 정답 때만 = 누적 경로 firsts 0, 머무는 시간 제한 없음)');
-eq(K.REVIEW,{share:.1,same:3,after:3,delay:[5,10],wait:[0,0,1,3],cap:200},'기억 늑대(§3.5, 복습 비율 상한은 시뮬로 0.2 → 0.1)');
+eq(K.REVIEW,{share:.07,same:3,after:3,delay:[5,10],wait:[0,0,1,3],cap:200},'기억 늑대(§3.5, 복습 비율 상한은 시뮬로 0.2 → 0.07)');
 eq([K.SESSION_GAP,K.DAY_DEFAULT,K.DAY_CHOICES,K.DAY_EXTEND],[4*HOURMS,30,[0,20,30,45,60],15],'놀이 간격 4시간 · 하루 시간 기본 30분');
 eq(K.GATE,{hold:20,digits:3,tries:3,wait:300,idle:1800},'보호자 문턱 상수(변경 기록 2차)');
 eq(K.VILLAGES,C.VILLAGES,'마을 4곳이 Combat.VILLAGES와 같음');

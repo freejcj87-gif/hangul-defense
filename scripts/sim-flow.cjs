@@ -117,8 +117,9 @@ function playEnd(age,kind,seed,opt){
       C.trackPace(s,q,ticks);W.answered(w);run(W.dashTicks(w)*W.TICK+.2);run(kidTime(q,false));
       const ok2=kind==='wrong'?false:kind==='guess'?rnd()<1/(n-1):rnd()<.8;
       if(bk){bk.boost=0;B.answered(bk.book,q,ok2?'second':'miss',{now:now(),age,run:s.run.no|0,special:sp&&sp.kind,finale:!!fin})}
-      if(ok2){C.settle(s,q,'second',{finale:!!fin,extra:!!sp});if(C.FOX.second&&W.foxShoo(w)){C.foxEnded(s,true);if(bk)B.foxSaved(bk.book,{now:now()})}if(fin)C.finaleSettle(s,'second')}
-      else{s.misses++;s.streak=0;C.track(s,q,'miss',{finale:!!fin,extra:!!sp});if(fin){const fz=C.finaleSettle(s,'miss');if(fz&&fz.stepped)W.king(w,'fight',s.run.steps)}}
+      const keep=!!(sp&&sp.kind==='review');/* 기억 늑대 문제는 놓쳐도 연속이 끊기지 않는다(화면과 같음) */
+      if(ok2){C.settle(s,q,'second',{finale:!!fin,extra:!!sp,keepStreak:keep});if(C.FOX.second&&W.foxShoo(w)){C.foxEnded(s,true);if(bk)B.foxSaved(bk.book,{now:now()})}if(fin)C.finaleSettle(s,'second')}
+      else{s.misses++;if(!keep)s.streak=0;C.track(s,q,'miss',{finale:!!fin,extra:!!sp});if(fin){const fz=C.finaleSettle(s,'miss');if(fz&&fz.stepped)W.king(w,'fight',s.run.steps)}}
       release();if(flowing||kind==='wrong'||kind==='guess')ask(false);run(C.learnTicks(q)*C.TICK+.2);if(kind==='wrong'||kind==='guess')buyOne();
       if(!sp&&(!fin||fin.normal))s.index++;
     }
