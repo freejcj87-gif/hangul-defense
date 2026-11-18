@@ -769,8 +769,12 @@ for(const age of Q.AGES)for(const mode of Q.MODES){
 a=seed({age:7,index:3});a.go();a.tick(20);const wt7=a.api.world.t,iv7=a.api.world.interval;a.n.age.value='10';a.n.age.onchange();shows(a,10,'story',3,'문제 중 전환');eq(a.api.world.t,wt7,'전환해도 늑대 세계는 그대로');eq([iv7,a.api.world.interval],[ivFor(7,a.api.state.seed,3),ivFor(10,a.api.state.seed,3)],'무리 간격은 새 나이에 맞춤');ok(ivFor(10,1)>ivFor(7,1),'(10세 간격이 7세보다 김)');
 eq(a.n.feedback.textContent,'10세 문제로 바꿨어요. 늑대는 그대로 와요.','전환 안내에 모드 이름 없음');eq(a.n.drawerSummary.textContent,'⚙️ 설정 · 10세','설정 요약');
 a=fresh();a.go();a.unlock();a.right();a.n.age.value='7';a.n.age.onchange();shows(a,8,'story',0,'정답 뒤(판매 연출 중)에는 그대로');ok(a.n.feedback.textContent.includes('다음 문제부터 7세'),'다음부터 적용 안내');a.tick(REWARD);shows(a,7,'story',1,'다음 문제는 7세');
-{const L1=Array.from({length:2000},(_,k)=>k).find(k=>Q.at(8,'story',k,1).lap===1);a=seed({index:L1,seed:1});a.go();const q=Q.at(8,'story',L1,1),lap1=a.n.answers.children.map(b=>b.dataset.i).join();
- eq(lap1,q.choices.map((_,i)=>String((i+1)%q.choices.length)).join(),'두 바퀴째는 보기를 한 칸 돌림')}
+{const L1=Array.from({length:2000},(_,k)=>k).find(k=>Q.at(8,'story',k,1).lap===1);a=seed({index:L1,seed:1});a.go();const q=Q.at(8,'story',L1,1);
+ eq(a.n.answers.children.map(b=>b._t),q.choices,'보기는 Questions.at()가 정한 순서 그대로(두 바퀴째도 화면이 따로 돌리지 않음)');
+ eq(a.n.answers.children.map(b=>b.dataset.i).join(),q.choices.map((_,i)=>String(i)).join(),'버튼 번호 = at() 보기 번호');
+ /* 불러오기 직후에도 같은 순서·같은 정답(저장에는 보기 순서가 없고 at()가 다시 만든다) */
+ const before=a.n.answers.children.map(b=>b._t);a.n.pause.click();const b2=boot();b2.go();eq(b2.n.answers.children.map(b=>b._t),before,'이어서 하기: 같은 보기 순서');eq(b2.api.round.q.answer,q.answer,'이어서 하기: 같은 정답 자리');
+ b2.unlock();b2.right();eq(b2.api.round.result,'first','이어서 한 문제를 정답으로 판정')}
 
 /* 2-9 저장·복원(늑대 세계 포함) */
 a=fresh();a.go();a.unlock();a.right();g0=a.api.state.gold;eq(JSON.parse(saved[KEY]).round,null,'판매 연출 중 저장: 하던 문제 없음(금화는 이미 받음)');

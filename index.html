@@ -500,9 +500,8 @@ function makeRound(){
  try{document.body.classList.toggle('long-read',q.mode==='story'&&Combat.syl(q.passage)>=40)}catch{}
  round={token:token(),q,t:0,tries:0,dash:0,lock:Combat.reveal(q),result:null,info:null,learn:0,ready:false,wait:0,fin:fin?{normal:fin.normal}:null};
  const list=$('answers'),[kind,cols]=layout(q.choices);list.innerHTML='';list.className=kind;list.dataset.cols=cols;list.dataset.qid=q.id;list.dataset.age=String(q.age);list.dataset.mode=q.mode;
- /* 같은 문항이 다시 돌아오면 보기 순서를 한 칸씩 돌려 자리 외우기를 막는다. */
- const n=q.choices.length,lap=q.lap||0;
- for(let k=0;k<n;k++){const i=(k+lap)%n,b=document.createElement('button');b.textContent=q.choices[i];b.dataset.i=String(i);b.onclick=()=>choose(i,b);list.append(b)}
+ /* 보기는 Questions.at()가 정한 순서 그대로(문제 번호·씨앗마다 섞이고 같은 정답 자리가 4번 넘게 이어지지 않음, 같은 문항이 돌아와도 순서가 바뀜). */
+ q.choices.forEach((c,i)=>{const b=document.createElement('button');b.textContent=c;b.dataset.i=String(i);b.onclick=()=>choose(i,b);list.append(b)});
  put($('prompt'),q.prompt);const P=$('passage'),big=!!q.passage&&[...q.passage].length<=(q.mode==='quiz'?14:6);P.className=big?'big':'';
  /* 상식·수학·영어의 큰 글은 띄어쓰기 묶음(🍪🍪🍪, −, 낱말) 단위로만 줄을 바꾼다. 세어야 하는 그림 묶음이 두 줄로 쪼개지지 않게. */
  if(big&&q.mode==='quiz'){P.textContent='';q.passage.split(' ').forEach((part,i)=>{if(i)P.append(' ');const s=document.createElement('span');s.className='grp';s.textContent=part;P.append(s)})}else put(P,q.passage||'');
