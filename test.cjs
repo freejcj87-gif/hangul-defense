@@ -2,7 +2,7 @@ const {chromium,webkit}=require('playwright');
 const assert=require('node:assert/strict'),http=require('node:http'),fs=require('node:fs'),path=require('node:path');
 const Questions=require('./questions.js'),Combat=require('./combat.js'),World=require('./world.js');
 const INTERIM=process.env.INTERIM_NO_3D_BUILD==='1',FULL_SHOTS=process.env.FULL_SHOTS==='1';
-const ONLY=process.env.ONLY||'',run=part=>!ONLY||ONLY.split(',').includes(part);/* ONLY=matrix,clock,feel,fallback,demo,flow,farm,stage,art 중 일부만 돌릴 때(개발용). CI는 전부 돌린다. */
+const ONLY=process.env.ONLY||'',run=part=>!ONLY||ONLY.split(',').includes(part);/* ONLY=matrix,clock,feel,fallback,demo,flow,farm,stage,art,testmode 중 일부만 돌릴 때(개발용). CI는 전부 돌린다. */
 /* 0.13: 아래 matrix·clock·feel·fallback·demo·flow 구간은 0.12 경제 회귀 검사라 주소에 flow=0을 붙여 연다(OLD). 흐르는 농장(기본 켬)은 맨 끝 farm 구간이 본다 */
 /* 0.14: 같은 까닭으로 그 구간들은 stages=0도 붙인다(단계를 끄면 0.13.2 화면·규칙 그대로라는 회귀 검사). 단계(기본 켬)는 맨 끝 stage 구간이 본다. farm 구간은 단계를 켠 채 돈다 */
 const OLD='/?flow=0&stages=0';Combat.FLAGS.FLOW=false;Combat.FLAGS.STAGES=false;Combat.FLAGS.ROUTES=false;/* 이 파일의 기대값 계산(Node 쪽 Combat)도 0.12 경제·단계 끔으로. farm·stage 구간은 상수만 읽는다 */
@@ -23,7 +23,7 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
  const output=path.join(__dirname,'.pages-build'),shots=path.join(__dirname,'test-results');
  const server=http.createServer((req,res)=>{
  const pathname=new URL(req.url,'http://localhost').pathname;
- const file=pathname==='/'?'index.html':['/combat.js','/world.js','/questions-gen.js','/questions.js','/village.js'].includes(pathname)?pathname.slice(1):pathname==='/art-handoff/coopnight/source-3d/models/environment-pack.glb'?pathname.slice(1):/^\/art-handoff\/coopnight\/browser\/[a-z/-]+[0-9a-z-]*\.png$/.test(pathname)?pathname.slice(1):/^\/art-handoff\/v015-v016\/(glb\/[a-z-]+\.glb|png\/[a-z-]+\.png)$/.test(pathname)?pathname.slice(1):null;
+ const file=pathname==='/'?'index.html':['/combat.js','/world.js','/questions-gen.js','/questions.js','/village.js','/testmode.js'].includes(pathname)?pathname.slice(1):pathname==='/art-handoff/coopnight/source-3d/models/environment-pack.glb'?pathname.slice(1):/^\/art-handoff\/coopnight\/browser\/[a-z/-]+[0-9a-z-]*\.png$/.test(pathname)?pathname.slice(1):/^\/art-handoff\/v015-v016\/(glb\/[a-z-]+\.glb|png\/[a-z-]+\.png)$/.test(pathname)?pathname.slice(1):null;
  if(!file||!fs.existsSync(path.join(output,file))){res.writeHead(404);return res.end()}
  res.setHeader('Content-Type',file.endsWith('.glb')?'model/gltf-binary':file.endsWith('.png')?'image/png':file.endsWith('.js')?'text/javascript; charset=utf-8':'text/html; charset=utf-8');
  res.end(fs.readFileSync(path.join(output,file)));
@@ -35,9 +35,9 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
 
  /* 화면에 나온 문제를 문제은행(Node 쪽 사본)과 대조한다. */
  async function shown(page){return page.locator('#answers').evaluate(n=>({qid:n.dataset.qid,age:Number(n.dataset.age),mode:n.dataset.mode,labels:[...n.children].map(b=>b.textContent),chip:document.getElementById('levelChip').textContent,prompt:document.getElementById('prompt').textContent,passage:document.getElementById('passage').textContent}))}
- /* 화면 문제 = 그 나이의 index번째(상식·수학·영어가 섞인 순서, Questions.at). mode는 언제나 'story'. 보기 순서는 바퀴(lap)마다 한 칸씩 돈다. */
+ /* 화면 문제 = 그 나이의 index번째(상식·수학·영어가 섞인 순서, Questions.at). mode는 언제나 'story'. 보기 순서는 at()가 정한 순서 그대로(2026-11-17부터 화면이 바퀴마다 돌리지 않음). */
  async function expectQuestion(page,age,mode,index,msg){
-  const s=await shown(page),seed=await page.evaluate(()=>window.__game().seed),q=Questions.at(age,mode,index,seed),n=q.choices.length,order=q.choices.map((_,k)=>q.choices[(k+(q.lap||0))%n]);
+  const s=await shown(page),seed=await page.evaluate(()=>window.__game().seed),q=Questions.at(age,mode,index,seed),order=q.choices.slice();
   eq(s.qid,q.id,msg+': question id');eq(s.age,age,msg+': age');eq(s.mode,q.mode,msg+': mode');eq(s.labels,order,msg+': choices');eq(s.prompt,q.prompt,msg+': prompt');eq(s.passage,q.passage||'',msg+': passage');
   if(q.mode==='quiz')ok(s.chip.startsWith(age+'세 · ')&&s.chip.endsWith(Questions.CATS[q.cat]),msg+': category chip '+s.chip);else{eq(s.chip,age+'세 · '+Questions.LEVELS[age][mode],msg+': level chip');eq(Questions.checkLevel(age,mode,q),[],msg+': level rules')}
   return q}
@@ -73,7 +73,8 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
  async function frames(page,n){const from=await page.evaluate(()=>window.VillageView.inspect().frames);await page.waitForFunction(t=>window.VillageView.inspect().frames>=t,from+n,{timeout:30000})}
  const beats=(page,n)=>page.evaluate(n=>new Promise(r=>{const goal=(window.__beats||0)+n;const f=()=>(window.__beats||0)>=goal?r():setTimeout(f,20);f()}),n);
  async function seed(page,s){await page.evaluate(s=>{Object.assign(state,s);state.round=null;save()},s);await page.reload();await ready(page)}
- const stored=page=>page.evaluate(k=>JSON.parse(localStorage.getItem(k)),KEY);
+ /* 0.14.2: 주소 stages=0(OLD)은 저장 열쇠가 따로('-stages0')라 페이지가 쓰는 열쇠(페이지 전역 KEY)를 읽는다 */
+ const stored=page=>page.evaluate(()=>JSON.parse(localStorage.getItem(KEY)));
  /* 이펙트는 1초 안팎으로 사라지므로, 생성되는 순간을 페이지 안에서 기록해 두고 읽는다. */
  const RECORD=()=>{window.__fx=[];document.addEventListener('DOMContentLoaded',()=>{const scene=document.getElementById('scene');new MutationObserver(m=>m.forEach(r=>r.addedNodes.forEach(n=>{if(!n.classList)return;if(n.classList.contains('sale')){window.__fx.push({c:'sale',t:n.textContent});return}if(n.classList.contains('paws')){window.__fx.push({c:'paws',t:n.dataset.point});return}if(!n.classList.contains('fx'))return;const e={c:[...n.classList].find(x=>x.startsWith('fx-')),t:n.textContent};if(e.c==='fx-label'){const w=n.offsetWidth/2,h=n.offsetHeight/2,x=parseFloat(n.style.left),y=parseFloat(n.style.top);e.inside=n.style.left.endsWith('px')&&x-w>=0&&x+w<=scene.clientWidth&&y-48-h>=0&&y+h<=scene.clientHeight;e.box=[Math.round(x-w),Math.round(x+w),Math.round(y),scene.clientWidth,scene.clientHeight]}window.__fx.push(e)}))).observe(document.getElementById('effects'),{childList:true})})};
  const fxLog=page=>page.evaluate(()=>window.__fx.splice(0));const names=f=>f.map(x=>x.c+':'+x.t);
@@ -250,7 +251,7 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
   }
   /* 다 자란 마을 */
   const smallHalf=three&&!INTERIM?(await page.evaluate(()=>window.VillageView.inspect())).cameraHalf:0;
-  await page.evaluate(()=>{localStorage.removeItem('hangul-defense-v1')});
+  await page.evaluate(()=>{localStorage.removeItem(KEY)});/* 페이지가 쓰는 열쇠(0.14.2: stages=0이면 '-stages0') */
   await seed(page,{gold:900,level:4,fence:4,chickens:8,farmers:2,pond:2,hall:3,feast:1,wins:40,index:5,age:8});await begin(page,{age:8},touch);
   await page.waitForFunction(()=>window.VillageView?.inspect().ready,{},{timeout:45000});
   await frames(page,40);
@@ -500,13 +501,14 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
 
   /* 체험 초기화: 체험 마을로 돌아가고, 원래 저장은 그대로 */
   {const {ctx,page,errors}=await open();await seed(page,{gold:777,wins:5,index:9,age:8});
-   await page.goto(url+'/?demo=2&flow=0&stages=0');await ready(page);const real=await page.evaluate(()=>localStorage.getItem('hangul-defense-v1'));
+   /* 0.14.2: 이 구간의 원래 저장은 OLD(stages=0) 주소의 열쇠 'hangul-defense-v1-stages0' */
+   await page.goto(url+'/?demo=2&flow=0&stages=0');await ready(page);const real=await page.evaluate(()=>localStorage.getItem('hangul-defense-v1-stages0'));ok(real&&JSON.parse(real).gold===777,'(the real save under the stages=0 key)');
    ok((await page.locator('header .demo-tag').textContent())==='체험: 마을회관 2단계','demo 2 label');
    await begin(page,{age:8},true);await answer(page,true,true);await phaseIs(page,'reward');await settle(page);
    let g=await game(page);ok(g.state.wins===1&&g.state.index===1&&g.state.gold!==450,'progress inside the demo');
    page.once('dialog',d=>d.accept());await page.locator('#drawerSummary').tap();await page.locator('#reset').tap();await phaseIs(page,'ask');
    g=await game(page);eq([g.state.hall,g.state.level,g.state.fence,g.state.chickens,g.state.farmers,g.state.power,g.state.gold,g.state.wins,g.state.index,g.world.radius],[2,3,4,6,1,1,450,0,0,13],'demo reset brings back the demo village');
-   eq(await page.evaluate(()=>localStorage.getItem('hangul-defense-v1')),real,'demo reset leaves the real save alone');eq((await page.evaluate(()=>JSON.parse(localStorage.getItem('hangul-defense-demo2')))).hall,2,'demo save after reset');
+   eq(await page.evaluate(()=>localStorage.getItem('hangul-defense-v1-stages0')),real,'demo reset leaves the real save alone');eq((await page.evaluate(()=>JSON.parse(localStorage.getItem('hangul-defense-demo2')))).hall,2,'demo save after reset');
    await page.goto(url+OLD);await ready(page);g=await game(page);eq([g.state.gold,g.state.wins,g.state.index],[777,5,9],'real progress intact outside the demo');eq(await page.locator('header .demo-tag').count(),0,'no demo label without ?demo');
    eq(errors,[],'flow demo reset page errors');await ctx.close()}
 
@@ -731,6 +733,18 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
    eq([g.stage.on,g.state.hall,g.world.radius,v.stage,v.roads,v.stageHouses,v.roadMarks,v.radius],[false,3,16,-1,'all',0,0,16],'stages=0: the 0.13.2 village');eq([c.nm,c.pr,c.stage],['회관','●●●',undefined],'stages=0: the 8th slot shows the hall dots');
    ok(!(await page.locator('#stageTag').isVisible()),'stages=0: no name tag');ok(!('stage' in (await stored(page)).world),'stages=0: no stage in the saved world');
    await shot(page.locator('.stage-card'),'stage-off');eq(errors,[],'stages=0 page errors');await ctx.close()}
+  /* 0.14.1 기준 화면 배치(기획서 §14.9): 노트북 실제 창 1366×640(높이 700 이하 규칙), 패드 가로 1180×820, 패드 세로 820×1180.
+     장면과 가게 2줄이 스크롤 없이 한 화면에 들고, 가로 넘침·겹침이 없고, 아이가 읽는 작은 글이 14px 이상, 패드 가로 문제 칸 안쪽이 370px 이상. 한 페이지에서 창 크기만 바꾼다 */
+  {const {ctx,page,errors}=await open({width:1366,height:640});await begin(page,{age:8},true);
+   for(const [width,height] of [[1366,640],[1180,820],[820,1180]]){
+    await page.setViewportSize({width,height});await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+    const tag='layout '+width+'x'+height,m=await page.evaluate(()=>{const slots=[...document.querySelectorAll('#shop .slot')].map(b=>b.getBoundingClientRect()),px=s=>parseFloat(getComputedStyle(document.querySelector(s)).fontSize),l=document.querySelector('.lesson'),c=getComputedStyle(l);
+     return {shopBottom:Math.round(Math.max(...slots.map(r=>r.bottom))),h:innerHeight,scene:Math.round(document.getElementById('scene').getBoundingClientRect().height),column:Math.round(l.clientWidth-parseFloat(c.paddingLeft)-parseFloat(c.paddingRight)),small:Math.min(px('.slot .nm'),px('.slot .pr'),px('.pill'),px('#stageTag'),px('#villageStatus'))}});
+    ok(m.shopBottom<=m.h&&m.scene>=300,tag+': the scene and both shop rows fit on one screen: '+JSON.stringify(m));
+    ok(await noOverflow(page),tag+': no horizontal overflow');ok(await shopFits(page),tag+': shop fits');ok(await pillsFit(page),tag+': pills fit');
+    ok(m.small>=14,tag+': the small text the child reads is 14px or more: '+m.small);
+    if(width===1180)ok(m.column>=370,tag+': the question column holds a sentence a line like the laptop: '+m.column)}
+   eq(errors,[],'layout page errors');await ctx.close()}
  }}finally{await stageBrowser.close()}
  /* ---------- 0.15 새 아트(art-handoff/v015-v016, 계획서 §2·§10-6): 모델마다 따로 불러와 하나가 실패해도 3D는 그대로이고 그 모델만 0.14 모습,
     주소 ?art15=0이면 아예 불러오지 않는다. 모두 3D 장면이 처음 보이기 전에 정해진다(늦게 모델이 바뀌지 않음) ---------- */
@@ -773,6 +787,44 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
    v=await insp(page);ok(v.fox&&v.fox.state==='come'&&v.wolfKinds.fox===1&&!v.king,'art15 '+label+': the thief fox is drawn: '+JSON.stringify([v.fox,v.wolfKinds]));
    await shot(page.locator('.scene'),'art15-'+label+'-fox');eq(errors,[],'art15 '+label+' finale page errors');await ctx.close()}
  }}finally{await artBrowser.close()}
+ /* ===== 0.14.1 프로듀서 테스트 모드(?test=1, testmode.js): test=1이 없으면 막대도 파일 요청도 없음 · 세 기준 화면(노트북 1366×768, 패드 1180×820 · 820×1180)에서
+    막대가 화면 아래에 있고 가게·보기와 겹치지 않음 · 다음 ▶ = 여러 프레임 빨리 감기 뒤 정답(게임이 그 시간에 푼 답으로 매김) · 틀리기 · 저장 분리.
+    3D와 무관해 GLB를 막아 그림 화면으로 돌린다. 움직임 줄이기(보기 맞춤 스크롤이 즉시)로 연다 ===== */
+ const tmBrowser=await chromium.launch({headless:true,args:SWIFT});
+ try{if(run('testmode')){
+  const open=async(q,w,h)=>{const ctx=await tmBrowser.newContext({viewport:{width:w,height:h},hasTouch:true,reducedMotion:'reduce'});await ctx.addInitScript(HOLD);await ctx.addInitScript(FAKE_TTS);
+   const page=await ctx.newPage(),errors=[],reqs=[];page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>reqs.push(new URL(r.url()).pathname));await page.route('**/environment-pack.glb',r=>r.abort());
+   await page.goto(url+q);await ready(page);if(q.includes('test=1'))await page.waitForFunction(()=>!!window.__testmode,{},{timeout:20000});return {ctx,page,errors,reqs}};
+  {const {ctx,page,errors,reqs}=await open('/',1366,768);
+   eq([await page.locator('#testBar').count(),await page.evaluate(()=>typeof window.__testmode),await page.locator('header small').textContent()],[0,'undefined','한글 디펜스 · 늑대가 오기 전에 읽어요 0.15'],'no test=1: no test bar, no hook, plain header');
+   ok(!reqs.includes('/testmode.js'),'no test=1: testmode.js is not even requested');eq(errors,[],'no test=1 page errors');await ctx.close()}
+  for(const [w,h] of [[1366,768],[1180,820],[820,1180]]){const tag='test mode '+w+'x'+h;
+   const {ctx,page,errors}=await open('/?test=1',w,h);
+   ok(await page.locator('#testBar').isVisible()&&(await page.locator('header .tm-head').textContent())==='🧪 테스트 모드',tag+': bar and header tag on the start screen');
+   await page.locator('#tmNext').click();await phaseIs(page,'ask');await page.evaluate(()=>{const g=window.__game();if(g.round.lock>0)window.__tick(g.round.lock)});
+   const b=await page.evaluate(()=>{const perfText=window.__testmode.perfNow(),r=id=>{const x=document.getElementById(id).getBoundingClientRect();return {top:x.top,bottom:x.bottom,left:x.left,right:x.right}};
+    return {bar:r('testBar'),shop:r('shopWrap'),answers:r('answers'),next:r('tmNext'),wrong:r('tmWrong'),perf:r('tmPerf'),perfText,h:innerHeight,w:innerWidth,sw:document.documentElement.scrollWidth}});
+   const apart=(p,q)=>p.right<=q.left+.5||q.right<=p.left+.5||p.bottom<=q.top+.5||q.bottom<=p.top+.5;
+   ok(b.perf.bottom<=b.bar.top+.5&&b.perf.left>=0&&b.perf.right<=b.w+.5&&apart(b.perf,b.shop)&&apart(b.perf,b.answers),tag+': performance chip above the bar, clear of the shop and answers');
+   ok(/^🎞 .+fps · 그림 화면 · 🏡 농가$/.test(b.perfText),tag+': performance chip (GLB blocked = picture view) '+b.perfText);
+   ok(b.bar.bottom<=b.h+.5&&b.bar.top>=b.h-80&&b.bar.left<=.5&&b.bar.right>=b.w-.5,tag+': one strip along the bottom (top '+Math.round(b.bar.top)+')');
+   ok(b.next.right<=b.w+.5&&b.next.bottom<=b.h+.5&&b.next.right-b.next.left>=100&&b.next.bottom-b.next.top>=44,tag+': next button at the bottom right, big enough');
+   ok(b.shop.bottom<=b.bar.top+.5,tag+': shop above the bar ('+Math.round(b.shop.bottom)+' <= '+Math.round(b.bar.top)+')');ok(b.answers.bottom<=b.bar.top+.5,tag+': answers above the bar ('+Math.round(b.answers.bottom)+')');
+   ok(b.sw<=b.w,tag+': no horizontal overflow');await shot(page,'testmode-'+w+'x'+h);eq(errors,[],tag+' page errors');await ctx.close()}
+  {const {ctx,page,errors}=await open('/?test=1',1366,768);await page.locator('#tmNext').click();await phaseIs(page,'ask');
+   const p0=await page.evaluate(()=>({...window.__testmode.plan(),need:Combat.needSeconds(round.q),lock:Math.max(3,Combat.reveal(round.q)),w:world.t}));
+   eq(p0.target,Math.max(p0.lock+4,Math.round(p0.need*10)),'test mode: reading time = max(lock + 0.4 s, need)');
+   await page.locator('#tmNext').click();const s=await page.evaluate(()=>{window.__testmode.frame();return {t:round.t,phase,w:world.t,job:!!window.__testmode.job,next:document.getElementById('tmNext').disabled}});
+   ok(s.job&&s.next&&s.phase==='ask'&&s.t>p0.t&&s.t<p0.target&&s.w>p0.w,'test mode: fast-forward runs over several frames, the world moves ('+s.t+'/'+p0.target+')');
+   const n=1+await page.evaluate(()=>window.__testmode.drain());const r=await page.evaluate(()=>({phase,last:window.__testmode.last,guard:round.info.guard,pace:state.pace,bar:document.getElementById('tmLast').textContent}));
+   eq([r.phase,r.last.t,r.last.result,r.guard],['reward',p0.target,'first',1],'test mode: next = answered at the reading time, no fast-answer penalty');ok(n>1&&n<=56&&r.bar.includes('감점 없음'),'test mode: '+n+' frames, bar says no penalty');
+   await page.evaluate(()=>{window.__testmode.next();window.__testmode.drain()});await phaseIs(page,'ask');
+   await page.locator('#tmWrong').click();await page.evaluate(()=>window.__testmode.drain());let g=await game(page);eq([g.phase,g.round.tries,g.state.streak],['ask',1,0],'test mode: wrong button picks a wrong choice after the reading time');
+   await page.locator('#tmNext').click();await page.evaluate(()=>window.__testmode.drain());g=await game(page);eq([g.phase,g.round.result],['learn','second'],'test mode: second try then learn');
+   await page.locator('#tmNext').click();await page.evaluate(()=>window.__testmode.drain());eq((await game(page)).phase,'ask','test mode: next leaves the learn step');
+   await page.evaluate(()=>save());eq(await page.evaluate(()=>localStorage.getItem('hangul-defense-v1')),null,'test mode never writes the child save');ok(await page.evaluate(()=>!!localStorage.getItem('hangul-defense-v1-test')),'test mode has its own save');
+   eq(errors,[],'test mode page errors');await ctx.close()}
+ }}finally{await tmBrowser.close()}
  console.log((ONLY?'PARTIAL('+ONLY+') ':'')+'PASS '+checks+' browser assertions (Chromium/WebKit, desktop + mobile emulation, held clock + one real-clock run). Physical audio/device validation remains manual.');
  }finally{server.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});
