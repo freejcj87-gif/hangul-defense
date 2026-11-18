@@ -4,8 +4,10 @@
   "description": "꼬꼬마을 Android 껍데기(Capacitor). 게임은 저장소 루트의 웹 파일이고, 이 폴더는 앱 포장만 맡는다.",
   "scripts": {
     "web": "node scripts/prepare-web.cjs",
-    "sync": "node scripts/prepare-web.cjs && cap sync android",
-    "check": "node scripts/version.cjs --self-test"
+    "sync": "node scripts/sync.cjs",
+    "sync:qa": "node scripts/sync.cjs --qa",
+    "check": "node scripts/version.cjs --self-test",
+    "test:shell": "node scripts/test-shell.cjs"
   },
   "dependencies": {
     "@capacitor/android": "8.6.2",

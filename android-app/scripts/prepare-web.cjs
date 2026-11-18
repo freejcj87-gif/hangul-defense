@@ -46,7 +46,14 @@ require('esbuild').buildSync({
   outfile: path.join(www, 'app-shell.js'),
 });
 
-for (const file of ['index.html', 'village.js', 'combat.js', 'world.js', 'questions.js', 'questions-gen.js', 'app-shell.js', 'art-handoff/coopnight/source-3d/models/environment-pack.glb']) {
+/* WebView가 capacitor.config.json의 android.minWebViewVersion(108)보다 낮거나 첫 화면을 못 불러올 때 Capacitor가 여는 화면(server.errorPath).
+   108 근거: 게임 화면 배치가 100svh(Chrome 108)·CSS translate/scale 속성(104)·:has()(105)를 쓴다. 오래된 엔진에서도 보이게 기본 CSS만 쓴다. */
+fs.writeFileSync(path.join(www, 'webview-old.html'), '<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>꼬꼬마을</title>'
+  + '<style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#253e34;color:#fff9df;font-family:sans-serif;text-align:center;padding:24px;box-sizing:border-box}div{max-width:560px;line-height:1.6}h1{font-size:22px}p{font-size:16px;color:#e8efd9}</style></head>'
+  + '<body><div><h1>꼬꼬마을을 열지 못했어요</h1><p>보호자께: 이 기기의 화면 엔진(Android System WebView)이 오래되었거나 화면을 불러오지 못했어요.</p>'
+  + '<p>Play 스토어에서 \'Android System WebView\'와 \'Chrome\'을 업데이트한 뒤 앱을 다시 열어 주세요.</p></div></body></html>\n');
+
+for (const file of ['index.html', 'village.js', 'combat.js', 'world.js', 'questions.js', 'questions-gen.js', 'app-shell.js', 'webview-old.html', 'art-handoff/coopnight/source-3d/models/environment-pack.glb']) {
   assert(fs.statSync(path.join(www, file)).isFile(), '앱 묶음에 없는 파일: ' + file);
 }
 for (const file of WEB_ONLY) assert(!fs.existsSync(path.join(www, file)), '웹 전용 파일이 앱 묶음에 들어갔어요: ' + file);

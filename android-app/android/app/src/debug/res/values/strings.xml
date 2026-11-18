@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='utf-8'?>
+<!-- QA 빌드(디버그 APK)만의 이름. 출시 앱(src/main)과 나란히 설치되므로 런처에서 구분되게 한다. -->
+<resources>
+    <string name="app_name">꼬꼬마을 QA</string>
+    <string name="title_activity_main">꼬꼬마을 QA</string>
+</resources>

@@ -4,12 +4,13 @@
   "webDir": "www",
   "server": {
     "androidScheme": "https",
-    "hostname": "localhost"
+    "hostname": "localhost",
+    "errorPath": "webview-old.html"
   },
   "android": {
     "backgroundColor": "#253e34",
     "allowMixedContent": false,
-    "webContentsDebuggingEnabled": false
+    "minWebViewVersion": 108
   },
   "plugins": {
     "SystemBars": {

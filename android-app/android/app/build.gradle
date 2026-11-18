@@ -45,6 +45,12 @@ android {
         }
     }
     buildTypes {
+        debug {
+            // QA 빌드: 출시 앱과 나란히 설치되도록 패키지 이름 뒤에 .qa(저장도 따로), 이름은 src/debug/res의 '꼬꼬마을 QA'.
+            // 디버그 빌드라 WebView 원격 디버깅(chrome://inspect)이 자동으로 켜진다. 시작 주소 ?test=1은 npm run sync:qa가 넣는다.
+            applicationIdSuffix '.qa'
+            versionNameSuffix '-qa'
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'

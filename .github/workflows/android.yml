@@ -1,7 +1,8 @@
 name: Build Android app
-# 꼬꼬마을 Android 껍데기(Capacitor, android-app/)로 디버그 APK와 release AAB를 만든다. 웹 배포(pages.yml)와는 따로 돈다.
-# 서명: 저장소 Secrets 4개(ANDROID_UPLOAD_KEYSTORE_BASE64, ANDROID_UPLOAD_STORE_PASSWORD, ANDROID_UPLOAD_KEY_ALIAS, ANDROID_UPLOAD_KEY_PASSWORD)가
-#       모두 있을 때만 AAB를 업로드 키로 서명한다. 없으면 서명 안 된 AAB(Play에는 못 올림)와 디버그 APK만 나온다.
+# 꼬꼬마을 Android 껍데기(Capacitor, android-app/)로 QA용 디버그 APK와 출시용 release AAB를 만든다. 웹 배포(pages.yml)와는 따로 돈다.
+# QA APK: 패키지 ...hanguldefense.qa, 이름 '꼬꼬마을 QA', 시작 주소 ?test=1, WebView 원격 디버깅 켜짐(디버그 빌드). 출시 앱과 나란히 설치된다.
+# 출시 AAB: 시작 주소 /, 원격 디버깅 꺼짐. 저장소 Secrets 4개(ANDROID_UPLOAD_KEYSTORE_BASE64, ANDROID_UPLOAD_STORE_PASSWORD,
+#           ANDROID_UPLOAD_KEY_ALIAS, ANDROID_UPLOAD_KEY_PASSWORD)가 모두 있을 때만 업로드 키로 서명한다. 없으면 서명 안 된 AAB(Play에는 못 올림).
 # 버전: android-app/scripts/version.cjs(게임 버전 index.html ?v= → versionCode·versionName). 같은 게임 버전을 다시 올릴 때만 build_number를 올린다.
 on:
   workflow_dispatch:
@@ -37,7 +38,7 @@ concurrency:
 jobs:
   android:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 40
     env:
       HD_BUILD_NUMBER: ${{ github.event.inputs.build_number || '0' }}
     steps:
@@ -59,23 +60,6 @@ jobs:
       - name: Version rule self-test
         working-directory: android-app
         run: npm run check
-      - name: Package the web game into the app
-        working-directory: android-app
-        run: npm run sync
-      - name: App shell behaviour (simulated bridge)
-        working-directory: android-app
-        run: node scripts/test-shell.cjs
-      - name: Check packaged web assets
-        run: |
-          public=android-app/android/app/src/main/assets/public
-          test -f "$public/index.html"
-          grep -q 'app-shell.js' "$public/index.html"
-          if grep -q 'viewport-fit=cover' "$public/index.html"; then echo 'viewport-fit=cover should be removed in the app copy'; exit 1; fi
-          test -f "$public/village.js"
-          test -f "$public/art-handoff/coopnight/source-3d/models/environment-pack.glb"
-          test ! -e "$public/robots.txt"
-          cat android-app/android/app/hd-version.properties
-          du -sh "$public"
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -83,7 +67,40 @@ jobs:
           cache: gradle
       - name: Android SDK platform 36
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" > /dev/null
-      - name: Restore upload key (only when secrets exist)
+
+      - name: QA - package the web game (start ?test=1)
+        working-directory: android-app
+        run: npm run sync:qa
+      - name: QA - app shell behaviour (simulated bridge)
+        working-directory: android-app
+        run: npm run test:shell
+      - name: QA - check start path
+        run: grep -q '"appStartPath": "/?test=1"' android-app/android/app/src/main/assets/capacitor.config.json
+      - name: QA - build debug APK
+        working-directory: android-app/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Release - package the web game
+        working-directory: android-app
+        run: npm run sync
+      - name: Release - check packaged web assets
+        run: |
+          public=android-app/android/app/src/main/assets/public
+          config=android-app/android/app/src/main/assets/capacitor.config.json
+          test -f "$public/index.html"
+          grep -q 'app-shell.js' "$public/index.html"
+          if grep -q 'viewport-fit=cover' "$public/index.html"; then echo 'viewport-fit=cover should be removed in the app copy'; exit 1; fi
+          if grep -q 'appStartPath' "$config"; then echo 'release config must not have appStartPath'; exit 1; fi
+          if grep -q 'webContentsDebuggingEnabled' "$config"; then echo 'leave webContentsDebuggingEnabled unset (debug-only default)'; exit 1; fi
+          test -f "$public/village.js"
+          test -f "$public/webview-old.html"
+          test -f "$public/art-handoff/coopnight/source-3d/models/environment-pack.glb"
+          test ! -e "$public/robots.txt"
+          cat android-app/android/app/hd-version.properties
+          du -sh "$public"
+      - name: Release - restore upload key (only when secrets exist)
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
         run: |
@@ -94,15 +111,13 @@ jobs:
           else
             echo 'Signing: no upload key secret, release AAB stays unsigned (cannot be uploaded to Play).'
           fi
-      - name: Build debug APK and release AAB
+      - name: Release - build AAB
         working-directory: android-app/android
         env:
           HD_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}
           HD_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
           HD_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
-        run: |
-          chmod +x gradlew
-          ./gradlew --no-daemon assembleDebug bundleRelease
+        run: ./gradlew --no-daemon bundleRelease
       - name: Remove upload key file
         if: always()
         run: rm -f "$RUNNER_TEMP/upload.jks"
