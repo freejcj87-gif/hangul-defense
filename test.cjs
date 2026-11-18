@@ -676,7 +676,7 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
    const page=await ctx.newPage(),errors=[],reqs=[];page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>reqs.push(new URL(r.url()).pathname));await page.route('**/environment-pack.glb',r=>r.abort());
    await page.goto(url+q);await ready(page);if(q.includes('test=1'))await page.waitForFunction(()=>!!window.__testmode,{},{timeout:20000});return {ctx,page,errors,reqs}};
   {const {ctx,page,errors,reqs}=await open('/',1366,768);
-   eq([await page.locator('#testBar').count(),await page.evaluate(()=>typeof window.__testmode),await page.locator('header small').textContent()],[0,'undefined','한글 디펜스 · 늑대가 오기 전에 읽어요 0.14.2'],'no test=1: no test bar, no hook, plain header');
+   eq([await page.locator('#testBar').count(),await page.evaluate(()=>typeof window.__testmode),await page.locator('header small').textContent()],[0,'undefined','한글 디펜스 · 늑대가 오기 전에 읽어요 0.14.3'],'no test=1: no test bar, no hook, plain header');
    ok(!reqs.includes('/testmode.js'),'no test=1: testmode.js is not even requested');eq(errors,[],'no test=1 page errors');await ctx.close()}
   for(const [w,h] of [[1366,768],[1180,820],[820,1180]]){const tag='test mode '+w+'x'+h;
    const {ctx,page,errors}=await open('/?test=1',w,h);

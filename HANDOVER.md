@@ -1,6 +1,6 @@
 # Claude Code 작업 인계
 
-기준일: 2026-11-17. 지금 작업은 0.14(보이는 단계 6개 · 넓어지는 영역 · 길, 브랜치 `claude/v014-stages`, worktree `work\claude-v013`)이고 아래 "실제 규칙과 한계 → 0.14"와 "확인된 검증과 배포 → 0.14"가 최신입니다. 그 뒤 문장은 2026-11-13 기준입니다. 0.12(엔딩·경제 개편, 브랜치 `claude/ending-economy`, worktree `work\claude-v012-ending`) 기준으로 갱신했습니다. 0.11은 듣고 고르기 폐쇄·읽어 주기 삭제(브랜치 `claude/no-sound`)입니다. 0.9는 상점·알 경제(브랜치 `claude/shop-economy`)입니다. 0.8은 PR #9(main `4700136`), 0.7은 PR #7(main `08e8ec7`)입니다. 0.6은 PR #5(main `d8d95f5`), 0.5는 [PR #3](https://github.com/freejcj87-gif/hangul-defense/pull/3)(main `965ad4e`)입니다. 0.4 인계 시점의 기록은 main `800f3f9` 기준이며 아래 “확인된 검증과 배포”에 그대로 남겼습니다. 문서 커밋 자체는 이후 이력에서 확인하세요.
+기준일: 2026-11-18. 최신은 0.14.3 문제은행 확장(브랜치 `claude/bank-expand`, 새 문항 852개, 문제은행 판 `state.bank`, 정본 기획서 §14.12, 이 문서 맨 끝 절)입니다. 그 앞 기록: 지금 작업은 0.14(보이는 단계 6개 · 넓어지는 영역 · 길, 브랜치 `claude/v014-stages`, worktree `work\claude-v013`)이고 아래 "실제 규칙과 한계 → 0.14"와 "확인된 검증과 배포 → 0.14"가 최신입니다. 그 뒤 문장은 2026-11-13 기준입니다. 0.12(엔딩·경제 개편, 브랜치 `claude/ending-economy`, worktree `work\claude-v012-ending`) 기준으로 갱신했습니다. 0.11은 듣고 고르기 폐쇄·읽어 주기 삭제(브랜치 `claude/no-sound`)입니다. 0.9는 상점·알 경제(브랜치 `claude/shop-economy`)입니다. 0.8은 PR #9(main `4700136`), 0.7은 PR #7(main `08e8ec7`)입니다. 0.6은 PR #5(main `d8d95f5`), 0.5는 [PR #3](https://github.com/freejcj87-gif/hangul-defense/pull/3)(main `965ad4e`)입니다. 0.4 인계 시점의 기록은 main `800f3f9` 기준이며 아래 “확인된 검증과 배포”에 그대로 남겼습니다. 문서 커밋 자체는 이후 이력에서 확인하세요.
 
 ## 먼저 알아야 할 것
 
