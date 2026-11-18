@@ -96,6 +96,7 @@ jobs:
           if grep -q 'webContentsDebuggingEnabled' "$config"; then echo 'leave webContentsDebuggingEnabled unset (debug-only default)'; exit 1; fi
           test -f "$public/village.js"
           test -f "$public/webview-old.html"
+          test -f "$public/oss-licenses.html"
           test -f "$public/art-handoff/coopnight/source-3d/models/environment-pack.glb"
           test ! -e "$public/robots.txt"
           cat android-app/android/app/hd-version.properties
@@ -121,6 +122,18 @@ jobs:
       - name: Remove upload key file
         if: always()
         run: rm -f "$RUNNER_TEMP/upload.jks"
+      - name: Policy report (dependencies, merged permissions, native libraries)
+        working-directory: android-app/android
+        run: |
+          ./gradlew --no-daemon -q app:dependencies --configuration releaseRuntimeClasspath > "$RUNNER_TEMP/release-dependencies.txt"
+          if grep -Ei 'firebase|play-services-ads|play-services-measurement|crashlytics|com\.google\.android\.gms' "$RUNNER_TEMP/release-dependencies.txt"; then echo 'Blocked library found (kids app: no analytics, ads, Firebase)'; exit 1; fi
+          merged=$(find app/build/intermediates -path '*release*' -name AndroidManifest.xml | head -n 1)
+          echo "Merged manifest: $merged"
+          grep -o 'uses-permission[^>]*' "$merged" | sort -u | tee "$RUNNER_TEMP/release-permissions.txt"
+          if grep -Ei 'AD_ID|LOCATION|READ_PHONE|CONTACTS|CAMERA|RECORD_AUDIO' "$RUNNER_TEMP/release-permissions.txt"; then echo 'Blocked permission found'; exit 1; fi
+          echo 'Native libraries in AAB (16KB page size matters only if any are listed):'
+          unzip -l app/build/outputs/bundle/release/*.aab | grep '\.so$' || echo 'none'
+          cp "$RUNNER_TEMP/release-dependencies.txt" "$RUNNER_TEMP/release-permissions.txt" app/build/outputs/
       - name: List outputs
         run: ls -la android-app/android/app/build/outputs/apk/debug/ android-app/android/app/build/outputs/bundle/release/
       - uses: actions/upload-artifact@v4
@@ -130,5 +143,6 @@ jobs:
             android-app/android/app/build/outputs/apk/debug/*.apk
             android-app/android/app/build/outputs/bundle/release/*.aab
             android-app/android/app/hd-version.properties
+            android-app/android/app/build/outputs/release-*.txt
           retention-days: 14
           if-no-files-found: error

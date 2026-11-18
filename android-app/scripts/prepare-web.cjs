@@ -53,7 +53,22 @@ fs.writeFileSync(path.join(www, 'webview-old.html'), '<!doctype html><html lang=
   + '<body><div><h1>꼬꼬마을을 열지 못했어요</h1><p>보호자께: 이 기기의 화면 엔진(Android System WebView)이 오래되었거나 화면을 불러오지 못했어요.</p>'
   + '<p>Play 스토어에서 \'Android System WebView\'와 \'Chrome\'을 업데이트한 뒤 앱을 다시 열어 주세요.</p></div></body></html>\n');
 
-for (const file of ['index.html', 'village.js', 'combat.js', 'world.js', 'questions.js', 'questions-gen.js', 'app-shell.js', 'webview-old.html', 'art-handoff/coopnight/source-3d/models/environment-pack.glb']) {
+/* 오픈소스 고지(정책 04 문서 §2.1): 앱 안 오프라인 화면 oss-licenses.html. 보호자 화면에서 이 파일로 가는 줄은 게임 쪽(보호자 화면)이 붙인다.
+   AndroidX 등 Gradle 의존성은 Apache-2.0 전문 한 벌로 고지한다(정확한 의존성 목록은 CI 빌드 뒤 확인: launch\android\02 문서). */
+const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const lic = (...p) => fs.readFileSync(path.join(...p), 'utf8').trim();
+const notices = [
+  ['three.js 0.180.0 (MIT)', lic(repo, 'node_modules', 'three', 'LICENSE')],
+  ['Capacitor: @capacitor/core, @capacitor/android ' + require('@capacitor/core/package.json').version + ' (MIT)', lic(appRoot, 'node_modules', '@capacitor', 'core', 'LICENSE')],
+  ['@capacitor/app ' + require('@capacitor/app/package.json').version + ' (MIT)', lic(appRoot, 'node_modules', '@capacitor', 'app', 'LICENSE')],
+  ['AndroidX (AppCompat, Activity, Core, CoordinatorLayout, Fragment, SplashScreen, WebKit), Apache Cordova Android (Apache License 2.0)', lic(appRoot, 'shell', 'licenses', 'Apache-2.0.txt')],
+];
+fs.writeFileSync(path.join(www, 'oss-licenses.html'), '<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>오픈소스 고지 · 꼬꼬마을</title>'
+  + '<style>body{margin:0;padding:20px;background:#fff9e9;color:#294235;font-family:system-ui,sans-serif;line-height:1.5}h1{font-size:22px}h2{font-size:16px;margin-top:28px}pre{white-space:pre-wrap;word-break:break-word;font-size:12px;background:#fff;border:1px solid #e6d9b8;border-radius:10px;padding:12px}a{display:inline-block;padding:10px 16px;border:1px solid #d8c89e;border-radius:12px;background:#f3e8c9;color:inherit;text-decoration:none;font-weight:700}</style></head>'
+  + '<body><a href="index.html">← 게임으로</a><h1>오픈소스 고지</h1><p>꼬꼬마을은 아래 오픈소스 소프트웨어를 사용합니다.</p>'
+  + notices.map(([name, text]) => '<h2>' + esc(name) + '</h2><pre>' + esc(text) + '</pre>').join('') + '</body></html>\n');
+
+for (const file of ['index.html', 'village.js', 'combat.js', 'world.js', 'questions.js', 'questions-gen.js', 'app-shell.js', 'webview-old.html', 'oss-licenses.html','art-handoff/coopnight/source-3d/models/environment-pack.glb']) {
   assert(fs.statSync(path.join(www, file)).isFile(), '앱 묶음에 없는 파일: ' + file);
 }
 for (const file of WEB_ONLY) assert(!fs.existsSync(path.join(www, file)), '웹 전용 파일이 앱 묶음에 들어갔어요: ' + file);

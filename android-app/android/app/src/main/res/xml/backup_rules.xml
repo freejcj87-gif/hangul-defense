@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 안드로이드 자동 백업 규칙(Android 11 이하 기기). 내용은 data_extraction_rules.xml과 같게 유지한다(설명은 그 파일). -->
+<!-- 안드로이드 자동 백업 규칙(Android 11 이하 기기). 내용은 data_extraction_rules.xml과 같게 유지한다(설명은 그 파일).
+     정책 03 문서 D5: requireFlags="clientSideEncryption"로 암호화될 때만 백업한다(Android 9 이상 + 화면 잠금). Android 8.1 이하는 백업되지 않는다. -->
 <full-backup-content>
-    <include domain="root" path="app_webview/" />
-    <include domain="sharedpref" path="." />
+    <include domain="root" path="app_webview/" requireFlags="clientSideEncryption" />
+    <include domain="sharedpref" path="." requireFlags="clientSideEncryption" />
     <exclude domain="root" path="app_webview/Default/GPUCache/" />
     <exclude domain="root" path="app_webview/Default/Service Worker/" />
     <exclude domain="root" path="app_webview/Default/Session Storage/" />

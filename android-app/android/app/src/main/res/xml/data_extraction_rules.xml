@@ -5,7 +5,8 @@
      localStorage의 정확한 하위 경로(app_webview/Default/Local Storage/)는 공식 문서가 아니어서 app_webview/ 전체를 넣고
      캐시성 폴더만 뺀다(백업 용량을 작게 유지). 백업이 실제로 되는지는 기기에서 bmgr로 확인한다(launch\android\02 문서). -->
 <data-extraction-rules>
-    <cloud-backup>
+    <!-- 정책 03 문서 D5: 암호화할 수 있는 기기(화면 잠금)에서만 클라우드 백업. 기기 간 옮기기는 서버를 거치지 않아 그대로 된다. -->
+    <cloud-backup disableIfNoEncryptionCapabilities="true">
         <include domain="root" path="app_webview/" />
         <include domain="sharedpref" path="." />
         <exclude domain="root" path="app_webview/Default/GPUCache/" />
