@@ -55,7 +55,22 @@
 
 ## 실제 규칙과 한계
 
-### 0.14 (현재)
+### 0.15 (현재)
+
+강 · 다리 · 물레방아와 늑대 왕 · 도둑 여우 새 모델입니다(브랜치 `claude/v015-river`, worktree `work\claude-v013`, main 0.14 `11fca3c` 기준). 정본은 [docs/game-plan.md](docs/game-plan.md) §15, 구현 계획서는 저장소 밖 `work\verification-20261113\design\v015-plan.md`, 커밋별 기록은 [docs/v015-progress.md](docs/v015-progress.md)입니다. 병합 · 배포 전입니다.
+
+- 프로듀서 결정('26.11.17): 물레방아는 물레방아 마을이 되면 저절로 서고 한 번에 맞힌 정답에만 바퀴가 돈다(금화 없음). 다리 길(6번, 화면 위) 늑대는 다리로 한 줄로 온다(`FLAGS.BRIDGE`, 시뮬 통과).
+- 아트: `art-handoff/v015-v016/`(원본 `outputs\art-v015-v016-20261117`을 그대로 복사, test-dom이 SHA-256을 manifest와 대조). 배포 묶음은 물레방아 · 다리 · 늑대 왕 · 도둑 여우 GLB · PNG 4쌍(`scripts/build-pages.cjs` `art15`). 소스에 적은 아트 경로가 묶음에 없으면 빌드가 멈춘다. 0.16 아트(성 · 성벽 · 성문 · 성탑)는 저장소에만 있다.
+- 규칙(`combat.js` · `world.js`): `FLAGS.RIVER`(그림) · `FLAGS.BRIDGE`(규칙), `World.BRIDGE` · `bridgeAt`. 단계 3 이상 6번 길 출현 각도 흔들림만 ±0.03rad, 난수 호출 수 그대로. 끄면 0.14와 한 글자도 다르지 않다(시뮬 끔 = 0.14 최종).
+- 화면(`index.html`): 주소 `?river=0`(둘 다 끔) · `?bridge=0`(규칙만), `rivered()`, `getVillageState().river · bridge`, 단계 3 띠 알림 한 줄. 그림 화면: `drawRiver`(강 띠 · 다리 · 물레방아), `drawStageArt`(열린 길 · 단계별 집), `wolfLook`(왕 · 여우 새 그림, 실패하면 0.14 그림), 모두 그림 화면에서만. `FALLBACK_RIVER` · `FALLBACK_COTTAGES`는 `layout.js`와 test-dom이 대조.
+- 3D(`src/geo.js` · `src/layout.js` · `src/props.js` · `src/monsters.js` · `src/village.js`): `prep`이 glTF `COLOR_0`를 씀, `loadArt15()`(파일마다 실패 허용, `?art15=0`), 늑대 왕 · 여우 GLB를 리그 한 장으로(`setRig`), `RIVER` · `bridgeSpot` · `deckY` · `millRace` · `MILL`(0.14 자리 `MILL0`), `riverGeometry` · `stageProps(…,{river})`, 강 메시 · 바퀴 배우 · 숲 비키기 · `riverLift`(시야 위로) · `millKick` · `riverStep`(다리 위 높이 · 물보라 · 누적 카운터). `inspect()`에 `art15` · `monsterArt` · `river` · `mill`.
+- 시뮬: `scripts/sim-flow.cjs` 맨 끝 두 열(20분까지 울타리 면별 부서짐, 다리 길 유입 %). 0.14 기준선은 `'{"FLAGS":{"BRIDGE":false}}'`.
+- 검사: test-dom S-9(손잡이 · 세계 · 배치 · 그림 화면 수 · 띠 알림)와 "0.15 아트 들여오기" 절, test.cjs `art` 구간(로더 · 실패 · 왕 · 여우)과 `stage` 구간의 강 덩어리(둘러보기 · 기준 화면 3개 × 단계 3 · 5 · 바퀴 · 다리 건너기 · 전환 · `?river=0` · `?art15=0` · 그림 화면).
+- 결정적 시계: 바퀴 · 물결 · 강이 흘러드는 연출 · 다리 높이 · 물보라는 화면 시계로만. 검사는 `debug({hold})` + `advance`와 누적 카운터(`river.bridged · waded · wadedIn · splashes`, `mill.kicks · turns`)로 본다.
+- 계획서와 다른 점: 강 방향 280°(284°는 성 단계 7번 길 낙오 늑대가 물에 닿음), 시야 위로 기울임을 세 기준 화면 모두에, 물보라 따로 예산, 왕 · 여우는 GLB 원래 크기.
+- 남은 것 · 한계(§15.8): 4번 면 쏠림(고친 시뮬로 8세 3개씩 +20%, 전체 +1%), 돌아가는 늑대 · 성 단계 7번 길 큰 무리 꼬리는 물을 건넘(물보라), 패드 세로 좌우 길 늑대가 늦게 보임(화면을 25% 더 물려야 해 그대로), 실기기 · 실제 아이 확인 없음.
+
+### 0.14 (참고)
 
 보이는 단계 6개 · 넓어지는 영역 · 길입니다(브랜치 `claude/v014-stages`, worktree `work\claude-v013`, main 0.13.2 `b5c9ae5` 기준). 정본은 [docs/game-plan.md](docs/game-plan.md) §14, 설계 근거는 저장소 밖 `work\verification-20261113\design\v014-scale-design.md`(§9 프로듀서 결정이 본문보다 우선)입니다. 병합·배포 전입니다.
 
@@ -63,7 +78,7 @@
 - 세계(`world.js`): `STAGE.radius` · `open` · `range`. 선택 칸 `w.stage`(0~5, 래치)가 있으면 반지름·열린 길·사거리 덤을 단계에서 읽고, 없으면 0.13.2와 한 글자도 다르지 않습니다. `sync(w, s, {hold:true})`는 단계·회관 승급을 세계에 넣지 않습니다(읽는 중 구매). 세계는 `Combat`을 직접 읽습니다(브라우저는 `window.Combat`, Node는 `require('./combat.js')`).
 - 화면(`index.html`): `staged` · `stageNow`(= `world.stage`) · `stageDue`, `stageRelease`(정답 연출·정답 배우기에 들어갈 때 보류를 풂) → `stageUp`(띠 알림 · 3D `build('stage')` · 이름표). `stageCell`이 8번째 칸, `stageHud`가 이름표(`#stageTag`), `regrow`가 나이를 바꿨을 때 문턱을 다시 맞춥니다. `__game().stage`로 검사합니다. 주소 `?stages=0` · `?routes=0`.
 - 3D(`src/layout.js` · `src/props.js` · `src/village.js`): `trailGeometry(routes)`(열린 길만 흙길, null이면 0.13의 발자국 길 8갈래), `stageProps(stage, 반지름, routes)`(집 · 우물 · 물레방아 오두막 · 길목 표시 · 성탑). `syncStage`가 상태의 `stage` · `routes`를 끌어오고, `buildStage`가 솟는 연출을 냅니다. 숲은 열린 길만 비킵니다(`laneNow`). `inspect()`에 `stage` · `roads` · `stageHouses` · `roadMarks` · `stageRising`.
-- 시뮬: `node scripts/sim-flow.cjs end 12 7,8,9,10 typ,slow,fast,guess [덮어쓰기]`. 단계 보류를 화면과 같은 때(답한 순간)에 풉니다. 0.13.2 기준선은 `'{"FLAGS":{"STAGES":false,"ROUTES":false}}'`.
+- 시뮬: `node scripts/sim-flow.cjs end 12 7,8,9,10 typ,slow,fast,guess [덮어쓰기]`. 문제를 읽는 중에 산 것만 보류했다가 답한 순간에 풀고, 문제 사이(정답 연출 · 정답 배우기)에 산 것은 바로 반영합니다(화면과 같음. 0.14 시뮬은 문제 사이 구매까지 보류해 단계 도달을 약 1문제 늦게 쟀고 0.15에서 고침, 리뷰 v014 2번). 0.13.2 기준선은 `'{"FLAGS":{"STAGES":false,"ROUTES":false}}'`.
 - 검사: `test-dom.cjs` · `test.cjs`의 기존 검사는 단계를 끄고(`STAGES=false`, 주소 `stages=0`) 돕니다 = 끄면 0.13.2와 같다는 회귀 검사. 단계는 `test-dom.cjs` 맨 끝 "0.14 단계" 절과 `test.cjs`의 stage 구간(`ONLY=stage`)이 봅니다.
 - 주의: 세계가 단계를 붙잡으므로, 검사·디버그에서 지은 수를 줄여 다시 불러와도 같은 세계면 단계가 내려가지 않습니다(새 세계 `freshWorld()`로 바꿔야 함). 타워 자리 번호·울타리 면 순서는 건드리지 않았습니다.
 - 0.14.1 프로듀서 테스트 모드(브랜치 `claude/test-mode`, worktree `work\claude-testmode`): 주소 `?test=1`에서만 `testmode.js`를 불러와 화면 아래 막대(다음 ▶ · 틀리기 · 아이 속도 · 자동 넘기기 · 📊 성능 · 🗺️ 단계로 바로 가기(브랜치 `claude/test-jump`, 값의 근거 `scripts/stage-seeds.cjs`))를 띄우고, 저장은 `hangul-defense-v1-test`에 따로 합니다. 다음 ▶은 게임의 `tick()`으로 읽는 시간을 빨리 감은 뒤 보기 버튼을 눌러 찍기 막기·읽기 속도·번개 판정이 그 시간 기준입니다. 사용법·근거는 기획서 §14.9, 검사는 `test-dom.cjs` 맨 끝 "0.14.1 프로듀서 테스트 모드" 절과 `test.cjs` testmode 구간(`ONLY=testmode`).
@@ -292,7 +307,7 @@ Playwright 시스템 의존성 설치는 WSL/Ubuntu 환경에 맞춰 수행하�
 - 브랜치 `claude/ending-economy`(worktree `work\claude-v012-ending`). 병합·배포 전입니다. origin/main(0.11.1 읽기 문항 확충, `427ba73`)을 병합해 두었습니다(캐시 버전 줄만 충돌, 0.12로 정리).
 - 검사: `node test-dom.cjs` PASS 9,123(0.11.1 문항 기준. 3-1 ~ 3-12가 0.12 엔딩·경제·피드백 검사), `node test-questions.cjs` PASS 44,208(문항 파일은 고치지 않음), `node --check test.cjs` 통과, `node scripts/build-pages.cjs` 성공(31개 파일).
 - 시뮬: `node scripts/sim-village.cjs end 12` — 엔딩까지 문제 수는 16칸 모두 설계 v2 표의 ±20% 안, 분은 11칸(벗어난 5칸은 9·10세, 설계가 가정한 지문 묶음이 아직 없어서), 10분 붕괴 192판 중 0판. 표는 기획서 §11.4.
-- `node test.cjs`(Playwright): 로컬에서 전체 PASS 1,590(두 번 연속 통과). 처음 돌렸을 때의 실패 2건은 모두 검사 가정이었습니다(무리 간격이 13~20초라고 본 fallback 발자국 대기 200틱, demo의 "한 시점에 늑대 10마리" → 간격만큼 대기·흘리는 동안의 최댓값으로). flow에 엔딩 흐름, demo에 3D 늑대 왕·여우 확인을 더했습니다. 캡처로 보고 고친 것: 별 방패 줄과 알림 띠 겹침(결전 중 띠를 아래로), 기다리는 왕이 화면 아래로 잘림(대기 자리 반지름 + 4), 여우가 너무 작음(0.7 → 1.15). 대표 캡처는 저장소 밖 `workerification-20261113012-shots`.
+- `node test.cjs`(Playwright): 로컬에서 전체 PASS 1,590(두 번 연속 통과). 처음 돌렸을 때의 실패 2건은 모두 검사 가정이었습니다(무리 간격이 13~20초라고 본 fallback 발자국 대기 200틱, demo의 "한 시점에 늑대 10마리" → 간격만큼 대기·흘리는 동안의 최댓값으로). flow에 엔딩 흐름, demo에 3D 늑대 왕·여우 확인을 더했습니다. 캡처로 보고 고친 것: 별 방패 줄과 알림 띠 겹침(결전 중 띠를 아래로), 기다리는 왕이 화면 아래로 잘림(대기 자리 반지름 + 4), 여우가 너무 작음(0.7 → 1.15). 대표 캡처는 저장소 밖 `work\verification-20261113\v012-shots`.
 - 남은 것: 정답 직후 1초쯤 금화 덧표시(`.gold-extra`)·판매 띠·알림 띠가 장면 위쪽에서 겹칠 수 있음(결전 중 특히), 기다리는 왕은 화면 아래 가장자리에 가까움, 마을별 땅 색 필터의 저사양 폰 성능, 실제 휴대폰·실제 아이의 길이 체감(9·10세 44~50분)은 확인하지 못했습니다.
 - `node_modules`: `work\claude-v09\node_modules` 연결은 비어 있어(가리키는 `claude-village-polish\node_modules`가 빈 폴더), `work\art-handoff-20261111\.claude\worktrees\agent-a23f51d934c674b82\node_modules`에 연결해 빌드했습니다(읽기만 함).
 
@@ -315,6 +330,15 @@ Playwright 시스템 의존성 설치는 WSL/Ubuntu 환경에 맞춰 수행하�
   - 화면: `playtest\v014-stages.cjs pad`(창 모드 Chromium)로 노트북 1366×768 · 패드 가로 1180×820 · 패드 세로 820×1180의 6단계와 폰 390×844 성 단계를 캡처(`v014-shots\laptop-*` · `pad-*` · `phone-*`, 성 단계는 `-stage5-scene.png` 장면만, 10세 가장 긴 지문은 `-stage5-long10.png`). 세 기준 화면 모두 6단계 전부에서 가게 2줄 · 문제 · 보기가 스크롤 없이 한 화면(패드 세로의 긴 글은 기존 보기 맞춤 스크롤로 장면·가게 카드가 위에 붙은 채). 페이지 오류 0(창 모드의 `favicon.ico` 404 한 줄은 페이지에 아이콘 지정이 없어 브라우저가 요청한 것).
   - 간헐 실패: "3D wolves visible" · "3D wolves move"는 실행 시각 씨앗 때문에 한 순간 늑대 0마리 · 모두 서 있음이 생기는 검사였다(Node 근사 재현 390 경로 3.5% · 0.45%, `v014-sim\flake-mc.cjs`). 검사를 걷는/있는 늑대가 나올 때까지 기다리게 고쳤다(게임 코드는 그대로). 고친 뒤 `ONLY=matrix node test.cjs` 4번 모두 PASS 1,265(`v014-sim\flake-matrix-after*.log`).
   - 검사(로컬): `node test-questions.cjs` PASS 44,208, `SOFT=1 node test-dom.cjs` PASS 12,092, `node scripts/build-pages.cjs` 성공(31개 파일), `node test.cjs` 전체 PASS 1,745(검사 1건 추가, 3,702초, 로그 `v014-sim\test-cjs-run7-final.log`). 이 단계 시작 때 앞 담당이 띄운 전체 실행(반지름 22 · 0.75배, 검사 수정 전)도 PASS 1,744(`test-cjs-run6.log`).
+
+### 0.15 (2026-11-17)
+
+- 브랜치 `claude/v015-river`(worktree `work\claude-v013`, main 0.14 `11fca3c` 기준). push · PR · 병합 · 배포 전입니다(리드가 합침). 커밋별 내용과 검사는 [docs/v015-progress.md](docs/v015-progress.md).
+- 검사(로컬): `node test-questions.cjs` PASS 44,208, `SOFT=1 node test-dom.cjs` PASS 12,452(0.14 12,092 + 0.15 아트 들여오기 절 · S-9), `node scripts/build-pages.cjs` 성공(39개 파일). 개발 중 부분 실행: `ONLY=art,demo` PASS 47, `ONLY=stage,art` PASS 160(배치 커밋), `ONLY=stage` PASS 150(움직임 커밋), 그림 화면 덩어리 따로 PASS 25.
+- 시뮬: 다리 길 규칙 켬 · 끔(12판 전 나이 · 전 아이, 48판 8 · 9 · 10세, 8판 요청 형식, 하나씩 · 3개씩). 리뷰 v014 2번에 따라 시뮬의 보류 시점을 화면과 같게(읽는 중 구매만 보류) 고친 뒤 다시 쟀다: 끔은 0.14 규칙 + 고친 시뮬과 22열 모두 같고, 켬은 통과선 안(보통 아이 울타리 −10 ~ +3%, 4번 면 최대 +20%, 기획서 §15.3 · §15.4). 0.14의 단계 도달 · 첫 전환 두 열도 고친 시뮬로 다시 적었다(§14.3, 8세 첫 전환 1.8 → 1.4분). 원자료 저장소 밖 `work\verification-20261113\v015-sim\fixed\`(고치기 전 값은 그 위 폴더).
+- 화면: 저장소 밖 `work\verification-20261113\playtest\v015-art.cjs`(세계는 `__HOLD_CLOCK`, 3D 화면 시계는 requestAnimationFrame 시각을 가짜 시계로 바꿔 결정적으로 찍음, 창 모드 Chromium)로 `work\verification-20261113\v015-shots\`에 캡처: 최종 기준 화면 3개 × 단계 3~5(`final-laptop|pad-*-stage3|4|5.png`), 늑대 왕 · 여우 GLB 대 0.14(`beasts-*`, 나란히 정면 `lineup-*`), 그림 화면(`fallback-*`), 0.14 빌드와 픽셀 비교(`same-*`: `?river=0&art15=0`은 기준 화면 3개 × 단계 0 · 3 · 5 · 기다리는 왕 12장 모두 PNG 바이트까지 같음). 다리 가운데 화면 높이 0.79~0.81 · 먼 끝 0.86, 그리기 호출 29 · 31 · 33, 삼각형 27~32만(늑대 없음, 상한 52 · 52만). 배속 영상은 찍지 않았다(프로듀서 요청 시).
+- 배포 준비(2026-11-18): main 0.14.2(`6d695f7`)와 밸런스 조정(`claude/balance-tune`)을 합쳤다. 10세 성곽 문턱은 31 → 32(합친 뒤 3개씩 울타리 +17% → +14%, 기획서 §15.4.1 통과선 표). 최종 검사: `node test-questions.cjs` PASS 54,890, `SOFT=1 node test-dom.cjs` PASS 12,798, `node scripts/build-pages.cjs` 40개 파일, 전체 `node test.cjs` PASS 1,909(553초). 위 줄들의 건수는 합치기 전 값이다.
+- 확인하지 못한 것: 실기기(패드 · 노트북) 프레임, 실제 아이, 패드 세로 좌우 길 늑대가 늦게 보이는 0.14 한계(계산만, 기획서 §15.8).
 
 ## 자동 배포와 협업
 

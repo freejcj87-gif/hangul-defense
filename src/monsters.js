@@ -186,6 +186,10 @@ function king(){return recolor(ember(),stone)}
 function fox(){return wolfBody({fur:0xd9782b,cream:0xfff1dc,dark:0x8a4316})}
 const BUILD={wolf,bramble,boar,granite,frost,ember,king,fox};
 export function monsterGeometry(kind){return bakeRig(BUILD[kind](),RIG[kind])}
+// 0.15: a kind drawn from a GLB (늑대 왕 · 도둑 여우, art-handoff/v015-v016) brings its own rig points (head, tail and leg pivots, mouth, top, hips)
+// and its own gait. Everything that reads RIG/GAIT (markers, health bars, footprints, attacks, falls) then follows the new model.
+// Called once, before the kind's mesh is made; with ?art15=0 (or a failed file) the code-built kind keeps WOLF_RIG and its 0.14 gait.
+export function setRig(kind,rig,gait){RIG[kind]=rig;if(gait)GAIT[kind]=gait}
 // Shadow stand-in: a handful of low parts on the wolf rig (every kind uses it, scaled per kind).
 export function shadowGeometry(){const R=WOLF_RIG,P=[['low',0,[0,.64,-.04],[.27,.26,.5]],['low',0,[0,1.0,.45],[.23,.22,.25],[0,0,0],1],['spike',0,[0,.9,-.8],[.1,.4,.1],dirY(0,.6,-.8),3]];
  R.L.forEach(([x,y,z],j)=>P.push(['box',0,[x,y-.24,z],[.1,.46,.1],[0,0,0],4+j]));return bakeRig(P,R)}

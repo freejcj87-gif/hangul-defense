@@ -220,16 +220,28 @@ body.paused *,body.paused *:before,body.paused *:after{animation-play-state:paus
 .slot[data-state="auto"],.slot[data-state="fight"],.slot[data-state="done"]{opacity:.92}.slot[data-state="auto"] .pr,.slot[data-state="fight"] .pr,.slot[data-state="done"] .pr{background:#e9f3dc;border-color:#b9d29a;color:#3c6b3f;letter-spacing:1px}
 #enemies .enemy[data-kind="king"]{width:74px}#enemies .enemy[data-kind="king"] img{filter:grayscale(1) brightness(1.08) contrast(1.25);width:74px}#enemies .enemy[data-kind="king"]:before{content:'👑';position:absolute;left:50%;top:-15px;translate:-50% 0;font-size:20px;line-height:1}
 #enemies .enemy[data-kind="fox"] img{filter:sepia(1) hue-rotate(-18deg) saturate(4) brightness(1.1);width:22px}
+/* 0.15 그림 화면: 늑대 왕 · 도둑 여우는 새 그림(art-handoff/v015-v016/png, 384px 정사각에 여백이 있어 몸이 가운데 약 52%)으로. 그림을 못 받으면 늑대 그림 + 필터(0.14) */
+#enemies .enemy[data-art="15"] img{filter:none;transform:none}#enemies .enemy[data-kind="king"][data-art="15"]:before{content:none}
+#enemies .enemy[data-kind="king"][data-art="15"] img{width:142px;margin:0 0 -26px -34px}#enemies .enemy[data-kind="fox"][data-art="15"] img{width:60px;margin:0 0 -11px -15px}
+/* 0.15 그림 화면의 강 · 다리 · 물레방아(물레방아 마을부터): 위치는 drawRiver가 3D와 같은 자리에서 계산한다 */
+.river{position:absolute;width:170%;transform-origin:50% 50%;background:linear-gradient(#d7c18a 0 14%,#86c9e7 14% 40%,#62b3de 40% 60%,#86c9e7 60% 86%,#d7c18a 86%);box-shadow:0 1px 0 #0002;pointer-events:none}
+.river-art{position:absolute;pointer-events:none;height:auto}
+.scene.is3d>.river,.scene.is3d>.river-art{display:none}
+/* 0.15 그림 화면의 열린 길(1단계부터 흙길 띠, 농가는 희미한 점선 8갈래)과 단계별 집(0.14 한계: 이름표와 8번째 칸만 단계를 보여 줌) */
+.stage-art{position:absolute;inset:0;pointer-events:none}.scene.is3d>.stage-art{display:none}
+.stage-art .lane{position:absolute;height:11px;transform-origin:0 50%;background:linear-gradient(#b89a5e 0 18%,#dcc08a 18% 82%,#b89a5e 82%);border-radius:6px;opacity:.9}
+.stage-art .lane.trail{height:6px;background:repeating-linear-gradient(90deg,#b9b07a 0 12px,transparent 12px 22px);opacity:.75}
+.stage-art img{position:absolute;height:auto;transform:translate(-50%,-82%)}
 .scene[data-village="quarry"]{background:#c2c3ad}.scene[data-village="frost"]{background:#b9d6cf}.scene[data-village="ember"]{background:#cdbd86}
 .scene[data-village="quarry"] canvas{filter:saturate(.72) sepia(.16)}.scene[data-village="frost"] canvas{filter:hue-rotate(26deg) saturate(.82) brightness(1.06)}.scene[data-village="ember"] canvas{filter:sepia(.26) saturate(1.2) hue-rotate(-12deg)}
 .map-row{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin:6px 0 12px;font-size:14px;font-weight:800;word-break:keep-all}.map-row span{padding:4px 10px;border-radius:99px;background:#e4f0d6;border:1px solid #bfd6a8;white-space:nowrap}.map-row span.now{background:#fff3b8;border-color:#d79a12}
 .end-stars{display:grid;gap:6px;margin:10px 0;padding:0;text-align:left;font-size:16px;font-weight:800;line-height:1.4;word-break:keep-all}.end-stars li{list-style:none;padding:7px 11px;border-radius:12px;background:#f6edd2}.end-stars li.off{opacity:.5}
 #endNew{width:100%;font-size:19px;min-height:58px;background:linear-gradient(#f8d255,#e0a21a);color:#4a3200;border-color:#b8860b}#endStay{width:100%;margin-top:8px;min-height:46px;font-size:16px}
 </style></head><body><main>
-<header><div><small>한글 디펜스 · 늑대가 오기 전에 읽어요 0.14.2</small><h1><img class="brand-chicken" src="art-handoff/coopnight/browser/characters/chicken.png" alt="">꼬꼬마을: 읽어서 지켜요</h1></div><button id="pause">잠깐 쉬기</button></header>
+<header><div><small>한글 디펜스 · 늑대가 오기 전에 읽어요 0.15</small><h1><img class="brand-chicken" src="art-handoff/coopnight/browser/characters/chicken.png" alt="">꼬꼬마을: 읽어서 지켜요</h1></div><button id="pause">잠깐 쉬기</button></header>
 <div class="game-layout"><section class="stage-card" id="stageCard" aria-label="우리 마을">
 <div class="stats"><span class="pill" id="gold"></span><span class="pill" id="flockPill"></span><span class="pill" id="level"></span><span class="pill" id="stage"></span></div>
-<div class="scene" id="scene"><div class="road"></div><div class="pond hidden" id="pond" aria-hidden="true"></div><div class="house"><img id="houseArt" src="art-handoff/coopnight/browser/buildings/home-01.png" alt="마을회관"></div><div class="village-extra" id="villageExtra" aria-hidden="true"></div><div class="fence-row" id="fenceRow" aria-hidden="true"></div><div id="tower"><img id="towerArt" src="art-handoff/coopnight/browser/buildings/tower-01.png" alt="방어 타워"><span class="tower-tag" id="towerTag"></span></div><div class="farmers" id="farmers" aria-hidden="true"></div><div class="flock" id="flock" aria-hidden="true"></div><div id="enemies" aria-label="다가오는 늑대"></div><div id="effects" aria-hidden="true"></div><div class="finale hidden" id="finale" role="img"></div><div class="yard-eggs hidden" id="yardEggs" role="img"></div><div class="stage-tag hidden" id="stageTag" role="img"></div><div id="pauseNote">⏸️ 쉬는 중이에요</div></div>
+<div class="scene" id="scene"><div class="road"></div><div class="river hidden" id="river" aria-hidden="true"></div><img class="river-art hidden" id="millArt" alt="" aria-hidden="true"><img class="river-art hidden" id="bridgeArt" alt="" aria-hidden="true"><div class="stage-art" id="stageArt" aria-hidden="true"></div><div class="pond hidden" id="pond" aria-hidden="true"></div><div class="house"><img id="houseArt" src="art-handoff/coopnight/browser/buildings/home-01.png" alt="마을회관"></div><div class="village-extra" id="villageExtra" aria-hidden="true"></div><div class="fence-row" id="fenceRow" aria-hidden="true"></div><div id="tower"><img id="towerArt" src="art-handoff/coopnight/browser/buildings/tower-01.png" alt="방어 타워"><span class="tower-tag" id="towerTag"></span></div><div class="farmers" id="farmers" aria-hidden="true"></div><div class="flock" id="flock" aria-hidden="true"></div><div id="enemies" aria-label="다가오는 늑대"></div><div id="effects" aria-hidden="true"></div><div class="finale hidden" id="finale" role="img"></div><div class="yard-eggs hidden" id="yardEggs" role="img"></div><div class="stage-tag hidden" id="stageTag" role="img"></div><div id="pauseNote">⏸️ 쉬는 중이에요</div></div>
 <div class="stage-caption"><span class="live-dot" aria-hidden="true"></span><span id="villageStatus">마을을 준비하고 있어요…</span></div>
 <div class="shop-wrap" id="shopWrap"><div class="bubble hidden" id="bubble" role="status" aria-live="polite"><img src="art-handoff/coopnight/browser/characters/chicken.png" alt="꼬꼬"><span id="bubbleText"></span><span id="bubbleTap" class="hidden" aria-hidden="true">👆</span></div><div class="shop-tip hidden" id="shopTip" role="status" aria-live="polite"></div><div class="shop" id="shop" role="group" aria-label="가게: 누르면 바로 사요"></div></div>
 <div id="coinLayer" aria-hidden="true"></div></section>
@@ -244,7 +256,7 @@ body.paused *,body.paused *:before,body.paused *:after{animation-play-state:paus
 <ul class="rules"><li>🐺 늑대가 쉬지 않고 사방에서 와서 닭을 물어 가고 건물을 부숴요.</li><li>🏹 한 번에 맞히면 타워가 일제히 쏘고, 닭이 알을 낳아 금화가 생겨요.</li><li>🪙 금화로 언제든 가게에서 타워·닭·농부를 사요.</li><li>💥 문제에는 상식·수학·영어도 섞여 있어요.</li></ul>
 <p class="start-q">몇 살이에요?</p><div class="age-row" id="ageRow"></div>
 <button id="go">시작하기 ▶</button><small>어려우면 나이를 낮춰도 괜찮아요.</small></div></div>
-<script src="combat.js?v=0.14.2"></script><script src="world.js?v=0.14.2"></script><script src="questions-gen.js?v=0.14.2"></script><script src="questions.js?v=0.14.2"></script><script>/* 체험 주소 ?demo=1~3: 그 회관 단계까지 자란 마을로 시작해 새 몬스터를 바로 본다(프로듀서·보호자 확인용). 저장은 따로 해서 원래 진행을 건드리지 않는다. */
+<script src="combat.js?v=0.15"></script><script src="world.js?v=0.15"></script><script src="questions-gen.js?v=0.15"></script><script src="questions.js?v=0.15"></script><script>/* 체험 주소 ?demo=1~3: 그 회관 단계까지 자란 마을로 시작해 새 몬스터를 바로 본다(프로듀서·보호자 확인용). 저장은 따로 해서 원래 진행을 건드리지 않는다. */
 const DEMO=(()=>{try{const m=/[?&]demo=([123])\b/.exec(location.search);return m?Number(m[1]):0}catch{return 0}})();
 /* 0.14.1 프로듀서 테스트 모드 ?test=1: 화면 아래 '다음 ▶' 막대(testmode.js, 이 스크립트 맨 끝에서 불러옴). 저장은 '-test'를 붙인 열쇠에 따로 해서 아이 저장과 섞이지 않는다 */
 const TEST=(()=>{try{return /[?&]test=1\b/.test(location.search)}catch{return false}})();
@@ -256,6 +268,8 @@ const KEY=(DEMO?'hangul-defense-demo'+DEMO:'hangul-defense-v1'+(STAGES_OFF?'-sta
 try{if(/[?&]flow=0\b/.test(location.search))Combat.FLAGS.FLOW=false}catch{}
 /* 0.14: 주소에 ?stages=0을 붙이면 단계(넓어지는 영역·열린 길·단계 진행 칸)를 끄고 0.13.2 규칙으로 돈다. ?routes=0은 열린 길만 끈다(전 단계 8방향) */
 try{if(STAGES_OFF){Combat.FLAGS.STAGES=false;Combat.FLAGS.ROUTES=false}if(/[?&]routes=0\b/.test(location.search))Combat.FLAGS.ROUTES=false}catch{}
+/* 0.15: ?river=0이면 강 · 다리 · 물레방아 바퀴와 다리 길 규칙을 끄고(0.14 화면 · 규칙), ?bridge=0이면 다리 길 규칙만 끈다(늑대가 넓게 와서 물을 건넌다). 단계나 길을 끄면(?stages=0 · ?routes=0) 둘 다 쓰지 않는다(rivered · World.bridgeAt가 함께 본다) */
+try{if(/[?&]river=0\b/.test(location.search)){Combat.FLAGS.RIVER=false;Combat.FLAGS.BRIDGE=false}if(/[?&]bridge=0\b/.test(location.search))Combat.FLAGS.BRIDGE=false}catch{}
 const DEMO_VILLAGE={1:{hall:1,level:2,fence:2,chickens:4,gold:250},2:{hall:2,level:3,fence:4,chickens:6,farmers:1,power:1,gold:450},3:{hall:3,level:5,fence:6,chickens:8,farmers:2,pond:2,power:2,gold:700}};
 /* 규칙은 combat.js(Combat)·world.js(World)가 정한다. 이 스크립트는 단계(phase) 진행, 화면, 효과음만 맡는다. 계약: docs/v09-contract.md
    0.11: 아이는 글을 읽기만 한다. 소리 모드도, 읽어 주는 음성(음성 합성)도 없다. state.mode는 저장 호환용으로 늘 'story'.
@@ -315,6 +329,7 @@ syncKing(true);
    문제를 읽는 동안(ask) 산 것으로 단계가 오르면 세계에 바로 넣지 않고(World.sync hold) 그 문제를 답한 순간(정답 연출·정답 배우기 = 문제 사이)에 넓힌다:
    읽는 동안에는 화면(카메라)이 스스로 움직이지 않는다. 그동안 8번째 칸은 '곧!'을 보여 준다 */
 const staged=()=>!!Combat.FLAGS.STAGES;
+const rivered=()=>staged()&&!!Combat.FLAGS.ROUTES&&!!Combat.FLAGS.RIVER;   /* 0.15: 단계 3부터 강 · 다리 · 물레방아(화면). 다리 길 규칙은 World.bridgeAt */
 const stageNow=()=>staged()?(Number.isSafeInteger(world.stage)?world.stage:0):-1;
 const stageDue=()=>staged()&&(Combat.stage(state)>stageNow()||(state.hall|0)>(world.hall|0));
 const STAGE_ICON=['🏡','🏘️','🏪','💧','🧱','🏰'],STAGE_SHORT=['농가','마을','장터','물레방아','성곽','성'];
@@ -345,8 +360,42 @@ const shownHall=()=>staged()?world.hall|0:state.hall|0;
 const homeArt=()=>'buildings/home-'+String(Math.min(5,1+shownHall()+(state.feast>0?1:0))).padStart(2,'0')+'.png';
 const FLOCK_MAX=20;
 let artStamp='';
+/* 0.15 그림 화면(3D가 안 될 때): 물레방아 마을부터 강 띠 · 다리 · 물레방아 그림을 3D와 같은 자리에(늑대와 같은 % 변환). 이 스크립트는 src/layout.js(ES 모듈)를 못 읽어
+   필요한 수만 옮겨 적는다(test-dom이 layout.js RIVER · MILL · BRIDGE와 같은지 확인). ?art15=0이면 새 그림을 쓰지 않는다(0.14 그림 화면) */
+const FALLBACK_RIVER={dir:280,dist:1.3,water:1.8,bank:.35,road:6,mill:[-4.52,-10.9],bridge:3.34};
+const ART15_PNG={king:'art-handoff/v015-v016/png/wolf-king.png',fox:'art-handoff/v015-v016/png/thief-fox.png',bridge:'art-handoff/v015-v016/png/bridge.png',mill:'art-handoff/v015-v016/png/watermill.png'};
+const ART15_OFF=(()=>{try{return /[?&]art15=0\b/.test(location.search)}catch{return false}})();
+/* 단계별 집 자리 [x, z, 나타나는 단계] = src/layout.js COTTAGES(test-dom이 같은지 확인) */
+const FALLBACK_COTTAGES=[[2.79,6.74,1],[-3.03,-6.97,1],[4.37,8.21,2],[-3.09,-8.98,2],[3.58,11.03,3],[5.7,9.87,3],[5.96,12.22,4],[-6.95,-12.04,4],[-8.14,11.63,4],[11.63,-8.14,4],[5.68,15.6,5],[-5.07,-15.6,5],[-13.76,9.64,5],[9.64,-13.76,5],[16.64,2.93,5],[-16.64,-2.93,5],[13.86,13.86,5],[0,19.6,5],[-13.86,13.86,5],[-19.6,0,5],[0,-19.6,5],[13.86,-13.86,5]];
+const fallbackOn=()=>$('scene').dataset.renderer==='fallback';
+/* 열린 길과 집(그림 화면에서만, 늑대와 같은 % 변환으로 3D와 같은 방향 · 자리). 단계를 끄면 그리지 않는다(0.13.2 그림 화면) */
+function drawStageArt(){
+ const box=$('stageArt');box.innerHTML='';if(!fallbackOn()||!staged())return;
+ const R=World.radius(world),span=R+World.EDGE,sc=$('scene'),W=sc.clientWidth||1,H=sc.clientHeight||1,px=(x,z)=>[W*(.5+x/span*.48),H*(.55+z/span*.42)],st=stageNow(),open=World.routes(world);
+ for(const p of open||[0,1,2,3,4,5,6,7]){const a=(p+.5)*Math.PI/4,[x0,y0]=px(Math.cos(a)*(R+.2),Math.sin(a)*(R+.2)),[x1,y1]=px(Math.cos(a)*span*1.3,Math.sin(a)*span*1.3);
+  const e=document.createElement('i');e.className='lane'+(open?'':' trail');e.dataset.road=String(p);e.style.left=x0.toFixed(1)+'px';e.style.top=y0.toFixed(1)+'px';e.style.width=Math.hypot(x1-x0,y1-y0).toFixed(1)+'px';
+  e.style.transform='translateY(-50%) rotate('+(Math.atan2(y1-y0,x1-x0)*180/Math.PI).toFixed(2)+'deg)';box.append(e)}
+ const unit=.48*W/span;FALLBACK_COTTAGES.forEach(([x,z,s],k)=>{if(s>st)return;const img=artImage('buildings/home-0'+(1+k%5)+'.png','');const [l,t]=px(x,z);img.className='cottage';img.style.left=l.toFixed(1)+'px';img.style.top=t.toFixed(1)+'px';img.style.width=Math.max(16,1.35*unit).toFixed(1)+'px';box.append(img)});
+}
+function drawRiver(){
+ const on=fallbackOn()&&rivered()&&stageNow()>=3,els=[$('river'),$('millArt'),$('bridgeArt')];for(const e of els)e.classList.toggle('hidden',!on);if(!on)return;
+ const F=FALLBACK_RIVER,R=World.radius(world),span=R+World.EDGE,sc=$('scene'),W=sc.clientWidth||1,H=sc.clientHeight||1,a=F.dir*Math.PI/180,n=[Math.cos(a),Math.sin(a)],d=R+F.dist;
+ const px=(x,z)=>[W*(.5+x/span*.48),H*(.55+z/span*.42)],place=(e,x,z)=>{const [l,t]=px(x,z);e.style.left=(l/W*100).toFixed(2)+'%';e.style.top=(t/H*100).toFixed(2)+'%'};
+ const rv=$('river'),[tx,tz]=[Math.sin(a),-Math.cos(a)],ang=Math.atan2(tz*.42*H,tx*.48*W)*180/Math.PI,thick=(F.water+2*F.bank)*Math.hypot(n[0]*.48*W,n[1]*.42*H)/span;
+ place(rv,n[0]*d,n[1]*d);rv.style.height=thick.toFixed(1)+'px';rv.style.transform='translate(-50%,-50%) rotate('+((ang+360+90)%180-90).toFixed(2)+'deg)';
+ /* 다리: 6번 길이 강 가운데 줄을 지나는 자리, 물레방아: MILL.at. 그림의 땅 원점(manifest png_origin_xy)을 그 자리에 둔다 */
+ const b=(F.road+.5)*Math.PI/4,u=[Math.cos(b),Math.sin(b)],r=d/(u[0]*n[0]+u[1]*n[1]),unit=.48*W/span,bridge=$('bridgeArt'),mill=$('millArt');
+ if(ART15_OFF){bridge.classList.add('hidden');mill.classList.add('hidden');return}
+ if(!bridge.getAttribute('src'))bridge.src=ART15_PNG.bridge;if(!mill.getAttribute('src'))mill.src=ART15_PNG.mill;
+ place(bridge,u[0]*r,u[1]*r);bridge.style.width=(F.bridge*1.12*unit).toFixed(1)+'px';bridge.style.transform='translate(-50%,-59.2%)';
+ place(mill,...F.mill);mill.style.width=(2.9*unit).toFixed(1)+'px';mill.style.transform='translate(-53.6%,-72.8%)';
+}
+/* 늑대 왕 · 도둑 여우 그림(0.15): 새 그림이 안 오면 그 자리만 늑대 그림 + 필터(0.14) */
+function wolfLook(el,kind){el.dataset.kind=kind;const img=el._img||el.firstChild;if(!img)return;const png=!ART15_OFF&&el.dataset.bad!==kind&&ART15_PNG[kind];
+ if(png){el.dataset.art='15';img.onerror=()=>{el.dataset.bad=kind;wolfLook(el,kind)};if(!img.src.endsWith(png))img.src=png}
+ else{delete el.dataset.art;img.onerror=null;if(!img.src.endsWith('wolves/wolf.png'))img.src=ART+'wolves/wolf.png'}}
 function updateVillageArt(){
- const hall=shownHall(),stamp=[state.level,state.chickens,state.hidden,state.fence,state.farmers,state.pond,hall,state.feast,stageNow()].join(':');if(stamp===artStamp)return;artStamp=stamp;
+ const hall=shownHall(),stamp=[state.level,state.chickens,state.hidden,state.fence,state.farmers,state.pond,hall,state.feast,stageNow(),rivered(),$('scene').clientWidth,$('scene').clientHeight,$('scene').dataset.renderer,World.radius(world)].join(':');if(stamp===artStamp)return;artStamp=stamp;drawRiver();drawStageArt();
  $('towerArt').src=ART+'buildings/tower-'+TOWER_ART[Math.min(5,state.level)]+'.png';put($('towerTag'),state.level?'타워 '+(1+state.level)+'개':'');$('houseArt').src=ART+homeArt();
  $('villageExtra').innerHTML='';$('villageExtra').append(artImage('buildings/coop.png','닭장'));if(hall>=1)$('villageExtra').append(artImage('buildings/store.png','가게'));for(let i=0;i<Math.min(3,state.feast);i++)$('villageExtra').append(emoji('🎏'));
  $('pond').classList.toggle('hidden',!state.pond);$('pond').dataset.size=String(Math.min(3,state.pond));
@@ -363,9 +412,9 @@ function drawWolves(){
  const list=phase==='start'?[]:world.wolves.filter(v=>v.state!=='gone').slice(0,World.MAX_WOLVES),span=World.radius(world)+World.EDGE;
  /* 늑대 왕·도둑 여우는 늑대 목록과 별개 자리(world.king·world.fox)다. 그림 화면에서는 늑대 그림의 색·크기만 바꿔 그린다 */
  if(phase!=='start'){if(world.king)list.push({x:world.king.x,z:world.king.z,state:'walk',kind:'king'});if(world.fox)list.push({x:world.fox.x,z:world.fox.z,state:world.fox.took?'carry':'walk',kind:'fox'})}
- while(WOLF_POOL.length<Math.min(World.MAX_WOLVES+2,list.length)){const w=document.createElement('div');w.className='enemy';w.append(artImage('wolves/wolf.png','늑대'));$('enemies').append(w);WOLF_POOL.push(w)}
+ while(WOLF_POOL.length<Math.min(World.MAX_WOLVES+2,list.length)){const w=document.createElement('div');w.className='enemy';w._img=artImage('wolves/wolf.png','늑대');w.append(w._img);$('enemies').append(w);WOLF_POOL.push(w)}
  for(let i=0;i<WOLF_POOL.length;i++){const el=WOLF_POOL[i],v=list[i];el.classList.toggle('hidden',!v);if(!v)continue;
-  el.style.left=Math.max(2,Math.min(98,50+v.x/span*48))+'%';el.style.bottom=Math.max(2,Math.min(90,45-v.z/span*42))+'%';el.classList.toggle('stunned',v.state==='dead');el.classList.toggle('carry',v.state==='carry');if(el.dataset.kind!==(v.kind||'wolf'))el.dataset.kind=v.kind||'wolf'}
+  el.style.left=Math.max(2,Math.min(98,50+v.x/span*48))+'%';el.style.bottom=Math.max(2,Math.min(90,45-v.z/span*42))+'%';el.classList.toggle('stunned',v.state==='dead');el.classList.toggle('carry',v.state==='carry');if(el.dataset.kind!==(v.kind||'wolf'))wolfLook(el,v.kind||'wolf')}
 }
 
 /* ---------- 화면 갱신 ---------- */
@@ -784,6 +833,7 @@ function stageUp(st0,h0){
 function stagePerks(st,st0,hallRose){
  const out=[],R=World.STAGE&&World.STAGE.open,n1=R&&Combat.FLAGS.ROUTES&&R[st]?R[st].length:0,n0=R&&Combat.FLAGS.ROUTES&&st0>0&&R[st0]?R[st0].length:0;
  if(n1&&n1!==n0)out.push('늑대는 길 '+n1+'곳으로 와요');
+ if(rivered()&&st>=3&&st0<3)out.push('강 건너 다리 길이 열렸어요');
  if(hallRose){out.push('알값 +'+Combat.PAY.hall);const opened=Combat.SHOP.filter(k=>Combat.ITEMS[k]&&Combat.ITEMS[k].need===(world.hall|0)).map(k=>(SHOP_LOOK[k]||[k])[0]);out.push(opened.length?'새 상품: '+opened.join('·'):'타워 자리 '+towerSpots()+'곳')}
  if(out.length<2)out.unshift('땅이 넓어졌어요');
  return out.slice(0,3).join(' · ');
@@ -1092,6 +1142,6 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden&&!paused&&p
 drawStart();
 /* 3D 마을(village.js)은 이 상태(늑대 세계 world 포함)를 매 프레임 읽어 간다. 일회성 연출(세계 사건·volley·produce·dash·build)만 따로 알린다.
    running: 늑대 세계 시계가 흐르는지(시작 화면·쉬기만 멈춤). 0.9에서 reward 단계가 생겨, 3D는 phase 목록 대신 이 값을 보면 된다. */
-window.getVillageState=()=>({phase,paused,running:phase!=='start'&&phase!=='ending'&&!paused,village:state.run.village,bell:state.run.bell,shields:state.run.shields,level:state.level,power:state.power|0,streak:state.streak|0,chickens:state.chickens,fence:state.fence,farmers:state.farmers,farmersTotal:1+(state.farmers|0),nest:state.nest|0,flow:!!world.flow&&flowing(),repairAct:!!Combat.FLAGS.REPAIR_ACT,marketDown:state.marketDown|0,recommend:rec.glow||null,pond:state.pond,hall:staged()?world.hall|0:state.hall,feast:state.feast,wins:state.wins,world,radius:World.radius(world),stage:stageNow(),routes:World.routes(world),tries:round?round.tries:0,dash:!!(round&&round.dash>0),result:round?round.result:null});
-if(TEST){const s=document.createElement('script');s.src='testmode.js?v=0.14.2';document.body.append(s)}/* 0.14.1: ?test=1일 때만 테스트 모드 막대를 불러온다 */
-</script><script src="village.js?v=0.14.2" defer></script></body></html>
+window.getVillageState=()=>({phase,paused,running:phase!=='start'&&phase!=='ending'&&!paused,village:state.run.village,bell:state.run.bell,shields:state.run.shields,level:state.level,power:state.power|0,streak:state.streak|0,chickens:state.chickens,fence:state.fence,farmers:state.farmers,farmersTotal:1+(state.farmers|0),nest:state.nest|0,flow:!!world.flow&&flowing(),repairAct:!!Combat.FLAGS.REPAIR_ACT,marketDown:state.marketDown|0,recommend:rec.glow||null,pond:state.pond,hall:staged()?world.hall|0:state.hall,feast:state.feast,wins:state.wins,world,radius:World.radius(world),stage:stageNow(),routes:World.routes(world),river:rivered(),bridge:rivered()&&!!Combat.FLAGS.BRIDGE,tries:round?round.tries:0,dash:!!(round&&round.dash>0),result:round?round.result:null});
+if(TEST){const s=document.createElement('script');s.src='testmode.js?v=0.15';document.body.append(s)}/* 0.14.1: ?test=1일 때만 테스트 모드 막대를 불러온다 */
+</script><script src="village.js?v=0.15" defer></script></body></html>
