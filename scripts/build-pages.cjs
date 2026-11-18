@@ -33,6 +33,8 @@ const assets = [
   "animation/reverse-quarter.png"
 ];
 const files = ['index.html', 'combat.js', 'world.js', 'questions-gen.js', 'questions.js', 'testmode.js', 'art-handoff/coopnight/source-3d/models/environment-pack.glb', ...assets.map(file => prefix + file)];
+/* 수첩 MVP: 기록 모듈과 쪽지·카드 콘텐츠(화면 연결은 다음 단계. 미리 배포 묶음에 넣어 둔다) */
+files.push('book.js', 'notes.js');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 for (const match of html.matchAll(/art-handoff\/coopnight\/browser\/[a-zA-Z0-9_/-]+\.png/g)) {
   assert(files.includes(match[0]), 'Missing static artwork in Pages package: ' + match[0]);
