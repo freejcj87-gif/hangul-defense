@@ -7,6 +7,7 @@
    - 아이 속도 느림·보통·빠름 = 보통 아이 필요 시간 × 1.8 · 1 · 0.62. 두 번째 고르기는 그 × 0.35.
      근거: 시뮬(scripts/sim-flow.cjs · sim-village.cjs)의 아이 모형 SPEEDK와 두 번째 고르기 시간. 테스트 모드는 흔들림(× 0.75~1.25) 없이 고정값을 쓴다.
    - 자동 넘기기: 빨리 감기 없이, 읽는 시간이 실제 시계로 지난 순간 저절로 정답(정답 배우기도 초록 답이 열리면 저절로).
+   - 🗺️ 단계로: 농가 · 마을 · 장터 마을 · 물레방아 마을 · 성곽 마을 · 성 · 결전 직전(종 열림) 가운데 고르면, 지금 나이로 그 단계에 막 들어선 마을에서 새로 시작(확인 한 번).
    - 📊 성능 표시(기본 켬): 막대 위 작은 글에 FPS · 3D 그리기 호출 · 삼각형 · 지금 단계. 그림 화면이면 '그림 화면'. 0.5초에 한 번 화면 쪽 숫자만 읽는다.
    게임은 이 답을 그 시간에 푼 답으로 센다: 빨리 감기는 게임의 tick()(검사 훅 window.__tick과 같은 길)을 돌려 round.t가 실제 틱으로 흐르고,
    누르는 것은 화면의 보기 버튼이라 찍기 막기(Combat.guard)·읽기 속도(trackPace)·번개(isFast) 판정이 아이가 그 시간에 누른 것과 같다.
@@ -125,6 +126,51 @@
   else if(phase==='learn'&&round.ready)press(round.q.answer,'learn');
  }
 
+ /* ---------- 단계로 바로 가기: 그 단계에 막 들어선 마을로 새로 시작(확인 한 번) ----------
+    근거: scripts/stage-seeds.cjs(시뮬 sim-flow.cjs playEnd 그대로, 8세 보통 아이 · 한 번에 3개씩 · 12판)가 단계가 세계에 반영된 순간(문제 사이)과 종이 열린 순간에 찍은
+    항목별 중앙값. level = 타워 수 − 1(시작 타워 2개 = 1), chickens = 닭 수, farmers = 산 농부 수(농부는 1 + farmers명), 회관은 넣지 않고 Combat.grow가 단계에서 정한다.
+    항목별 중앙값의 합은 문턱과 1~2개 다를 수 있어, 지은 수(회관 뺌)를 그 나이 문턱에 꼭 맞게 비례로 맞춘다(최대 나머지 방식, 9·10세는 문턱이 낮아 같은 비율로 줄어든다).
+    결전 직전 = 종 문턱(7·8세 66, 9세 50, 10세 46)에 꼭 맞게 지어 종이 막 열린 마을. 문제 번호·한 번에 맞힌 수도 같은 비율. 여우는 지나온 문턱(지은 수 20·40·55)만큼 이미 왔다가 쫓겨 간 것으로 */
+ const JUMP_BASE={
+  1:{level:1,fence:2,chickens:3,farmers:0,pond:0,power:0,gold:26,index:5,wins:5},
+  2:{level:3,fence:5,chickens:8,farmers:0,pond:0,power:0,gold:54,index:17,wins:15},
+  3:{level:5,fence:7,chickens:12,farmers:2,pond:0,power:1,gold:105,index:26,wins:22},
+  4:{level:8,fence:9,chickens:17,farmers:4,pond:0,power:1,gold:158,index:35,wins:30},
+  5:{level:15,fence:11,chickens:20,farmers:5,pond:1,power:1,gold:309,index:42,wins:36},
+  bell:{level:19,fence:14,chickens:20,farmers:9,pond:3,power:1,gold:79,index:48,wins:41}};
+ const JUMPS=[['0','🏡 농가'],['1','🏘️ 마을'],['2','🏪 장터 마을'],['3','💧 물레방아 마을'],['4','🧱 성곽 마을'],['5','🏰 성'],['bell','🔔 결전 직전(종 열림)']];
+ const PARTS=[['level','tower',0],['fence','fence',0],['chickens','chicken',1],['farmers','farmer',0],['pond','pond',0],['power','power',0]];/* [상태 칸, 상품, 기본 수] */
+ const hallTop=()=>Combat.FLAGS.STAGE_HALL.length;/* 성 단계의 회관(3) */
+ /* 지은 수(회관 뺌) 목표: 단계 k의 그 나이 문턱, 결전 직전은 종 문턱 − 성 단계 회관 */
+ const jumpTarget=(key,age)=>key==='bell'?Combat.bellBuilt({age})-hallTop():Combat.stageAt({age})[Number(key)];
+ function jumpState(key,age){
+  const s=Combat.fresh(age);s.seed=newSeed();s.run.t0=Date.now();if(key==='0')return s;
+  const B=JUMP_BASE[key],T=jumpTarget(key,age),T8=jumpTarget(key,8),v=PARTS.map(([f,,b])=>Math.max(0,(B[f]|0)-b)),cap=PARTS.map(([,k])=>Combat.max(k)),S=v.reduce((a,x)=>a+x,0);
+  /* 최대 나머지: 비례로 내린 정수 + 소수점이 큰 칸부터 1씩. 모자라면(목표가 더 크면) 많은 칸부터, 상한은 넘지 않는다 */
+  const raw=v.map(x=>S>0?x*T/S:0),x=raw.map((r,i)=>Math.min(cap[i],Math.floor(r)));
+  const order=raw.map((r,i)=>i).sort((i,j)=>(raw[j]-Math.floor(raw[j]))-(raw[i]-Math.floor(raw[i]))||v[j]-v[i]||i-j);
+  let sum=x.reduce((a,y)=>a+y,0);
+  for(const i of order){if(sum>=T)break;if(x[i]<cap[i]&&raw[i]>x[i]){x[i]++;sum++}}
+  for(let guard=0;sum<T&&guard<500;guard++){const i=v.map((y,j)=>j).filter(j=>x[j]<cap[j]).sort((p,q)=>v[q]-v[p]||p-q)[0];if(i===undefined)break;x[i]++;sum++}
+  if(x[0]<1){x[0]=1;sum++}/* 시작 타워(level 1)는 늘 있다 */
+  for(let guard=0;sum>T&&guard<500;guard++){const i=x.map((y,j)=>j).filter(j=>j>0?x[j]>0:x[j]>1).sort((p,q)=>x[q]-x[p]||p-q)[0];if(i===undefined)break;x[i]--;sum--}
+  PARTS.forEach(([f,,b],i)=>{s[f]=x[i]+b});
+  const r=T8>0?T/T8:1;s.gold=B.gold;s.index=Math.round(B.index*r);s.wins=Math.min(s.index,Math.round(B.wins*r));
+  Combat.grow(s);/* 회관(단계 2·4·5에서 1·2·3)과 종(결전 직전이면 열림) */
+  const R=s.run,bn=Combat.builtNew(s);R.fox=(s.hall|0)>=Combat.FOX.needHall?Combat.FOX.at.filter(n=>bn>=n).length:0;R.foxSaved=R.fox;
+  R.asked=s.index;R.first=s.wins;R.ok=[];R.miss=[];/* 판 기록(결전 문제는 여기서 맞힌·틀린 문제를 고른다): 7문제에 1개꼴로 틀림 */
+  for(let i=0;i<s.index;i++)(i%7===3?R.miss:R.ok).push(i);R.ok=R.ok.slice(-Combat.CAPS.ok);R.miss=R.miss.slice(-Combat.CAPS.miss);
+  return s;
+ }
+ function jump(key,ask){
+  const J=JUMPS.find(j=>j[0]===String(key));if(!J||T.job)return false;
+  if(ask!==false&&!confirm('🧪 '+J[1]+'에 막 들어선 마을로 새로 시작할까요?\n지금 테스트 판은 사라져요(아이 저장은 그대로예요).'))return false;
+  state=jumpState(J[0],state.age);world=freshWorld();resetView();$('ending').hidden=true;$('start').hidden=true;
+  T.last=null;T.tok=null;T.wrongAt=null;newRound();
+  if(state.run.bell===1){syncKing(true);bellOpen()}
+  T.note='🧪 '+J[1]+'에 막 들어선 마을로 시작했어요';save();render();show();return true;
+ }
+
  /* ---------- 막대 ---------- */
  const css=
   '#testBar{position:fixed;left:0;right:0;bottom:0;z-index:60;display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:7px max(12px,env(safe-area-inset-right)) calc(7px + env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));background:#14231dee;color:#e9f3df;font-size:12px;line-height:1.35;box-shadow:0 -3px 0 #0003}'+
@@ -143,8 +189,11 @@
   'html.test-mode{scroll-padding-bottom:78px}body.test-mode main{padding-bottom:86px}'+
   '@media(min-width:761px){body.test-mode .scene{height:clamp(380px,calc(100svh - 382px),760px)}}'+
   '@media(min-width:761px) and (max-height:800px){body.test-mode .scene{height:clamp(360px,calc(100svh - 364px),760px)}}'+
+  '@media(min-width:760.02px) and (max-height:700px){body.test-mode .scene{height:300px;height:clamp(300px,calc(100svh - 304px),760px)}}'+
   '@media(min-width:761px) and (max-aspect-ratio:1/1){body.test-mode .scene{height:clamp(380px,calc(48svh - 64px),760px)}body.test-mode.long-read .scene{height:clamp(320px,calc(38svh - 64px),620px)}}'+
-  '@media(max-width:1020px){#testBar .tm-label{display:none}}'+
+  '#testBar #tmJump{flex:none;min-height:44px;max-width:150px;padding:6px 8px;font-size:14px;font-weight:700;border-radius:12px;color:#31503d}'+
+  /* 좁은 넓은 화면(패드 세로 820 등): 한 줄에 들도록 이름표는 🧪만(머리글에 '테스트 모드'가 있다), 글 칸·속도 칸을 줄인다 */
+  '@media(max-width:1020px){#testBar .tm-label{display:none}#testBar .tm-tag{font-size:0;padding:3px 7px}#testBar .tm-tag:before{content:"🧪";font-size:14px}#testBar .tm-info{flex-basis:60px}#testBar .tm-speed button{min-width:44px;padding:6px 7px}#testBar #tmJump{max-width:104px}}'+
   '@media(max-width:760px){html.test-mode{scroll-padding-bottom:150px}body.test-mode main{padding-bottom:160px}#testBar{gap:6px;padding:6px 8px}#testBar .tm-info{flex-basis:100%;order:2}#testBar button{min-height:40px;padding:5px 9px}#testBar #tmNext{min-width:90px}#tmPerf{bottom:122px}}';
  {const st=el('style');st.textContent=css;(document.head||document.body).append(st)}
  document.body.classList.add('test-mode');try{document.documentElement.classList.add('test-mode')}catch{}
@@ -158,7 +207,10 @@
  const wrongBtn=el('button',{type:'button',id:'tmWrong',title:'읽는 시간을 채운 뒤 틀린 보기를 눌러요'},'✖ 틀리기');wrongBtn.onclick=wrong;
  const nextBtn=el('button',{type:'button',id:'tmNext',title:'읽는 시간을 빨리 감은 뒤 정답을 눌러요'},'다음 ▶');nextBtn.onclick=next;
  const perfBtn=el('button',{type:'button',id:'tmPerfBtn',title:'성능 표시(FPS · 그리기 호출 · 삼각형 · 단계) 켜기/끄기','aria-label':'성능 표시'},'📊');perfBtn.onclick=()=>setPerf(!opt.perf);
- bar.append(tag,info,label,speedBox,autoBtn,perfBtn,wrongBtn,nextBtn);document.body.append(bar);
+ const jumpSel=el('select',{id:'tmJump','aria-label':'단계로 바로 가기',title:'그 단계에 막 들어선 마을로 새로 시작해요(확인 한 번)'});
+ jumpSel.append(el('option',{value:''},'🗺️ 단계로'));for(const [k,n] of JUMPS)jumpSel.append(el('option',{value:k},n));
+ jumpSel.onchange=()=>{const k=jumpSel.value;jumpSel.value='';if(k)jump(k)};
+ bar.append(tag,info,label,speedBox,autoBtn,perfBtn,jumpSel,wrongBtn,nextBtn);document.body.append(bar);
  const perfEl=el('div',{id:'tmPerf',role:'status','aria-label':'성능'});document.body.append(perfEl);
  try{const h=document.querySelector&&document.querySelector('header small');if(h){const s=el('span',{class:'tm-head'},'🧪 테스트 모드');h.append(' · ',s)}}catch{}
 
@@ -181,7 +233,7 @@
   set(nowEl,s);set(lastEl,T.note||lastText());
   for(const k of ORDER){const v=String(opt.speed===k);if(speedBtns[k].getAttribute('aria-pressed')!==v)speedBtns[k].setAttribute('aria-pressed',v)}
   set(autoBtn,opt.auto?'⏯ 자동 켬':'⏯ 자동 끔');autoBtn.setAttribute('aria-pressed',String(opt.auto));
-  nextBtn.disabled=!!j;wrongBtn.disabled=!!j||paused||phase!=='ask';
+  nextBtn.disabled=!!j;wrongBtn.disabled=!!j||paused||phase!=='ask';jumpSel.disabled=!!j;
   perfBtn.setAttribute('aria-pressed',String(opt.perf));perfEl.hidden=!opt.perf;
  }
 
@@ -213,7 +265,7 @@
  tick=function(){baseTick();watch();if(opt.auto&&!T.job)autoStep();show()};
  show();
  /* 검사·프로듀서 콘솔용 */
- window.__testmode={get speed(){return opt.speed},get auto(){return opt.auto},get perf(){return opt.perf},setPerf,perfNow:perfTick,get job(){return T.job&&{...T.job}},get last(){return T.last&&{...T.last}},get done(){return T.done&&{...T.done}},get note(){return T.note},
+ window.__testmode={get speed(){return opt.speed},get auto(){return opt.auto},get perf(){return opt.perf},setPerf,perfNow:perfTick,jump,jumpState,JUMP_BASE:JSON.parse(JSON.stringify(JUMP_BASE)),JUMPS:JUMPS.map(j=>j.slice()),get job(){return T.job&&{...T.job}},get last(){return T.last&&{...T.last}},get done(){return T.done&&{...T.done}},get note(){return T.note},
   next,wrong,setSpeed,setAuto,plan:()=>phase==='ask'&&round?{t:round.t,target:target(),tries:round.tries,lock:round.lock,dash:round.dash}:null,
   frame(){if(T.job)ffFrame();return !!T.job},drain(max){let n=0;while(T.job&&n<(max||5000)){ffFrame();n++}return n},SPEED:JSON.parse(JSON.stringify(SPEED)),RETRY,AFTER_LOCK,OPT_KEY};
 })();

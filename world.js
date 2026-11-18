@@ -212,21 +212,25 @@
 
   /* ---------- 경제 상태(Combat)와 맞추기 ----------
      타워 = 1 + s.level(첫 타워는 처음부터): 빈 자리부터 세우고, 그 단계 자리가 다 차면 가장 낮은 타워(같으면 서 있는 것, 그다음 앞 자리)를 한 층 올린다.
-       층은 내려가지 않는다(회관이 커져 자리가 늘어도 이미 올린 층은 그대로, 새 자리는 다음 타워부터 채움). 언제나 층의 합 = 1 + s.level.
+       층은 내려가지 않는다(회관이 커져 자리가 늘어도 이미 올린 층은 그대로, 새 자리는 다음 타워부터 채움). 언제나 층의 합 = 1 + s.level(0.14.2: 회관이 오를 참인 보류 중에만 모자랄 수 있다, sync 참고).
      울타리 = s.fence(0~18): 6면을 앞에서부터 한 겹씩, 다 막으면 다시 앞에서부터 두 겹·세 겹(가장 얇은 면부터). fenceLayers 참고.
      닭 = s.chickens(최대 20), 회관 단계 = s.hall. 잡혀간 닭은 index.html이 s.chickens를 줄여서 반영한다. */
   /* 울타리 산 수 n(0~18) → 6면의 겹 수 [0~3, …] */
   const fenceLayers=n=>{const f=Math.max(0,Math.min(18,n|0)),out=[];for(let k=0;k<6;k++)out.push(f>k?Math.min(3,1+Math.floor((f-1-k)/6)):0);return out};
   /* opt.hold(0.14): 단계·회관이 오르는 것을 세계에 아직 반영하지 않는다(화면이 문제를 읽는 동안 산 것은 문제 사이에 넓힌다. 그동안 반지름·열린 길·타워 자리·새 건물은 그대로).
-     처음 맞추는 세계(w.stage 없음)는 hold여도 바로 맞춘다 */
+     처음 맞추는 세계(w.stage 없음)는 hold여도 바로 맞춘다.
+     0.14.2: 보류 중에 회관이 오르면(타워 자리가 늘어날 참이면) 자리가 다 찼어도 층을 올리지 않고 기다린다. 보류를 풀 때 늘어난 바깥 자리에 선다(문제 사이에 산 것과 같은 배치).
+       전에는 옛 자리 수로 맞춰 안쪽 타워의 층이 되었고, 층은 내려가지 않아 새 자리가 빈 채로 남았다(리뷰 1번) */
   function sync(w,s,opt){
+    let wait=false;
     if(stagesOn()){
       if(!(opt&&opt.hold&&hasStage(w))){w.hall=Math.max(0,Math.min(3,s.hall|0));w.stage=Math.max(hasStage(w)?w.stage:0,Math.max(0,Math.min(STAGE_MAX,combat().stage(s)|0)))}
+      else wait=Math.max(0,Math.min(3,s.hall|0))>w.hall;
     }else{w.hall=Math.max(0,Math.min(3,s.hall|0));if('stage' in w)delete w.stage}
     const R=radius(w);
     const want={coop:1,market:1,nursery:w.hall>=1?1:0,barn:w.hall>=3?1:0};
     for(const kind of Object.keys(want))if(want[kind]&&!w.buildings.some(b=>b.kind===kind)){const [x,z]=PLACE[kind];w.buildings.push({id:id(w),kind,x,z,hp:HP[kind],max:HP[kind],broken:false})}
-    syncTowers(w,Math.max(1,Math.min(TOWER_UNITS,1+(s.level|0))));
+    syncTowers(w,Math.max(1,Math.min(TOWER_UNITS,1+(s.level|0))),wait);
     const layers=fenceLayers(s.fence);
     for(let k=0;k<6;k++){
       let f=w.buildings.find(b=>b.kind==='fence'&&b.side===k);const L=layers[k];
@@ -248,7 +252,8 @@
     return w;
   }
   const TOWER_UNITS=20; /* 타워 수(층 포함) 상한 = 경제의 1 + 19 */
-  function syncTowers(w,units){
+  /* wait(0.14.2): 보류 중이고 회관이 오를 참이라 자리가 곧 늘어난다. 빈 자리는 채우되 층은 올리지 않는다(그동안 층의 합 < 1 + s.level, 보류를 풀면 맞춰진다) */
+  function syncTowers(w,units,wait){
     const slots=towerSlots(w.hall).length;
     /* 그 단계에 없는 자리의 타워(망가진 저장)는 버린다 */
     if(w.buildings.some(b=>b.kind==='tower'&&!(b.slot<slots)))w.buildings=w.buildings.filter(b=>b.kind!=='tower'||b.slot<slots);
@@ -256,7 +261,7 @@
     /* 빈 자리부터 채운다(망가진 저장에서 타워 하나가 빠져도 자리가 겹치지 않게) */
     for(let i=0;i<slots&&sum<units;i++)if(!w.buildings.some(b=>b.kind==='tower'&&b.slot===i)){const [x,z]=ALL_SLOTS[i];w.buildings.push({id:id(w),kind:'tower',slot:i,floor:1,x,z,hp:HP.tower,max:HP.tower,broken:false,cd:0,stun:0});sum++}
     /* 자리가 다 찼으면 가장 낮은 타워부터 한 층씩(같은 높이면 서 있는 타워, 그다음 앞 자리) */
-    while(sum<units){let low=null;for(const b of w.buildings)if(b.kind==='tower'&&(!low||b.floor<low.floor||b.floor===low.floor&&(b.broken!==low.broken?low.broken:b.slot<low.slot)))low=b;if(!low)break;low.floor++;sum++}
+    while(!wait&&sum<units){let low=null;for(const b of w.buildings)if(b.kind==='tower'&&(!low||b.floor<low.floor||b.floor===low.floor&&(b.broken!==low.broken?low.broken:b.slot<low.slot)))low=b;if(!low)break;low.floor++;sum++}
     /* 경제보다 많으면(망가진 저장·상한 보정) 가장 높은 타워(같으면 뒤 자리)부터 낮추고, 1층이면 없앤다 */
     while(sum>units){let hi=null;for(const b of w.buildings)if(b.kind==='tower'&&(!hi||b.floor>hi.floor||b.floor===hi.floor&&b.slot>hi.slot))hi=b;if(!hi)break;if(hi.floor>1)hi.floor--;else w.buildings.splice(w.buildings.indexOf(hi),1);sum--}
   }

@@ -673,8 +673,8 @@ a.tick(30);eq(a.api.round,null,'시작 화면에서는 문제 없음');eq(a.api.
 for(const id of ['battle','next','shield','combatInfo','buildPrompt','buyChicken','buyFence','timebar','timeFill','wolfHead','timeTag','choices','cards','skip','gainLine','gainParts'])ok(!html.includes('id="'+id+'"'),'없앤 요소: '+id);
 ok(!html.includes('소리 도움말'),'정답을 글자로 보여 주던 소리 도움말 제거');ok(!src.includes('다음 무리')&&!src.includes('barLeft')&&!src.includes('secondsLeft'),'늑대 시간 표시(초·막대) 코드 없음');
 ok(!src.includes('enterPick')&&!src.includes('picks')&&!src.includes('offers('),'카드 고르기 단계 코드 없음');
-ok(html.includes('src="combat.js?v=0.14.1"')&&html.includes('src="world.js?v=0.14.1"')&&html.includes('src="questions.js?v=0.14.1"')&&html.includes('src="village.js?v=0.14.1"')&&src.includes("s.src='testmode.js?v=0.14.1'")&&!html.includes('?v=0.12')&&!/\?v=0\.14"/.test(html),'캐시 갱신용 ?v=0.14.1');
-ok(html.indexOf('src="questions-gen.js?v=0.14.1"')>0&&html.indexOf('src="questions-gen.js?v=0.14.1"')<html.indexOf('src="questions.js?v=0.14.1"'),'생성 문항 파일을 questions.js보다 먼저 불러옴');
+ok(html.includes('src="combat.js?v=0.14.2"')&&html.includes('src="world.js?v=0.14.2"')&&html.includes('src="questions.js?v=0.14.2"')&&html.includes('src="village.js?v=0.14.2"')&&src.includes("s.src='testmode.js?v=0.14.2'")&&!html.includes('?v=0.12')&&!/\?v=0\.14"/.test(html),'캐시 갱신용 ?v=0.14.2');
+ok(html.indexOf('src="questions-gen.js?v=0.14.2"')>0&&html.indexOf('src="questions-gen.js?v=0.14.2"')<html.indexOf('src="questions.js?v=0.14.2"'),'생성 문항 파일을 questions.js보다 먼저 불러옴');
 /* 0.11: 듣고 고르기 모드 폐쇄. 시작 화면·설정에 모드 고르기가 없고, 스크립트에 소리 모드 분기가 없다 */
 for(const id of ['startSound','startStory','mode'])ok(!html.includes('id="'+id+'"'),'없앤 모드 버튼: '+id);
 ok(!html.includes('mode-row')&&!html.replace(/<script>[\s\S]*?<\/script>/,'').includes('듣고 고르기'),'화면에 모드 고르기·듣고 고르기 문구 없음');
@@ -769,8 +769,12 @@ for(const age of Q.AGES)for(const mode of Q.MODES){
 a=seed({age:7,index:3});a.go();a.tick(20);const wt7=a.api.world.t,iv7=a.api.world.interval;a.n.age.value='10';a.n.age.onchange();shows(a,10,'story',3,'문제 중 전환');eq(a.api.world.t,wt7,'전환해도 늑대 세계는 그대로');eq([iv7,a.api.world.interval],[ivFor(7,a.api.state.seed,3),ivFor(10,a.api.state.seed,3)],'무리 간격은 새 나이에 맞춤');ok(ivFor(10,1)>ivFor(7,1),'(10세 간격이 7세보다 김)');
 eq(a.n.feedback.textContent,'10세 문제로 바꿨어요. 늑대는 그대로 와요.','전환 안내에 모드 이름 없음');eq(a.n.drawerSummary.textContent,'⚙️ 설정 · 10세','설정 요약');
 a=fresh();a.go();a.unlock();a.right();a.n.age.value='7';a.n.age.onchange();shows(a,8,'story',0,'정답 뒤(판매 연출 중)에는 그대로');ok(a.n.feedback.textContent.includes('다음 문제부터 7세'),'다음부터 적용 안내');a.tick(REWARD);shows(a,7,'story',1,'다음 문제는 7세');
-{const L1=Array.from({length:2000},(_,k)=>k).find(k=>Q.at(8,'story',k,1).lap===1);a=seed({index:L1,seed:1});a.go();const q=Q.at(8,'story',L1,1),lap1=a.n.answers.children.map(b=>b.dataset.i).join();
- eq(lap1,q.choices.map((_,i)=>String((i+1)%q.choices.length)).join(),'두 바퀴째는 보기를 한 칸 돌림')}
+{const L1=Array.from({length:2000},(_,k)=>k).find(k=>Q.at(8,'story',k,1).lap===1);a=seed({index:L1,seed:1});a.go();const q=Q.at(8,'story',L1,1);
+ eq(a.n.answers.children.map(b=>b._t),q.choices,'보기는 Questions.at()가 정한 순서 그대로(두 바퀴째도 화면이 따로 돌리지 않음)');
+ eq(a.n.answers.children.map(b=>b.dataset.i).join(),q.choices.map((_,i)=>String(i)).join(),'버튼 번호 = at() 보기 번호');
+ /* 불러오기 직후에도 같은 순서·같은 정답(저장에는 보기 순서가 없고 at()가 다시 만든다) */
+ const before=a.n.answers.children.map(b=>b._t);a.n.pause.click();const b2=boot();b2.go();eq(b2.n.answers.children.map(b=>b._t),before,'이어서 하기: 같은 보기 순서');eq(b2.api.round.q.answer,q.answer,'이어서 하기: 같은 정답 자리');
+ b2.unlock();b2.right();eq(b2.api.round.result,'first','이어서 한 문제를 정답으로 판정')}
 
 /* 2-9 저장·복원(늑대 세계 포함) */
 a=fresh();a.go();a.unlock();a.right();g0=a.api.state.gold;eq(JSON.parse(saved[KEY]).round,null,'판매 연출 중 저장: 하던 문제 없음(금화는 이미 받음)');
@@ -1581,6 +1585,92 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   {const K=L.KEEP;for(const p of W.ALL_SLOTS)ok(d2(K.at,p)>=1.2+K.r,'성탑: 타워 자리와 1.2 이상');for(const p of W.HOMES)ok(d2(K.at,p)>=.9+K.r,'성탑: 닭 자리와 0.9 이상');ok(d2(K.at,W.PLACE.nursery)>=SIZE.nursery+K.r+.3&&d2(K.at,W.PLACE.coop)<2,'성탑: 회관 바로 뒤, 작은 닭장과는 떨어짐')}
   ok(L.ROAD.r0>W.STAGE.radius[0]&&L.ROAD.r0<W.STAGE.radius[1]-.4&&L.ROAD_MARK.out>0&&L.ROAD_MARK.side>L.ROAD.edge/2+.4,'늑대 길은 마을 가장자리 안쪽에서 시작하고, 길목 표시는 울타리 밖 · 길 양옆');
  });
+ /* ---------- 0.14.2 리뷰 수정(work\verification-20261113\review-v014\report.md 1·3·5·7·10번) ---------- */
+ const towersOf=w=>w.buildings.filter(b=>b.kind==='tower').map(b=>[b.slot,b.floor]).sort((p,q)=>p[0]-q[0]);
+ const ring=(n,f)=>Array.from({length:n},(_,i)=>[i,f?f(i):1]);
+ /* R-1 보류 중에 산 타워가 회관 승급을 부르면 안쪽 타워의 층이 되지 않고, 보류를 풀 때 새 바깥 자리에 선다(재현: 8세, 지은 수 13, 타워 6개 = 0단계 자리 6개가 다 참, 읽는 중 타워 구매) */
+ {const a=seed({age:8,level:5,fence:4,chickens:5,gold:900,seed:5},{view:true});a.go();calmWorld(a);
+  let g=a.game();eq([g.stage.now,g.state.hall,towersOf(a.api.world)],[1,0,ring(6)],'(8세 지은 수 13 = 마을, 타워 6개로 0단계 자리가 다 참)');
+  a.tick(5);a.buy('tower');g=a.game();
+  eq([a.api.phase,g.stage.rule,g.stage.now,g.stage.due,g.state.level,g.state.hall,g.stage.hall],['ask',2,1,true,6,1,0],'(읽는 중에 7번째 타워: 규칙은 장터 마을·회관 1, 세계는 보류)');
+  eq(towersOf(a.api.world),ring(6),'보류 중: 안쪽 타워의 층을 올리지 않고 기다림');
+  /* R-10 그림 화면(3D를 못 쓰는 기기)의 회관도 보류를 지킨다 */
+  const art=()=>{const gd=a.n.garden.children;return [a.n.houseArt.src.split('/').pop(),a.n.villageExtra.children.some(e=>e.alt==='가게'),gd[gd.length-1].textContent.match(/회관 \d단계/)[0]]};
+  eq(art(),['home-01.png',false,'회관 0단계'],'그림 화면: 보류 중에는 회관 그림·가게·이름이 그대로(3D의 world.hall과 같음)');
+  let floors=0;for(let i=0;i<20;i++){a.tick(1);floors+=a.api.world.buildings.filter(b=>b.kind==='tower'&&b.floor>1).length}eq(floors,0,'보류가 이어지는 20틱 동안 층이 오른 타워 0');
+  a.unlock();a.right();g=a.game();eq([a.api.phase,g.stage.now,g.stage.hall,g.world.radius],['reward',2,1,11.5],'(답한 순간 장터 마을)');
+  const held=towersOf(a.api.world);eq(held,ring(7),'보류를 풀면 새 바깥 자리(6번)에 타워가 서고 층은 모두 1');eq(W.towerUnits(a.api.world),1+a.api.state.level,'층의 합 = 1 + level');
+  {const t=a.api.world.buildings.find(b=>b.kind==='tower'&&b.slot===6);ok(Math.hypot(t.x,t.z)<=W.radius(a.api.world)-1.4,'6번 자리('+t.x+','+t.z+')는 넓어진 울타리 안쪽')}
+  eq(art(),['home-02.png',true,'회관 1단계'],'그림 화면: 답한 순간 회관 그림·가게·이름이 바뀜');
+  /* 문제 사이(정답 연출 중)에 산 것과 같은 배치 */
+  const b=seed({age:8,level:5,fence:4,chickens:5,gold:900,seed:5});b.go();calmWorld(b);b.unlock();b.right();b.tick(5);b.buy('tower');eq(towersOf(b.api.world),held,'읽는 중에 산 것 = 문제 사이에 산 것(같은 타워 배치)');
+  /* 보류 중 이어하기: 저장된 세계는 층이 모자란 채이고, 불러오면 바로 새 자리에 */
+  const c=seed({age:8,level:5,fence:4,chickens:5,gold:900,seed:5});c.go();calmWorld(c);c.tick(5);c.buy('tower');c.unload();eq(towersOf(JSON.parse(saved[KEY]).world),ring(6),'(보류 중 저장: 타워 6개)');
+  const d=boot();eq([d.game().stage.now,towersOf(d.api.world)],[2,ring(7)],'보류 중에 나갔다 오면 장터 마을, 새 자리에 타워')}
+ /* R-1 세계 규칙: 보류 중 회관이 오를 참이면 층을 미루고(여러 단계를 한꺼번에 넘어도), 회관이 그대로인 보류는 0.14처럼 바로 층을 올린다 */
+ {const w=W.sync(W.create({seed:3}),built(4));eq([w.stage,w.hall,towersOf(w)],[0,0,ring(5)],'(농가, 타워 5개)');
+  const s=built(14);eq([s.hall,s.level+1],[1,15],'(지은 수 14 = 장터 마을, 회관 1, 타워 15개)');
+  W.sync(w,s,{hold:true});eq([w.stage,w.hall,towersOf(w)],[0,0,ring(6)],'농가 → 장터 마을을 한 문제에 넘는 보류: 빈 자리만 채우고 층은 미룸');
+  W.sync(w,s);eq([w.stage,w.hall,towersOf(w)],[2,1,ring(10,i=>i<5?2:1)],'풀면 새 자리 4곳을 먼저 채우고, 남은 5개는 층(0.14 규칙 그대로)');eq(W.towerUnits(w),15,'층의 합 = 15');
+  const v=W.sync(W.create({seed:3}),built(4)),t=built(7);eq([C.stage(t),t.hall],[1,0],'(지은 수 7 = 마을, 회관 0)');W.sync(v,t,{hold:true});
+  eq([v.stage,towersOf(v),W.towerUnits(v)],[0,ring(6,i=>i<2?2:1),8],'회관이 그대로인 보류(농가 → 마을)는 자리가 늘지 않으니 바로 층을 올림(0.14와 같음)')}
+ /* R-3 보류 중에 종이 열림(10세: 성 37 + 회관 3 = 40, 종 46). 종이 열리는 순간 미뤄 둔 성 전환을 풀어 왕이 넓어진 울타리 밖에 서고, 결전 중에는 전환이 없다.
+    재현: 10세 성곽 마을에서 읽는 중 7번 구매 → 종 → 답. 왕과 울타리 사이 거리는 한 순간이 아니라 종이 열린 뒤 내내 잰다 */
+ {const a=seed({age:10,level:10,fence:12,chickens:9,farmers:4,power:2,gold:30000,seed:5},{view:true});a.go();calmWorld(a);a.api.world.fox=null;/* 첫 문제의 여우가 닭을 물어 가면 지은 수가 줄어 종 문턱이 흔들린다 */
+  let g=a.game();eq([g.stage.now,g.state.hall,g.world.radius,g.state.run.bell,C.builtNew(g.state)],[4,2,18,0,38],'(10세 지은 수 36 + 회관 2 = 성곽 마을)');
+  a.tick(5);a.buy('tower');g=a.game();eq([a.api.phase,g.stage.rule,g.stage.now,g.stage.due,g.world.radius],['ask',5,4,true,18],'(읽는 중 1번째 구매: 규칙은 성, 세계는 보류)');
+  for(let i=1;i<7;i++){a.tick(5);a.buy(i%2?'fence':'tower')}g=a.game();
+  eq([a.api.phase,a.api.round.tries,g.state.run.bell,C.builtNew(g.state)],['ask',0,1,46],'(같은 문제를 읽는 중 7번째 구매에 종이 열림: 지은 수 46)');
+  eq([g.stage.now,g.stage.due,g.world.radius,g.king&&g.king.state],[5,false,22,'wait'],'종이 열리는 순간 미뤄 둔 성 전환을 풂(반지름 22), 늑대 왕은 그 둘레 숲에서 기다림');
+  {const bn=a.fx('banner').map(e=>e.textContent);ok(bn.length===1&&bn[0].startsWith('🏰성이 되었어요!'),'띠 알림: 성 전환이 먼저(늑대 왕 띠는 그다음 차례) '+JSON.stringify(bn))}eq(a.game().sfx.stage|0,1,'단계 효과음 1번');
+  let minGap=Infinity,back=0,prev=null;const radii=new Set();
+  const watch=()=>{const k=a.api.world.king,R=W.radius(a.api.world);radii.add(R);if(k){minGap=Math.min(minGap,k.r-R);if(prev!==null&&a.api.state.run.bell===2&&k.r>prev+1e-9)back++;prev=k.r}};
+  for(let i=0;i<5;i++){a.tick(1);watch()}
+  a.buy('bell');g=a.game();eq([g.state.run.bell,g.king.state,a.api.phase,a.api.round.tries],[2,'come','ask',0],'(종을 울림: 결전, 풀던 문제는 그대로)');
+  for(let i=0;i<80;i++){a.tick(1);watch()}eq(a.api.world.king.state,'stand','(왕이 멈춤 지점에 섬)');
+  const stageSfx=a.game().sfx.stage|0;a.unlock();a.right();g=a.game();watch();
+  eq([a.api.phase,g.stage.now,g.stage.due,g.world.radius,a.api.round.wait],['reward',5,false,22,12],'답한 순간: 단계 전환 없음(정답 연출은 평소 1.2초)');
+  ok(!a.fx('banner').some(e=>e.textContent.includes('되었어요'))&&(a.game().sfx.stage|0)===stageSfx,'결전 중 답에서 단계 띠 알림·효과음 없음');
+  for(let i=0;i<60;i++){a.tick(1);watch()}
+  ok(minGap>=W.KING.stop-3*W.KING.step-1e-9,'종이 열린 뒤 내내 왕은 울타리 밖(왕 거리 − 반지름 최소 '+minGap.toFixed(2)+' ≥ 0.6)');eq([back,[...radii]],[0,[22]],'결전 중 왕이 뒷걸음친 틱 0, 영역은 반지름 22 그대로')}
+ /* R-3 결전 중에 미뤄진 단계가 풀리면(보통은 종이 열릴 때 풀려 생기지 않음. 망가진 저장 등) 띠 알림·효과음·전환 연출 없이 영역만 세계를 따름 */
+ {const run={...C.freshRun(),bell:2,shields:0,fpick:[-1,-1,-1,-1,-1,-1]},a=seed({age:10,level:14,fence:16,chickens:12,farmers:4,power:3,gold:500,seed:5,index:40,run},{view:true});
+  a.go();calmWorld(a);a.api.world.fox=null;let g=a.game();eq([g.state.run.bell,!!a.api.round.fin,g.stage.now,g.world.radius],[2,true,5,22],'(결전 문제, 성)');
+  a.api.world.stage=4;eq(a.game().stage.due,true,'(세계 단계를 4로 되돌려 미뤄진 전환을 만듦)');
+  const n0=a.built.length;a.unlock();a.right();g=a.game();
+  eq([a.api.phase,g.stage.now,g.world.radius,g.state.run.shields],['reward',5,22,1],'결전 중 답: 영역은 성으로(반지름 22), 방패 하나 깸');
+  ok(!a.fx('banner').some(e=>e.textContent.includes('되었어요'))&&(g.sfx.stage|0)===0&&!a.built.slice(n0).includes('stage'),'결전 중에는 단계 띠 알림·효과음·전환 연출 없음')}
+ /* R-5 단계를 켠 채 설정의 나이(#age)를 바꿈: 문제 사이(정답 연출·정답 배우기)면 바로 넓히고, 읽는 중(ask)이면 그 문제를 답할 때 넓힌다.
+    8세 지은 수 26 = 물레방아 마을 → 10세 문턱(26)이면 성곽 마을 */
+ {const S26={age:8,level:8,fence:10,chickens:6,farmers:3,gold:300,seed:5},to10=x=>{x.n.age.value='10';x.n.age.onchange()};
+  const start=o=>{const x=seed(S26,o);x.go();calmWorld(x);x.api.world.fox=null;return x};
+  const a=start({view:true});let g=a.game();eq([g.stage.now,g.state.hall,g.world.radius],[3,1,14.5],'(8세 지은 수 26 = 물레방아 마을)');
+  a.unlock();a.right();eq(a.api.phase,'reward','(정답 연출 중)');to10(a);g=a.game();
+  eq([a.api.phase,g.state.age,g.stage.rule,g.stage.now,g.stage.due,g.state.hall,g.stage.hall,g.world.radius,a.api.round.wait],['reward',10,4,4,false,2,2,18,16],'정답 연출 중 10세로: 바로 성곽 마을(반지름 18, 회관 2), 화면이 물러나는 1.6초 동안 다음 문제를 띄우지 않음');
+  ok(a.built.includes('stage')&&a.fx('banner').some(e=>e.textContent.startsWith('🧱성곽 마을이 되었어요!')),'정답 연출 중: 전환 장면과 띠 알림');
+  const b=start();b.unlock();b.wrong();b.tick(C.DASH_TICKS+2);b.wrong(1);eq(b.api.phase,'learn','(두 번 틀려 정답 배우기)');to10(b);g=b.game();
+  eq([b.api.phase,g.stage.now,g.stage.due,g.world.radius],['learn',4,false,18],'정답 배우기 중 10세로: 바로 성곽 마을');
+  const c=start();c.tick(5);to10(c);g=c.game();
+  eq([c.api.phase,g.state.age,g.stage.rule,g.stage.now,g.stage.due,g.world.radius,g.stage.cell.pr],['ask',10,4,3,true,14.5,'✨ 곧!'],'읽는 중 10세로: 영역은 그대로, 8번째 칸은 "곧!"');
+  let grew=0;for(let i=0;i<30;i++){c.tick(1);if(W.radius(c.api.world)!==14.5)grew++}eq(grew,0,'읽는 동안 30틱 내내 넓어지지 않음');
+  c.unlock();c.right();g=c.game();eq([c.api.phase,g.stage.now,g.world.radius],['reward',4,18],'그 문제를 답한 순간 성곽 마을(다음 답까지 밀리지 않음)')}
+ /* R-7 ① 경제 저장이 버려져(모르는 버전) 새 판이 되면 늑대 세계도 새로: 성(단계 래치)이던 세계가 새 판으로 넘어가지 않음 */
+ {const s=built(55),w=W.sync(W.create({seed:9,interval:150}),s);for(let i=0;i<50;i++)W.step(w,s);eq([w.stage,w.t],[5,50],'(성, 50틱 흐른 세계)');const wr=JSON.parse(JSON.stringify({...w,events:[]}));
+  const bad=JSON.stringify({version:99,...s,gold:555,world:wr});saved={[KEY]:bad};const a=boot();const g=a.game();
+  eq([g.state.gold,g.state.level,g.stage.now,g.world.radius,a.api.world.t,a.api.world.buildings.filter(b=>b.kind==='tower').length],[20,1,0,7,0,2],'모르는 버전의 경제 저장 → 새 판, 세계도 새로(농가, 반지름 7, 타워 2개, 시계 0)');
+  eq(saved[KEY+'-bak'],bad,'버리기 전 원본은 -bak에 그대로');
+  saved={[KEY]:JSON.stringify({version:3,...s,world:wr})};const b=boot();eq([b.game().stage.now,b.game().world.radius,b.api.world.t],[5,22,50],'(대조: 버전 3 저장은 세계도 이어받음)')}
+ /* R-7 ② 주소 ?stages=0은 '-stages0' 열쇠에 따로 저장: 아이 저장(세계의 단계 래치 포함)을 읽지도 쓰지도 않는다.
+    전: 같은 저장을 끈 채로 맞추면 world.stage를 지워, 닭을 잃은 마을을 보통 주소로 다시 열면 지은 수로 다시 세어 영역이 줄었다 */
+ {const kid=seed({age:8,level:8,fence:10,chickens:6,farmers:3,gold:300,seed:5});kid.go();kid.tick(10);kid.unload();
+  const k0=JSON.parse(saved[KEY]);eq(k0.world.stage,3,'(아이 저장: 물레방아 마을)');k0.chickens=2;const kidRaw=JSON.stringify(k0);saved={[KEY]:kidRaw};
+  eq(C.stage(C.restore(k0,Q.AGES)),2,'(닭을 잃어 지은 수 22: 지은 수로만 세면 장터 마을)');
+  withFlags({},()=>{const d=boot({query:'?stages=0'});eq([d.api.KEY,d.api.state.gold,d.game().stage.on,'stage' in d.api.world],[KEY+'-stages0',20,false,false],'?stages=0: 따로 저장하는 새 판(단계 끔)');
+   d.go();d.tick(30);d.unload();ok(JSON.parse(saved[KEY+'-stages0']).version===3,'?stages=0 진행은 -stages0 열쇠에');eq(saved[KEY],kidRaw,'아이 저장은 한 글자도 바뀌지 않음');
+   eq([boot({query:'?test=1&stages=0'}).api.KEY,boot({query:'?routes=0'}).api.KEY],[KEY+'-stages0-test',KEY],'열쇠: 테스트 모드와 함께면 -stages0-test, ?routes=0은 아이 저장');
+   ok(src.includes("(DEMO?'hangul-defense-demo'+DEMO:'hangul-defense-v1'+(STAGES_OFF?'-stages0':''))+(TEST?'-test':'')"),'열쇠 식: 체험(demo)은 원래 따로라 그대로(가짜 DOM은 체험 주소를 띄우지 못해 식으로 확인)')});
+  ok(C.FLAGS.STAGES&&C.FLAGS.ROUTES,'(주소가 바꾼 손잡이 되돌림)');
+  const e=boot();eq([e.game().stage.rule,e.game().stage.now,e.game().world.radius],[2,3,14.5],'보통 주소로 다시 열면 래치 그대로(닭을 잃어도 물레방아 마을, 반지름 14.5)')}
 }
 
 /* ======================= 0.14.1 프로듀서 테스트 모드(주소 ?test=1, testmode.js) ======================= */
@@ -1600,7 +1690,7 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
  {const b=seed({age:7,seed:4242});b.go();b.unlock();b.rightNow();ok(b.api.round.info.guard<1,'대조: 열리자마자 누르면 찍기 막기 배수 '+b.api.round.info.guard.toFixed(2)+' < 1')}
  /* TM-2 켜짐: 막대, 따로 저장, 시작 화면에서 다음 ▶ = 시작하기 */
  saved={[KEY]:kid};const a=boot({query:TQ}),T=a.window.__testmode,u=UI(a);
- ok(T&&u.bar&&a.document.body.classList.contains('test-mode'),'test=1: 화면 아래 막대와 훅');ok(a.document.body.children.some(e=>e.tagName==='script'&&e.src==='testmode.js?v=0.14.1'),'test=1: testmode.js를 불러옴');
+ ok(T&&u.bar&&a.document.body.classList.contains('test-mode'),'test=1: 화면 아래 막대와 훅');ok(a.document.body.children.some(e=>e.tagName==='script'&&e.src==='testmode.js?v=0.14.2'),'test=1: testmode.js를 불러옴');
  eq([a.api.KEY,a.api.state.gold],[TKEY,20],'저장 열쇠는 -test, 아이 저장(금화 777)을 읽지 않고 새 판');
  eq([T.speed,T.auto,Object.keys(T.SPEED),Object.values(T.SPEED).map(s=>s.k),T.RETRY],['typ',false,['slow','typ','fast'],[1.8,1,.62],.35],'아이 속도 느림·보통·빠름 = 시뮬 아이 모형(× 1.8 · 1 · 0.62, 두 번째 × 0.35), 기본 보통·자동 끔');
  eq([u.speed('typ').getAttribute('aria-pressed'),u.auto.textContent,u.wrong.disabled,u.now()],['true','⏯ 자동 끔',true,'시작 화면 · 다음 ▶ = 시작하기'],'막대 처음 모습');
@@ -1671,6 +1761,30 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   const goal=readT(b.api.round.q,1);U.next.click();M.drain();eq([b.api.state.run.shields,b.api.state.run.bell,b.api.phase,M.last.t,b.api.round.info.guard],[6,3,'reward',goal,1],'결전: 다음 ▶으로 마지막 방패를 깸(그 시간에 한 번에 맞힘)');
   U.next.click();M.drain();eq([b.api.phase,b.n.ending.hidden],['ending',false],'달아나는 장면을 감고 엔딩 카드');eq(U.now(),'엔딩 · 다음 ▶ = 새 마을로 떠나기','막대 안내');
   U.next.click();eq([b.api.phase,b.api.state.run.no,b.n.ending.hidden],['ask',2,true],'엔딩에서 다음 ▶ = 새 마을로 떠나기');ok(!(KEY in saved),'아이 저장 열쇠는 쓰지 않음')}
+ /* TM-11 🗺️ 단계로 바로 가기: 지금 나이 그대로, 그 나이 문턱에 꼭 맞게 '막 들어선' 마을로 새로 시작. Combat.stage · 세계 반지름 · 열린 길 · 회관 · 종,
+    첫 문제에 여우가 밀려오지 않음, 지은 것은 시뮬 중앙값(8세 보통 · 3개씩, scripts/stage-seeds.cjs) 비례, 아이 저장 불변 */
+ {const HALL=[0,0,1,1,2,3];let rows=0;
+  for(const age of [8,7,9,10]){
+   saved={[KEY]:kid};const b=boot({query:TQ}),M=b.window.__testmode,U=UI(b),sel=U.bar.children.find(e=>e.attrs.id==='tmJump');
+   if(age===8)eq(sel.children.map(o=>o.textContent),['🗺️ 단계로','🏡 농가','🏘️ 마을','🏪 장터 마을','💧 물레방아 마을','🧱 성곽 마을','🏰 성','🔔 결전 직전(종 열림)'],'바로 가기 칸: 6단계 + 결전 직전');
+   if(age!==8)b.n.ageRow.children.find(x=>x.dataset.age===String(age)).click();
+   for(const [key,name] of M.JUMPS){const tag=age+'세 '+name;
+    sel.value=key;sel.onchange();
+    const s=b.api.state,w=b.api.world,g=b.game(),k=key==='bell'?5:Number(key),cnt=C.stageCount(s),bn=C.builtNew(s);
+    eq([b.api.phase,b.n.start.hidden,sel.value,s.age,C.stage(s),w.stage,W.radius(w),W.routes(w),s.hall,w.hall],['ask',true,'',age,k,k,W.STAGE.radius[k],k>0?W.STAGE.open[k]:null,HALL[k],HALL[k]],tag+': 단계 · 반지름 · 열린 길 · 회관');
+    if(key==='0')eq([cnt,s.level,s.chickens,s.gold,s.index],[1,1,1,20,0],tag+': 새 판 그대로');
+    else{const goal=key==='bell'?C.bellBuilt({age})-3:C.stageAt({age})[k];eq(cnt,goal,tag+': 지은 수(회관 뺌) = 그 나이 문턱 '+goal);
+     if(k<5)ok(cnt<C.stageAt({age})[k+1],tag+': 다음 단계 문턱 아래');eq(s.gold,M.JUMP_BASE[key].gold,tag+': 금화 = 시뮬 중앙값');ok(s.level>=1&&s.chickens>=1,tag+': 시작 타워·닭')}
+    if(key==='bell')eq([s.run.bell,bn,g.king&&g.king.state,b.slots()[7].dataset.key],[1,C.bellBuilt({age}),'wait','bell'],tag+': 종이 막 열리고 늑대 왕이 기다림');
+    else eq([s.run.bell,g.king],[0,null],tag+': 종은 아직');
+    eq([g.fox,s.run.fox],[null,(s.hall|0)>=C.FOX.needHall?C.FOX.at.filter(n=>bn>=n).length:0],tag+': 지나온 여우 문턱은 이미 지남(첫 문제에 여우가 밀려오지 않음)');
+    if(age===8&&key!=='0'){const B=M.JUMP_BASE[key];ok(['level','fence','chickens','farmers','pond','power'].every(f=>Math.abs(s[f]-B[f])<=2),tag+': 지은 것 = 시뮬 중앙값(±2, 문턱에 맞춤) '+JSON.stringify([s.level,s.fence,s.chickens,s.farmers,s.pond,s.power]))}
+    rows++}
+   /* 바로 간 마을에서 그대로 이어서 놀 수 있다: 결전 직전 → 다음 ▶ → 종 → 결전 문제는 판 기록에서 고름 */
+   M.next();M.drain();eq(b.api.phase,'reward',age+'세 결전 직전: 다음 ▶으로 바로 풀 수 있음');M.next();M.drain();b.tick(5);b.buy('bell');
+   ok(b.api.state.run.bell===2&&b.api.state.run.fpick.length===C.FINALE.shields&&b.api.state.run.fpick.some(i=>i>=0),age+'세: 종을 울리면 결전(판 기록에서 문제를 고름) '+JSON.stringify(b.api.state.run.fpick));
+   b.unload();eq(saved[KEY],kid,age+'세 바로 가기: 아이 저장 그대로');eq(JSON.parse(saved[TKEY]).age,age,age+'세: 테스트 저장에 바로 간 판')}
+  eq(rows,28,'나이 4 × 바로 가기 7')}
 }
 
 eq(spoken,0,'검사 전체에서 음성 합성(speechSynthesis)을 한 번도 부르지 않음');

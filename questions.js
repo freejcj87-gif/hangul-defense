@@ -476,11 +476,11 @@
   }
   const hash=str=>{let h=2166136261;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0};
   const rng=a=>()=>{a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
-  const GAP=10,STEP=.5,MEMO=new Map();
+  const GAP=10,STEP=.5,MEMO=new Map(),MEMO_MAX=192;
   /* 같은 묶음(한 판에서 멀리 띄울 문항): 같은 지문의 질문들, 7세는 같은 낱말(낱말 → 그림, 그림 → 낱말) */
   const grp=q=>q.mode!=='story'?q.id:q.age===7?(HANGUL_RE.test(q.passage)?q.passage:q.choices[q.answer]):q.passage;
   const TIER=8;
-  const memo=(key,f)=>{if(MEMO.has(key))return MEMO.get(key);if(MEMO.size>96)MEMO.clear();const v=f();MEMO.set(key,v);return v};
+  const memo=(key,f)=>{if(MEMO.has(key))return MEMO.get(key);if(MEMO.size>MEMO_MAX)MEMO.clear();const v=f();MEMO.set(key,v);return v};
   function rawOrder(age,pool,list,seed,lap){
     return memo('r|'+age+'|'+pool+'|'+seed+'|'+lap,()=>{
       const r=rng(hash(age+'|'+pool+'|'+seed+'|'+lap)),n=list.length,w=list.map(q=>r()+((q.level||2)-1)*STEP);
@@ -499,6 +499,40 @@
       return c;
     });
   }
+  /* ---------- 보기 순서(2026-11-17 감사 후속) ----------
+     화면은 at()가 준 보기 순서를 그대로 보여 준다(예전의 '두 바퀴째 한 칸 돌리기'는 이것으로 대신함).
+     정답 자리: 20칸 묶음마다 (나이, 씨앗, 묶음)으로 정한다. 묶음 안에서는 같은 자리가 RUN_MAX(3)번까지만 이어지고,
+     묶음의 처음 두 칸과 끝 두 칸은 서로 달라 묶음 경계에서도 2번까지만 이어진다 → 같은 자리 4연속 없음. 자리는 고르게 뽑는다.
+     나머지 보기(오답) 순서는 (나이, 씨앗, 번호)로 섞는다. 같은 (나이, 씨앗, 번호) = 같은 순서(이어하기·결전 문제도 같음).
+     '가장 큰·작은' 문항은 보기가 크기순으로 늘어서지 않게 오답 둘을 바꾼다. 은행 순서(get·quiz·snapshot)는 그대로다. */
+  const SPOT_BLOCK=20,RUN_MAX=3;
+  const choiceCount=(a,i)=>isQuiz(a,i)?QUIZ_CHOICES[a]:CHOICE_COUNT[a].story;
+  function answerSpots(a,s,b){
+    return memo('p|'+a+'|'+s+'|'+b,()=>{
+      const r=rng(hash('p|'+a+'|'+s+'|'+b)),out=[];
+      for(let j=0;j<SPOT_BLOCK;j++){
+        const n=choiceCount(a,b*SPOT_BLOCK+j),ban=new Set();
+        if(j>=RUN_MAX&&out.slice(j-RUN_MAX).every(v=>v===out[j-1]))ban.add(out[j-1]);
+        if(j===1||j===SPOT_BLOCK-1)ban.add(out[j-1]);
+        const can=[...Array(n).keys()].filter(v=>!ban.has(v));
+        out.push(can[Math.floor(r()*can.length)]);
+      }
+      return out;
+    });
+  }
+  const numOf=c=>{const m=String(c).match(/^(\d+)분의 (\d+)$/);return m?+m[2]/+m[1]:Number(c)};
+  const monotone=v=>v.every((x,k)=>!k||x>v[k-1])||v.every((x,k)=>!k||x<v[k-1]);
+  function arrange(q,a,s,i){
+    const n=q.choices.length,want=answerSpots(a,s,Math.floor(i/SPOT_BLOCK))[i%SPOT_BLOCK],p=want<n?want:want%n;
+    const r=rng(hash('c|'+a+'|'+s+'|'+i)),rest=q.choices.filter((_,k)=>k!==q.answer);
+    for(let k=rest.length-1;k>0;k--){const j=Math.floor(r()*(k+1));[rest[k],rest[j]]=[rest[j],rest[k]]}
+    rest.splice(p,0,q.choices[q.answer]);
+    if(/가장 (큰|작은)/.test(q.prompt)&&rest.every(c=>!Number.isNaN(numOf(c)))&&monotone(rest.map(numOf))){
+      const w=rest.map((_,k)=>k).filter(k=>k!==p);[rest[w[0]],rest[w[1]]]=[rest[w[1]],rest[w[0]]];
+    }
+    q.choices=rest;q.answer=p;return q;
+  }
+
   /* index번째 칸: kind, cat, 묶음 안 순번 seq, 바퀴 lap, 순열 자리 pos, 묶음 크기 size */
   function slot(age,mode,index,seed){
     const a=normAge(age),m=normMode(mode),i=normIndex(index),s=normSeed(seed);
@@ -531,11 +565,11 @@
       const i=Number.isFinite(index)?Math.floor(index):0;
       return qcopy(list[((i%n)+n)%n],false);
     },
-    /* 게임 문제(seed는 0 이상 정수, 기본 0): 같은 입력 = 같은 문항, lap = 몇 바퀴째(보기 돌리기). mode는 무엇을 넣어도 읽기(story) */
+    /* 게임 문제(seed는 0 이상 정수, 기본 0): 같은 입력 = 같은 문항·같은 보기 순서, lap = 몇 바퀴째. 보기는 화면에 보일 순서(arrange). mode는 무엇을 넣어도 읽기(story) */
     at(age,mode,index,seed){
-      const a=normAge(age),m=normMode(mode),s=normSeed(seed),t=slot(a,m,index,s);
-      if(t.kind==='quiz'){const list=QPOOL[a][t.cat],q=qcopy(list[lapOrder(a,'q-'+t.cat,list,s,t.lap)[t.pos]],false);q.lap=t.lap;return q}
-      const list=BANK[a][m],q=copy(list[lapOrder(a,m,list,s,t.lap)[t.pos]],false);q.lap=t.lap;return q;
+      const a=normAge(age),m=normMode(mode),s=normSeed(seed),i=normIndex(index),t=slot(a,m,i,s);
+      if(t.kind==='quiz'){const list=QPOOL[a][t.cat],q=qcopy(list[lapOrder(a,'q-'+t.cat,list,s,t.lap)[t.pos]],false);q.lap=t.lap;return arrange(q,a,s,i)}
+      const list=BANK[a][m],q=copy(list[lapOrder(a,m,list,s,t.lap)[t.pos]],false);q.lap=t.lap;return arrange(q,a,s,i);
     },
     /* 퀴즈 칸인지(모드·시드 무관), 그 20칸 묶음의 퀴즈 칸 수 */
     isQuiz(age,index){return isQuiz(normAge(age),normIndex(index));},
