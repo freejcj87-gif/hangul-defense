@@ -305,7 +305,7 @@ Playwright 시스템 의존성 설치는 WSL/Ubuntu 환경에 맞춰 수행하�
 - 브랜치 `claude/ending-economy`(worktree `work\claude-v012-ending`). 병합·배포 전입니다. origin/main(0.11.1 읽기 문항 확충, `427ba73`)을 병합해 두었습니다(캐시 버전 줄만 충돌, 0.12로 정리).
 - 검사: `node test-dom.cjs` PASS 9,123(0.11.1 문항 기준. 3-1 ~ 3-12가 0.12 엔딩·경제·피드백 검사), `node test-questions.cjs` PASS 44,208(문항 파일은 고치지 않음), `node --check test.cjs` 통과, `node scripts/build-pages.cjs` 성공(31개 파일).
 - 시뮬: `node scripts/sim-village.cjs end 12` — 엔딩까지 문제 수는 16칸 모두 설계 v2 표의 ±20% 안, 분은 11칸(벗어난 5칸은 9·10세, 설계가 가정한 지문 묶음이 아직 없어서), 10분 붕괴 192판 중 0판. 표는 기획서 §11.4.
-- `node test.cjs`(Playwright): 로컬에서 전체 PASS 1,590(두 번 연속 통과). 처음 돌렸을 때의 실패 2건은 모두 검사 가정이었습니다(무리 간격이 13~20초라고 본 fallback 발자국 대기 200틱, demo의 "한 시점에 늑대 10마리" → 간격만큼 대기·흘리는 동안의 최댓값으로). flow에 엔딩 흐름, demo에 3D 늑대 왕·여우 확인을 더했습니다. 캡처로 보고 고친 것: 별 방패 줄과 알림 띠 겹침(결전 중 띠를 아래로), 기다리는 왕이 화면 아래로 잘림(대기 자리 반지름 + 4), 여우가 너무 작음(0.7 → 1.15). 대표 캡처는 저장소 밖 `workerification-20261113012-shots`.
+- `node test.cjs`(Playwright): 로컬에서 전체 PASS 1,590(두 번 연속 통과). 처음 돌렸을 때의 실패 2건은 모두 검사 가정이었습니다(무리 간격이 13~20초라고 본 fallback 발자국 대기 200틱, demo의 "한 시점에 늑대 10마리" → 간격만큼 대기·흘리는 동안의 최댓값으로). flow에 엔딩 흐름, demo에 3D 늑대 왕·여우 확인을 더했습니다. 캡처로 보고 고친 것: 별 방패 줄과 알림 띠 겹침(결전 중 띠를 아래로), 기다리는 왕이 화면 아래로 잘림(대기 자리 반지름 + 4), 여우가 너무 작음(0.7 → 1.15). 대표 캡처는 저장소 밖 `work\verification-20261113\v012-shots`.
 - 남은 것: 정답 직후 1초쯤 금화 덧표시(`.gold-extra`)·판매 띠·알림 띠가 장면 위쪽에서 겹칠 수 있음(결전 중 특히), 기다리는 왕은 화면 아래 가장자리에 가까움, 마을별 땅 색 필터의 저사양 폰 성능, 실제 휴대폰·실제 아이의 길이 체감(9·10세 44~50분)은 확인하지 못했습니다.
 - `node_modules`: `work\claude-v09\node_modules` 연결은 비어 있어(가리키는 `claude-village-polish\node_modules`가 빈 폴더), `work\art-handoff-20261111\.claude\worktrees\agent-a23f51d934c674b82\node_modules`에 연결해 빌드했습니다(읽기만 함).
 
