@@ -66,7 +66,7 @@ function build() {
   fs.copyFileSync(path.join(root,'node_modules/three/LICENSE'),path.join(out,'THREE-LICENSE.txt'));
   fs.writeFileSync(path.join(out, '.nojekyll'), '');
   fs.writeFileSync(path.join(out, 'robots.txt'), 'User-agent: *\nDisallow: /\n');
-  fs.writeFileSync(path.join(out, 'version.json'), JSON.stringify({commit:process.env.GITHUB_SHA || null, title:'꼬꼬마을: 읽어서 지켜요'}, null, 2)+'\n');
+  fs.writeFileSync(path.join(out, 'version.json'), JSON.stringify({commit:process.env.GITHUB_SHA || null, title:'꼬꼬마을: 한글 읽기로 마을 지키기'}, null, 2)+'\n');
   console.log('Packaged ' + files.length + ' runtime files for GitHub Pages.');
 }
 // test-dom.cjs가 묶음 목록·참조 검사를 빌드 없이 읽는다(require). `node scripts/build-pages.cjs`로 직접 실행할 때만 빌드한다.

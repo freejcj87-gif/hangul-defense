@@ -1,6 +1,6 @@
 # Claude Code 작업 인계
 
-기준일: 2026-11-17. 지금 작업은 0.14(보이는 단계 6개 · 넓어지는 영역 · 길, 브랜치 `claude/v014-stages`, worktree `work\claude-v013`)이고 아래 "실제 규칙과 한계 → 0.14"와 "확인된 검증과 배포 → 0.14"가 최신입니다. 그 뒤 문장은 2026-11-13 기준입니다. 0.12(엔딩·경제 개편, 브랜치 `claude/ending-economy`, worktree `work\claude-v012-ending`) 기준으로 갱신했습니다. 0.11은 듣고 고르기 폐쇄·읽어 주기 삭제(브랜치 `claude/no-sound`)입니다. 0.9는 상점·알 경제(브랜치 `claude/shop-economy`)입니다. 0.8은 PR #9(main `4700136`), 0.7은 PR #7(main `08e8ec7`)입니다. 0.6은 PR #5(main `d8d95f5`), 0.5는 [PR #3](https://github.com/freejcj87-gif/hangul-defense/pull/3)(main `965ad4e`)입니다. 0.4 인계 시점의 기록은 main `800f3f9` 기준이며 아래 “확인된 검증과 배포”에 그대로 남겼습니다. 문서 커밋 자체는 이후 이력에서 확인하세요.
+기준일: 2026-11-19. 최신은 0.15.1 문제은행 확장(브랜치 `claude/bank-expand`, 0.15 위에 새 문항 852개, 문제은행 판 `state.bank`, 앱 이름 "꼬꼬마을: 한글 읽기로 마을 지키기", 정본 기획서 §16, 이 문서 맨 끝 절)입니다. 그 앞 기록: 지금 작업은 0.14(보이는 단계 6개 · 넓어지는 영역 · 길, 브랜치 `claude/v014-stages`, worktree `work\claude-v013`)이고 아래 "실제 규칙과 한계 → 0.14"와 "확인된 검증과 배포 → 0.14"가 최신입니다. 그 뒤 문장은 2026-11-13 기준입니다. 0.12(엔딩·경제 개편, 브랜치 `claude/ending-economy`, worktree `work\claude-v012-ending`) 기준으로 갱신했습니다. 0.11은 듣고 고르기 폐쇄·읽어 주기 삭제(브랜치 `claude/no-sound`)입니다. 0.9는 상점·알 경제(브랜치 `claude/shop-economy`)입니다. 0.8은 PR #9(main `4700136`), 0.7은 PR #7(main `08e8ec7`)입니다. 0.6은 PR #5(main `d8d95f5`), 0.5는 [PR #3](https://github.com/freejcj87-gif/hangul-defense/pull/3)(main `965ad4e`)입니다. 0.4 인계 시점의 기록은 main `800f3f9` 기준이며 아래 “확인된 검증과 배포”에 그대로 남겼습니다. 문서 커밋 자체는 이후 이력에서 확인하세요.
 
 ## 먼저 알아야 할 것
 
@@ -351,3 +351,12 @@ Playwright 시스템 의존성 설치는 WSL/Ubuntu 환경에 맞춰 수행하�
 - main에 병합한 뒤 Actions 성공과 실제 링크를 확인하고 사용자에게 같은 URL을 전달하세요. 아직 확인하지 않은 품질·기능을 완료라고 쓰지 마세요.
 
 다음 작업은 [TODO.md](TODO.md)를 확인하세요.
+
+## 문제은행 판(edition)과 문항 붙이기 (2026-11-18, 브랜치 `claude/bank-expand`)
+
+- 문항 수: 7세 377(읽기 225 + 퀴즈 152) · 8세 502(377 + 125) · 9세 503(301 + 202) · 10세 513(291 + 222). 7세는 '받침 없는 낱말' 규칙 때문에 500 미만이고, 7세는 규칙 유지로 확정('26.11.19)되어 받침 낱말 제안 154문항(`work\verification-20261113\bank-expand\a7-new-받침안.json`)은 보류입니다.
+- 이행 규칙: 문항을 더하면 번호 → 문항 순서가 통째로 바뀌므로, 판(run)마다 문제은행 판 번호 `state.bank`를 저장합니다. `Questions.at(나이, 모드, 번호, 씨앗, bank)`은 그 판의 문항(손 문항 + 생성 문항 앞쪽 `editions[bank-1]`개)만으로 그때와 똑같은 순서·보기 배치를 냅니다. bank 없는 예전 저장은 판 1(0.14.2), 새 판(새 마을·처음부터)은 최신 판(`Questions.BANK_VERSION`)입니다. 그래서 풀던 문제·`run.ok`·`run.miss`·`run.fpick`이 같은 문항을 가리킵니다. 저장 버전은 3 그대로입니다.
+- 수첩 MVP처럼 판이 바뀌어도 순번을 이어 갈 때는 `state.bank`를 올리는 시점을 한 바퀴가 끝나는 곳으로 잡으면 '한 바퀴 안 반복 0'이 깨지지 않습니다(지금은 `Combat.nextRun`에 `bank`를 넘길 때 올라감).
+- 새 문항 붙이기: `node scripts/bank-add.cjs 초안.json …`(배열 또는 `{story, quiz}`). 생성 구간 맨 뒤에 g 번호로 붙이고 `questions-gen.js`의 `DATA.editions`에 한 줄을 더해 판을 올립니다. 규칙에 어긋나면 파일을 되돌립니다. 끝에 찍히는 지문 줄을 `test-questions.cjs` 10-2 `BANK_PRINT`에 더하세요. **예전 판 줄과 예전 문항의 순서·수는 바꾸지 않습니다**(내용 고치기는 됨). `--print`는 판마다 지문만, `--dry`는 쓰지 않고 수만 봅니다.
+- `questions-gen.js`는 약 690KB(gzip 약 95KB)라 검사 한도를 1MB로 올렸습니다. 나이별 파일로 나누는 안은 빌드 목록·오프라인·Android 포장을 함께 바꿔야 해서 하지 않았습니다.
+- 확인하지 못한 것: 브라우저·`test.cjs`(CI), 새 그림 4개(🐭 👒 🍛 📻)의 실기기 표시.

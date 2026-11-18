@@ -137,7 +137,7 @@
   /* 상점 띠 2줄 × 4칸(위치 고정). 8번째 칸: 회관(자동 승급이면 살 수 없는 그림 칸) → 종이 열리면 종(값 없음) → 엔딩 뒤 자유 놀이에서는 잔치 */
   const SHOP=['repair','tower','power','fence','chicken','farmer','pond','hall'];
   const ORDER=['tower','fence','power','chicken','farmer','pond','hall','feast'];/* (0.8 카드 순서, offers 전용) */
-  const NUMS=['gold','level','fence','chickens','hidden','farmers','pond','hall','feast','wins','misses','index','help','late','repairs','broken','power','streak','nest','marketDown','pace','paced','seed'];
+  const NUMS=['gold','level','fence','chickens','hidden','farmers','pond','hall','feast','wins','misses','index','help','late','repairs','broken','power','streak','nest','marketDown','pace','paced','seed','bank'];/* bank = 이 판이 쓰는 문제은행 판(Questions.BANK_VERSION, 0 = 아직 안 정함) */
   /* 타워 강화 단계별 설명(지금 단계 → 다음 단계). 1~3단계 펑·큰 펑·세 갈래, 4~10단계 화살 피해 +1 */
   const POWER_NOTE=['펑! 터져서 둘레도 맞아요','더 크게 펑!','한 번에 세 마리!'].concat(Array(7).fill('화살이 더 세져요!'));
   /* 상식·수학·영어 문제: 생각하는 시간(초, 수학은 계산 시간 포함) */
@@ -152,7 +152,7 @@
   const freshRun=()=>({no:1,village:VILLAGES[0],built0:0,pack:{towers:0,hens:0},wolfMul:100,bell:0,bellQ:-1,prompts:0,shields:0,fq:0,fpick:[],steps:0,
     fox:0,foxSaved:0,foxLost:0,ok:[],miss:[],asked:0,first:0,lost:0,newOk:0,t0:0});
   const freshMeta=()=>({stamps:[],villages:[],acc:[],seenOk:[],from:0});
-  function fresh(age){return {gold:20,level:Math.max(0,(FLAGS.START_TOWERS|0)-1),fence:0,chickens:1,hidden:0,farmers:0,pond:0,hall:0,feast:0,wins:0,misses:0,index:0,help:0,late:0,repairs:0,broken:0,power:0,streak:0,nest:0,marketDown:0,pace:100,paced:0,seed:0,mode:'story',age:age||8,round:null,run:freshRun(),meta:freshMeta()}}
+  function fresh(age){return {gold:20,level:Math.max(0,(FLAGS.START_TOWERS|0)-1),fence:0,chickens:1,hidden:0,farmers:0,pond:0,hall:0,feast:0,wins:0,misses:0,index:0,help:0,late:0,repairs:0,broken:0,power:0,streak:0,nest:0,marketDown:0,pace:100,paced:0,seed:0,bank:0,mode:'story',age:age||8,round:null,run:freshRun(),meta:freshMeta()}}
   const runOf=s=>s.run||(s.run=freshRun()),metaOf=s=>s.meta||(s.meta=freshMeta());
   /* 숨은 상한(산 횟수). 아이에게 보이지 않는다. 타워 1+19=20 · 닭 1+19=20 · 농부 1+9=10 · 잔치 FEAST_MAX */
   const max=key=>key==='feast'?FLAGS.FEAST_MAX:key==='repair'?Infinity:ITEMS[key]?ITEMS[key].prices.length:0;
@@ -459,7 +459,7 @@
     const o=opt||{},m=restoreMeta(metaOf(s)),n=fresh(s.age),k=Math.min(START_PACK.max,m.stamps.length);
     const last=m.villages[m.villages.length-1];if(last&&last.no===r.no)last.snap=snapOf(s);
     const pack={towers:k*START_PACK.perStamp.towers,hens:k*START_PACK.perStamp.hens};
-    n.level+=pack.towers;n.chickens=Math.min(HENS_MAX,n.chickens+pack.hens);n.meta=m;n.pace=s.pace;n.paced=s.paced|0;n.seed=o.seed>0?o.seed:0;
+    n.level+=pack.towers;n.chickens=Math.min(HENS_MAX,n.chickens+pack.hens);n.meta=m;n.pace=s.pace;n.paced=s.paced|0;n.seed=o.seed>0?o.seed:0;n.bank=o.bank>0?o.bank|0:0;/* 새 판은 최신 문제은행 판으로(화면이 넘겨 줌) */
     n.run=Object.assign(freshRun(),{no:r.no+1,village:villageOf(r.no+1),built0:pack.towers+pack.hens,pack,wolfMul:nextMul(s),t0:Number.isFinite(o.now)&&o.now>0?o.now:0});
     grow(n);return n;
   }

@@ -120,7 +120,7 @@
     button(box,'모든 기록 지우기',()=>askGate(()=>{if(!confirm('이 기기에 저장된 게임 기록을 모두 지울까요? 되돌릴 수 없어요.'))return;Book.wipeAll(localStorage,BK);bookDirty=false;reloadFromStore()}),'g-danger');
   }
   /* 진행 파일: 내보내기는 보호자가 직접 누를 때만. 어디로 보낼지는 보호자가 고른다(앱이 스스로 올리거나 보내지 않는다) */
-  function appVersion(){try{const m=/\d+\.\d+(\.\d+)?/.exec(document.querySelector('header small').textContent);return m?m[0]:''}catch{return ''}}
+  function appVersion(){try{const m=/\d+\.\d+(\.\d+)?/.exec($('appVersion').textContent);return m?m[0]:''}catch{return ''}}
   function exportNow(){
     const now=Date.now();save(true);
     const text=Book.exportText(book,{...state,version:Combat.SAVE_VERSION},{now,app:appVersion()}),name=Book.fileName(now);
