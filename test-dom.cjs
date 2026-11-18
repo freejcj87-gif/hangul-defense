@@ -1650,6 +1650,23 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   eq([c.api.phase,g.state.age,g.stage.rule,g.stage.now,g.stage.due,g.world.radius,g.stage.cell.pr],['ask',10,4,3,true,14.5,'✨ 곧!'],'읽는 중 10세로: 영역은 그대로, 8번째 칸은 "곧!"');
   let grew=0;for(let i=0;i<30;i++){c.tick(1);if(W.radius(c.api.world)!==14.5)grew++}eq(grew,0,'읽는 동안 30틱 내내 넓어지지 않음');
   c.unlock();c.right();g=c.game();eq([c.api.phase,g.stage.now,g.world.radius],['reward',4,18],'그 문제를 답한 순간 성곽 마을(다음 답까지 밀리지 않음)')}
+ /* R-7 ① 경제 저장이 버려져(모르는 버전) 새 판이 되면 늑대 세계도 새로: 성(단계 래치)이던 세계가 새 판으로 넘어가지 않음 */
+ {const s=built(55),w=W.sync(W.create({seed:9,interval:150}),s);for(let i=0;i<50;i++)W.step(w,s);eq([w.stage,w.t],[5,50],'(성, 50틱 흐른 세계)');const wr=JSON.parse(JSON.stringify({...w,events:[]}));
+  const bad=JSON.stringify({version:99,...s,gold:555,world:wr});saved={[KEY]:bad};const a=boot();const g=a.game();
+  eq([g.state.gold,g.state.level,g.stage.now,g.world.radius,a.api.world.t,a.api.world.buildings.filter(b=>b.kind==='tower').length],[20,1,0,7,0,2],'모르는 버전의 경제 저장 → 새 판, 세계도 새로(농가, 반지름 7, 타워 2개, 시계 0)');
+  eq(saved[KEY+'-bak'],bad,'버리기 전 원본은 -bak에 그대로');
+  saved={[KEY]:JSON.stringify({version:3,...s,world:wr})};const b=boot();eq([b.game().stage.now,b.game().world.radius,b.api.world.t],[5,22,50],'(대조: 버전 3 저장은 세계도 이어받음)')}
+ /* R-7 ② 주소 ?stages=0은 '-stages0' 열쇠에 따로 저장: 아이 저장(세계의 단계 래치 포함)을 읽지도 쓰지도 않는다.
+    전: 같은 저장을 끈 채로 맞추면 world.stage를 지워, 닭을 잃은 마을을 보통 주소로 다시 열면 지은 수로 다시 세어 영역이 줄었다 */
+ {const kid=seed({age:8,level:8,fence:10,chickens:6,farmers:3,gold:300,seed:5});kid.go();kid.tick(10);kid.unload();
+  const k0=JSON.parse(saved[KEY]);eq(k0.world.stage,3,'(아이 저장: 물레방아 마을)');k0.chickens=2;const kidRaw=JSON.stringify(k0);saved={[KEY]:kidRaw};
+  eq(C.stage(C.restore(k0,Q.AGES)),2,'(닭을 잃어 지은 수 22: 지은 수로만 세면 장터 마을)');
+  withFlags({},()=>{const d=boot({query:'?stages=0'});eq([d.api.KEY,d.api.state.gold,d.game().stage.on,'stage' in d.api.world],[KEY+'-stages0',20,false,false],'?stages=0: 따로 저장하는 새 판(단계 끔)');
+   d.go();d.tick(30);d.unload();ok(JSON.parse(saved[KEY+'-stages0']).version===3,'?stages=0 진행은 -stages0 열쇠에');eq(saved[KEY],kidRaw,'아이 저장은 한 글자도 바뀌지 않음');
+   eq([boot({query:'?test=1&stages=0'}).api.KEY,boot({query:'?routes=0'}).api.KEY],[KEY+'-stages0-test',KEY],'열쇠: 테스트 모드와 함께면 -stages0-test, ?routes=0은 아이 저장');
+   ok(src.includes("(DEMO?'hangul-defense-demo'+DEMO:'hangul-defense-v1'+(STAGES_OFF?'-stages0':''))+(TEST?'-test':'')"),'열쇠 식: 체험(demo)은 원래 따로라 그대로(가짜 DOM은 체험 주소를 띄우지 못해 식으로 확인)')});
+  ok(C.FLAGS.STAGES&&C.FLAGS.ROUTES,'(주소가 바꾼 손잡이 되돌림)');
+  const e=boot();eq([e.game().stage.rule,e.game().stage.now,e.game().world.radius],[2,3,14.5],'보통 주소로 다시 열면 래치 그대로(닭을 잃어도 물레방아 마을, 반지름 14.5)')}
 }
 
 /* ======================= 0.14.1 프로듀서 테스트 모드(주소 ?test=1, testmode.js) ======================= */
