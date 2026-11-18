@@ -178,10 +178,10 @@ eq(B.MEDALS,['one','fresh','again','rush','en','quiz','king','fox','arrow','keep
 eq(K.MEDAL,{one:[50,300,1000],fresh:[30,100,200],again:[5,30,100],rush:[1,15,60],en:[5,25,80],quiz:[10,50,150],king:[1,5,15],fox:[3,15,40],arrow:[100,1000,5000],keeper:[1,5,15],star:[1,5,15],map:[1,2,4]},'훈장 조건표(§3.3)');
 eq(Object.values(K.MEDAL_GROUP).reduce((t,g)=>(t[g]=(t[g]||0)+1,t),{}),{read:6,guard:4,town:2},'읽기 6 · 지킴이 4 · 마을 2');
 eq(K.NOTE.need,{wolf:{plays:2,kills:30},bramble:{plays:2,kills:30},boar:{plays:2,kills:8},granite:{plays:2,kills:8},frost:{plays:2,kills:12},ember:{plays:2,kills:2},fox:{plays:2,kills:0},king:{plays:1,kills:1}},'쪽지 자격(§3.1)');
-eq([K.NOTE.cap,K.NOTE.gap,K.NOTE.after,K.SPECIAL.gap],[2,10,5,3],'쪽지 빈도(§3.2)');
+eq([K.NOTE.cap,K.NOTE.gap,K.NOTE.after,K.SPECIAL.gap],[1,10,5,3],'쪽지 빈도(§3.2, 놀이당 쪽지는 시뮬로 2 → 1)');
 eq([K.RIBBON.need,K.RIBBON.kills],[3,{wolf:10,bramble:10,boar:3,granite:3,frost:4,ember:1,fox:1,king:1}],'리본 조건(§3.1)');
 eq(K.SHINY,{p:.25,pity:2,after:10,firsts:25},'반짝 손님(§3.4, 변경 기록 2차: firsts 25, 머무는 시간 제한 없음)');
-eq(K.REVIEW,{share:.2,same:3,after:3,delay:[5,10],wait:[0,0,1,3],cap:200},'기억 늑대(§3.5)');
+eq(K.REVIEW,{share:.1,same:3,after:3,delay:[5,10],wait:[0,0,1,3],cap:200},'기억 늑대(§3.5, 복습 비율 상한은 시뮬로 0.2 → 0.1)');
 eq([K.SESSION_GAP,K.DAY_DEFAULT,K.DAY_CHOICES,K.DAY_EXTEND],[4*HOURMS,30,[0,20,30,45,60],15],'놀이 간격 4시간 · 하루 시간 기본 30분');
 eq(K.GATE,{hold:20,digits:3,tries:3,wait:300,idle:1800},'보호자 문턱 상수(변경 기록 2차)');
 eq(K.VILLAGES,C.VILLAGES,'마을 4곳이 Combat.VILLAGES와 같음');
@@ -479,7 +479,10 @@ const CH=o=>Object.assign({run:1,asked:10,boost2:true,kinds:['wolf','bramble','f
  for(let p=1;p<=3;p++){B.nextPlay(b,T);kills(b,'wolf',9);eq(b.mon.wolf.rib.n,p-1,'한 놀이 9마리: 아직');const r=B.volleyKill(b,'wolf',{now:T});eq([b.mon.wolf.rib.n,r.ribbon],[p,p===3],'한 놀이 10마리: 리본 진행 '+p);kills(b,'wolf',15);eq(b.mon.wolf.rib.n,p,'놀이당 한 번만')}
  eq([B.page(b,'wolf').ribbon,B.cells(b),B.volleyKill(b,'wolf',{now:T}).drop],[true,3,false],'리본 완성(3칸), 친구는 쪽지를 다시 떨어뜨리지 않음');
 }
-{/* 놀이당 쪽지 2개, 쪽지 사이 10문제, 특별 문제 사이 3문제 */
+{/* 기본값: 한 놀이에 쪽지 하나 */
+ const one=mk();for(const k of ['wolf','bramble'])one.mon[k]=Object.assign(one.mon[k],{foot:T,plays:2,last:0,kills:40,note:1});kills(one,'wolf',1);fill(one,5);const s0=B.nextSpecial(one,ctxOf({index:5}));B.answered(one,s0.q,'first',{now:T,age:8,run:1,special:'note'});
+ eq([B.canDrop(one,'bramble'),B.volleyKill(one,'bramble',{now:T}).drop],[false,false],'한 놀이에 쪽지는 하나(둘째는 다음 놀이로)');B.nextPlay(one,T);ok(B.volleyKill(one,'bramble',{now:T}).drop,'다음 놀이에 떨어뜨림(기본값)');}
+withBook({NOTE:{cap:2}},()=>{/* 상한을 2로 두었을 때: 놀이당 쪽지 2개, 쪽지 사이 10문제 */
  const b=mk();for(const k of ['wolf','bramble','boar'])b.mon[k]=Object.assign(b.mon[k],{foot:T,plays:2,last:0,kills:40,note:1});
  ok(kills(b,'wolf',1).drop,'늑대 쪽지');eq(B.volleyKill(b,'bramble',{now:T}).drop,false,'쪽지 하나를 들고 있으면 다른 종도 기다림');
  fill(b,5);const s1=B.nextSpecial(b,ctxOf({index:5}));B.answered(b,s1.q,'first',{now:T,age:8,run:1,special:'note'});
@@ -493,7 +496,8 @@ const CH=o=>Object.assign({run:1,asked:10,boost2:true,kinds:['wolf','bramble','f
  B.nextPlay(b,T);ok(b.drop&&b.drop.kind==='boar','놀이가 바뀌어도 쪽지는 들고 있음');fill(b,5);eq(B.nextSpecial(b,ctxOf({index:40})).key,'boar','다음 놀이 5문제 이후에 나옴');
  withBook({FLAGS:{notes:false}},()=>{const c=mk();c.mon.wolf=Object.assign(c.mon.wolf,{plays:2,kills:40,note:1});eq([B.volleyKill(c,'wolf',{now:T}).drop,c.mon.wolf.foot>0],[false,true],'?notes=0: 쪽지는 없고 발자국은 남음')});
  /* 7~10세 모두 그 나이의 쪽지가 나옴, 나이가 바뀌면 걸린 쪽지는 그 나이 것으로 다시 */
- for(const a of Q.AGES){const c=mk();c.mon.frost=Object.assign(c.mon.frost,{foot:T,plays:2,kills:20,note:1});kills(c,'frost',1);fill(c,5);const s=B.nextSpecial(c,ctxOf({age:a,index:5}));eq([s.id,s.q.age],['a'+a+'-note-frost-1',a],a+'세 쪽지 문항');
+ });
+{for(const a of Q.AGES){const c=mk();c.mon.frost=Object.assign(c.mon.frost,{foot:T,plays:2,kills:20,note:1});kills(c,'frost',1);fill(c,5);const s=B.nextSpecial(c,ctxOf({age:a,index:5}));eq([s.id,s.q.age],['a'+a+'-note-frost-1',a],a+'세 쪽지 문항');
    if(a===8){const s9=B.nextSpecial(c,ctxOf({age:9,index:5}));eq(s9&&s9.id,'a9-note-frost-1','풀기 전에 나이를 바꾸면 그 나이의 쪽지로')}}
 }
 {/* 종별 자격 문턱(놀이 2번 + 누적 처치), 여우(구출한 놀이 2번), 왕(두 번째 승리에 떨어뜨림) */
@@ -545,13 +549,15 @@ const CH=o=>Object.assign({run:1,asked:10,boost2:true,kinds:['wolf','bramble','f
  for(let i=0;i<120;i++){const s=B.nextSpecial(b,ctxOf({index:i}));
    if(s){sp++;minGap=Math.min(minGap,b.pq-lastAt);lastAt=b.pq;seenIds[s.id]=(seenIds[s.id]||0)+1;B.answered(b,s.q,'second',Object.assign({special:'review'},o));if(b.pq>=5)maxShare=Math.max(maxShare,sp/b.pq)}
    else{fill(b,1);asked++}}
- ok(sp>10&&sp<=Math.max(1,Math.floor(.2*b.pq))+1,'복습 문제 수 '+sp+'/'+b.pq+' ≤ 20%');
- ok(maxShare<=.25,'어느 시점에도 복습 비율이 20% 언저리(최대 '+maxShare.toFixed(2)+')');
- ok(minGap>=3,'특별 문제 사이 3문제 이상(최소 '+minGap+')');
+ ok(sp>5&&sp<=Math.max(1,Math.floor(K.REVIEW.share*b.pq))+1,'복습 문제 수 '+sp+'/'+b.pq+' ≤ '+100*K.REVIEW.share+'%');
+ ok(maxShare<=K.REVIEW.share+.1,'어느 시점에도 복습 비율이 상한 언저리(최대 '+maxShare.toFixed(2)+')');
+ withBook({REVIEW:{share:.2}},()=>{const c2=mk();for(let i=0;i<40;i++)c2.rv.push({id:story(8,i+100).id,box:1,due:0,dp:1,miss:1,seen:0});let n2=0;for(let i=0;i<120;i++){const s=B.nextSpecial(c2,ctxOf({index:i}));if(s){n2++;B.answered(c2,s.q,'second',Object.assign({special:'review'},o))}else fill(c2,1)}ok(n2>sp&&n2<=Math.floor(.2*c2.pq)+1,'상한을 0.2로 올리면 그만큼 더 나옴('+n2+'/'+c2.pq+')')});
+ ok(minGap>=4,'특별 문제 사이에 평소 문제 3개 이상(푼 문제 수 차이 최소 '+minGap+' = 특별 1 + 평소 3)');
  ok(Object.values(seenIds).every(v=>v<=3),'같은 글은 한 놀이에 3번까지 '+Math.max(...Object.values(seenIds)));
  /* 나이: 지금 나이 글만 */
  const c=mk();c.rv=[{id:story(9,3).id,box:1,due:0,dp:1,miss:1,seen:0}];fill(c,5);
  eq(B.nextSpecial(c,ctxOf({age:8,index:5})),null,'다른 나이 글은 쉼');eq(B.nextSpecial(c,ctxOf({age:9,index:5})).id,story(9,3).id,'그 나이로 돌아오면 다시');
+ {const p=mk();p.rv=[{id:story(9,3).id,box:1,due:0,dp:1,miss:1,seen:0}];fill(p,5);const s9=B.nextSpecial(p,ctxOf({age:9,index:5}));eq([s9.id,B.nextSpecial(p,ctxOf({age:8,index:5})),p.pend],[story(9,3).id,null,null],'복습 문제가 걸린 채 나이를 바꾸면 그 글은 내려놓음(다른 나이 글을 내지 않음)')}
  /* 영어 끄기: 영어 글은 쉼 */
  const e=mk();e.rv=[{id:eng(8).id,box:1,due:0,dp:1,miss:1,seen:0}];fill(e,5);B.setOpt(e,'en','off');eq(B.nextSpecial(e,ctxOf({index:5})),null,'영어 끄기면 영어 글은 쉼');
  B.setOpt(e,'en','std');eq(B.nextSpecial(e,ctxOf({index:5})).id,eng(8).id,'영어를 켜면 다시');

@@ -803,8 +803,8 @@ async function start(){
  // king · fox (0.12) are not in World.KINDS: they live in world.king / world.fox, one seat each, and are drawn through the same herd as pseudo-wolves.
  const KIND_FALLBACK={wolf:{size:1,speed:1},bramble:{size:.85,speed:1.3},boar:{size:1.1,speed:.85},granite:{size:1.25,speed:.6},frost:{size:.95,speed:1.7},ember:{size:1.8,speed:.7,boss:true},
   king:{size:3.6,speed:.7,boss:true},fox:{size:1.15,speed:1.6}};
- const kingV={},foxV={},extraWolves=[];
- const pseudo=(o,src,kind)=>{o.id=src.id;o.kind=kind;o.x=num(src.x);o.z=num(src.z);o.state=src.state==='flee'?'leave':'walk';o.hp=1;o.max=1;o.target=0;o.hen=0;return o};
+ const kingV={},foxV={},guestV={},extraWolves=[];let guestSparkAt=-9;   // 수첩 MVP: the shiny guest (world.guest) is one more pseudo-wolf, with a slow trail of gold sparkles
+ const pseudo=(o,src,kind)=>{o.id=src.id;o.kind=kind;o.x=num(src.x);o.z=num(src.z);o.state=src.state==='flee'||src.state==='leave'?'leave':'walk';o.hp=1;o.max=1;o.target=0;o.hen=0;return o};
  const kindInfo=k=>{const K=W('KINDS');return (K&&K[k])||KIND_FALLBACK[k]||KIND_FALLBACK.wolf};
  const deathEnd=o=>o.K.boss?1.75:1.45;   // seconds of world time the fall + poof + sink takes
  function newWolf(v){
@@ -819,6 +819,7 @@ async function start(){
   extraWolves.length=0;
   if(w.king&&typeof w.king==='object')extraWolves.push(pseudo(kingV,w.king,'king'));
   if(w.fox&&typeof w.fox==='object')extraWolves.push(pseudo(foxV,w.fox,'fox'));
+  if(w.guest&&typeof w.guest==='object'){extraWolves.push(pseudo(guestV,w.guest,RIG[w.guest.kind]?w.guest.kind:'wolf'));if(!less&&time-guestSparkAt>.45){guestSparkAt=time;sparkles(num(w.guest.x),1.1,num(w.guest.z),2,.5,GOLD,0,.5)}}
   const pack=Array.isArray(w.wolves)?w.wolves:[];
   for(const v of extraWolves.length?pack.concat(extraWolves):pack){
    if(!v||typeof v!=='object'||v.state==='gone')continue;
@@ -1156,6 +1157,11 @@ async function start(){
     case 'fox':{const R=Rgoal+num(W('EDGE')),a=spawnAngle(num(e.point)),x=Math.cos(a)*R,z=Math.sin(a)*R;warns.push({x,z,t0:time,color:ORANGE,life:2.4});dustBurst(x,z,6,.7);break}
     case 'foxSaved':{const fx=s.world&&s.world.fox;if(fx){const x=num(fx.x),z=num(fx.z);flashAt(x,.7,z,2.2,GOLD,.1);starBurst(x,.8,z,10,.9,[GOLD,WHITE],.1)}break}
     case 'foxScare':featherBurst(0,.6,0,8,.8);break;
+    // 수첩 MVP cues: the shiny guest bows when the answer arrow reaches it, a friend card and a dropped name note get a small sparkle (no banner, no sound here)
+    case 'shinyMet':{const g=s.world&&s.world.guest;if(g){const x=num(g.x),z=num(g.z);flashAt(x,.9,z,2.2,GOLD,.1);starBurst(x,1,z,12,1,[GOLD,WHITE],.1)}break}
+    case 'guest':{const g=s.world&&s.world.guest;if(g)sparkles(num(g.x),1.2,num(g.z),8,.8,GOLD,0,.6);break}
+    case 'friend':sparkles(0,2.5,0,12,Math.max(2,Rgoal*.4),GOLD,0,.9);break;
+    case 'noteDrop':sparkles(0,2.2,0,6,Math.max(2,Rgoal*.3),WHITE,0,.8);break;
     case 'dash':{let k=0;for(const o of wolfVis.values()){if(o.state==='dead'||o.ghost)continue;knock(o,0,0,0,2.2);if(k<24){dustBurst(o.x,o.z,4,.6,k*.02);k++}}shake(.06);break}
     default:break;   // 'broken', 'carry' and the rest are drawn from the pulled state
    }

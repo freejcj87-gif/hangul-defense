@@ -10,6 +10,9 @@ on:
       - questions.js
       - questions-gen.js
       - testmode.js
+      - book.js
+      - notes.js
+      - bookui.js
       - src/**
       - art-handoff/coopnight/browser/**
       - art-handoff/coopnight/source-3d/models/environment-pack.glb
@@ -29,6 +32,7 @@ jobs:
           node-version: '22'
       - run: node test-questions.cjs
       - run: node test-dom.cjs
+      - run: node test-book.cjs
       - run: npm install --no-save --package-lock=false three@0.180.0 esbuild@0.25.10
       - run: node scripts/build-pages.cjs
       - uses: actions/upload-artifact@v4

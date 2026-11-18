@@ -16,7 +16,8 @@
     DAY_DEFAULT:30,DAY_CHOICES:[0,20,30,45,60],DAY_EXTEND:15,/* 하루 시간(분). 0 = 없음. 기본값은 프로듀서 확인 전(변경 기록 2차) */
     VILLAGES:['meadow','quarry','frost','ember'],/* Combat.VILLAGES와 같아야 함(검사) */
     /* §3.1 쪽지 자격: 정답 화살로 물리친 놀이 수 + 누적 처치. 자격이 된 그다음 처치에서 떨어뜨린다. 여우 = 구출, 왕 = 결전 승리(두 번째 승리 때 떨어뜨림) */
-    NOTE:{cap:2,gap:10,after:5,
+    /* cap: 한 놀이에 쪽지 문제 수. 2 → 1(2026-11-19 시뮬: 2이면 친구 카드 8장이 6판에 끝남, 통과선 7~12판) */
+    NOTE:{cap:1,gap:10,after:5,
       need:{wolf:{plays:2,kills:30},bramble:{plays:2,kills:30},boar:{plays:2,kills:8},granite:{plays:2,kills:8},frost:{plays:2,kills:12},ember:{plays:2,kills:2},fox:{plays:2,kills:0},king:{plays:1,kills:1}}},
     /* 리본: 카드 뒤, 한 놀이에 이만큼 정답 화살로 물리친 놀이 need번 */
     RIBBON:{need:3,kills:{wolf:10,bramble:10,boar:3,granite:3,frost:4,ember:1,fox:1,king:1}},
@@ -24,7 +25,8 @@
     /* §3.4 반짝 손님: 판당 기회 한 번(after번째 문제 뒤, 신바람 2단 또는 그 판 한 번에 맞힌 수 firsts 중 먼저), 확률 p, 꽝 pity번 뒤 확정. firsts 0 = 누적 경로 끔 */
     SHINY:{p:.25,pity:2,after:10,firsts:25},
     /* §3.5 기억 늑대: 칸 1 같은 놀이 delay문제 뒤, 칸 2 다음 놀이, 칸 3 세 놀이 뒤 */
-    REVIEW:{share:.2,same:3,after:3,delay:[5,10],wait:[0,0,1,3],cap:200},
+    /* share: 한 놀이 문제 가운데 복습 비율 상한. 0.2 → 0.1(2026-11-19 시뮬: 0.2이면 엔딩까지 문제 +1.4~4.6%·분당 금화 −5~−6%로 통과선 +3%·±2%를 넘음) */
+    REVIEW:{share:.1,same:3,after:3,delay:[5,10],wait:[0,0,1,3],cap:200},
     /* §3.3 훈장 문턱 [동, 은, 금] */
     MEDAL:{one:[50,300,1000],fresh:[30,100,200],again:[5,30,100],rush:[1,15,60],en:[5,25,80],quiz:[10,50,150],king:[1,5,15],fox:[3,15,40],arrow:[100,1000,5000],keeper:[1,5,15],star:[1,5,15],map:[1,2,4]},
     MEDAL_GROUP:{one:'read',fresh:'read',again:'read',rush:'read',en:'read',quiz:'read',king:'guard',fox:'guard',arrow:'guard',keeper:'guard',star:'town',map:'town'},
@@ -416,11 +418,11 @@
       return {kind:p.kind,key:p.key,id:p.id,q};
     };
     if(b.pend){
-      if(b.pend.index===(c.index|0)&&b.pend.run===(c.run|0)){const e=b.rv[rvAt(b,b.pend.id)],r=made(b.pend,e?e.seen:1);if(r)return r}
+      if(b.pend.index===(c.index|0)&&b.pend.run===(c.run|0)&&(b.pend.kind==='note'||b.pend.id.startsWith('a'+c.age+'-'))){/* 나이를 바꾸면 걸려 있던 다른 나이의 복습 글은 내려놓는다 */const e=b.rv[rvAt(b,b.pend.id)],r=made(b.pend,e?e.seen:1);if(r)return r}
       b.pend=null;/* 다른 칸의 낡은 표(마을 처음부터 등)는 버린다. 쪽지는 drop이 남아 있어 다시 나온다 */
     }
     const lastSp=Math.max(b.notes.play===b.play?b.notes.lastQ:-99,b.rvPlay.play===b.play?b.rvPlay.lastQ:-99);
-    if(b.pq-lastSp<BOOK.SPECIAL.gap)return null;
+    if(b.pq-lastSp<=BOOK.SPECIAL.gap)return null;/* 특별 문제 사이에 평소 문제가 gap개 이상(특별 문제 자신이 pq를 1 올리므로 +1) */
     /* 쪽지 먼저(드문 쪽) */
     const N=BOOK.NOTE,d=b.drop;
     if(BOOK.FLAGS.notes&&d&&b.mon[d.kind].note===1&&noteCount(b)<N.cap&&b.pq>=N.after&&(noteCount(b)===0||b.pq-b.notes.lastQ>=N.gap)&&c.noteOf){
