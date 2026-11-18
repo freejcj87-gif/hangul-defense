@@ -189,6 +189,7 @@
   'html.test-mode{scroll-padding-bottom:78px}body.test-mode main{padding-bottom:86px}'+
   '@media(min-width:761px){body.test-mode .scene{height:clamp(380px,calc(100svh - 382px),760px)}}'+
   '@media(min-width:761px) and (max-height:800px){body.test-mode .scene{height:clamp(360px,calc(100svh - 364px),760px)}}'+
+  '@media(min-width:760.02px) and (max-height:700px){body.test-mode .scene{height:300px;height:clamp(300px,calc(100svh - 304px),760px)}}'+
   '@media(min-width:761px) and (max-aspect-ratio:1/1){body.test-mode .scene{height:clamp(380px,calc(48svh - 64px),760px)}body.test-mode.long-read .scene{height:clamp(320px,calc(38svh - 64px),620px)}}'+
   '#testBar #tmJump{flex:none;min-height:44px;max-width:150px;padding:6px 8px;font-size:14px;font-weight:700;border-radius:12px;color:#31503d}'+
   /* 좁은 넓은 화면(패드 세로 820 등): 한 줄에 들도록 이름표는 🧪만(머리글에 '테스트 모드'가 있다), 글 칸·속도 칸을 줄인다 */
