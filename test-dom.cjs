@@ -1443,8 +1443,8 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   eq([C.stage(C.fresh(8)),C.stageCount(C.fresh(8))],[0,1],'새 판은 농가(시작 타워 1개를 지은 수 1로 센다)');
   eq([4,5,13,14,23,24,35,36,49,50,62].map(n=>C.stage(built(n))),[0,1,1,2,2,3,3,4,4,5,5],'8세: 5 · 14 · 24 · 36 · 50에서 단계가 오름');
   eq([13,14,35,36,49,50].map(n=>built(n).hall),[0,1,1,2,2,3],'회관은 장터 마을(14) · 성곽 마을(36) · 성(50)에 들어설 때 오름');
-  eq([3,4,10,11,18,19,30,31,37,38].map(n=>C.stage(built(n,10))),[0,1,1,2,2,3,3,4,4,5],'10세: 4 · 11 · 19 · 31 · 38(0.14 밸런스: 회관 2를 지은 수 26 → 31로 늦춤, game-plan §14.10)');
-  eq([10,11,30,31,37,38].map(n=>built(n,10).hall),[0,1,1,2,2,3],'10세 회관은 지은 수 11 · 31 · 38에서 오름(0.13.2는 10 · 32 · 54)');
+  eq([3,4,10,11,18,19,31,32,37,38].map(n=>C.stage(built(n,10))),[0,1,1,2,2,3,3,4,4,5],'10세: 4 · 11 · 19 · 32(0.15: 31 → 32) · 38(0.14 밸런스: 회관 2를 지은 수 26 → 31로 늦춤, game-plan §14.10)');
+  eq([10,11,31,32,37,38].map(n=>built(n,10).hall),[0,1,1,2,2,3],'10세 회관은 지은 수 11 · 32 · 38에서 오름(0.13.2는 10 · 32 · 54)');
   eq([3,4,10,11,18,19,28,29,39,40].map(n=>C.stage(built(n,9))),[0,1,1,2,2,3,3,4,4,5],'9세: 4 · 11 · 19 · 29 · 40');
   eq([7,8,9,10].map(a=>C.stageAt({age:a})[1]),[5,5,4,4],'첫 문턱: 7·8세 5, 9·10세 4');
   eq([7,8,9,10].map(a=>C.bellBuilt({age:a})),[66,66,50,46],'종 문턱: 7·8세 66, 9세 50, 10세 46');
@@ -1724,9 +1724,9 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   ok(!a.fx('banner').some(e=>e.textContent.includes('되었어요'))&&(g.sfx.stage|0)===0&&!a.built.slice(n0).includes('stage'),'결전 중에는 단계 띠 알림·효과음·전환 연출 없음')}
  /* R-5 단계를 켠 채 설정의 나이(#age)를 바꿈: 문제 사이(정답 연출·정답 배우기)면 바로 넓히고, 읽는 중(ask)이면 그 문제를 답할 때 넓힌다.
     8세 지은 수 26 = 물레방아 마을 → 10세 문턱(26)이면 성곽 마을 */
- {const S26={age:8,level:8,fence:10,chickens:11,farmers:3,gold:300,seed:5},to10=x=>{x.n.age.value='10';x.n.age.onchange()};
+ {const S26={age:8,level:8,fence:10,chickens:12,farmers:3,gold:300,seed:5},to10=x=>{x.n.age.value='10';x.n.age.onchange()};
   const start=o=>{const x=seed(S26,o);x.go();calmWorld(x);x.api.world.fox=null;return x};
-  const a=start({view:true});let g=a.game();eq([g.stage.now,g.state.hall,g.world.radius],[3,1,14.5],'(8세 지은 수 31 = 물레방아 마을. 밸런스 조정으로 10세 성곽 마을 문턱 26 → 31)');
+  const a=start({view:true});let g=a.game();eq([g.stage.now,g.state.hall,g.world.radius],[3,1,14.5],'(8세 지은 수 32 = 물레방아 마을. 10세 성곽 마을 문턱 26 → 32)');
   a.unlock();a.right();eq(a.api.phase,'reward','(정답 연출 중)');to10(a);g=a.game();
   eq([a.api.phase,g.state.age,g.stage.rule,g.stage.now,g.stage.due,g.state.hall,g.stage.hall,g.world.radius,a.api.round.wait],['reward',10,4,4,false,2,2,18,16],'정답 연출 중 10세로: 바로 성곽 마을(반지름 18, 회관 2), 화면이 물러나는 1.6초 동안 다음 문제를 띄우지 않음');
   ok(a.built.includes('stage')&&a.fx('banner').some(e=>e.textContent.startsWith('🧱성곽 마을이 되었어요!')),'정답 연출 중: 전환 장면과 띠 알림');
