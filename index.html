@@ -355,6 +355,11 @@ function bookOpen(){
  bookDirty=!!bookH&&(bookH.status==='new'||bookH.status==='migrated');bookSavedAt=0;
 }
 bookOpen();
+/* 보호자 설정의 영어 비중을 문제은행에 알린다(수첩이 꺼져 있으면 처음 값) */
+function applyMix(){if(typeof Questions.setMix!=='function')return;if(!book){Questions.setMix();return}for(const a of AGES)Questions.setMix(a,Book.mixOf(book,a))}
+applyMix();
+/* 이 판을 마칠 때 이어 순서에 더할 것: 쓴 수 · 이 판의 문제은행 판 · 최신 판 · 묶음 크기 */
+const ordDone=()=>({age:state.age,used:state.seed===book.order.seed?Questions.used(state.age,state.index,state.seed,state.bank):null,bank:state.bank,latest:Questions.BANK_VERSION,size:Questions.bankCount(state.age,state.bank)});
 let phase='start',paused=false,round=null,acc=0,last=null,worldNote=null,lastShot=-99;
 /* uiT: 화면 시계(틱, 쉬는 동안 멈춤). 동전·말풍선·가게 두 번 누름 방지는 모두 이 시계로 센다(검사는 __tick으로). */
 let uiT=0,coins=[],pendingGold=0,lastLaunch=-1,shopLock=0,tipLeft=0,lastHowl=-999,lastDing=-99,shopPrev=[];
@@ -368,7 +373,10 @@ const Shop={list:s=>Combat.shop(s),buy:(s,k)=>Combat.buy(s,k)|0};
 /* 늑대 세계(world.js). 무리 간격(0.12) = 이 아이에게 실제로 나올 다음 120문제(상식·수학·영어 섞임 포함)의 평균 기본 시간 × 1.3, 13~45초(World.tempoInterval).
    긴 글을 읽는 나이는 그만큼 늑대도 느긋하게 온다. 무리 사이에도 낙오 늑대가 계속 온다. */
 const TEMPO_SPAN=120;
-function waveInterval(){let sum=0;for(let i=0;i<TEMPO_SPAN;i++)sum+=Combat.baseSeconds(Questions.at(state.age,state.mode,state.index+i,state.seed,state.bank));return World.tempoInterval(sum/TEMPO_SPAN)}
+/* 수첩 MVP 이어 순서: 판이 바뀌어도 같은 씨앗(book.order.seed)을 쓰고 묶음 순번을 지난 판들이 쓴 만큼(off) 밀어, 문제은행을 한 바퀴 다 돌 때까지 같은 글이 다시 나오지 않게 한다.
+   한 판 안에서 off는 바뀌지 않는다(판이 끝날 때 Book.newVillage · resetVillage가 더한다). 씨앗이 기록과 다른 판(이어 순서를 켜기 전에 시작한 판 등)·?order=0은 밀지 않는다 */
+const ordOff=()=>book&&Book.BOOK.FLAGS.order&&state.seed===book.order.seed?Book.orderFor(book,state.age).off:undefined;
+function waveInterval(){let sum=0;const off=ordOff();for(let i=0;i<TEMPO_SPAN;i++)sum+=Combat.baseSeconds(Questions.at(state.age,state.mode,state.index+i,state.seed,state.bank,off));return World.tempoInterval(sum/TEMPO_SPAN)}
 /* guard(0.10): 새 판은 처음 한 번에 맞힐 때까지(3번) 늑대가 쫓기만 하고, 마지막 닭 한 마리는 늘 지켜진다 */
 const freshWorld=()=>World.sync(World.create({seed:(Date.now()%2147483647)||1,interval:waveInterval(),guard:true}),state);
 /* 0.13 흐르는 농장: 켜져 있으면 세계에 흐름 칸(world.flow)을 만들고, 0.12 저장의 남은 알(state.nest)은 마당 알로 한 번만 옮긴다(옮긴 뒤 nest 0 → 다시 불러와도 알이 늘지 않는다) */
@@ -636,7 +644,7 @@ function makeRound(resume){
  /* 수첩 MVP: 이름 쪽지·기억 늑대는 평소 문제 대신 이 칸에 끼워 넣는다(문제 번호는 넘기지 않음, Book.nextSpecial). 평소 문제를 이어하는 중이면 끼워 넣지 않는다 */
  const fin=Combat.finaleNow(state),sp=book&&(!resume||pendNow())?Book.nextSpecial(book,{age:state.age,index:state.index|0,run:state.run.no|0,finale:!!fin,noteOf:NOTES.get,byId:qById}):null;
  if(sp)bookDirty=true;
- const q=sp?sp.q:Questions.at(state.age,state.mode,fin?fin.index:state.index,state.seed,state.bank);
+ const q=sp?sp.q:Questions.at(state.age,state.mode,fin?fin.index:state.index,state.seed,state.bank,ordOff());
  /* 긴 글(9세 이상 읽기)을 읽는 동안 작은 폰에서는 장면을 줄여 보기가 한 화면에 들어오게 한다 */
  try{document.body.classList.toggle('long-read',q.mode==='story'&&Combat.syl(q.passage)>=40)}catch{}
  round={token:token(),q,t:0,tries:0,dash:0,lock:Combat.reveal(q),result:null,info:null,learn:0,ready:false,wait:0,fin:fin?{normal:fin.normal}:null,special:sp?{kind:sp.kind,key:sp.key,id:sp.id}:null};
@@ -699,7 +707,7 @@ function choose(i,b){
    const fz=fin?Combat.finaleSettle(state,'first',{now:Date.now()}):null;
    if(!round.special&&(!fin||fin.normal))state.index++;
    /* 0.13 흐르는 농장: 알은 이 순간 팔리지 않는다. 정답이 닭에게 기운을 주고(연속·번개는 덤 기운과 신바람), 닭·농부가 다음 문제를 읽는 동안 그 기운을 쓴다 */
-   if(round.info.flow){const nf=Combat.finaleNow(state),nq=Questions.at(state.age,state.mode,nf?nf.index:state.index,state.seed,state.bank);flowSync();World.flowCorrect(world,round.info.flow.credit,round.info.flow.boost,Combat.beatTicks(state,nq))}
+   if(round.info.flow){const nf=Combat.finaleNow(state),nq=Questions.at(state.age,state.mode,nf?nf.index:state.index,state.seed,state.bank,ordOff());flowSync();World.flowCorrect(world,round.info.flow.credit,round.info.flow.boost,Combat.beatTicks(state,nq))}
    /* 새 판 보호 한 칸 줄이기, 정답 소리가 묻히지 않게 1초 동안 전투음 쉬기 */
    World.answered(world);hushUntil=world.t+10;
    /* 읽기가 곧 방어: 한 번에 맞히면 모든 타워가 일제 사격(긴 글일수록·빨리 맞힐수록 많이) */
@@ -738,7 +746,7 @@ function bellOpen(){
 /* 종 칸(값 없음)을 누름: 결전 문제 6개를 정하고 왕이 울타리 밖 멈춤 지점까지 걸어온다. 풀던 문제는 그대로 풀고, 다음 문제부터 결전 문제가 나온다 */
 function ringBell(i){
  if(phase==='start'||phase==='ending'||paused||shopLock>0)return false;
- if(!Combat.ringBell(state,{idOf:n=>Questions.at(state.age,state.mode,n,state.seed,state.bank).id}))return false;
+ if(!Combat.ringBell(state,{idOf:n=>Questions.at(state.age,state.mode,n,state.seed,state.bank,ordOff()).id}))return false;
  shopLock=4;if(rec.prev&&rec.prev.key==='bell')rec.prev.followed=true;rec.glow=null;hideBubble();
  if(book){Book.finaleStart(book);World.guestGone(world);bookDirty=true}/* 결전이 시작되면 남은 반짝 손님은 숲으로 돌아간다(다음 기회 확정) */
  World.king(world,'fight',0);jingle('hall');jingle('roar');banner('🔔','종이 울렸어요!','한 번에 맞히면 별 방패가 깨져요',true,true);
@@ -1266,12 +1274,14 @@ function changeSetting(){
 }
 $('age').value=String(state.age);$('age').onchange=()=>{const age=Number($('age').value);if(!AGES.includes(age)||paused){$('age').value=String(state.age);return}state.age=age;changeSetting()};
 /* 처음부터 시작: 마을·금화·도장(지도)을 새로 만든다. 수첩 MVP: 수첩·훈장·기억 늑대 기록은 지우지 않는다(판 저장만 새로, Book.resetVillage). 모든 기록 지우기는 보호자 화면에서만 */
-$('reset').onclick=()=>{if(!confirm(book?'마을을 처음부터 다시 시작할까요? 수첩과 훈장은 그대로 남아요.':'저장된 금화와 마을을 초기화할까요?'))return;if(book){Book.resetVillage(book,Date.now(),{age:state.age});bookDirty=true;gainReset()}
- state=Object.assign(Combat.fresh(state.age),{seed:newSeed(),bank:Questions.BANK_VERSION},DEMO?DEMO_VILLAGE[DEMO]:{});state.run.t0=Date.now();world=freshWorld();resetView();$('ending').hidden=true;$('sleepy').hidden=true;sleepyOn=false;nextQuestion()};
+$('reset').onclick=()=>{if(!confirm(book?'마을을 처음부터 다시 시작할까요? 수첩과 훈장은 그대로 남아요.':'저장된 금화와 마을을 초기화할까요?'))return;let ord=null;if(book){ord=Book.resetVillage(book,Date.now(),ordDone());bookDirty=true;gainReset()}
+ state=Object.assign(Combat.fresh(state.age),{seed:ord&&ord.seed&&Book.BOOK.FLAGS.order?ord.seed:newSeed(),bank:ord&&ord.bank||Questions.BANK_VERSION},DEMO?DEMO_VILLAGE[DEMO]:{});state.run.t0=Date.now();world=freshWorld();resetView();$('ending').hidden=true;$('sleepy').hidden=true;sleepyOn=false;nextQuestion()};
 /* 엔딩 카드의 두 버튼. 새 마을: 회관 0부터, 도장 수만큼 타워·닭을 덤으로(Combat.nextRun), 늑대 세계도 새로. 더 놀기: 이 마을에서 자유 놀이(잔치가 열리고, 기본은 늑대 없음) */
 $('endNew').onclick=()=>{
- if(phase!=='ending')return;const next=Combat.nextRun(state,{seed:newSeed(),bank:Questions.BANK_VERSION,now:Date.now()});if(!next)return;
- if(book){Book.newVillage(book,Date.now(),{age:state.age});bookDirty=true;gainReset()}/* 놀이 번호 +1. 이어 순서(출제 순번 잇기)는 문제은행 판을 합친 뒤 연결 */
+ if(phase!=="ending"||state.run.bell<3)return;
+ /* 수첩: 놀이 번호 +1, 이 판이 쓴 만큼 이어 순서를 민다. 새 판은 같은 씨앗으로, 문제은행 판은 읽기 묶음 한 바퀴가 끝난 곳에서만 최신으로 올린다(Book.advanceOrder) */
+ let ord=null;if(book){ord=Book.newVillage(book,Date.now(),ordDone());bookDirty=true;gainReset()}
+ const next=Combat.nextRun(state,{seed:ord&&ord.seed&&Book.BOOK.FLAGS.order?ord.seed:newSeed(),bank:ord&&ord.bank||Questions.BANK_VERSION,now:Date.now()});if(!next)return;
  state=next;world=freshWorld();resetView();$('ending').hidden=true;nextQuestion();
  banner('🗺️',Combat.VILLAGE_NAME[state.run.village]+' 마을에 왔어요!',state.run.built0?'타워와 꼬꼬를 덤으로 데려왔어요':'');
 };

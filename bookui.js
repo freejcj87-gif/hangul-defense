@@ -112,7 +112,7 @@
     para(box,'하루 시간이 지나면 다음 문제 사이에 "꼬꼬가 졸려요" 화면이 나와요. 결전 중이면 결전이 끝난 뒤에 나와요. 잃는 것은 없어요.','g-note');
     /* 영어 비중은 문제은행이 받아 줄 때만 보인다(Questions.setMix, 문제은행 판 연결 뒤) */
     if(typeof Questions.setMix==='function'){
-      pick(box,'영어 문제',[['off','끄기'],['std','보통'],['more','조금 더'+(state.age<Book.BOOK.MORE_FROM?' (9세부터)':''),state.age<Book.BOOK.MORE_FROM]],book.set.en,v=>{if(Book.setOpt(book,'en',v,{age:state.age,now:Date.now()})){bookDirty=true;Questions.setMix(Book.mixOf(book,state.age));save(true)}drawGuard()});
+      pick(box,'영어 문제',[['off','끄기'],['std','보통'],['more','조금 더'+(state.age<Book.BOOK.MORE_FROM?' (9세부터)':''),state.age<Book.BOOK.MORE_FROM]],book.set.en,v=>{if(Book.setOpt(book,'en',v,{age:state.age,now:Date.now()})){bookDirty=true;applyMix();world.interval=waveInterval();save(true)}drawGuard()});
     }
     para(box,'읽기 단계(나이)와 효과음은 ⚙️ 설정에서 바꿔요.','g-note');
     para(box,'처음부터','g-h');

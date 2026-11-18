@@ -14,7 +14,7 @@ const C=require(path.join(ROOT,'combat.js')),W=require(path.join(ROOT,'world.js'
 /* 수첩 MVP: book 명령이 쓰는 기록 규칙·쪽지 문항. playEnd의 opt.bk가 없으면 한 줄도 쓰지 않는다(0.15 시뮬과 같은 결과) */
 const B=require(path.join(ROOT,'book.js')),N=require(path.join(ROOT,'notes.js'));
 /* 문제은행 판 고르기: BANK=1 node scripts/sim-flow.cjs … (없으면 최신 판) */
-if(process.env.BANK){const at=Q.at;Q.at=(a,m,i,s)=>at(a,m,i,s,+process.env.BANK)}
+if(process.env.BANK){const at=Q.at;Q.at=(a,m,i,s,b,off)=>at(a,m,i,s,+process.env.BANK,off)}
 const mulberry=a=>()=>{a=(a+0x6D2B79F5)>>>0;let t=Math.imul(a^a>>>15,a|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296};
 const SPEEDK={slow:1.8,typ:1,fast:.62,guess:1,wrong:1,vslow:2.2,nofarmer:1,randbuy:1},ACC1={slow:.75,typ:.85,fast:.95,vslow:.75,nofarmer:.85,randbuy:.85};
 const CHEAP=['repair','chicken','tower','farmer','fence','power','pond','feast'];
@@ -28,6 +28,8 @@ function apply(over){const o=over||{};if('FLOW' in o)C.FLAGS.FLOW=!!o.FLOW;if(o.
 function playEnd(age,kind,seed,opt){
   const o=opt||{},rnd=mulberry(seed>>>0),mode='story',QMAX=o.qmax||600,MINMAX=o.minmax||200;
   let s=o.state||C.fresh(age);const flowing=C.flowOn(s);
+  /* 이어 순서: 수첩을 든 판은 지난 판들이 쓴 만큼 묶음 순번을 민다(bk.off). 수첩이 없으면 0.15와 같은 호출 */
+  const QA=i=>bk&&bk.off?Q.at(age,mode,i,s.seed,s.bank||undefined,bk.off):Q.at(age,mode,i,s.seed);
   const bk=o.bk||null,now=()=>bk.t0+Math.round(w.t*W.TICK*1000);/* bk = {book, byId, t0, sp:[], boost} (수첩을 들고 도는 판) */
   const w=W.sync(W.create({seed:Math.floor(rnd()*2147483646)+1,interval:W.tempoInterval(meanBase(age,s.seed)),guard:true}),s);
   if(flowing)W.flowOn(w);
@@ -82,15 +84,16 @@ function playEnd(age,kind,seed,opt){
   const done=()=>({lost:s.run.lost,stage:w.stage,topRoute:inflowN?100*Math.max(...inflow)/inflowN:NaN,bridgeRoute:inflowN?100*inflow[6]/inflowN:NaN,state:s,ended,qn,min:clock()/60,ms,collapse:minHen10===0,snaps,earned,first,built:C.built(s),hens:s.chickens,farmers:1+s.farmers,gold:s.gold,st,fenceHits,yard:W.flowYard(w),credit:w.flow?w.flow.credit:0});
   if(kind==='idle'||kind==='idleBuy'){
     idling=true;   /* 방치 아이는 첫 문제를 띄운 채 답하지 않는다: 산 것은 화면처럼 보류된 채 */
-    if(flowing)W.flowQuestion(w,C.beatTicks(s,Q.at(age,mode,0,s.seed)));
+    if(flowing)W.flowQuestion(w,C.beatTicks(s,QA(0)));
     const end=(o.idleMin||30)*60;while(clock()<end){run(3);if(kind==='idleBuy'){ask(false);buyOne()}}
     return Object.assign(done(),{idle:true});
   }
   while(qn<QMAX&&clock()<MINMAX*60&&!ended){
-    if(s.run.bell===1){C.ringBell(s,{rnd,idOf:i=>Q.at(age,mode,i,s.seed).id});W.king(w,'fight',0);finale={q0:qn,t0:clock()};mark('ring');if(bk){B.finaleStart(bk.book);W.guestGone(w)}}
+    if(s.run.bell===1){C.ringBell(s,{rnd,idOf:i=>QA(i).id});W.king(w,'fight',0);finale={q0:qn,t0:clock()};mark('ring');if(bk){B.finaleStart(bk.book);W.guestGone(w)}}
     /* 수첩: 쪽지·기억 늑대는 문제 번호를 넘기지 않고 이 칸에 끼워 넣는다(화면의 makeRound와 같음) */
-    const fin=C.finaleNow(s),sp=bk?B.nextSpecial(bk.book,{age,index:s.index|0,run:s.run.no|0,finale:!!fin,noteOf:N.get,byId:bk.byId}):null,q=sp?sp.q:Q.at(age,mode,fin?fin.index:s.index,s.seed),n=q.choices.length;qn++;
+    const fin=C.finaleNow(s),sp=bk?B.nextSpecial(bk.book,{age,index:s.index|0,run:s.run.no|0,finale:!!fin,noteOf:N.get,byId:bk.byId}):null,q=sp?sp.q:QA(fin?fin.index:s.index),n=q.choices.length;qn++;
     if(sp)bk.sp.push({kind:sp.kind,id:sp.id,at:qn});
+    if(o.seen&&!sp){o.seen.cat[q.mode==='quiz'?q.cat:'story']++;if((!fin||fin.normal)&&q.mode!=='quiz')o.seen.ids.push(q.id)}/* S9·S12: 평소 순서로 나온 글(결전이 이번 판 글을 다시 내는 칸은 뺌) */
     if(flowing)W.flowQuestion(w,C.beatTicks(s,q));
     if(!fin&&!w.fox&&C.foxDue(s)){W.fox(w,s,C.foxTicks(s,q),{scare:C.foxScareOnly(s)});C.foxCame(s)}
     const t=kidTime(q,true),lock=Math.max(3,C.reveal(q))/10,ok1=kind==='wrong'?false:kind==='guess'?rnd()<1/n:rnd()<ACC1[kind]-(sp&&sp.kind==='review'?.15:0);/* 가정: 복습 글은 한 번 놓친 글이라 정답률 −0.15 */
@@ -101,7 +104,7 @@ function playEnd(age,kind,seed,opt){
     if(ok1){
       const fast=C.isFast(q,ticks);s.marketDown=W.marketDown(w);const g0=s.gold,res=C.settle(s,q,'first',{fast,ticks,finale:!!fin,extra:!!sp});earned+=s.gold-g0;first++;
       const fz=fin?C.finaleSettle(s,'first',{}):null;if(!sp&&(!fin||fin.normal))s.index++;
-      if(res.flow){const nf=C.finaleNow(s),nq=Q.at(age,mode,nf?nf.index:s.index,s.seed);W.flowCorrect(w,res.flow.credit,res.flow.boost,C.beatTicks(s,nq));st.credit+=res.flow.credit}
+      if(res.flow){const nf=C.finaleNow(s),nq=QA(nf?nf.index:s.index);W.flowCorrect(w,res.flow.credit,res.flow.boost,C.beatTicks(s,nq));st.credit+=res.flow.credit}
       W.answered(w);W.volley(w,s,{scale:C.scale(q),fast});release();if(W.foxShoo(w)){C.foxEnded(s,true);if(bk)B.foxSaved(bk.book,{now:now()})}
       if(bk){const lv=res.flow?res.flow.boost|0:0,rose=lv>=2&&bk.boost<2;bk.boost=lv;
         const br=B.answered(bk.book,q,'first',{now:now(),age,run:s.run.no|0,special:sp&&sp.kind,finale:!!fin});if(rose)B.rushed(bk.book,{now:now()});
@@ -179,12 +182,13 @@ function byId(id){if(!QMAP){QMAP=new Map();const s=Q.snapshot();for(const a of Q
 const DAY=86400000,T0=Date.UTC(2026,10,19,3);
 function playBook(age,kind,plays,seed0,on){
   const rnd=mulberry((seed0^0x9e3779b9)>>>0),newSeed=()=>1+Math.floor(rnd()*2147483646),idle=kind==='idle'||kind==='idleBuy';
-  let state=Object.assign(C.fresh(age),{seed:newSeed()}),t0=T0;state.run.t0=t0;
-  const book=on?B.fresh(t0,state.seed):null;if(book)book.set.day=0;/* 하루 한 판 가정이라 하루 시간 멈춤은 끈다(멈춤은 판 길이와 무관) */
-  const rows=[],mark={};
+  let state=Object.assign(C.fresh(age),{seed:newSeed(),bank:Q.BANK_VERSION}),t0=T0;state.run.t0=t0;
+  const book=on?B.fresh(t0,state.seed):null;if(book){book.set.day=0;/* 하루 한 판 가정이라 하루 시간 멈춤은 끈다(멈춤은 판 길이와 무관) */
+    if(EN!=='std'&&B.setOpt(book,'en',EN,{age}))Q.setMix(age,B.mixOf(book,age))}
+  const rows=[],mark={},seen={ids:[],cat:{story:0,common:0,math:0,english:0}};
   for(let p=1;p<=plays;p++){
-    const bk=book?{book,byId,t0,sp:[],boost:0}:null;if(book)B.beginSession(book,t0);
-    const r=playEnd(age,kind,seed0+p*104729,{state,bk});
+    const bk=book?{book,byId,t0,sp:[],boost:0,off:B.BOOK.FLAGS.order?B.orderFor(book,age).off:null}:null;if(book)B.beginSession(book,t0);
+    const r=playEnd(age,kind,seed0+p*104729,{state,bk,seen});
     const sp=bk?bk.sp:[],rv=sp.filter(x=>x.kind==='review'),nt=sp.filter(x=>x.kind==='note'),same={};rv.forEach(x=>same[x.id]=(same[x.id]||0)+1);
     let gap=Infinity;for(let i=1;i<sp.length;i++)gap=Math.min(gap,sp[i].at-sp[i-1].at-1);
     rows.push({q:r.ended?r.ended.q:NaN,min:r.ended?r.ended.min:NaN,gpm:r.earned/r.min,earned:r.earned,qn:r.qn,ended:!!r.ended,rv:rv.length,nt:nt.length,gap,same:Math.max(0,...Object.values(same)),
@@ -192,15 +196,22 @@ function playBook(age,kind,plays,seed0,on){
       shiny:book?B.KINDS.filter(k=>book.mon[k].shiny>0).length:0,bronze:book?B.MEDALS.filter(k=>book.medal[k].at[0]>0).length:0,tiers:book?B.MEDALS.reduce((s,k)=>s+book.medal[k].at.filter(Boolean).length,0):0,rvLen:book?book.rv.length:0});
     if(book){const x=rows[rows.length-1];for(const [k,ok] of [['card8',x.cards>=8],['rib8',x.rib>=8],['full',x.cells>=B.CELLS]])if(ok&&!mark[k])mark[k]=p}
     if(idle||!r.ended){state=r.state;t0+=DAY;continue}/* 엔딩을 못 본 판은 같은 마을에서 이어 간다 */
-    t0+=DAY;const next=C.nextRun(r.state,{seed:newSeed(),now:t0});if(!next){state=r.state;continue}
-    if(book)B.newVillage(book,t0,{age});state=next;
+    t0+=DAY;if(r.state.run.bell<3){state=r.state;continue}
+    /* 새 마을: 수첩이 있으면 같은 씨앗으로 이어 가고(쓴 만큼 순번을 밀고, 문제은행 판은 한 바퀴 끝에서만 올림), 없으면 판마다 새 씨앗(0.15) */
+    const ord=book?B.newVillage(book,t0,{age,used:Q.used(age,r.state.index,r.state.seed,r.state.bank),bank:r.state.bank,latest:Q.BANK_VERSION,size:Q.bankCount(age,r.state.bank)}):null;
+    state=C.nextRun(r.state,{seed:ord&&B.BOOK.FLAGS.order?ord.seed:newSeed(),bank:ord?ord.bank:Q.BANK_VERSION,now:t0});
   }
-  return {rows,book,mark,size:book?JSON.stringify(book).length:0};
+  if(EN!=='std')Q.setMix();
+  /* S9: 읽기 묶음 크기만큼씩 끊어 그 안에서 겹친 글 수(이어 순서가 있으면 0이어야 함). S12: 평소 칸 가운데 영어 비율 */
+  const size=Q.bankCount(age,Q.BANK_VERSION).story;let dup=0;for(let i=0;i<seen.ids.length;i+=size){const lap=seen.ids.slice(i,i+size);dup+=lap.length-new Set(lap).size}
+  const total=Object.values(seen.cat).reduce((x,y)=>x+y,0);
+  return {rows,book,mark,size:book?JSON.stringify(book).length:0,dup,read:seen.ids.length,lap:size,english:total?seen.cat.english/total:0};
 }
+let EN='std';/* 영어 설정(시뮬 덮어쓰기 JSON의 "en": off · std · more) */
 function bookReport(plays,ages,kinds,runs){
   const out={};
-  console.log('| 나이 | 아이 | 엔딩 문제(수첩 ÷ 끔) | 분(수첩 · 끔) | 분당 금화(수첩 ÷ 끔) | 판당 복습 · 쪽지(최대) | 복습 비율 최대 | 특별 사이 최소 | 같은 글 최대 | 첫 판 발자국 · 훈장 동 | 카드 8장(판) | 리본 8개(판) | 32칸(판) | 반짝(20판 · 끝) | 끝: 칸 · 카드 · 훈장 단계 | 복습 대기열 최대 · 졸업 | 기록 크기 |');
-  console.log('|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|');
+  console.log('| 나이 | 아이 | 엔딩 문제(수첩 ÷ 끔) | 분(수첩 · 끔) | 분당 금화(수첩 ÷ 끔) | 판당 복습 · 쪽지(최대) | 복습 비율 최대 | 특별 사이 최소 | 같은 글 최대 | 첫 판 발자국 · 훈장 동 | 카드 8장(판) | 리본 8개(판) | 32칸(판) | 반짝(20판 · 끝) | 끝: 칸 · 카드 · 훈장 단계 | 복습 대기열 최대 · 졸업 | 기록 크기 | 같은 글 다시 나옴(수첩 · 끔, 읽은 글 ÷ 한 바퀴) | 영어 비율(' + EN + ') |');
+  console.log('|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|');
   for(const age of ages)for(const kind of kinds){
     const on=[],off=[];for(let i=0;i<runs;i++){on.push(playBook(age,kind,plays,5000+7919*i,true));off.push(playBook(age,kind,plays,5000+7919*i,false))}
     const all=(list,k)=>list.flatMap(x=>x.rows.map(r=>r[k])),m=(list,k)=>med(all(list,k)),a=(list,k)=>avg(all(list,k)),idle=kind==='idle'||kind==='idleBuy'||kind==='wrong';
@@ -209,7 +220,7 @@ function bookReport(plays,ages,kinds,runs){
     const row=out[age+kind]={q:m(on,'q')/m(off,'q'),min:m(on,'min'),min0:m(off,'min'),gpm:a(on,'gpm')/a(off,'gpm'),share,gap:Math.min(...all(on,'gap')),same:Math.max(...all(on,'same')),nt:Math.max(...all(on,'nt')),
       foot1:avg(on.map(x=>x.rows[0].foot)),bronze1:avg(on.map(x=>x.rows[0].bronze)),card8:at('card8'),rib8:at('rib8'),full:at('full'),shiny20:avg(on.map(x=>row20(x).shiny)),shinyEnd:avg(on.map(x=>lastRow(x).shiny)),
       cells:avg(on.map(x=>lastRow(x).cells)),cards:avg(on.map(x=>lastRow(x).cards)),tiers:avg(on.map(x=>lastRow(x).tiers)),rvMax:Math.max(...all(on,'rvLen')),grad:avg(on.map(x=>x.book.medal.again.n)),size:Math.max(...on.map(x=>x.size)),undone:all(on,'ended').filter(v=>!v).length};
-    console.log(`| ${age}세 | ${NAME[kind]} | ${idle?'-':f(m(on,'q'))+' ÷ '+f(m(off,'q'))+' = '+f(100*row.q,1)+'% (평균 '+f(100*a(on,'q')/a(off,'q'),1)+'%)'+(row.undone?' (못 감 '+row.undone+')':'')} | ${idle?'-':f(row.min,1)+' · '+f(row.min0,1)+' (평균 '+f(100*a(on,'min')/a(off,'min'),1)+'%)'} | ${f(a(on,'gpm'),1)} ÷ ${f(a(off,'gpm'),1)} = ${f(100*row.gpm,1)}% | ${f(a(on,'rv'),1)} · ${f(a(on,'nt'),1)}(${row.nt}) | ${f(100*share,1)}% | ${Number.isFinite(row.gap)?row.gap:'-'} | ${row.same} | ${f(row.foot1,1)} · ${f(row.bronze1,1)} | ${f(row.card8)} | ${f(row.rib8)} | ${f(row.full)} | ${f(row.shiny20,1)} · ${f(row.shinyEnd,1)} | ${f(row.cells,1)} · ${f(row.cards,1)} · ${f(row.tiers,1)} | ${row.rvMax} · ${f(row.grad,1)} | ${(row.size/1024).toFixed(1)}KB |`);
+    console.log(`| ${age}세 | ${NAME[kind]} | ${idle?'-':f(m(on,'q'))+' ÷ '+f(m(off,'q'))+' = '+f(100*row.q,1)+'% (평균 '+f(100*a(on,'q')/a(off,'q'),1)+'%)'+(row.undone?' (못 감 '+row.undone+')':'')} | ${idle?'-':f(row.min,1)+' · '+f(row.min0,1)+' (평균 '+f(100*a(on,'min')/a(off,'min'),1)+'%)'} | ${f(a(on,'gpm'),1)} ÷ ${f(a(off,'gpm'),1)} = ${f(100*row.gpm,1)}% | ${f(a(on,'rv'),1)} · ${f(a(on,'nt'),1)}(${row.nt}) | ${f(100*share,1)}% | ${Number.isFinite(row.gap)?row.gap:'-'} | ${row.same} | ${f(row.foot1,1)} · ${f(row.bronze1,1)} | ${f(row.card8)} | ${f(row.rib8)} | ${f(row.full)} | ${f(row.shiny20,1)} · ${f(row.shinyEnd,1)} | ${f(row.cells,1)} · ${f(row.cards,1)} · ${f(row.tiers,1)} | ${row.rvMax} · ${f(row.grad,1)} | ${(row.size/1024).toFixed(1)}KB | ${f(avg(on.map(x=>x.dup)),1)} · ${f(avg(off.map(x=>x.dup)),1)} (${f(avg(on.map(x=>x.read)))} ÷ ${on[0].lap}) | ${f(100*avg(on.map(x=>x.english)),1)}% |`);
   }
   /* S6: 찍기 아이의 수첩 칸(10판) ÷ 보통 아이 */
   for(const age of ages){const t=out[age+'typ'],g=out[age+'guess'],s=out[age+'slow'];if(t&&g)console.log(`${age}세 끝 수첩 칸: 보통 ${f(t.cells,1)} · 느린 ${s?f(s.cells,1):'-'} · 찍기 ${f(g.cells,1)} (찍기 ÷ 보통 = ${f(100*g.cells/t.cells)}%)`)}
@@ -229,7 +240,7 @@ if(require.main===module){
   const over=json?JSON.parse(json):{};apply(over);
   console.log(`== ${cmd} · STAGES ${C.FLAGS.STAGES} · ROUTES ${C.FLAGS.ROUTES} · 단계 문턱 ${JSON.stringify(C.FLAGS.STAGE_AT)} · 종 ${C.FLAGS.BELL_BUILT} ${JSON.stringify(C.FLAGS.STAGE_BELL_BY_AGE)} · 반지름 ${JSON.stringify(W.STAGE.radius)}`);
   console.log(`== ${cmd} · FLOW ${C.FLAGS.FLOW} · Combat.FLOW ${JSON.stringify(C.FLOW)} · World.FLOW ${JSON.stringify(W.FLOW)}`);
-  if(cmd==='book'){applyBook(over);console.log('== book · Book.BOOK '+JSON.stringify({NOTE:{cap:B.BOOK.NOTE.cap,gap:B.BOOK.NOTE.gap,after:B.BOOK.NOTE.after},REVIEW:B.BOOK.REVIEW,SHINY:B.BOOK.SHINY,SPECIAL:B.BOOK.SPECIAL}));
+  if(cmd==='book'){applyBook(over);if(over.en)EN=String(over.en);console.log('== book · Book.BOOK '+JSON.stringify({NOTE:{cap:B.BOOK.NOTE.cap,gap:B.BOOK.NOTE.gap,after:B.BOOK.NOTE.after},REVIEW:B.BOOK.REVIEW,SHINY:B.BOOK.SHINY,SPECIAL:B.BOOK.SPECIAL}));
     bookReport(Number(rest[0])||30,rest[1]?rest[1].split(',').map(Number):Q.AGES,rest[2]?rest[2].split(','):['typ','slow','fast','guess','idle','idleBuy','wrong'],Number(over.runs)||3);shinyCheck()}
   else if(cmd==='farm')farmReport(rest[0]?rest[0].split(',').map(Number):[8]);
   else endReport(Number(rest[0])||12,rest[1]?rest[1].split(',').map(Number):Q.AGES,rest[2]?rest[2].split(','):ALL,{buys:over.buys});

@@ -184,7 +184,7 @@
   const ESPOT={3:[0,1,2,0,1,2,0,1],4:[0,2,1,3,1,3,0,2,2,0,3,1,3,1,2,0]};
   const ENGLISH={};
   for(const age of AGES)ENGLISH[age]=E[age].map((r,i)=>{const pos=ESPOT[r[2].length][i];
-    return {age,mode:'quiz',cat:'english',prompt:r[0],passage:r[1],speak:r[3],choices:place(r[2],pos),answer:pos,note:'영어 이름',level:age>=9&&i>=8?2:1}});
+    return {age,mode:'quiz',cat:'english',prompt:r[0],passage:r[1],speak:r[3],choices:place(r[2],pos),answer:pos,note:'',level:age>=9&&i>=8?2:1}});
 
   /* ---------- 개인정보처리방침 본문(앱 안 오프라인 글) ----------
      원문: launch/policy/03-데이터보안-개인정보처리방침-초안-20261118.md §2. 대괄호는 게시 전에 사람이 채울 자리(개발자 이름·이메일·시행일). 방침 문구를 고칠 때는 정책 문서부터 고친다.

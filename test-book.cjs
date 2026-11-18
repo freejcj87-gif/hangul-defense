@@ -130,7 +130,8 @@ for(const a of N.AGES){
     eq(Object.keys(q),['age','mode','cat','prompt','passage','speak','choices','answer','note','level'],id+' 키(생성 문항 형식에서 id만 뺌)');
     eq([q.age,q.mode,q.cat],[a,'quiz','english'],id+' age/mode/cat');
     eq(Q.checkQuiz(a,Object.assign({id:'a'+a+'-quiz-g'+String(900+i)},q)),[],id+' 퀴즈 규칙(Questions.checkQuiz)');
-    const k=q.prompt+'\n'+q.passage;ok(!have.has(k)&&!mine.has(k),id+' 질문·지문이 은행·서로와 겹치지 않음');mine.add(k);
+    const k=q.prompt+'\n'+q.passage;ok(have.has(k)&&!mine.has(k),id+' 문제은행(판 '+Q.BANK_VERSION+')에 붙어 있고 서로 겹치지 않음');mine.add(k);
+    {const inBank=bankQuiz(a).find(x=>x.prompt===q.prompt&&x.passage===q.passage);ok(inBank&&inBank.cat==='english'&&inBank.choices.join('|')===q.choices.join('|')&&inBank.answer===q.answer&&/-g\d+$/.test(inBank.id),id+' 은행 문항과 보기·정답이 같음(생성 구간 뒤에 붙임)')}
     ok(!/[0-9A-Za-z]/.test(q.speak)&&!PIC.test(q.speak)&&/[?.]$/.test(q.speak),id+' speak는 한글 문장');
     ok(!PIC.test(q.prompt),id+' 질문 글에 그림 문자 없음');
     for(const s of [q.passage,...q.choices])for(const c of s)if(PIC.test(c)){ok(SAFE_PIC.has(c)||PENDING_PIC.has(c),id+' 그림 '+c);if(PENDING_PIC.has(c))usedPending.add(c)}
@@ -141,7 +142,7 @@ for(const a of N.AGES){
     const ans=q.choices[q.answer];for(const [h,kids] of Object.entries(HYPER))if(kids.includes(ans))ok(!q.choices.includes(h),id+' 정답의 상위어가 오답에 없음');
     ok(!/shiny/i.test(q.passage+q.choices.join(' ')),id+' Shiny 표기 없음');
     lint(id,[q.prompt,/[가-힣]/.test(q.passage)?q.passage.replace(/^[a-z]+ /,''):'',...q.choices.filter(c=>/[가-힣]/.test(c))]);
-    ok([1,2].includes(q.level)&&q.note==='영어 이름',id+' level·note');
+    ok([1,2].includes(q.level)&&q.note==='',id+' level·note(퀴즈 문항의 note는 빈 글)');
   });
   const pos=list.map(q=>q.answer),t={};pos.forEach(p=>t[p]=(t[p]||0)+1);
   ok(Object.values(t).every(c=>c*2<=pos.length)&&pos.every((v,i)=>i<2||!(v===pos[i-1]&&v===pos[i-2])),a+'세 영어 이름 정답 자리 '+JSON.stringify(t));
@@ -180,7 +181,7 @@ eq(Object.values(K.MEDAL_GROUP).reduce((t,g)=>(t[g]=(t[g]||0)+1,t),{}),{read:6,g
 eq(K.NOTE.need,{wolf:{plays:2,kills:30},bramble:{plays:2,kills:30},boar:{plays:2,kills:8},granite:{plays:2,kills:8},frost:{plays:2,kills:12},ember:{plays:2,kills:2},fox:{plays:2,kills:0},king:{plays:1,kills:1}},'쪽지 자격(§3.1)');
 eq([K.NOTE.cap,K.NOTE.gap,K.NOTE.after,K.SPECIAL.gap],[1,10,5,3],'쪽지 빈도(§3.2, 놀이당 쪽지는 시뮬로 2 → 1)');
 eq([K.RIBBON.need,K.RIBBON.kills],[3,{wolf:10,bramble:10,boar:3,granite:3,frost:4,ember:1,fox:1,king:1}],'리본 조건(§3.1)');
-eq(K.SHINY,{p:.25,pity:2,after:10,firsts:25},'반짝 손님(§3.4, 변경 기록 2차: firsts 25, 머무는 시간 제한 없음)');
+eq(K.SHINY,{p:.25,pity:2,after:10,firsts:0},'반짝 손님(§3.4, 프로듀서 결정 2026-11-19: 연속 정답 때만 = 누적 경로 firsts 0, 머무는 시간 제한 없음)');
 eq(K.REVIEW,{share:.1,same:3,after:3,delay:[5,10],wait:[0,0,1,3],cap:200},'기억 늑대(§3.5, 복습 비율 상한은 시뮬로 0.2 → 0.1)');
 eq([K.SESSION_GAP,K.DAY_DEFAULT,K.DAY_CHOICES,K.DAY_EXTEND],[4*HOURMS,30,[0,20,30,45,60],15],'놀이 간격 4시간 · 하루 시간 기본 30분');
 eq(K.GATE,{hold:20,digits:3,tries:3,wait:300,idle:1800},'보호자 문턱 상수(변경 기록 2차)');
@@ -399,7 +400,12 @@ const CH=o=>Object.assign({run:1,asked:10,boost2:true,kinds:['wolf','bramble','f
  const h=mk(3);for(const k of ['wolf','bramble'])h.mon[k].shiny=T;h.shiny.miss=2;eq(B.shinyChance(h,CH()).kind,'fox','이미 받은 종류는 후보에서 빠짐');
  const g=mk(3);g.shiny.miss=2;eq(B.shinyChance(g,CH({kinds:['king','dragon','wolf']})).kind,'wolf','왕·모르는 종류는 손님이 되지 않음');
 }
-{/* 누적 경로(느린 아이): 그 판에서 한 번에 맞힌 수 25개 */
+{/* 기본값(연속 정답 때만): 한 번에 맞힌 수가 아무리 많아도 신바람 2단이 아니면 기회 없음 */
+ const d0=mk(4);d0.shiny.miss=2;for(let i=0;i<60;i++)B.answered(d0,story(8,i),'first',{now:T,age:8,run:1});
+ eq([B.shinyChance(d0,CH({asked:60,boost2:false})),d0.shiny.run],[null,0],'연속 정답(신바람 2단)이 아니면 기회 없음(한 번에 60개를 맞혀도)');ok(B.shinyChance(d0,CH({asked:60,boost2:true})).win,'신바람 2단이 되면 기회');
+ const t0=B.shinyText();ok(t0.includes('25% 확률')&&!t0.includes('개가 되')&&t0.includes('두 번 오지 않으면 세 번째에는 반드시')&&t0.includes('기다려요'),'공개 문구(기본값): 연속 경로만 '+t0);
+ /* 누적 경로를 켰을 때(SHINY.firsts 25): 그 판에서 한 번에 맞힌 수 25개 */
+ K.SHINY.firsts=25;
  const b=mk(4);b.shiny.miss=2;
  for(let i=0;i<24;i++)B.answered(b,story(8,i),'first',{now:T,age:8,run:3});
  for(let i=0;i<10;i++)B.answered(b,story(8,30+i),'second',{now:T,age:8,run:3});
@@ -417,6 +423,7 @@ const CH=o=>Object.assign({run:1,asked:10,boost2:true,kinds:['wolf','bramble','f
  const txt=B.shinyText();ok(txt.includes('25% 확률')&&txt.includes('25개가 되')&&txt.includes('두 번 오지 않으면 세 번째에는 반드시')&&txt.includes('기다려요')&&!/당첨|뽑기|레어|shiny/i.test(txt.replace('뽑는 것은 없어요','')),'공개 문구 '+txt);
  withBook({SHINY:{p:.2,firsts:30}},()=>ok(B.shinyText().includes('20% 확률')&&B.shinyText().includes('30개가 되'),'공개 문구는 상수를 바꾸면 같이 바뀜'));
  withBook({SHINY:{firsts:0}},()=>ok(!B.shinyText().includes('개가 되'),'누적 경로를 끄면 문구에서도 빠짐'));
+ K.SHINY.firsts=0;
 }
 
 /* B-8 훈장: 사건 하나에 +1, 문턱에서 받은 시각 */
@@ -561,10 +568,10 @@ withBook({NOTE:{cap:2}},()=>{/* 상한을 2로 두었을 때: 놀이당 쪽지 2
  /* 영어 끄기: 영어 글은 쉼 */
  const e=mk();e.rv=[{id:eng(8).id,box:1,due:0,dp:1,miss:1,seen:0}];fill(e,5);B.setOpt(e,'en','off');eq(B.nextSpecial(e,ctxOf({index:5})),null,'영어 끄기면 영어 글은 쉼');
  B.setOpt(e,'en','std');eq(B.nextSpecial(e,ctxOf({index:5})).id,eng(8).id,'영어를 켜면 다시');
- /* 고르는 순서: 칸 낮은 것 → due 이른 것 → dp 오래된 것 */
+ /* 고르는 순서: 칸 높은 것(졸업에 가까운 글) → due 이른 것 → dp 오래된 것 */
  const g=mk();g.play=9;g.notes.play=9;g.rvPlay.play=9;g.rv=[{id:story(8,1).id,box:3,due:0,dp:2,miss:1,seen:0},{id:story(8,2).id,box:2,due:0,dp:8,miss:1,seen:0},{id:story(8,3).id,box:2,due:0,dp:5,miss:1,seen:0},{id:story(8,4).id,box:1,due:9,dp:8,miss:1,seen:0},{id:story(8,5).id,box:1,due:4,dp:8,miss:1,seen:0}];
  const order=[];for(let i=0;i<5;i++){g.pq=50+i*10;g.rvPlay.lastQ=-99;const s=B.nextSpecial(g,ctxOf({index:i,run:9}));order.push(s.id);g.rv=g.rv.filter(x=>x.id!==s.id);g.pend=null}
- eq(order,[5,4,3,2,1].map(i=>story(8,i).id),'고르는 순서');
+ eq(order,[1,3,2,5,4].map(i=>story(8,i).id),'고르는 순서(칸 3 → 칸 2 오래된 것 → 칸 1 이른 것)');
  /* 쪽지와 복습이 같이 기다리면 쪽지 먼저 */
  const h=mk();h.mon.wolf=Object.assign(h.mon.wolf,{foot:T,plays:2,kills:40,note:1});kills(h,'wolf',1);h.rv=[{id:story(8,1).id,box:1,due:0,dp:1,miss:1,seen:0}];fill(h,5);
  eq(B.nextSpecial(h,ctxOf({index:5})).kind,'note','쪽지와 복습이 같이 기다리면 쪽지 먼저');
@@ -680,6 +687,47 @@ withBook({ON:false},()=>{const b=mk(),x=clone(b);
  const pages=fs.readFileSync(path.join(__dirname,'scripts/build-pages.cjs'),'utf8');ok(/'book\.js'/.test(pages)&&/'notes\.js'/.test(pages),'배포 목록(build-pages.cjs)에 book.js·notes.js');
  {const page=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');ok(page.includes('<script src="notes.js')&&page.indexOf('<script src="book.js')>page.indexOf('<script src="notes.js')&&page.indexOf('<script src="bookui.js')>page.indexOf('<script src="book.js'),'2단계: index.html이 notes.js · book.js를 인라인 스크립트 앞에, bookui.js를 뒤에 불러옴');
   ok(pages.includes("'bookui.js'"),'배포 목록에 bookui.js')}
+}
+/* B-16 문제은행 쪽 이어 순서·영어 비중(questions.js): off가 없으면 한 글자도 같고, 판을 이어도 한 바퀴 안에서는 같은 글이 없다 */
+{const V=Q.BANK_VERSION,zero={story:0,common:0,math:0,english:0};
+ for(const a of Q.AGES)for(const s of [0,7,4242]){
+  const plain=JSON.stringify(Array.from({length:300},(_,i)=>Q.at(a,'story',i,s,V)));
+  eq(JSON.stringify(Array.from({length:300},(_,i)=>Q.at(a,'story',i,s,V,undefined))),plain,a+'세 씨앗 '+s+': off가 없으면 지금과 같음');
+  eq(JSON.stringify(Array.from({length:300},(_,i)=>Q.at(a,'story',i,s,V,zero))),plain,a+'세 씨앗 '+s+': off 0도 같음');
+  for(const n of [0,1,37,160]){const u=Q.used(a,n,s,V);eq(u.story+u.common+u.math+u.english,n,a+'세: used 합 = 번호 '+n);
+   const c={story:0,common:0,math:0,english:0};for(let i=0;i<n;i++){const q=Q.at(a,'story',i,s,V);c[q.mode==='quiz'?q.cat:'story']++}eq(u,c,a+'세: used = 실제로 나온 묶음별 수('+n+')')}
+ }
+ /* 세 판을 이어도(같은 씨앗, 판마다 쓴 만큼 밀기) 읽기 글이 한 번에 긴 판 하나와 같은 순서로 이어지고, 한 바퀴 안에 같은 글이 없다 */
+ for(const a of Q.AGES){const s=4242,size=Q.bankCount(a,V),len=[50,70,60],off={...zero},seq=[],cats={common:[],math:[],english:[]};
+  for(const n of len){for(let i=0;i<n;i++){const q=Q.at(a,'story',i,s,V,off);if(q.mode==='quiz')cats[q.cat].push(q.id);else seq.push(q.id)}const u=Q.used(a,n,s,V);for(const k of Object.keys(off))off[k]+=u[k]}
+  const one=[];for(let i=0;one.length<seq.length;i++){const q=Q.at(a,'story',i,s,V);if(q.mode!=='quiz')one.push(q.id)}
+  eq(seq,one,a+'세: 이어 붙인 세 판의 읽기 글 순서 = 긴 판 하나의 순서');
+  const lap=seq.slice(0,size.story);eq(new Set(lap).size,lap.length,a+'세: 세 판('+seq.length+'문제)을 이어도 한 바퀴('+size.story+') 안에 같은 읽기 글 없음');
+  for(const c of Object.keys(cats)){const l=cats[c].slice(0,size[c]);eq(new Set(l).size,l.length,a+'세 '+c+': 판을 이어도 한 바퀴 안에 같은 문항 없음('+l.length+'/'+size[c]+')')}
+  /* 이어 붙이지 않으면(판마다 0부터) 첫 문제부터 겹친다 */
+  eq(Q.at(a,'story',0,s,V).id,Q.at(a,'story',0,s,V,zero).id,a+'세: 밀지 않으면 새 판 첫 글이 지난 판 첫 글과 같음(이어 순서가 필요한 까닭)');
+ }
+ /* 기록의 이어 순서와 맞물림: 판을 마칠 때 Book.advanceOrder(used, bank, latest, bankCount) */
+ {const b=B.fresh(T,4242),a=8,o1=B.orderFor(b,a);eq(o1.off,zero,'처음은 0');
+  const u=Q.used(a,73,4242,1),o2=B.advanceOrder(b,a,u,{bank:1,latest:V,size:Q.bankCount(a,1)});
+  eq([o2.off,o2.bank,o2.seed],[u,1,4242],'예전 판(1)으로 시작한 아이: 읽기 묶음 한 바퀴가 끝나기 전에는 그 판 그대로 이어 감');
+  const big={story:Q.bankCount(a,1).story,common:0,math:0,english:0},o3=B.advanceOrder(b,a,big,{bank:1,latest:V,size:Q.bankCount(a,1)});
+  eq([o3.off,o3.bank],[zero,V],'한 바퀴가 끝난 곳에서 최신 판('+V+')으로 올리고 새 바퀴 처음부터');
+  ok(Q.at(a,'story',0,4242,o3.bank,o3.off).id===Q.at(a,'story',0,4242,V).id,'올린 뒤 첫 문제 = 최신 판의 첫 문제');}
+ /* byId: 은행 문항 복사본 */
+ {const q=Q.get(8,'story',5),z=Q.byId(q.id);eq(z,q,'byId = 은행 문항');z.choices.push('x');eq(Q.byId(q.id).choices.length,q.choices.length,'byId는 복사본');
+  const e=bankQuiz(9).find(x=>x.cat==='english');eq(Q.byId(e.id),e,'퀴즈 문항도');eq([Q.byId('nope'),Q.byId(undefined)],[null,null],'모르는 id는 null');
+  ok(N.all().every(n=>Q.byId(n.id)===null),'쪽지 문항은 문제은행에 없음(평소 출제에 섞이지 않음)')}
+ /* setMix: 영어 끄기 · 보통 · 조금 더 */
+ {const share=(a,n=4000)=>{let q=0,e=0;for(let i=0;i<n;i++){const x=Q.at(a,'story',i,99);if(x.mode==='quiz'){q++;if(x.cat==='english')e++}}return [e/n,q?e/q:0]};
+  const base={};for(const a of Q.AGES)base[a]=JSON.stringify(Array.from({length:200},(_,i)=>Q.at(a,'story',i,99)));
+  for(const a of Q.AGES){const b=B.fresh(T,1);B.setOpt(b,'en','off');ok(Q.setMix(a,B.mixOf(b,a)),'setMix 끄기');eq(share(a,1200)[0],0,a+'세 영어 "끄기": 영어 문제 0');
+   ok(Array.from({length:400},(_,i)=>Q.isQuiz(a,i)).join()===Array.from({length:400},(_,i)=>Q.at(a,'story',i,99).mode==='quiz').join(),a+'세: 퀴즈 칸 자리는 그대로(분류만 바뀜)')}
+  for(const [a,lo,hi] of [[9,.075,.105],[10,.105,.15]]){const b=B.fresh(T,1);B.setOpt(b,'en','more',{age:a});Q.setMix(a,B.mixOf(b,a));const [all,inQuiz]=share(a);
+   ok(all>=lo-.01&&all<=hi+.01,a+'세 영어 "조금 더": 전체 중 영어 '+(100*all).toFixed(1)+'% (명세 '+100*lo+'~'+100*hi+'% ± 1%p)');ok(Math.abs(inQuiz-6/20)<.02,a+'세 "조금 더": 퀴즈 칸 가운데 영어 6/20')}
+  ok(!Q.setMix(8,{math:1,common:1,english:1})&&!Q.setMix(6,{math:10,common:8,english:2})&&!Q.setMix(8,{math:21,common:-1,english:0}),'합이 20이 아니거나 모르는 나이는 무시');
+  Q.setMix();for(const a of Q.AGES){eq(JSON.stringify(Array.from({length:200},(_,i)=>Q.at(a,'story',i,99))),base[a],a+'세: 되돌리면 처음과 같은 출제');eq(Q.QUIZ_MIX[a],K.MIX.std[a],a+'세: 처음 비중')}
+  for(const a of [9,10]){const [all]=share(a);ok(all>0,a+'세 보통: 영어 '+(100*all).toFixed(1)+'%')}}
 }
 if(fails.length)process.exitCode=1;
 console.log((fails.length?'FAIL '+fails.length+' / ':'PASS ')+n+' book assertions (콘텐츠 '+A_COUNT+' · 기록 '+(n-A_COUNT)+').');

@@ -13,7 +13,7 @@
     ON:true,
     FLAGS:{notes:true,review:true,order:true,shiny:true,medals:true,friends:true},
     SESSION_GAP:4*HOUR,/* 마지막 활동에서 이만큼 지나 다시 시작하면 새 놀이(§3.6) */
-    DAY_DEFAULT:30,DAY_CHOICES:[0,20,30,45,60],DAY_EXTEND:15,/* 하루 시간(분). 0 = 없음. 기본값은 프로듀서 확인 전(변경 기록 2차) */
+    DAY_DEFAULT:30,DAY_CHOICES:[0,20,30,45,60],DAY_EXTEND:15,/* 하루 시간(분). 0 = 없음. 기본 30분은 프로듀서 결정(2026-11-19) */
     VILLAGES:['meadow','quarry','frost','ember'],/* Combat.VILLAGES와 같아야 함(검사) */
     /* §3.1 쪽지 자격: 정답 화살로 물리친 놀이 수 + 누적 처치. 자격이 된 그다음 처치에서 떨어뜨린다. 여우 = 구출, 왕 = 결전 승리(두 번째 승리 때 떨어뜨림) */
     /* cap: 한 놀이에 쪽지 문제 수. 2 → 1(2026-11-19 시뮬: 2이면 친구 카드 8장이 6판에 끝남, 통과선 7~12판) */
@@ -23,7 +23,8 @@
     RIBBON:{need:3,kills:{wolf:10,bramble:10,boar:3,granite:3,frost:4,ember:1,fox:1,king:1}},
     SPECIAL:{gap:3},/* 특별 문제(쪽지·복습) 사이 문제 수 */
     /* §3.4 반짝 손님: 판당 기회 한 번(after번째 문제 뒤, 신바람 2단 또는 그 판 한 번에 맞힌 수 firsts 중 먼저), 확률 p, 꽝 pity번 뒤 확정. firsts 0 = 누적 경로 끔 */
-    SHINY:{p:.25,pity:2,after:10,firsts:25},
+    /* firsts 0: 프로듀서 결정(2026-11-19) '반짝 손님은 연속 정답 때만'. 누적 경로(느린 아이용, 25개)는 꺼 둔다(찍기 아이도 이 경로로 손님을 만났음, 시뮬 S6) */
+    SHINY:{p:.25,pity:2,after:10,firsts:0},
     /* §3.5 기억 늑대: 칸 1 같은 놀이 delay문제 뒤, 칸 2 다음 놀이, 칸 3 세 놀이 뒤 */
     /* share: 한 놀이 문제 가운데 복습 비율 상한. 0.2 → 0.1(2026-11-19 시뮬: 0.2이면 엔딩까지 문제 +1.4~4.6%·분당 금화 −5~−6%로 통과선 +3%·±2%를 넘음) */
     REVIEW:{share:.1,same:3,after:3,delay:[5,10],wait:[0,0,1,3],cap:200},
@@ -436,7 +437,7 @@
     if(!BOOK.FLAGS.review||!c.byId)return null;
     const R=BOOK.REVIEW;if(b.rvPlay.play!==b.play)b.rvPlay={play:b.play,n:0,ids:{},lastQ:-99};
     if(b.rvPlay.n>=Math.max(1,Math.floor(R.share*b.pq)))return null;
-    const pre='a'+c.age+'-',list=b.rv.filter(e=>e.id.startsWith(pre)&&(b.rvPlay.ids[e.id]|0)<R.same&&rvDue(b,e)).sort((x,y)=>x.box-y.box||x.due-y.due||x.dp-y.dp);
+    const pre='a'+c.age+'-',list=b.rv.filter(e=>e.id.startsWith(pre)&&(b.rvPlay.ids[e.id]|0)<R.same&&rvDue(b,e)).sort((x,y)=>y.box-x.box||x.due-y.due||x.dp-y.dp);/* 칸 높은 것(졸업에 가까운 글) 먼저: 낮은 칸 먼저면 새로 놓친 글에 밀려 다음 놀이·3놀이 뒤 복습이 영영 차례를 못 얻는다(2026-11-19 시뮬: 졸업 0) */
     for(const e of list){
       const src=c.byId(e.id);
       if(!src||(b.set.en==='off'&&src.cat==='english'))continue;

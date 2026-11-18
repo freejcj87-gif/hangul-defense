@@ -191,7 +191,7 @@
   '@media(min-width:761px) and (max-height:800px){body.test-mode .scene{height:clamp(360px,calc(100svh - 364px),760px)}}'+
   '@media(min-width:760.02px) and (max-height:700px){body.test-mode .scene{height:300px;height:clamp(300px,calc(100svh - 304px),760px)}}'+
   '@media(min-width:761px) and (max-aspect-ratio:1/1){body.test-mode .scene{height:clamp(380px,calc(48svh - 64px),760px)}body.test-mode.long-read .scene{height:clamp(320px,calc(38svh - 64px),620px)}}'+
-  '#testBar #tmJump{flex:none;min-height:44px;max-width:150px;padding:6px 8px;font-size:14px;font-weight:700;border-radius:12px;color:#31503d}'+
+  '#testBar #tmJump,#testBar #tmBook{flex:none;min-height:44px;max-width:150px;padding:6px 8px;font-size:14px;font-weight:700;border-radius:12px;color:#31503d}'+
   /* 좁은 넓은 화면(패드 세로 820 등): 한 줄에 들도록 이름표는 🧪만(머리글에 '테스트 모드'가 있다), 글 칸·속도 칸을 줄인다 */
   '@media(max-width:1020px){#testBar .tm-label{display:none}#testBar .tm-tag{font-size:0;padding:3px 7px}#testBar .tm-tag:before{content:"🧪";font-size:14px}#testBar .tm-info{flex-basis:60px}#testBar .tm-speed button{min-width:44px;padding:6px 7px}#testBar #tmJump{max-width:104px}}'+
   '@media(max-width:760px){html.test-mode{scroll-padding-bottom:150px}body.test-mode main{padding-bottom:160px}#testBar{gap:6px;padding:6px 8px}#testBar .tm-info{flex-basis:100%;order:2}#testBar button{min-height:40px;padding:5px 9px}#testBar #tmNext{min-width:90px}#tmPerf{bottom:122px}}';
@@ -210,7 +210,29 @@
  const jumpSel=el('select',{id:'tmJump','aria-label':'단계로 바로 가기',title:'그 단계에 막 들어선 마을로 새로 시작해요(확인 한 번)'});
  jumpSel.append(el('option',{value:''},'🗺️ 단계로'));for(const [k,n] of JUMPS)jumpSel.append(el('option',{value:k},n));
  jumpSel.onchange=()=>{const k=jumpSel.value;jumpSel.value='';if(k)jump(k)};
- bar.append(tag,info,label,speedBox,autoBtn,perfBtn,jumpSel,wrongBtn,nextBtn);document.body.append(bar);
+ /* 수첩 MVP: 프로듀서가 수첩을 바로 확인하는 단추(수첩이 켜져 있을 때만). 모두 시험 열쇠(-test)의 기록만 바꾼다 */
+ const bookSel=el('select',{id:'tmBook','aria-label':'수첩 시험',title:'수첩을 바로 확인해요(시험 기록만 바뀜)'});
+ bookSel.append(el('option',{value:''},'📒 수첩'));for(const [k,n] of [['note','📜 쪽지 자격 주기'],['shiny','✨ 반짝 기회'],['play','🗓️ 놀이 +1'],['wipe','🧹 기록 비우기']])bookSel.append(el('option',{value:k},n));
+ bookSel.onchange=()=>{const k=bookSel.value;bookSel.value='';if(k)bookTest(k)};
+ function bookTest(k){
+  if(typeof book==='undefined'||!book)return false;const now=Date.now();
+  if(k==='note'){
+   /* 지금 나오는 몬스터 가운데 아직 친구가 아닌 하나에게 자격을 주고 쪽지를 떨어뜨린다: 다음 문제가 쪽지 문제 */
+   const kind=kindsNow().concat(['king']).find(x=>book.mon[x].note!==3);if(!kind){say('🧪 지금 나오는 몬스터는 모두 친구예요.');return false}
+   const m=book.mon[kind],need=Book.BOOK.NOTE.need[kind];if(!m.foot)m.foot=now;m.plays=Math.max(m.plays,need.plays);m.kills=Math.max(m.kills,need.kills,1);m.note=1;
+   book.drop={kind,at:book.play};book.pend=null;book.pq=Math.max(book.pq,Book.BOOK.NOTE.after);book.notes={play:book.play,n:0,lastQ:-99};book.rvPlay.lastQ=-99;
+   say('🧪 '+josa(NOTES.MON[kind].name,'이','가')+' 쪽지를 떨어뜨렸어요. 다음 문제가 쪽지 문제예요.');
+  }else if(k==='shiny'){
+   if(phase==='start'||world.guest){say('🧪 판을 시작한 뒤에, 손님이 없을 때 눌러요.');return false}
+   const kind=kindsNow().find(x=>!book.mon[x].shiny);if(!kind){say('🧪 지금 나오는 몬스터의 반짝 칸은 모두 받았어요.');return false}
+   if(World.guest(world,kind)){book.shiny.guest=kind;book.shiny.pend=null;book.shiny.run=state.run.no|0;say('🧪 반짝 손님('+NOTES.MON[kind].name+')이 왔어요. 한 번에 맞히면 화살이 닿아요.')}
+  }else if(k==='play'){Book.nextPlay(book,now);say('🧪 놀이 번호 +1 (지금 '+book.play+'번째 놀이)')}
+  else if(k==='wipe'){if(!confirm('시험 기록(수첩·훈장·마을)을 모두 비울까요?'))return false;T.job=null;Book.wipeAll(localStorage,BK);bookDirty=false;reloadFromStore();return true}
+  else return false;
+  bookDirty=true;save(true);render();return true;
+ }
+ T.book=bookTest;
+ bar.append(tag,info,label,speedBox,autoBtn,perfBtn,jumpSel);if(typeof book!=='undefined'&&book)bar.append(bookSel);bar.append(wrongBtn,nextBtn);document.body.append(bar);
  const perfEl=el('div',{id:'tmPerf',role:'status','aria-label':'성능'});document.body.append(perfEl);
  try{const h=document.querySelector&&document.querySelector('header small');if(h){const s=el('span',{class:'tm-head'},'🧪 테스트 모드');h.append(' · ',s)}}catch{}
 
@@ -265,7 +287,7 @@
  tick=function(){baseTick();watch();if(opt.auto&&!T.job)autoStep();show()};
  show();
  /* 검사·프로듀서 콘솔용 */
- window.__testmode={get speed(){return opt.speed},get auto(){return opt.auto},get perf(){return opt.perf},setPerf,perfNow:perfTick,jump,jumpState,JUMP_BASE:JSON.parse(JSON.stringify(JUMP_BASE)),JUMPS:JUMPS.map(j=>j.slice()),get job(){return T.job&&{...T.job}},get last(){return T.last&&{...T.last}},get done(){return T.done&&{...T.done}},get note(){return T.note},
+ window.__testmode={bookTest,get speed(){return opt.speed},get auto(){return opt.auto},get perf(){return opt.perf},setPerf,perfNow:perfTick,jump,jumpState,JUMP_BASE:JSON.parse(JSON.stringify(JUMP_BASE)),JUMPS:JUMPS.map(j=>j.slice()),get job(){return T.job&&{...T.job}},get last(){return T.last&&{...T.last}},get done(){return T.done&&{...T.done}},get note(){return T.note},
   next,wrong,setSpeed,setAuto,plan:()=>phase==='ask'&&round?{t:round.t,target:target(),tries:round.tries,lock:round.lock,dash:round.dash}:null,
   frame(){if(T.job)ffFrame();return !!T.job},drain(max){let n=0;while(T.job&&n<(max||5000)){ffFrame();n++}return n},SPEED:JSON.parse(JSON.stringify(SPEED)),RETRY,AFTER_LOCK,OPT_KEY};
 })();

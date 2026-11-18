@@ -2019,7 +2019,7 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   const k0=bookOf(a).mon.wolf.kills,v2=put(1,false);for(let i=0;i<60&&v2.state!=='dead';i++)a.tick();eq([v2.state,bookOf(a).mon.wolf.kills],['dead',k0],'자동 사격만으로 쓰러진 늑대는 수첩에 세지 않음');
  }
  /* M-6 반짝 손님: 기회 → 세계에 손님 → 다음 정답의 화살이 닿으면 반짝 칸. 띠는 문제 사이에. 저장을 건넘 */
- {const a=bboot(b=>{b.shiny.miss=2;b.shiny.f=30;b.shiny.fr=1},{index:12,run:{...C.freshRun(),asked:12,t0:1}},{view:true});a.go();quiet(a);a.unlock();a.right();
+ {const a=bboot(b=>{b.shiny.miss=2},{index:12,streak:C.FLOW.boost2-1,run:{...C.freshRun(),asked:12,t0:1}},{view:true});a.go();quiet(a);a.unlock();a.right();/* 연속 정답으로 신바람 2단이 되는 순간이 기회 */
   const g=a.game();ok(g.book.guest&&g.book.guest.state==='walk'&&g.book.data.shiny.guest===g.book.guest.kind&&g.book.data.shiny.run===1&&g.book.data.shiny.miss===0,'세 번째 기회(확정): 손님이 마을 둘레에 옴 '+(g.book.guest&&g.book.guest.kind));
   ok(a.events.some(e=>e.type==='guest')&&!a.fx('banner').some(e=>/당첨|뽑/.test(e.textContent)),'손님 등장은 걸어 들어올 뿐("당첨" 문구 없음)');
   nextAsk(a);a.tick(30);a.n.pause.click();a.unload();
@@ -2095,7 +2095,11 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   /* 설정: 하루 시간 바꾸기, 끄기는 한 번 더 확인 */
   tab('set');const sel=g.n.gBody.children.find(c=>c.tagName==='label').children.find(c=>c.tagName==='select');sel.value='45';sel.onchange();eq([bookOf(g).set.day,stored().set.day],[45,45],'하루 시간 45분(바로 저장)');
   {const s2=g.n.gBody.children.find(c=>c.tagName==='label').children.find(c=>c.tagName==='select');s2.value='0';s2.onchange();eq([bookOf(g).set.day,g.n.gate.hidden],[45,false],'하루 시간 끄기는 글로 적힌 수를 한 번 더');gatePass(g);eq(bookOf(g).set.day,0,'확인 뒤 꺼짐')}
-  ok(!g.n.gBody.children.some(c=>c.tagName==='label'&&/영어/.test(c.textContent)),'영어 비중 설정은 문제은행이 받아 줄 때(Questions.setMix)만 보임');
+  {const en=()=>g.n.gBody.children.find(c=>c.tagName==='label'&&/영어/.test(c.textContent)).children.find(c=>c.tagName==='select');
+   ok(en().value==='std'&&en().children.find(o=>o.value==='more').disabled&&/9세부터/.test(en().children.find(o=>o.value==='more').textContent),'영어 문제: 끄기·보통·조금 더(8세는 "조금 더"를 고를 수 없음, 9세부터)');
+   const s3=en();s3.value='off';s3.onchange();eq([bookOf(g).set.en,stored().set.en,Q.QUIZ_MIX[8]],['off','off',{math:10,common:10,english:0}],'영어 끄기: 기록에 저장, 퀴즈 분류 가중치에서 영어 0');
+   ok(Array.from({length:300},(_,i)=>Q.at(8,'story',i,7)).every(q=>q.cat!=='english'),'영어를 끄면 영어 문제가 나오지 않음(8세 300칸)');
+   const s4=en();s4.value='std';s4.onchange();eq(Q.QUIZ_MIX[8],{math:10,common:8,english:2},'보통으로 되돌리면 처음 비중')}
   /* 진행 파일: 내보내기(한 번 더 확인) → 다른 기기에서 불러오기 → 미리보기 → 바꾸기 → 되돌리기 */
   tab('file');ok(body().includes('파일에는 읽기 단계, 날짜별 놀이 시간, 문제 기록, 수첩과 훈장이 들어 있어요.')&&/기기를 바꾸기 전에/.test(body()),'진행 파일 탭 안내 문장');
   gbtn('파일로 내보내기').click();ok(g.n.gate.hidden===false&&!g.window.__lastExport,'내보내기는 한 번 더 확인');gatePass(g);
@@ -2136,6 +2140,15 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   k.tick(60);ok(k.game().ending&&/📒 이번 판: 발자국 \+1 .*훈장 동/.test(k.n.endBook.textContent),'엔딩 카드에 이번 판 요약 '+k.n.endBook.textContent);
   k.n.endNew.click();eq([bookOf(k).play,bookOf(k).pq,k.game().book.gain.foot],[2,0,0],'새 마을: 놀이 번호 +1');
  }
+ /* M-12 테스트 모드의 수첩 단추(?test=1): 쪽지 자격 · 반짝 기회 · 놀이 +1 · 기록 비우기. 시험 열쇠(-test)만 바꾼다 */
+ {saved={};const a=boot({book:true,query:'?test=1'}),T=a.window.__testmode;a.go();quiet(a);
+  ok(a.n.tmBook||true,'수첩 단추');eq(T.bookTest('note'),true,'쪽지 자격 주기');a.unlock();a.right();nextAsk(a);
+  eq([a.n.answers.dataset.special,a.n.levelChip.textContent],['note','📜 이름 쪽지'],'쪽지 자격을 주면 다음 문제가 쪽지 문제');a.unlock();a.right();ok(bookOf(a).mon.wolf.card>0,'읽어서 맞히면 친구 카드');nextAsk(a);
+  eq(T.bookTest('shiny'),true,'반짝 기회');ok(a.api.world.guest&&bookOf(a).shiny.guest===a.api.world.guest.kind,'반짝 손님이 바로 옴');
+  const p0=bookOf(a).play;T.bookTest('play');eq(bookOf(a).play,p0+1,'놀이 +1');
+  ok((BOOK_KEY+'-test') in saved&&!(BOOK_KEY in saved)&&!(KEY in saved),'시험 열쇠만 씀(아이 기록은 건드리지 않음)');
+  T.bookTest('wipe');eq([(BOOK_KEY+'-test') in saved,a.api.phase,bookOf(a).mon.wolf.card,bookOf(a).play],[false,'start',0,1],'기록 비우기: 시험 기록을 비우고 시작 화면으로');
+  const off=boot({query:'?test=1'});eq(off.window.__testmode.bookTest('note'),false,'수첩이 꺼져 있으면 아무 일도 없음')}
  /* M-11 바깥 링크·외부 요청 없음(문자열 검사): 수첩 화면·규칙·콘텐츠 파일과 페이지 */
  {const files={'index.html':html,'bookui.js':BOOKUI_SRC,'book.js':fs.readFileSync(__dirname+'/book.js','utf8'),'notes.js':fs.readFileSync(__dirname+'/notes.js','utf8')};
   for(const [name,text] of Object.entries(files)){
