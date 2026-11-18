@@ -400,7 +400,7 @@
     if(POOLS[v])return POOLS[v];
     const o={};
     for(const a of AGES){
-      const e=v<BANK_VERSION&&EDITIONS[v-1]&&EDITIONS[v-1][a],cut=(list,n)=>e&&Number.isInteger(n)?list.slice(0,list.filter(q=>!/-gd+$/.test(q.id)).length+n):list;
+      const e=v<BANK_VERSION&&EDITIONS[v-1]&&EDITIONS[v-1][a],cut=(list,n)=>e&&Number.isInteger(n)?list.slice(0,list.filter(q=>!/-g\d+$/.test(q.id)).length+n):list;
       const story=cut(BANK[a].story,e&&e.story),quiz=cut(BANK[a].quiz,e&&e.quiz),q={};
       for(const c of Object.keys(CATS))q[c]=quiz.filter(x=>x.cat===c);
       o[a]={story,q};
@@ -502,7 +502,7 @@
   const memo=(key,f)=>{if(MEMO.has(key))return MEMO.get(key);if(MEMO.size>MEMO_MAX)MEMO.clear();const v=f();MEMO.set(key,v);return v};
   function rawOrder(age,pool,list,seed,lap){
     return memo('r|'+age+'|'+pool+'|'+seed+'|'+lap,()=>{
-      const r=rng(hash(age+'|'+pool.replace(/@d+$/,'')+'|'+seed+'|'+lap))/* '@판'은 캐시 열쇠에만: 예전 판의 순서는 그때와 같은 난수 */,n=list.length,w=list.map(q=>r()+((q.level||2)-1)*STEP);
+      const r=rng(hash(age+'|'+pool.replace(/@\d+$/,'')+'|'+seed+'|'+lap))/* '@판'은 캐시 열쇠에만: 예전 판의 순서는 그때와 같은 난수 */,n=list.length,w=list.map(q=>r()+((q.level||2)-1)*STEP);
       /* 같은 묶음의 둘째·셋째 문항은 첫째 자리 + TIER씩 뒤로: 묶음마다 하나씩 다 나온 뒤에야 둘째가 나온다 */
       const first=new Map();
       [...Array(n).keys()].sort((x,y)=>w[x]-w[y]||x-y).forEach(x=>{const g=grp(list[x]),f=first.get(g);if(f)w[x]=f[0]+TIER*f[1]++;else first.set(g,[w[x],1])});
