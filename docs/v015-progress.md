@@ -43,6 +43,7 @@
 - 2026-11-18 전체 `node test.cjs` 기록(0.14.2 병합 전, 커밋 `8c830bc`~`c3b4dec`): 1차(11-17 밤)는 PC가 잠들어 farm 구간 프레임 대기에서 시간 초과(15시간 경과, 통과 건수 없음). 2차(11-18 08:45)는 24분째 feel 구간 캡처(`test.cjs:326`, 0.15가 바꾸지 않은 줄)에서 "element to be stable" 시간 초과, 그때 규칙 검사를 같이 돌려 CPU가 겹쳤다. 3차는 다른 에이전트의 브라우저가 끝나기를 기다리다 세션이 끊겨 시작되지 않았다(로그 없음 = 결과 불명). 그래서 0.14.2 병합 전 상태의 전체 통과는 확인하지 못했다. 부분 실행(`ONLY=art,demo` 47, `ONLY=stage` 150, 그림 화면 덩어리 25)만 통과.
 
 - 2026-11-18 10. 배포 준비(코디네이터 전달): ① `git merge origin/main`(0.14.2 `6d695f7`). 충돌 5개(`index.html` 머리글 · 캐시 · 주소 손잡이 · 그림 화면 stamp · getVillageState, `scripts/build-pages.cjs`, `test.cjs`, `test-dom.cjs`, 기획서)를 저장소 밖 `v015-sim\merge-resolve.py`로 풀었다: 양쪽을 모두 살리고 버전은 0.15(testmode.js 포함). test-dom은 0.14 절 안에서 S-9 → 0.14.2 검사 순서(0.14.2 쪽이 절을 닫는다). ② `git merge claude/balance-tune`: `combat.js` FLAGS 끝은 `STAGE_GUARD`와 `RIVER` · `BRIDGE` 모두, 기획서 밸런스 절은 §14.12로. 0.14.2 검사 가운데 10세 옛 문턱(26 · 37)을 가정한 6건을 새 문턱에 맞춤. ③ 시뮬 재측정(`v015-sim\merged\` = 문턱 31, `v015-sim\final\` = 최종): 합친 직후 10세 3개씩 48판 울타리가 0.13.2 +17%라 밸런스 절의 대안대로 10세 성곽 문턱 31 → 32(+2% · +14%). 통과선 표는 기획서 §15.4.1. ④ 검사: test-questions 54,890 · test-dom 12,798 · 빌드 40개 파일. 전체 `node test.cjs`는 아래 줄.
+  - 전체 `node test.cjs`(11-18 17:54, 코드 커밋 `c62875a`, 그 뒤 커밋은 문서뿐): PASS 1,909(553초, Chromium SwiftShader + WebKit, 기존 구간 + testmode + stage 강 덩어리 · 그림 화면 덩어리 + art 구간). 기준 화면 3개 × 단계 3 · 5의 다리 화면 안 검사(0.14.2 화면 CSS 위에서)도 이 안에서 통과. 로그 `v015-sim\test-cjs-merged-2.log`.
   - 정리: 11-18 10:40에 걸어 둔 제 대기 루프(bash 2개)가 남아 있어 종료했다. 다른 에이전트의 브라우저는 건드리지 않았다.
 
 ## 다음 담당에게
