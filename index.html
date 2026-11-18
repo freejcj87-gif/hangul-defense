@@ -276,6 +276,9 @@ if(DEMO&&!state.wins&&!state.index)Object.assign(state,DEMO_VILLAGE[DEMO]);
 /* 문제 순서 씨앗(0.10): 판마다 다른 순서. 예전 저장(씨앗 0)은 이어하는 순간 하나를 받는다 */
 const newSeed=()=>1+Math.floor(Math.random()*2147483646);
 if(!(state.seed>0))state.seed=newSeed();
+/* 문제은행 판: 이어받은 예전 저장(bank 없음)은 판 1(0.14.2까지의 문항·순서)로 끝까지 가고, 새 판(새 마을·처음부터)부터 최신 판을 쓴다.
+   문항이 늘어도 풀던 판의 문제 번호·결전 문제 번호(run.ok·miss·fpick)가 같은 문항을 가리킨다(questions.js '문제은행 판') */
+if(!(state.bank>=1&&state.bank<=Questions.BANK_VERSION))state.bank=stateKept?1:Questions.BANK_VERSION;
 if(!state.run.t0)state.run.t0=Date.now();/* 판 시작 시각(보호자 보기용, 도장에 걸린 분으로 남는다) */
 let phase='start',paused=false,round=null,acc=0,last=null,worldNote=null,lastShot=-99;
 /* uiT: 화면 시계(틱, 쉬는 동안 멈춤). 동전·말풍선·가게 두 번 누름 방지는 모두 이 시계로 센다(검사는 __tick으로). */
@@ -290,7 +293,7 @@ const Shop={list:s=>Combat.shop(s),buy:(s,k)=>Combat.buy(s,k)|0};
 /* 늑대 세계(world.js). 무리 간격(0.12) = 이 아이에게 실제로 나올 다음 120문제(상식·수학·영어 섞임 포함)의 평균 기본 시간 × 1.3, 13~45초(World.tempoInterval).
    긴 글을 읽는 나이는 그만큼 늑대도 느긋하게 온다. 무리 사이에도 낙오 늑대가 계속 온다. */
 const TEMPO_SPAN=120;
-function waveInterval(){let sum=0;for(let i=0;i<TEMPO_SPAN;i++)sum+=Combat.baseSeconds(Questions.at(state.age,state.mode,state.index+i,state.seed));return World.tempoInterval(sum/TEMPO_SPAN)}
+function waveInterval(){let sum=0;for(let i=0;i<TEMPO_SPAN;i++)sum+=Combat.baseSeconds(Questions.at(state.age,state.mode,state.index+i,state.seed,state.bank));return World.tempoInterval(sum/TEMPO_SPAN)}
 /* guard(0.10): 새 판은 처음 한 번에 맞힐 때까지(3번) 늑대가 쫓기만 하고, 마지막 닭 한 마리는 늘 지켜진다 */
 const freshWorld=()=>World.sync(World.create({seed:(Date.now()%2147483647)||1,interval:waveInterval(),guard:true}),state);
 /* 0.13 흐르는 농장: 켜져 있으면 세계에 흐름 칸(world.flow)을 만들고, 0.12 저장의 남은 알(state.nest)은 마당 알로 한 번만 옮긴다(옮긴 뒤 nest 0 → 다시 불러와도 알이 늘지 않는다) */
@@ -505,7 +508,7 @@ function layout(choices){const len=Math.max(...choices.map(c=>[...c].length)),n=
 function makeRound(){
  /* 상식·수학·영어 칸은 나이·문제 번호로 정해진다(0.10: 20칸마다 7세 2·8세 3·9세 5→7·10세 7→10, Questions.at). 순서는 판마다 씨앗으로. */
  /* 0.12 결전 중이면 문제는 종을 울릴 때 정해 둔 번호(이번 판에 맞힌 것 4 + 틀린 것 2, Combat.finaleNow)에서 낸다. fin.normal = 평소 순서의 문제(기록이 모자랄 때) */
- const fin=Combat.finaleNow(state),q=Questions.at(state.age,state.mode,fin?fin.index:state.index,state.seed);
+ const fin=Combat.finaleNow(state),q=Questions.at(state.age,state.mode,fin?fin.index:state.index,state.seed,state.bank);
  /* 긴 글(9세 이상 읽기)을 읽는 동안 작은 폰에서는 장면을 줄여 보기가 한 화면에 들어오게 한다 */
  try{document.body.classList.toggle('long-read',q.mode==='story'&&Combat.syl(q.passage)>=40)}catch{}
  round={token:token(),q,t:0,tries:0,dash:0,lock:Combat.reveal(q),result:null,info:null,learn:0,ready:false,wait:0,fin:fin?{normal:fin.normal}:null};
@@ -566,7 +569,7 @@ function choose(i,b){
    const fz=fin?Combat.finaleSettle(state,'first',{now:Date.now()}):null;
    if(!fin||fin.normal)state.index++;
    /* 0.13 흐르는 농장: 알은 이 순간 팔리지 않는다. 정답이 닭에게 기운을 주고(연속·번개는 덤 기운과 신바람), 닭·농부가 다음 문제를 읽는 동안 그 기운을 쓴다 */
-   if(round.info.flow){const nf=Combat.finaleNow(state),nq=Questions.at(state.age,state.mode,nf?nf.index:state.index,state.seed);flowSync();World.flowCorrect(world,round.info.flow.credit,round.info.flow.boost,Combat.beatTicks(state,nq))}
+   if(round.info.flow){const nf=Combat.finaleNow(state),nq=Questions.at(state.age,state.mode,nf?nf.index:state.index,state.seed,state.bank);flowSync();World.flowCorrect(world,round.info.flow.credit,round.info.flow.boost,Combat.beatTicks(state,nq))}
    /* 새 판 보호 한 칸 줄이기, 정답 소리가 묻히지 않게 1초 동안 전투음 쉬기 */
    World.answered(world);hushUntil=world.t+10;
    /* 읽기가 곧 방어: 한 번에 맞히면 모든 타워가 일제 사격(긴 글일수록·빨리 맞힐수록 많이) */
@@ -604,7 +607,7 @@ function bellOpen(){
 /* 종 칸(값 없음)을 누름: 결전 문제 6개를 정하고 왕이 울타리 밖 멈춤 지점까지 걸어온다. 풀던 문제는 그대로 풀고, 다음 문제부터 결전 문제가 나온다 */
 function ringBell(i){
  if(phase==='start'||phase==='ending'||paused||shopLock>0)return false;
- if(!Combat.ringBell(state,{idOf:n=>Questions.at(state.age,state.mode,n,state.seed).id}))return false;
+ if(!Combat.ringBell(state,{idOf:n=>Questions.at(state.age,state.mode,n,state.seed,state.bank).id}))return false;
  shopLock=4;if(rec.prev&&rec.prev.key==='bell')rec.prev.followed=true;rec.glow=null;hideBubble();
  World.king(world,'fight',0);jingle('hall');jingle('roar');banner('🔔','종이 울렸어요!','한 번에 맞히면 별 방패가 깨져요',true,true);
  worldNote={text:'👑 늑대 왕이 다가와요! 한 번에 맞혀요',until:world.t+60};view([{type:'bell'}]);
@@ -1031,7 +1034,7 @@ window.__game=()=>{const kinds={};for(const v of liveWolves())kinds[v.kind||'wol
  shop:shopRows(),shopLock,gold:{shown:shownGold(),pending:pendingGold,coins:coins.length,flying:coins.filter(c=>c.el).length},fast:$('fastIcon').dataset.state,
  rec:{glow:rec.glow,bubble:rec.bubble&&{...rec.bubble},left:rec.left,last:rec.last,times:rec.times.slice(),shown:rec.shown,want:rec.want&&{...rec.want},mute:{...rec.mute},ign:{...rec.ign},opened:rec.opened.slice(),said:{...rec.said}},
  flow:world.flow?{on:flowing(),yard:World.flowYard(world),cap:World.flowCap(world),credit:world.flow.credit,beat:world.flow.beat,boost:{...world.flow.boost},nest:world.flow.nest,pile:world.flow.pile,slots:world.flow.slots.map(x=>({...x})),eggs:world.hens.map(h=>h.egg|0),hud:$('yardEggs').textContent,flames:Number($('streakRow').dataset.n||0)}:null,
- sfx:{...sfxCount},calm:world.calm|0,keep:!!world.keep,seed:state.seed,
+ sfx:{...sfxCount},calm:world.calm|0,keep:!!world.keep,seed:state.seed,bank:state.bank,
  stage:{on:staged(),now:stageNow(),rule:Combat.stage(state),due:stageDue(),world:world.stage,hall:world.hall|0,routes:World.routes(world),tag:$('stageTag').classList.contains('hidden')?'':$('stageTag').textContent,cell:stageCell()}}};
 
 /* ---------- 버튼 ---------- */
@@ -1053,10 +1056,10 @@ function changeSetting(){
 }
 $('age').value=String(state.age);$('age').onchange=()=>{const age=Number($('age').value);if(!AGES.includes(age)||paused){$('age').value=String(state.age);return}state.age=age;changeSetting()};
 /* 처음부터 시작: 마을·금화·도장(지도)까지 모두 지운다 */
-$('reset').onclick=()=>{if(!confirm('저장된 금화와 마을을 초기화할까요?'))return;state=Object.assign(Combat.fresh(state.age),{seed:newSeed()},DEMO?DEMO_VILLAGE[DEMO]:{});state.run.t0=Date.now();world=freshWorld();resetView();$('ending').hidden=true;newRound()};
+$('reset').onclick=()=>{if(!confirm('저장된 금화와 마을을 초기화할까요?'))return;state=Object.assign(Combat.fresh(state.age),{seed:newSeed(),bank:Questions.BANK_VERSION},DEMO?DEMO_VILLAGE[DEMO]:{});state.run.t0=Date.now();world=freshWorld();resetView();$('ending').hidden=true;newRound()};
 /* 엔딩 카드의 두 버튼. 새 마을: 회관 0부터, 도장 수만큼 타워·닭을 덤으로(Combat.nextRun), 늑대 세계도 새로. 더 놀기: 이 마을에서 자유 놀이(잔치가 열리고, 기본은 늑대 없음) */
 $('endNew').onclick=()=>{
- if(phase!=='ending')return;const next=Combat.nextRun(state,{seed:newSeed(),now:Date.now()});if(!next)return;
+ if(phase!=='ending')return;const next=Combat.nextRun(state,{seed:newSeed(),bank:Questions.BANK_VERSION,now:Date.now()});if(!next)return;
  state=next;world=freshWorld();resetView();$('ending').hidden=true;newRound();
  banner('🗺️',Combat.VILLAGE_NAME[state.run.village]+' 마을에 왔어요!',state.run.built0?'타워와 꼬꼬를 덤으로 데려왔어요':'');
 };
