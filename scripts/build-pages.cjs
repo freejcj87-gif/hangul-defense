@@ -40,7 +40,7 @@ const art15 = ['watermill', 'bridge', 'wolf-king', 'thief-fox'];
 const files = ['index.html', 'combat.js', 'world.js', 'questions-gen.js', 'questions.js', 'testmode.js', 'art-handoff/coopnight/source-3d/models/environment-pack.glb', ...assets.map(file => prefix + file),
   ...art15.flatMap(name => [ART15_DIR + 'glb/' + name + '.glb', ART15_DIR + 'png/' + name + '.png'])];
 /* 수첩 MVP: 기록 모듈과 쪽지·카드 콘텐츠 */
-files.push('book.js', 'notes.js');
+files.push('book.js', 'notes.js', 'bookui.js');
 // 페이지(index.html)와 3D 스크립트(src/*.js)가 글자 그대로 적은 아트 경로. 참조했는데 묶지 않은 파일이 있으면 빌드를 멈춘다
 // (실제 주소에서는 깨진 그림이나 코드 도형으로만 드러나서 놓치기 쉽다). 경로는 조각내지 말고 한 문자열로 적는다.
 const ART_REF = /art-handoff\/(?:coopnight\/browser|coopnight\/source-3d\/models|v015-v016\/(?:glb|png))\/[a-zA-Z0-9/_-]+\.(?:png|glb)/g;

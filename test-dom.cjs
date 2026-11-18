@@ -3,7 +3,9 @@
 const fs=require('fs'),assert=require('node:assert/strict'),C=require('./combat.js'),W=require('./world.js'),Q=require('./questions.js');
 const html=fs.readFileSync(__dirname+'/index.html','utf8');
 const src=html.match(/<script>([\s\S]*?)<\/script>/)[1];
-const TESTMODE_SRC=fs.readFileSync(__dirname+'/testmode.js','utf8');/* 0.14.1 프로듀서 테스트 모드(?test=1에서만 불러옴) */
+const TESTMODE_SRC=fs.readFileSync(__dirname+'/testmode.js','utf8');
+/* 수첩 MVP: 기록 규칙(book.js)·콘텐츠(notes.js)·화면(bookui.js). boot({book:true})일 때만 게임에 넣는다. 그 밖의 검사는 수첩 없이 돈다 = 수첩을 끄면 0.15와 같다는 회귀 검사 */
+const Bk=require('./book.js'),Nt=require('./notes.js'),BOOKUI_SRC=fs.readFileSync(__dirname+'/bookui.js','utf8'),BOOK_KEY='hangul-defense-book';/* 0.14.1 프로듀서 테스트 모드(?test=1에서만 불러옴) */
 const KEY='hangul-defense-v1';
 /* SOFT=1 node test-dom.cjs : 첫 실패에서 멈추지 않고 실패한 검사를 모두 모아 보여 준다(규칙을 크게 바꿀 때 한 번에 훑기용). 끝에서 실패가 있으면 종료 코드 1 */
 const SOFT=!!process.env.SOFT,fails=[];
@@ -22,7 +24,7 @@ C.FLAGS.FLOW=false;
 C.FLAGS.STAGES=false;C.FLAGS.ROUTES=false;
 
 /* ======================= 1. 규칙 모듈 ======================= */
-eq(C.API,4,'규칙 API 버전(0.12 판 진행·저장 v3)');
+eq(C.API,5,'규칙 API 버전(수첩 MVP: track의 extra)');
 /* 1-1 제한시간: 짧은 문제(7세 낱말)는 8~10초, 긴 글은 길이에 비례(최대 50초), 언제나 보통 아이 필요 시간 이상. 0.11: 문항은 읽기(story)뿐 */
 let shortCount=0;
 for(const a of Q.AGES)for(const m of Q.MODES)for(const q of bank(a,m)){
@@ -597,21 +599,21 @@ function boot(opts={}){
   setAttribute(k,v){this.attrs[k]=String(v)}getAttribute(k){return k in this.attrs?this.attrs[k]:null}remove(){if(this.parentNode)this.parentNode.children=this.parentNode.children.filter(x=>x!==this)}
   click(){if(!this.disabled&&this.onclick)this.onclick()}getBoundingClientRect(){return {left:0,top:0,width:0,height:0}}scrollIntoView(){}
  }
- const document={body:new E('body'),hidden:false,getElementById:id=>nodes[id]??=new E(),createElement:t=>new E(t),addEventListener:(k,f)=>{(docHandlers[k]??=[]).push(f)}};
+ const document={body:new E('body'),hidden:false,getElementById:id=>nodes[id]??=new E(),createElement:t=>new E(t),querySelector:()=>null,addEventListener:(k,f)=>{(docHandlers[k]??=[]).push(f)}};
  if(opts.reduced)document.body.classList.add('reduced');
  const window={addEventListener:(k,f)=>{(winHandlers[k]??=[]).push(f)}};
  const events=[],built=[];
  if(opts.view)window.VillageView={build:k=>{built.push(k);return {x:.4,y:.5}},reward(){},events:l=>events.push(...l),inspect(){return {ready:true}}};
  /* 0.11: 게임은 음성 합성을 쓰지 않는다. 브라우저에 있더라도 한 번도 부르지 않는지 센다(맨 끝에서 0 확인) */
  window.speechSynthesis={speak(){spoken++},cancel(){spoken++},getVoices(){spoken++;return []}};
- const localStorage={getItem:k=>k in saved?saved[k]:null,setItem:(k,v)=>{saved[k]=v}};
+ const localStorage={getItem:k=>k in saved?saved[k]:null,setItem:(k,v)=>{saved[k]=String(v)},removeItem:k=>{delete saved[k]}};
  /* 추천 규칙은 기본으로 끈다(말풍선이 문제 흐름 시간을 바꾸지 않게). 말풍선 검사만 규칙이나 가짜 규칙을 켠다. */
  const Cx=opts.rec==='real'?C:{...C,recommend:typeof opts.rec==='function'?opts.rec:()=>null};
  /* 0.14.1: opts.query = 주소 뒤 글(예: '?test=1'). 테스트 모드면 브라우저가 맨 끝에 불러오는 testmode.js를 같은 범위에 이어 붙여 돌린다(브라우저에서도 같은 전역을 본다) */
  const loc=opts.query?{search:opts.query}:undefined,tm=opts.query&&/[?&]test=1\b/.test(opts.query)?'\n'+TESTMODE_SRC:'';
- const api=new Function('document','window','localStorage','setInterval','setTimeout','confirm','Combat','World','Questions','performance','location',
-  src+tm+'\nreturn {get state(){return state},get phase(){return phase},get round(){return round},get paused(){return paused},get world(){return world},get uiT(){return uiT},get KEY(){return KEY},render};')
-  (document,window,localStorage,f=>{intervals.push(f);return intervals.length},()=>0,()=>true,Cx,W,Q,undefined,loc);
+ const api=new Function('document','window','localStorage','setInterval','setTimeout','confirm','Combat','World','Questions','performance','location','Book','NOTES',
+  src+(opts.book?String.fromCharCode(10)+BOOKUI_SRC:'')+tm+'\nreturn {get state(){return state},get phase(){return phase},get round(){return round},get paused(){return paused},get world(){return world},get uiT(){return uiT},get KEY(){return KEY},render};')
+  (document,window,localStorage,f=>{intervals.push(f);return intervals.length},()=>0,()=>true,Cx,W,Q,undefined,loc,opts.book?Bk:undefined,opts.book?Nt:undefined);
  const n=new Proxy(nodes,{get:(t,k)=>typeof k==='string'?(t[k]??=new E()):t[k]}),kids=()=>n.answers.children;
  const h={n,api,events,built,intervals,document,window,
   tick(c=1){for(let i=0;i<c;i++)intervals[0]()},
@@ -1886,6 +1888,251 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
  {const pg=fs.readFileSync(__dirname+'/.github/workflows/pages.yml','utf8'),m=/art15 = \[([^\]]*)\]/.exec(pg);
   eq(m&&m[1].split(',').map(s=>s.trim().replace(/'/g,'')),B.art15,'pages.yml 실제 주소 검사: 배포한 0.15 아트 4쌍을 모두 받아 봄');
   ok(pg.includes("'art-handoff/v015-v016/glb/' + name + '.glb').startswith(b'glTF')")&&pg.includes("'art-handoff/v015-v016/png/' + name + '.png').startswith(bytes.fromhex('89504e470d0a1a0a'))"),'pages.yml: GLB는 glTF 머리, PNG는 PNG 머리로 확인')}
+}
+
+/* ======================= MVP 수첩(발자국 수첩 · 훈장 · 기억 늑대 · 반짝 손님 · 보호자 화면) ======================= */
+/* 여기까지의 검사는 모두 수첩 없이 돌았다(boot에 book을 주지 않음 = ?book=0과 같은 길). 아래는 수첩을 켠 게임이다. 규칙 단위 검사는 test-book.cjs */
+{
+ const realNow=Date.now;let skew=0;Date.now=()=>realNow()+skew;
+ const bookOf=a=>a.game().book.data,stored=()=>saved[BOOK_KEY]?JSON.parse(saved[BOOK_KEY]):null;
+ /* 기록을 미리 만들어 두고 시작(mut이 고친 기록을 열쇠에 넣는다). s = 판 저장에 덮을 칸 */
+ const bboot=(mut,s,opts)=>{const b=Bk.fresh(Date.now(),4242);if(mut)mut(b);saved={[KEY]:JSON.stringify({version:3,...C.fresh(8),seed:4242,...(s||{})}),[BOOK_KEY]:JSON.stringify(b)};return boot({book:true,...(opts||{})})};
+ const shownOff=el=>el.hidden||el.classList.contains('hidden');
+ const NAMES={이:2,삼:3,사:4,오:5,육:6,칠:7,팔:8,구:9};
+ const gateDigits=a=>{const m=/^(.)백(.)십(.)$/.exec(a.n.gateCode.textContent);return m?[m[1],m[2],m[3]].map(c=>String(NAMES[c])):null};
+ const gateType=(a,ds)=>{for(const d of ds)a.n.gatePad.children.find(b=>b.dataset.d===d).click()};
+ const gatePass=a=>gateType(a,gateDigits(a));
+ const press=(a,id,ms)=>{a.n[id].onpointerdown();skew+=ms;a.n[id].onpointerup()};
+ const nextAsk=a=>{a.tick(REWARD+2);a.untilAsk()};
+ const quiet=a=>{const w=a.api.world;w.wolves=[];w.wave.arrive=w.t+1e6;w.trickle=w.t+1e6;w.calm=0};
+
+ /* M-1 저장 연결: 열쇠가 따로, 풀이 중 1초마다 쓰지 않음, ?book=0 · 체험은 읽지도 쓰지도 않음 */
+ {const a=fresh({book:true});ok(a.game().book.on&&a.game().book.status==='new','수첩을 켜면 새 기록으로 시작');
+  ok(!shownOff(a.n.bookRow)&&a.n.reset.textContent==='마을을 처음부터 (수첩·훈장은 그대로)'&&/하루 30분/.test(a.n.dayNote.textContent),'시작 화면: 수첩·보호자 단추, 처음부터 단추 글, 하루 시간 안내');
+  a.go();ok(stored()&&stored().fmt==='kkm-book'&&stored().v===1&&saved[KEY],'기록은 판 저장과 다른 열쇠에(hangul-defense-book, 기록 v1)');
+  ok(!JSON.parse(saved[KEY]).book&&JSON.parse(saved[KEY]).version===3,'판 저장은 저장 v3 그대로(기록 칸이 섞이지 않음)');
+  const w0=a.game().book.writes;a.tick(150);eq(a.game().book.writes,w0,'풀이 중 15초 동안 기록 열쇠를 다시 쓰지 않음(1초마다 쓰는 것은 판 저장뿐)');
+  ok(a.game().book.dirty&&a.game().book.data.today.s>=14,'그동안 하루 시간은 메모리에서 흐름('+a.game().book.data.today.s+'초)');
+  a.unlock();a.right();ok(a.game().book.writes>w0&&stored().medal.one.n===1&&stored().pq===1,'문제 사이(정답 연출)에 기록을 씀: 한 번에 읽기 1');
+  const w1=a.game().book.writes;nextAsk(a);a.n.pause.click();ok(a.game().book.writes>w1,'잠깐 쉬기는 풀이 중이어도 바로 씀');a.n.pause.click();
+  const b2=boot({book:true});eq([b2.game().book.status,b2.game().book.data.medal.one.n],['ok',1],'다시 열면 같은 기록');
+ }
+ {saved={};const a=boot({book:true,query:'?book=0'});a.go();a.unlock();a.right();nextAsk(a);
+  eq([a.game().book.on,BOOK_KEY in saved,shownOff(a.n.bookRow),a.n.reset.textContent],[false,false,true,'처음부터 시작'],'?book=0: 기록 열쇠를 읽지도 쓰지도 않고 수첩 단추도 없음(0.15 화면)');
+  saved={};const d=boot({book:true,query:'?demo=1'});d.go();d.unlock();d.right();nextAsk(d);
+  eq([d.game().book.status,d.game().book.locked,Object.keys(saved).filter(k=>k.includes('book')),d.game().book.data.medal.one.n],['memory',true,[],1],'체험(?demo=1): 기록은 메모리 안에서만(열쇠를 쓰지 않음)');
+  saved={};const t=boot({book:true,query:'?test=1'});t.go();t.unlock();t.right();
+  ok((BOOK_KEY+'-test') in saved&&!(BOOK_KEY in saved),'시험 모드(?test=1)는 -test 열쇠');
+ }
+ {saved={[BOOK_KEY]:'{깨진 글'};const a=boot({book:true});a.go();a.unlock();a.right();
+  eq([a.game().book.status,stored().medal.one.n],['broken',1],'깨진 기록이 판을 막지 않음(새 기록으로 계속)');
+  const newer=JSON.stringify({...Bk.fresh(Date.now(),1),v:2,medal:{one:{n:777}}});saved={[BOOK_KEY]:newer};const b=boot({book:true});b.go();b.unlock();b.right();nextAsk(b);b.n.pause.click();b.unload();
+  eq([b.game().book.status,b.game().book.locked,saved[BOOK_KEY]],['newer',true,newer],'앱보다 새 버전의 기록은 덮어쓰지 않음(글자 그대로)');
+  const meta={stamps:[{no:1,village:'meadow',age:8,stars:[1,1,1],q:60,acc:80,lost:0,min:20,date:Date.now()-86400000}],villages:[],acc:[80],seenOk:['a8-story-01','a8-story-02'],from:0};
+  saved={[KEY]:JSON.stringify({version:3,...C.fresh(8),seed:55,meta})};const m=boot({book:true});
+  eq([m.game().book.status,bookOf(m).from,bookOf(m).medal.king.n,bookOf(m).seen.length,bookOf(m).order.seed,bookOf(m).set.day],['migrated',3,1,2,55,30],'판 저장의 meta에서 한 번 이행(왕 1 · 새 글 2 · 씨앗 · 하루 30분)');
+  m.go();ok(stored()&&stored().from===3,'이행한 기록을 씀');
+ }
+
+ /* M-2 처치 출처(world.js): 정답 화살에 한 번이라도 맞은 뒤 쓰러지면 by:'volley', 타워 자동 사격만으로 쓰러지면 없음 */
+ {const s=C.fresh(8),mkW=()=>{const w=W.sync(W.create({seed:7,interval:1e6}),s);w.wolves=[];w.wave.arrive=1e9;w.trickle=1e9;return w};
+  const wolfAt=(w,hp)=>{const v={id:w.nextId++,kind:'wolf',x:3,z:0,sx:20,sz:0,hp,max:hp,speed:.01,state:'walk',target:0,timer:0,inside:0,hen:0};w.wolves.push(v);return v};
+  const runTo=(w,v)=>{const ev=[];for(let i=0;i<400&&v.state!=='dead';i++)ev.push(...W.step(w,s));return ev.filter(e=>e.type==='kill')};
+  {const w=mkW(),v=wolfAt(w,1);const k=runTo(w,v);ok(k.length===1&&!('by' in k[0])&&!v.vh&&!(w.stats.volleyKills>0),'타워 자동 사격만으로 쓰러짐 → by 없음')}
+  {const w=mkW(),v=wolfAt(w,1);const n=W.volley(w,s,{scale:1});ok(n>0&&w.arrows.every(x=>x.v===1),'일제 사격 화살에는 v=1');const k=runTo(w,v);eq([k[0].by,v.vh,w.stats.volleyKills],['volley',1,1],'정답 화살에 쓰러짐 → by:"volley"')}
+  {const w=mkW(),v=wolfAt(w,400);W.volley(w,s,{scale:1});for(let i=0;i<8;i++)W.step(w,s);ok(v.vh===1&&v.state!=='dead'&&!w.arrows.some(x=>x.v),'정답 화살을 맞고도 살아 있음(vh=1)');
+   const r=W.restore(JSON.parse(JSON.stringify({...w,events:[]})));eq(r.wolves[0].vh,1,'저장·복원 뒤에도 vh 보존');const rv=r.wolves[0];rv.hp=1;const k=runTo(r,rv);eq(k[0].by,'volley','마지막 한 발이 자동 사격이어도 by:"volley"')}
+  {const w=mkW();wolfAt(w,50);W.volley(w,s,{scale:1});const r=W.restore(JSON.parse(JSON.stringify({...w,events:[]})));ok(r.arrows.length>0&&r.arrows.every(x=>x.v===1),'날아가는 정답 화살의 v도 저장을 건넘');
+   const bad=JSON.parse(JSON.stringify({...w,events:[]}));bad.arrows[0].v='x';bad.wolves[0].vh=7;bad.guest={id:'x'};const t=W.restore(bad);ok(!('v' in t.arrows[0])&&!('vh' in t.wolves[0])&&!('guest' in t),'틀린 모양의 선택 칸은 지움')}
+  /* 반짝 손님: 늑대 목록과 별개(타워가 저절로 쏘지 않고 닭·건물을 노리지 않음). 인사하면 황금 화살 → shinyMet → 숲으로. 난수를 쓰지 않아 세계 결과가 같음 */
+  {const A=W.sync(W.create({seed:99,interval:120}),s),Bw=W.sync(W.create({seed:99,interval:120}),s);const g=W.guest(Bw,'bramble');
+   ok(g&&g.kind==='bramble'&&g.state==='walk'&&W.guest(Bw,'wolf')===null&&W.guest(W.sync(W.create({seed:1,interval:120}),s),'king')===null,'손님은 한 번에 하나, 왕은 손님이 아님');
+   for(let i=0;i<1000;i++){W.step(A,s);W.step(Bw,s)}
+   const strip=w=>JSON.stringify({wolves:w.wolves,hens:w.hens,buildings:w.buildings,rng:w.rng,stats:w.stats,t:w.t},(k,v)=>k==='id'?undefined:v);/* 손님이 번호 하나를 쓰므로 번호(id)만 빼고 견준다 */eq(strip(A),strip(Bw),'같은 씨앗 1,000틱: 손님이 있어도 늑대·닭·건물·난수가 한 글자도 다르지 않음');
+   const R=W.radius(Bw);ok(Bw.guest&&Bw.guest.state==='walk'&&Math.abs(Math.hypot(Bw.guest.x,Bw.guest.z)-(R+W.GUEST.out))<.2,'손님은 시간 제한 없이 울타리 밖을 계속 돎(1,000틱 뒤에도 있음)');
+   const r=W.restore(JSON.parse(JSON.stringify({...Bw,events:[]})));eq([r.guest.kind,r.guest.state],['bramble','walk'],'손님은 저장을 건넘(앱을 닫았다 열어도 있음)');
+   ok(W.guestGreet(Bw)&&Bw.guest.state==='bow'&&Bw.arrows.some(x=>x.gold&&x.wolf===g.id)&&!W.guestGreet(Bw),'인사: 황금 화살 한 발');
+   let met=0,left=false;for(let i=0;i<400&&!left;i++){for(const e of W.step(Bw,s))if(e.type==='shinyMet'&&e.kind==='bramble')met++;left=!Bw.guest}
+   eq([met,left],[1,true],'화살이 닿으면 shinyMet 한 번, 손님은 숲으로 돌아감');
+   const Cw=W.sync(W.create({seed:3,interval:120}),s);W.guest(Cw,'fox');ok(W.guestGone(Cw)&&Cw.events.some(e=>e.type==='shinyGone')&&Cw.guest.state==='leave'&&!W.guestGone(W.create({seed:1,interval:120})),'못 만난 채 판이 끝나면 shinyGone')}
+ }
+
+ /* M-3 특별 문제 틀(이름 쪽지): 문제 번호를 넘기지 않고 끼워 넣음, 금화는 평소와 같음, 이어하기는 같은 문제 */
+ const noteReady=b=>{Object.assign(b.mon.wolf,{foot:Date.now(),plays:2,last:1,kills:40,note:1});b.drop={kind:'wolf',at:1};b.pq=6};
+ {const a=bboot(noteReady,{index:20});a.go();
+  const g=a.game();eq([a.n.answers.dataset.qid,a.n.answers.dataset.special,a.n.levelChip.textContent,g.round.token,g.book.special],['a8-note-wolf-1','note','📜 이름 쪽지','8:story:Xa8-note-wolf-1',{kind:'note',key:'wolf',id:'a8-note-wolf-1'}],'쪽지 문제가 평소 문제 대신 그 칸에');
+  ok(a.n.quiz.classList.contains('note-q')&&a.n.passage.textContent===Nt.get(8,'wolf',1).passage,'쪽지 문제 칸(종이 무늬), 지문은 쪽지 글');
+  eq(g.state.index,20,'문제 번호는 그대로');
+  /* 새로고침 뒤 같은 특별 문제 */
+  a.tick(25);a.unload();const b=boot({book:true});ok(b.n.go.textContent.startsWith('이어서'),'하던 쪽지 문제가 있으면 "이어서 하기"');b.go();
+  eq([b.n.answers.dataset.qid,b.game().round.token,b.game().round.t>=20,bookOf(b).notes.n],['a8-note-wolf-1','8:story:Xa8-note-wolf-1',true,1],'새로고침 뒤 같은 쪽지 문제로 이어 감(쪽지 수를 두 번 세지 않음)');
+  const gold0=b.game().state.gold,asked0=b.game().state.run.asked;b.unlock();b.right();const r=b.game();
+  ok(r.state.gold>gold0&&r.round.gold>0,'쪽지 문제도 평소처럼 금화(+'+r.round.gold+')');
+  eq([r.state.index,r.state.run.ok.includes(20),r.state.run.miss.includes(20),r.state.run.asked,r.state.run.first],[20,false,false,asked0+1,1],'문제 번호 그대로, 결전 문제 후보(run.ok·miss)에 안 들어감, 푼 수에는 셈');
+  eq([bookOf(b).mon.wolf.note,bookOf(b).mon.wolf.card>0,bookOf(b).drop,bookOf(b).pend,r.book.gain.card],[3,true,null,null,1],'한 번에 맞히면 친구 카드');
+  ok(/🤝 늑대 누리와 친구가 됐어요! Wolf/.test(b.n.feedback.textContent)&&b.fx('friend-card').length===1&&r.round.wait>=25&&r.sfx.friend===1,'친구 카드 연출: 문구 · 카드 · 2.5초 · 효과음');
+  ok(stored().mon.wolf.card>0,'친구 카드를 받은 순간 기록을 씀');
+  b.tick(12);eq(b.api.phase,'reward','연출이 끝날 때까지(25틱) 다음 문제를 띄우지 않음');b.tick(15);b.untilAsk();
+  eq([b.game().state.index,b.n.answers.dataset.qid,b.n.answers.dataset.special,b.game().round.token],[20,Q.at(8,'story',20,4242).id,'','8:story:20'],'그다음은 같은 번호의 평소 문제');
+  ok(!b.n.quiz.classList.contains('note-q')&&b.n.levelChip.textContent.startsWith('8세 · '),'평소 문제 칸으로 돌아옴');
+ }
+ {/* 놓침: 두 번째 정답 → 평소 배우기 + 쪽지 문구, 번호 그대로, 다음 놀이에 다른 문항 */
+  const a=bboot(noteReady,{index:20});a.go();a.unlock();a.wrong();a.tick(C.DASH_TICKS+2);a.unlock();a.btn(a.api.round.q.answer).click();
+  ok(a.api.phase==='learn'&&/쪽지가 바람에 날아갔어요/.test(a.n.feedback.textContent),'두 번째 정답: 쪽지가 날아갔다는 문구');
+  eq([bookOf(a).mon.wolf.note,bookOf(a).mon.wolf.nv,bookOf(a).mon.wolf.card,a.game().state.index],[2,1,0,20],'잃는 것 없이 이번 놀이만 쉼(다음 문항으로 바뀜), 문제 번호 그대로');
+  for(let i=0;i<120&&!a.api.round.ready;i++)a.tick();a.btn(a.api.round.q.answer).click();a.untilAsk();
+  eq([a.game().state.index,a.n.answers.dataset.special],[20,''],'배운 뒤에도 번호를 넘기지 않고 평소 문제로');
+  /* 두 번 틀림 */
+  const c=bboot(noteReady,{index:20});c.go();c.unlock();c.wrong(0);c.tick(C.DASH_TICKS+2);c.unlock();c.wrong(1);
+  ok(c.api.phase==='learn'&&/쪽지가 바람에 날아갔어요/.test(c.n.feedback.textContent)&&bookOf(c).mon.wolf.note===2&&c.game().state.run.miss.length===0,'두 번 틀림: 같은 문구, 판 기록 목록에 넣지 않음');
+ }
+ /* M-4 기억 늑대: 칩 · 문구 · 번호 고정 */
+ {const X=Q.get(8,'story',150);const a=bboot(b=>{b.pq=6;b.rv=[{id:X.id,box:1,due:0,dp:1,miss:1,seen:0}]},{index:9});a.go();
+  eq([a.n.answers.dataset.qid,a.n.answers.dataset.special,a.n.levelChip.textContent,a.game().round.token],[X.id,'review','🐺 기억 늑대: 지난번 글이에요','8:story:X'+X.id],'기억 늑대 문제');
+  eq([...a.n.answers.children].map(b=>b._t).sort(),X.choices.slice().sort(),'보기는 같은 글의 보기(순서만 섞음)');
+  a.unlock();a.right();ok(/🧠 기억했어요!$/.test(a.n.feedback.textContent)&&bookOf(a).rv[0].box===2&&a.game().state.index===9,'한 번에 맞히면 " · 🧠 기억했어요!", 칸 2로, 번호 그대로');
+  nextAsk(a);a.unlock();a.wrong(0);a.tick(C.DASH_TICKS+2);a.unlock();a.wrong(1);
+  const id=a.n.answers.dataset.qid;ok(bookOf(a).rv.some(e=>e.id===id&&e.box===1)&&a.game().state.run.miss.length===1,'평소 문제를 놓치면 기억 늑대 대기열에(판 기록은 지금 규칙 그대로)');
+ }
+ /* M-5 정답 화살 처치 → 발자국·훈장, 읽는 중에는 띠 없음(문제 사이에만) */
+ {const a=bboot(b=>{Object.assign(b.mon.wolf,{foot:Date.now(),plays:2,last:1,kills:40,note:1})},{index:3},{view:true});a.go();quiet(a);
+  const w=a.api.world,put=(hp,vh)=>{const v={id:w.nextId++,kind:'wolf',x:3,z:0,sx:20,sz:0,hp,max:hp,speed:.01,state:'walk',target:0,timer:0,inside:0,hen:0};if(vh)v.vh=1;w.wolves.push(v);return v};
+  const v=put(1,true);for(let i=0;i<60&&v.state!=='dead';i++)a.tick();
+  eq([a.api.phase,v.state,bookOf(a).mon.wolf.kills,bookOf(a).medal.arrow.n,bookOf(a).drop&&bookOf(a).drop.kind],['ask','dead',41,1,'wolf'],'읽는 중에 정답 화살 맞은 늑대가 쓰러짐 → 처치 +1, 쪽지를 떨어뜨림');
+  ok(a.events.some(e=>e.type==='noteDrop'&&e.kind==='wolf'),'3D에는 종이 한 장(noteDrop 사건)');
+  eq([a.fx('banner').filter(e=>/쪽지|반짝|훈장/.test(e.textContent)).length,a.game().book.later],[0,1],'읽는 중(ask)에는 수첩 띠를 띄우지 않고 모아 둠');
+  a.unlock();a.right();ok(a.fx('banner').some(e=>/늑대가 이름 쪽지를 떨어뜨렸어요!/.test(e.textContent))&&a.game().book.later===0,'그 문제를 답한 순간(문제 사이)에 띠 알림');
+  /* 타워가 저절로 쏜 화살로만 쓰러지면 세지 않음 */
+  const k0=bookOf(a).mon.wolf.kills,v2=put(1,false);for(let i=0;i<60&&v2.state!=='dead';i++)a.tick();eq([v2.state,bookOf(a).mon.wolf.kills],['dead',k0],'자동 사격만으로 쓰러진 늑대는 수첩에 세지 않음');
+ }
+ /* M-6 반짝 손님: 기회 → 세계에 손님 → 다음 정답의 화살이 닿으면 반짝 칸. 띠는 문제 사이에. 저장을 건넘 */
+ {const a=bboot(b=>{b.shiny.miss=2;b.shiny.f=30;b.shiny.fr=1},{index:12,run:{...C.freshRun(),asked:12,t0:1}},{view:true});a.go();quiet(a);a.unlock();a.right();
+  const g=a.game();ok(g.book.guest&&g.book.guest.state==='walk'&&g.book.data.shiny.guest===g.book.guest.kind&&g.book.data.shiny.run===1&&g.book.data.shiny.miss===0,'세 번째 기회(확정): 손님이 마을 둘레에 옴 '+(g.book.guest&&g.book.guest.kind));
+  ok(a.events.some(e=>e.type==='guest')&&!a.fx('banner').some(e=>/당첨|뽑/.test(e.textContent)),'손님 등장은 걸어 들어올 뿐("당첨" 문구 없음)');
+  nextAsk(a);a.tick(30);a.n.pause.click();a.unload();
+  const b=boot({book:true,view:true});b.go();ok(b.game().book.guest&&b.game().book.guest.kind===g.book.guest.kind,'앱을 닫았다 열어도 손님이 그대로 있음');
+  quiet(b);b.unlock();b.right();ok(b.api.world.guest.state==='bow','다음에 한 번에 맞히면 일제 사격의 한 발이 손님에게');
+  let n=0;while(b.api.world.guest&&b.api.world.guest.state==='bow'&&n++<200){if(b.api.phase==='ask')break;b.tick()}
+  for(let i=0;i<200&&!bookOf(b).mon[g.book.guest.kind].shiny;i++)b.tick();
+  const d=bookOf(b);ok(d.mon[g.book.guest.kind].shiny>0&&d.shiny.guest===null&&Bk.cells(d)===1&&b.game().sfx.shiny===1,'화살이 닿으면 반짝 칸(수첩 1칸)');
+  if(b.api.phase==='ask'){eq(b.fx('banner').filter(e=>/반짝/.test(e.textContent)).length,0,'읽는 중이면 반짝 띠를 미룸');b.unlock();b.right()}
+  ok(b.fx('banner').some(e=>/반짝 손님이 인사하고 갔어요!/.test(e.textContent)),'띠 알림은 문제 사이에');
+  /* 종을 울리면(결전 시작) 남은 손님은 떠나고 다음 기회 확정 */
+  const c=bboot(x=>{x.shiny.guest='wolf';x.shiny.run=1},{index:30,run:{...C.freshRun(),asked:30,t0:1,bell:1}},{view:true});c.go();ok(c.api.world.guest&&c.api.world.guest.kind==='wolf','기록에 손님이 있으면 세계에도 세움');
+  c.buy('bell');eq([bookOf(c).shiny.guest,bookOf(c).shiny.miss,c.api.world.guest&&c.api.world.guest.state],[null,2,'leave'],'결전이 시작되면 손님은 숲으로(다음 기회 확정)');
+ }
+ /* M-7 '마을을 처음부터'는 판 저장만 새로 만들고 기록은 그대로 */
+ {const a=bboot(b=>{Object.assign(b.mon.wolf,{foot:Date.now(),card:Date.now(),note:3,plays:3,kills:50});b.medal.king.n=2;b.medal.king.at=[Date.now(),0,0];b.rv=[{id:'a8-story-03',box:2,due:0,dp:1,miss:2,seen:1}];b.play=5},{index:40,gold:900,level:3});
+  a.go();a.unlock();a.right();const before=bookOf(a);a.n.reset.click();const g=a.game();
+  eq([g.state.gold,g.state.index,g.state.level,g.state.meta.stamps.length],[20,0,1,0],'판 저장은 새 판(금화 20 · 문제 0번)');
+  eq([g.book.data.mon.wolf,g.book.data.medal,g.book.data.rv,g.book.data.play,g.book.data.order.seed,g.book.data.seen],[before.mon.wolf,before.medal,before.rv,5,4242,before.seen],'수첩·훈장·기억 늑대·놀이 번호·이어 순서 씨앗은 그대로');
+  ok(stored().mon.wolf.card>0&&stored().medal.king.n===2,'저장소의 기록 열쇠도 그대로');
+ }
+ /* M-8 하루 시간: 문제 사이에서만 멈춤, 보호자 15분 더(길게 누르기 + 글로 적힌 수), 같은 날 다시 열면 이 화면부터, 다음 날 풀림 */
+ {const today=Bk.dayOf(Date.now());const a=bboot(b=>{b.today={d:today,s:1790,ext:0}},{index:5});a.go();quiet(a);
+  a.tick(110);eq([bookOf(a).today.s>=1800,a.api.phase,a.api.paused,shownOff(a.n.sleepy)],[true,'ask',false,true],'시간이 넘어도 읽는 중에는 멈추지 않음');
+  a.unlock();a.right();eq(a.api.phase,'reward','정답 연출은 그대로');a.tick(REWARD+1);
+  ok(a.n.sleepy.hidden===false&&a.api.paused&&a.game().book.sleepy&&a.game().sfx.sleepy===1,'다음 문제 사이에 "꼬꼬가 졸려요" 화면(세계 멈춤)');
+  const t0=a.api.world.t;a.tick(30);a.n.pause.click();eq([a.api.world.t,a.api.paused],[t0,true],'쉬는 동안 세계는 멈추고, 잠깐 쉬기 단추로 풀리지 않음');
+  const gold0=a.game().state.gold;ok(gold0>20&&stored().today.s>=1800,'잃는 것 없음(금화 그대로), 기록 저장');
+  press(a,'sleepyMore',300);ok(a.n.gate.hidden!==false&&/길게/.test(a.n.sleepyNote.textContent),'짧게 누르면 안내만("보호자는 길게 눌러요")');
+  press(a,'sleepyMore',2100);ok(a.n.gate.hidden===false&&gateDigits(a),'2초 길게 누르면 어른 확인: 글로 적힌 세 자리 수 '+a.n.gateCode.textContent);
+  ok(!/\d/.test(a.n.gateCode.textContent)&&a.n.gatePad.children.length===10,'수는 글로만 보이고(숫자 예시 없음) 숫자판으로 입력');
+  gatePass(a);eq([a.n.gate.hidden,a.n.sleepy.hidden,a.api.paused,a.api.phase,bookOf(a).today.ext],[true,true,false,'ask',15],'맞히면 15분 더, 다음 문제로');
+  a.n.pause.click();a.unload();
+  /* 같은 날 다시 열어도(시간이 다 찼으면) 이 화면부터 */
+  const b=bboot(x=>{x.today={d:today,s:1800,ext:0}},{index:5});b.go();ok(b.n.sleepy.hidden===false&&b.game().book.sleepy&&b.api.phase==='start','같은 날 다시 열면 쉬기 화면부터');
+  skew+=86400000;b.hide(true);b.hide(false);ok(b.n.sleepy.hidden&&b.api.phase==='ask','다음 날이 되면 풀림');skew-=86400000;
+  /* 결전 중이면 결전이 끝난 뒤 */
+  const c=bboot(x=>{x.today={d:today,s:5000,ext:0}},{index:5,run:{...C.freshRun(),asked:20,t0:1,bell:2,fpick:[1,2,3,4,5,6],shields:0,fq:0}});c.go();ok(c.n.sleepy.hidden!==false&&c.api.phase==='ask','결전 중에는 쉬기 화면을 미룸');
+  /* 하루 시간 "없음" */
+  const d=bboot(x=>{x.today={d:today,s:9999,ext:0};x.set.day=0},{index:5});d.go();ok(d.api.phase==='ask'&&shownOff(d.n.dayNote)===false&&d.n.dayNote.textContent==='','하루 시간 "없음"이면 멈추지 않음');
+ }
+ /* M-9 수첩 화면 · 보호자 화면 */
+ {const a=bboot(b=>{Object.assign(b.mon.wolf,{foot:Date.now(),card:Date.now(),note:3,plays:3,kills:50,rib:{n:1,last:2}});Object.assign(b.mon.bramble,{foot:Date.now(),plays:1,kills:18});b.mon.wolf.shiny=Date.now();
+   b.medal.one.n=60;b.medal.one.at=[Date.now(),0,0];b.rv=[{id:'a8-story-03',box:1,due:0,dp:1,miss:4,seen:1}];b.tot={q:80,f:60,s:1500,days:2};b.play=3},{index:5});
+  a.n.openBook.click();ok(a.n.bookScreen.hidden===false,'시작 화면에서 수첩이 열림');
+  eq([a.n.bookTitle.textContent,a.n.bookPages.children.length,a.n.bookMedals.children.length],['📒 발자국 수첩 4 / 32',8,12],'표지: 채운 칸 4 / 32, 8쪽, 훈장 12개');
+  const page=k=>a.n.bookPages.children.find(c=>c.dataset.kind===k);
+  ok(page('wolf').dataset.state==='friend'&&/늑대 누리/.test(page('wolf').textContent)&&/Wolf/.test(page('wolf').textContent)&&/친구가 된 날/.test(page('wolf').textContent)&&/친구 리본까지 1 \/ 3/.test(page('wolf').textContent),'친구 쪽: 종 이름·개인 이름·영어 이름·친구가 된 날·리본 진행');
+  ok(page('bramble').dataset.state==='foot'&&/정답 화살로 덤불 늑대를 30마리 물리치면 쪽지를 떨어뜨려요 \(18\/30\)/.test(page('bramble').textContent)&&!/보리/.test(page('bramble').textContent),'발자국 쪽: 조건 한 줄과 진행 숫자, 개인 이름은 아직 안 보임');
+  ok(page('king').dataset.state==='none'&&/아직 만나지 않았어요/.test(page('king').textContent),'아직 만나지 않은 쪽');
+  ok(!/한 판만 더|조금만 더|거의 다|서둘러|오늘 안에/.test(a.n.bookPages.textContent+a.n.bookMedals.textContent),'수첩에 재촉 문구 없음');
+  const md=a.n.bookMedals.children.find(c=>c.dataset.key==='one');eq(md.dataset.tier,'1','훈장 단계(동)');md.click();ok(/한 번에 읽기: .*동 50 · 은 300 · 금 1000 · 지금 60 · 다음 단계까지 240/.test(a.n.bookTip.textContent),'훈장을 누르면 조건과 남은 수');
+  a.n.bookClose.click();ok(a.n.bookScreen.hidden,'닫기');
+  a.go();a.n.openBook.click();a.n.pauseBook.click();ok(a.n.bookScreen.hidden&&shownOff(a.n.pauseBook),'읽는 중(ask)에는 수첩이 열리지 않고 단추도 없음');
+  a.n.pause.click();ok(!shownOff(a.n.pauseBook),'잠깐 쉬기 중에만 수첩 단추');a.n.pauseBook.click();ok(a.n.bookScreen.hidden===false,'쉬는 중에는 열림');a.n.bookClose.click();a.n.pause.click();ok(shownOff(a.n.pauseBook),'계속하면 단추가 사라짐');
+  /* 보호자 문턱: 짧게 누르면 안내만, 길게 누르면 글로 적힌 수, 3번 틀리면 30초 쉼 */
+  const g=bboot(b=>{b.medal.one.n=60;b.rv=[{id:'a8-story-03',box:1,due:0,dp:1,miss:4,seen:1}];b.tot={q:80,f:60,s:1500,days:2}},{index:5});
+  press(g,'openGuard',200);ok(g.n.gate.hidden!==false&&g.n.guardian.hidden!==false&&/길게/.test(g.n.dayNote.textContent),'보호자 단추를 짧게 누르면 열리지 않음');
+  press(g,'openGuard',2100);ok(g.n.gate.hidden===false&&g.n.guardian.hidden!==false,'길게 누르면 어른 확인');
+  const wrongDs=()=>{const d=gateDigits(g);return [d[0]==='9'?'8':'9',d[1],d[2]]};
+  const c1=g.n.gateCode.textContent;gateType(g,wrongDs());ok(g.n.gate.hidden===false&&g.n.guardian.hidden!==false&&/수가 달라요/.test(g.n.gateAsk.textContent),'틀리면 열리지 않고 새 수');
+  gateType(g,wrongDs());gateType(g,wrongDs());ok(/잠깐 쉬었다가/.test(g.n.gateAsk.textContent)&&g.n.gatePad.children.length===0&&g.n.gateCode.textContent==='','3번 틀리면 30초 쉼(숫자판이 사라짐)');
+  g.n.gateClose.click();press(g,'openGuard',2100);ok(g.n.gatePad.children.length===0,'쉬는 동안에는 다시 눌러도 입력할 수 없음');g.n.gateClose.click();
+  skew+=31000;press(g,'openGuard',2100);gatePass(g);ok(g.n.gate.hidden&&g.n.guardian.hidden===false,'30초 뒤 맞히면 보호자 화면이 열림');
+  eq(g.n.gTabs.children.map(b=>b.textContent),['기록','설정','진행 파일','도움말'],'탭 4개');
+  const body=()=>g.n.gBody.textContent,tab=k=>g.n.gTabs.children.find(b=>b.dataset.tab===k).click(),gbtn=t=>g.n.gBody.children.find(c=>c.tagName==='button'&&c.textContent.startsWith(t));
+  ok(/전체: 놀이 1번 · 푼 문제 80 · 한 번에 맞힌 문제 60/.test(body())&&/자주 놓친 글/.test(body())&&/놓친 수 4/.test(body()),'기록 탭: 숫자 사실');
+  ok(!/%|순위|등수|평균|또래|보다 잘|실력|효과|향상/.test(body()),'기록 탭에 비율·순위·비교·효과 문구 없음');
+  tab('help');ok(body().includes(Bk.shinyText())&&/25% 확률/.test(body())&&/수첩은 몬스터 8종, 32칸으로 끝이 있어요/.test(body())&&/보안 장치가 아니에요/.test(body()),'도움말: 반짝 손님 확률(상수에서 만든 문구) · 수집 구조 · 문턱 안내');
+  ok(body().includes('게임 기록은 이 기기에 저장되고, 개발자에게 보내지 않아요.')&&!/이 기기에만|기기 안에만|밖으로 나가지 않아요/.test(body()),'저장 위치는 기준 문장 그대로("에만" 없음)');
+  ok(/개인정보처리방침/.test(body())&&/수집하는 개인정보: 없습니다/.test(body())&&/\[개발자 이름\]/.test(body())&&/\[문의 이메일\]/.test(body())&&/오픈소스 고지/.test(body()),'도움말: 개인정보처리방침 본문(개발자 이름·이메일은 자리표시)과 오픈소스 고지');
+  ok(!/https?:|www\./.test(body()),'보호자 화면 글에 바깥 주소 없음');
+  /* 설정: 하루 시간 바꾸기, 끄기는 한 번 더 확인 */
+  tab('set');const sel=g.n.gBody.children.find(c=>c.tagName==='label').children.find(c=>c.tagName==='select');sel.value='45';sel.onchange();eq([bookOf(g).set.day,stored().set.day],[45,45],'하루 시간 45분(바로 저장)');
+  {const s2=g.n.gBody.children.find(c=>c.tagName==='label').children.find(c=>c.tagName==='select');s2.value='0';s2.onchange();eq([bookOf(g).set.day,g.n.gate.hidden],[45,false],'하루 시간 끄기는 글로 적힌 수를 한 번 더');gatePass(g);eq(bookOf(g).set.day,0,'확인 뒤 꺼짐')}
+  ok(!g.n.gBody.children.some(c=>c.tagName==='label'&&/영어/.test(c.textContent)),'영어 비중 설정은 문제은행이 받아 줄 때(Questions.setMix)만 보임');
+  /* 진행 파일: 내보내기(한 번 더 확인) → 다른 기기에서 불러오기 → 미리보기 → 바꾸기 → 되돌리기 */
+  tab('file');ok(body().includes('파일에는 읽기 단계, 날짜별 놀이 시간, 문제 기록, 수첩과 훈장이 들어 있어요.')&&/기기를 바꾸기 전에/.test(body()),'진행 파일 탭 안내 문장');
+  gbtn('파일로 내보내기').click();ok(g.n.gate.hidden===false&&!g.window.__lastExport,'내보내기는 한 번 더 확인');gatePass(g);
+  const file=g.window.__lastExport;ok(file&&/^kkomaeul-progress-\d{8}\.json$/.test(file.name)&&JSON.parse(file.text).book.medal.one.n===60&&!('world' in JSON.parse(file.text).run),'진행 파일(세계는 빠짐)');
+  const mine=[saved[KEY],saved[BOOK_KEY]];
+  const h=bboot(b=>{b.medal.one.n=3;b.play=2},{index:1,gold:55});press(h,'openGuard',2100);gatePass(h);h.n.gTabs.children.find(b=>b.dataset.tab==='file').click();
+  eq([h.window.__importText('{').ok,/진행 파일이 아니에요/.test(h.n.gNote.textContent)],[false,true],'엉뚱한 파일은 거절');
+  {const f=JSON.parse(file.text);f.v=2;h.window.__importText(JSON.stringify(f));ok(/새 버전 앱에서 만든 파일/.test(h.n.gNote.textContent),'새 버전 파일은 거절')}
+  {const f=JSON.parse(file.text);f.book.medal.one.n=61;h.window.__importText(JSON.stringify(f));ok(/손상됐을 수 있어요\. 그래도 불러올까요\?/.test(h.n.gBody.textContent),'검사합이 어긋나면 경고(보호자가 고름)');h.n.gBody.children.find(c=>c.textContent==='그만두기').click()}
+  h.window.__importText(file.text);const hb=h.n.gBody.textContent;ok(/불러올 기록: 친구 카드 0 · 훈장 1 · 놀이 1번/.test(hb)&&/이 기기의 기록: 친구 카드 0 · 훈장 0 · 놀이 2번/.test(hb)&&!/손상/.test(hb),'미리보기: 불러올 기록과 이 기기의 기록');
+  const keep=[saved[KEY],saved[BOOK_KEY]];h.n.gBody.children.find(c=>c.textContent==='바꾸기').click();ok(h.n.gate.hidden===false&&saved[BOOK_KEY]===keep[1],'바꾸기도 한 번 더 확인');gatePass(h);
+  eq([h.game().book.data.medal.one.n,h.game().state.index,h.game().state.gold,h.api.phase,h.n.start.hidden],[60,5,20,'start',false],'바꾼 뒤: 불러온 기록과 판으로 시작 화면');
+  ok(/되돌리기/.test(h.n.gBody.textContent)&&saved[BOOK_KEY+'-bak'],'직전 기록을 -bak에 한 벌, 되돌리기 단추');
+  h.n.gBody.children.find(c=>c.textContent.startsWith('되돌리기')).click();
+  eq([saved[KEY],saved[BOOK_KEY],BOOK_KEY+'-bak' in saved,h.game().book.data.medal.one.n,h.game().state.gold],[keep[0],keep[1],false,3,55],'되돌리면 바꾸기 전 판 저장·기록이 글자 그대로(한 번뿐)');
+  ok(!/되돌리기/.test(h.n.gBody.textContent),'되돌리기는 마지막 1번');
+  /* 3분 동안 손대지 않으면 닫힘 */
+  skew+=181000;h.n.gTabs.children[0].click();ok(h.n.guardian.hidden,'3분 동안 손대지 않으면 다음 손길에 닫힘');
+  /* 모든 기록 지우기: 보호자 화면에서만, 한 번 더 확인 */
+  press(h,'openGuard',2100);gatePass(h);h.n.gTabs.children.find(b=>b.dataset.tab==='set').click();h.n.gBody.children.find(c=>c.textContent==='모든 기록 지우기').click();ok(h.n.gate.hidden===false&&saved[BOOK_KEY],'모든 기록 지우기도 한 번 더 확인');gatePass(h);
+  eq([KEY in saved,BOOK_KEY in saved,h.game().book.status,h.game().state.gold,h.game().book.data.medal.one.n,h.api.phase],[false,false,'new',20,0,'start'],'두 열쇠를 비우고 새로 시작');
+  /* 보호자 안내(시작 화면): 문턱 없이 개인정보처리방침 본문만 */
+  h.n.openInfo.click();ok(h.n.guardian.hidden===false&&h.n.gTabs.children.length===1&&/개인정보처리방침/.test(h.n.gBody.textContent)&&!h.n.gBody.children.some(c=>c.tagName==='button'),'보호자 안내: 방침 본문만(문턱·단추 없음)');h.n.guardClose.click();
+  saved={[KEY]:mine[0],[BOOK_KEY]:mine[1]};
+ }
+ /* M-10 엔딩 카드: 쉬기 권유가 단추 위에, 이번 판 요약, "오늘은 그만하기" */
+ {const a=bboot(b=>{Object.assign(b.mon.wolf,{foot:Date.now(),card:Date.now(),note:3,plays:3,kills:50})},{index:60,run:{...C.freshRun(),asked:60,first:50,t0:1,bell:3}});a.go();
+  ok(a.game().ending&&!shownOff(a.n.endRest)&&html.includes('id="endRest">🌙 오늘은 여기까지 해도 좋아요</p>')&&!shownOff(a.n.endQuit)&&!shownOff(a.n.endBookBtn),'엔딩 카드: 쉬기 권유 · 오늘은 그만하기 · 수첩 보기');
+  ok(/놀러 올 친구: 누리/.test(a.n.endFriends.textContent)&&shownOff(a.n.endBook),'놀러 올 친구 줄(이번 판에 얻은 것이 없으면 요약 줄 생략)');
+  {const p=html.indexOf('id="endRest"'),q=html.indexOf('id="endQuit"'),r=html.indexOf('id="endNew"');ok(p>0&&p<q&&q<r,'쉬기 권유와 "오늘은 그만하기"가 새 마을 단추보다 위')}
+  a.n.endBookBtn.click();ok(a.n.bookScreen.hidden===false,'엔딩 카드에서 수첩 보기');a.n.bookClose.click();
+  a.n.endQuit.click();eq([a.api.phase,a.n.ending.hidden,a.n.start.hidden,a.n.go.textContent],['start',true,false,'이어서 하기 ▶'],'오늘은 그만하기: 시작 화면으로(진행은 저장)');
+  a.go();ok(a.game().ending,'다시 들어오면 엔딩 카드부터');a.n.endStay.click();a.untilAsk();eq(a.window.getVillageState().friends,[{kind:'wolf',ribbon:false,shiny:false}],'더 놀기: 3D에 놀러 올 친구 목록');
+  const off=fresh();ok(!off.game().book.on,'수첩을 끄면 기록 없음');eq(off.window.getVillageState().friends,[],'수첩을 끄면 친구 목록도 빔');
+  /* 결전 승리 → 왕 발자국·훈장, 새 마을 → 놀이 +1 */
+  const k=bboot(null,{index:60,run:{...C.freshRun(),asked:60,first:50,t0:1,bell:2,fpick:[1],shields:C.FINALE.shields-1,fq:C.FINALE.shields-1,ok:[1,2,3]}});k.go();quiet(k);k.unlock();k.right();
+  const d=bookOf(k);eq([d.medal.king.n,d.mon.king.foot>0,d.mon.king.shiny>0,d.vil.meadow,k.game().book.gain.foot],[1,true,true,1,1],'결전 승리: 늑대 왕 훈장 · 발자국 · (한 번도 안 틀려) 반짝 칸 · 마을 도장');
+  k.tick(60);ok(k.game().ending&&/📒 이번 판: 발자국 \+1 .*훈장 동/.test(k.n.endBook.textContent),'엔딩 카드에 이번 판 요약 '+k.n.endBook.textContent);
+  k.n.endNew.click();eq([bookOf(k).play,bookOf(k).pq,k.game().book.gain.foot],[2,0,0],'새 마을: 놀이 번호 +1');
+ }
+ /* M-11 바깥 링크·외부 요청 없음(문자열 검사): 수첩 화면·규칙·콘텐츠 파일과 페이지 */
+ {const files={'index.html':html,'bookui.js':BOOKUI_SRC,'book.js':fs.readFileSync(__dirname+'/book.js','utf8'),'notes.js':fs.readFileSync(__dirname+'/notes.js','utf8')};
+  for(const [name,text] of Object.entries(files)){
+   for(const w of ['fetch(','XMLHttpRequest','sendBeacon','WebSocket','EventSource','window.open','location.href','target="_blank"','<a href','.href=\'http','https://','http://'])ok(!text.includes(w),name+': '+w+' 없음(바깥 링크·외부 요청 없음)');
+  }
+  ok(!/당첨|뽑기에|레어|가챠/.test(BOOKUI_SRC+files['index.html']),'화면 글에 뽑기·당첨 표현 없음');
+  ok(!/실력 향상|학습 효과|성적/.test(BOOKUI_SRC+files['index.html']),'화면 글에 효과 주장 없음');
+  ok(Nt.PRIVACY.length>=13&&Nt.PRIVACY.every(([h,l])=>typeof h==='string'&&Array.isArray(l)&&l.every(t=>typeof t==='string'&&t.length>0)),'개인정보처리방침 본문 모양');
+ }
+ Date.now=realNow;
 }
 
 eq(spoken,0,'검사 전체에서 음성 합성(speechSynthesis)을 한 번도 부르지 않음');

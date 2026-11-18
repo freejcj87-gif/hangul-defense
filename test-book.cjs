@@ -672,7 +672,8 @@ withBook({ON:false},()=>{const b=mk(),x=clone(b);
  for(const w of ['Date.now','Math.random','localStorage','sessionStorage','fetch(','XMLHttpRequest','sendBeacon','document.','navigator.','setTimeout','setInterval'])ok(!code.includes(w),'book.js는 '+w+'를 쓰지 않음(시계·난수·저장소·통신은 인자로만)');
  const buf=fs.readFileSync(path.join(__dirname,'book.js'));ok(!(buf[0]===0xEF&&buf[1]===0xBB)&&!srcB.includes('\uFFFD')&&Buffer.byteLength(srcB.replace(/\r\n/g,'\n'))<60*1024,'book.js BOM 없음·60KB 이하('+Buffer.byteLength(srcB.replace(/\r\n/g,'\n'))+')');
  const pages=fs.readFileSync(path.join(__dirname,'scripts/build-pages.cjs'),'utf8');ok(/'book\.js'/.test(pages)&&/'notes\.js'/.test(pages),'배포 목록(build-pages.cjs)에 book.js·notes.js');
- ok(!/\b(Book|NOTES)\b/.test(fs.readFileSync(path.join(__dirname,'index.html'),'utf8')),'1단계: index.html에는 아직 연결하지 않음(화면 연결은 0.15 병합 뒤)');
+ {const page=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');ok(page.includes('<script src="notes.js')&&page.indexOf('<script src="book.js')>page.indexOf('<script src="notes.js')&&page.indexOf('<script src="bookui.js')>page.indexOf('<script src="book.js'),'2단계: index.html이 notes.js · book.js를 인라인 스크립트 앞에, bookui.js를 뒤에 불러옴');
+  ok(pages.includes("'bookui.js'"),'배포 목록에 bookui.js')}
 }
 if(fails.length)process.exitCode=1;
 console.log((fails.length?'FAIL '+fails.length+' / ':'PASS ')+n+' book assertions (콘텐츠 '+A_COUNT+' · 기록 '+(n-A_COUNT)+').');

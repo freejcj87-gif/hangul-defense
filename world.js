@@ -104,6 +104,8 @@
   const KING={point:2,far:3,wait:-3,stop:2.4,step:.6,speed:1.2,flee:4,size:3.6};
   /* 도둑 여우(0.12): 한 번에 한 마리, 늑대 목록과 별개(w.fox)라 타워가 저절로 쏘지 않는다. 정해진 틱(total)에 맞춰 닭까지 온다 */
   const FOX={flee:3.2,arrow:1.6,size:.7};
+  /* 수첩 MVP 반짝 손님: 늑대 목록과 별개(w.guest)라 타워가 저절로 쏘지 않고, 닭·건물을 노리지 않는다. 마을 둘레를 천천히 돈다. 머무는 시간 제한 없음(판이 끝날 때 화면이 치움) */
+  const GUEST={point:5,out:1.6,turn:.12,walk:1.4,leave:3,far:3};
   const MAX_WOLVES=90;
   const TRAVEL=Math.ceil(EDGE/WOLF.speed/TICK); /* 출현에서 마을 경계까지 걸리는 틱(약 7초) */
   /* 고정 배치. 0단계 타워 자리 6(0.8과 같음, 중심에서 가까운 순서). */
@@ -365,6 +367,10 @@
           else{hen.state='gone';free--;f.took=true;w.stats.henLost++;w.stats.foxLost++;mercyUp(w);w.events.push({type:'foxLost',hen:hen.id,fox:f.id},{type:'henLost',hen:hen.id,wolf:0,fox:true})}
           f.state='flee'}
       }else if(move(f,f.sx,f.sz,FOX.flee,.3)){w.fox=null;w.events.push({type:'foxGone',fox:f.id})}}
+    /* 반짝 손님: 숲에서 걸어 나와 울타리 밖을 돈다. 인사(bow)하면 황금 화살을 기다렸다가 숲으로 돌아간다 */
+    if(w.guest){const g=w.guest,R=radius(w),goal=g.state==='leave'?R+EDGE+GUEST.far:R+GUEST.out,sp=(g.state==='leave'?GUEST.leave:GUEST.walk)*TICK;
+      if(Math.abs(goal-g.r)<=sp){g.r=goal;if(g.state==='leave')w.guest=null}else g.r+=Math.sign(goal-g.r)*sp;
+      if(w.guest){if(g.state==='walk')g.a+=GUEST.turn*TICK;g.x=Math.round(Math.cos(g.a)*g.r*1000)/1000;g.z=Math.round(Math.sin(g.a)*g.r*1000)/1000}}
     /* 늑대·몬스터 */
     for(const v of w.wolves){
       if(!alive(v))continue;
@@ -419,11 +425,12 @@
     /* 화살: 날아가는 동안 과녁을 따라가고, 닿으면 맞힌다(펑 화살은 둘레도). 과녁이 먼저 쓰러졌으면 그 자리에서 터진다. */
     const byId=new Map();if(w.arrows.length)for(const v of w.wolves)if(!byId.has(v.id))byId.set(v.id,v); /* find(같은 id면 앞의 것)와 같다 */
     for(const a of w.arrows){
-      if(a.gold){const o=w.fox&&w.fox.id===a.wolf?w.fox:w.king&&w.king.id===a.wolf?w.king:null;if(o){a.tx=o.x;a.tz=o.z}} /* 황금 화살(여우·늑대 왕): 과녁을 따라가기만 한다 */
+      if(a.gold){const o=w.fox&&w.fox.id===a.wolf?w.fox:w.king&&w.king.id===a.wolf?w.king:w.guest&&w.guest.id===a.wolf?w.guest:null;if(o){a.tx=o.x;a.tz=o.z}
+        if(a.t<=1&&o&&o===w.guest&&o.state==='bow'){o.state='leave';w.events.push({type:'shinyMet',kind:o.kind,guest:o.id})}} /* 황금 화살(여우·늑대 왕): 과녁을 따라가기만 한다 */
       const v=byId.get(a.wolf),live=v&&alive(v);
       if(live||v&&v.state==='dead'){a.tx=v.x;a.tz=v.z} /* 쓰러진 자리(같은 틱에 먼저 쓰러져도 그 자리)로 */
       if(--a.t>0)continue;
-      if(live)hit(w,v,a.damage);
+      if(live)hit(w,v,a.damage,a.v);
       if(a.splash>0&&(live||a.tx!==undefined))burst(w,a,live?v:null);
     }
     w.arrows=w.arrows.filter(a=>a.t>0);
@@ -458,9 +465,11 @@
   const floors=b=>Math.max(0,((b&&b.floor)|0)-1); /* 1층 위로 올린 층 수 */
   const towerDamage=(s,b)=>damage(s)+FLOOR.damage*floors(b);
   const towerRange=(s,b,w)=>range(s,w)+FLOOR.range*floors(b);
-  function shoot(w,b,v,s){
+  function shoot(w,b,v,s,src){
     const d=dist(b.x,b.z,v.x,v.z),t=Math.max(2,Math.ceil(d/(TOWER.arrowSpeed*TICK))),P=power(s);
-    w.arrows.push({id:id(w),tower:b.id,wolf:v.id,fx:b.x,fz:b.z,tx:v.x,tz:v.z,t,total:t,damage:towerDamage(s,b),splash:P.splash,share:P.share});
+    const a={id:id(w),tower:b.id,wolf:v.id,fx:b.x,fz:b.z,tx:v.x,tz:v.z,t,total:t,damage:towerDamage(s,b),splash:P.splash,share:P.share};
+    if(src)a.v=1; /* 수첩 MVP: 일제 사격(정답 화살)이 쏜 화살. 타워 자동 사격에는 이 칸이 없다 */
+    w.arrows.push(a);
     w.events.push({type:'shoot',tower:b.id,wolf:v.id,splash:P.splash>0});
   }
   /* 사거리 안에서 위험한 순(같으면 가까운 순, 그것도 같으면 목록 순)으로 k마리. 거리는 한 번만 재고 정렬 없이 고른다(안정 정렬의 앞 k마리와 같다) */
@@ -477,15 +486,18 @@
     const x=center?center.x:a.tx,z=center?center.z:a.tz,dmg=Math.max(1,Math.round(a.damage*a.share));let n=0;
     for(const o of w.wolves){if(o===center||!alive(o))continue;const r=a.splash+.25*(kindOf(o).size-1),dx=o.x-x,dz=o.z-z;
       if(dx>r||dx<-r||dz>r||dz<-r)continue;
-      if(Math.hypot(dx,dz)<=r){hit(w,o,dmg);n++}}
+      if(Math.hypot(dx,dz)<=r){hit(w,o,dmg,a.v);n++}}
     w.stats.splash+=n;w.events.push({type:'splash',x,z,r:a.splash,n,arrow:a.id});
   }
-  function hit(w,v,dmg){
+  /* src = 정답 화살(일제 사격 화살이나 그 화살의 펑). 한 번이라도 맞으면 v.vh=1, 그 뒤 쓰러지면(마지막 한 발이 자동 사격이어도) kill 사건에 by:'volley' */
+  function hit(w,v,dmg,src){
+    if(src)v.vh=1;
     v.hp-=dmg;w.events.push({type:'hit',wolf:v.id});
     if(v.hp<=0){
       if(v.state==='bite'||v.state==='carry'){const hen=w.hens.find(h=>h.id===v.hen);if(hen&&(hen.state==='carried'||hen.state==='caught')){hen.state='flee';hen.calm=0;w.stats.henSaved++;w.events.push({type:'henSaved',hen:hen.id})}}
       const boss=!!kindOf(v).boss;
-      v.state='dead';v.timer=0;w.stats.kills++;if(boss)w.stats.bossKills++;w.events.push({type:'kill',wolf:v.id,kind:v.kind||'wolf',boss});
+      v.state='dead';v.timer=0;w.stats.kills++;if(boss)w.stats.bossKills++;
+      const e={type:'kill',wolf:v.id,kind:v.kind||'wolf',boss};if(v.vh){e.by='volley';w.stats.volleyKills=(w.stats.volleyKills|0)+1}w.events.push(e);
     }
   }
   /* ok를 만족하는 것 가운데 가장 가까운 것(같으면 목록 앞). 걸러 낸 새 배열을 만들지 않는다 */
@@ -506,7 +518,7 @@
       const reach=(base+FLOOR.range*floors(b))*TOWER.volleyRange,near=[];for(const v of live){const d=dist(v.x,v.z,b.x,b.z);if(d<=reach)near.push({v,d})} /* 거리는 한 번만 재서 정렬 */
       if(!near.length)continue;
       near.sort((p,q)=>p.d-q.d);
-      for(let i=0;i<per;i++){shoot(w,b,near[i%near.length].v,s);n++}}
+      for(let i=0;i<per;i++){shoot(w,b,near[i%near.length].v,s,1);n++}}
     return n;
   }
   /* ---------- 늑대 왕 · 도둑 여우 · 물러남 (0.12. 화면·시뮬이 부른다) ---------- */
@@ -540,6 +552,16 @@
   /* 정답 사격이 여우를 맞힘(일제 사격 1순위. 화면이 한 번에 맞혔을 때, 그리고 FOX.second면 두 번째 정답에도 부른다):
      아직 닭에 닿기 전이면 황금 화살이 나가고 여우는 그 순간 달아난다(구출). 이미 닿았으면 false */
   function foxShoo(w){const f=w.fox;if(!f||f.state!=='come')return false;f.state='flee';f.saved=true;w.stats.foxSaved++;goldArrow(w,f);return true}
+  /* 반짝 손님 등장(Book.shinyChance가 당첨일 때 화면이 부른다). 난수를 쓰지 않는다(세계 결과가 손님과 무관하게 같다). 이미 있으면 null */
+  function guest(w,kind){
+    if(w.guest||kind==='king')return null;
+    const a=(GUEST.point+.5)*Math.PI*2/SPAWNS,r=radius(w)+EDGE+GUEST.far;
+    w.guest={id:id(w),kind:KINDS[kind]||kind==='fox'?kind:'wolf',a,r,x:Math.round(Math.cos(a)*r*1000)/1000,z:Math.round(Math.sin(a)*r*1000)/1000,state:'walk'};return w.guest;
+  }
+  /* 정답 사격이 손님에게 닿음(일제 사격 1순위 한 발): 황금 화살이 날아가고, 닿으면 shinyMet 사건과 함께 숲으로 돌아간다 */
+  function guestGreet(w){const g=w.guest;if(!g||g.state!=='walk')return false;g.state='bow';goldArrow(w,g);return true}
+  /* 판이 끝남(결전 시작·새 마을): 손님이 숲으로 돌아간다. 만나지 못했으면 shinyGone 사건 */
+  function guestGone(w){const g=w.guest;if(!g)return false;if(g.state!=='leave'){g.state='leave';w.events.push({type:'shinyGone',kind:g.kind,guest:g.id})}return true}
   /* 늑대가 모두 물러난다(늑대 왕을 물리침): 물던 닭은 놓고 달아나며, ticks틱 동안(−1 = 계속) 새 늑대가 나오지 않는다. → 물러난 수 */
   function retreat(w,ticks){
     let n=0;
@@ -585,7 +607,7 @@
   const isObj=o=>!!o&&typeof o==='object'&&!Array.isArray(o);
   const fin=Number.isFinite,int=(x,lo,hi)=>Number.isSafeInteger(x)&&x>=lo&&x<=hi;
   const WOLF_STATES=['walk','smash','hunt','bite','carry','leave','dead','gone'],HEN_STATES=['yard','flee','hidden','home','caught','carried','gone'];
-  const KING_STATES=['wait','come','stand','flee'],FOX_STATES=['come','flee'];
+  const KING_STATES=['wait','come','stand','flee'],FOX_STATES=['come','flee'],GUEST_STATES=['walk','bow','leave'];
   /* 흐르는 농장 칸 다듬기(선택 칸): 음수·모양이 틀린 값만 고친다. 망가진 일손 슬롯은 쉬는 슬롯으로(들고 있던 알은 버린다) */
   function tidyFlow(w){
     if(!isObj(w.flow)){w.flow=flowFresh();return}
@@ -611,6 +633,8 @@
     if(!int(w.mercyT,0,MERCY.decay))w.mercyT=MERCY.decay-w.t%MERCY.decay; /* 0.8 첫 저장: 예전 풀림 시각을 이어 쓴다 */
     if('calm' in w&&!int(w.calm,0,GUARD.calm))w.calm=0;if('keep' in w&&typeof w.keep!=='boolean')w.keep=!!w.keep;
     const st=w.stats||{};w.stats={kills:0,henLost:0,henSaved:0,broken:0,fenceBroken:0,waves:0,bosses:0,bossKills:0,splash:0,foxSaved:0,foxLost:0,foxScared:0};for(const k in w.stats)if(Number.isSafeInteger(st[k]))w.stats[k]=st[k];
+    if(Number.isSafeInteger(st.volleyKills)&&st.volleyKills>0)w.stats.volleyKills=st.volleyKills; /* 수첩 MVP 선택 칸: 정답 화살 처치 수 */
+    if(w.guest!=null){const g=w.guest;if(!isObj(g)||!Number.isSafeInteger(g.id)||!fin(g.a)||!fin(g.r)||!(KINDS[g.kind]||g.kind==='fox')||!GUEST_STATES.includes(g.state))delete w.guest;else{g.x=Math.round(Math.cos(g.a)*g.r*1000)/1000;g.z=Math.round(Math.sin(g.a)*g.r*1000)/1000}}else if('guest' in w)delete w.guest;
     /* 0.12: 물러남·늑대 왕·여우. 모양이 틀리면 없는 것으로(화면이 run.bell을 보고 왕을 다시 세운다) */
     if('peace' in w&&!(Number.isSafeInteger(w.peace)&&w.peace>=-1&&w.peace<=1e6))w.peace=0;
     if(w.king!=null){const k=w.king;if(!isObj(k)||!Number.isSafeInteger(k.id)||!fin(k.a)||!fin(k.r)||!KING_STATES.includes(k.state))w.king=null;else{if(!int(k.steps,0,3))k.steps=0;kingPut(k)}}
@@ -623,6 +647,7 @@
       if(!(fin(v.speed)&&v.speed>0))v.speed=WOLF.speed*K.speed; /* 0이면 영영 못 움직인다 */
       if(!fin(v.sx)||!fin(v.sz)){v.sx=v.x;v.sz=v.z}
       for(const k of ['target','timer','inside','hen'])if(!fin(v[k]))v[k]=0;
+      if('vh' in v&&v.vh!==1)delete v.vh;
       if(K.boss&&!fin(v.roar))v.roar=ROAR.every>>1;
     }
     w.hens=w.hens.filter(h=>isObj(h)&&Number.isSafeInteger(h.id)&&fin(h.x)&&fin(h.z)).slice(0,HENS_MAX);
@@ -641,12 +666,14 @@
       if(b.kind==='tower'){if(!int(b.floor,1,TOWER_UNITS))b.floor=1;if(!int(b.cd,0,1e6))b.cd=0;if(!int(b.stun,0,ROAR.stun))b.stun=0}
     }
     w.arrows=w.arrows.filter(a=>isObj(a)&&Number.isSafeInteger(a.id)&&['fx','fz','tx','tz','t','total','damage','splash','share'].every(k=>fin(a[k])));
+    for(const a of w.arrows)if('v' in a&&a.v!==1)delete a.v;
     let top=0;for(const list of [w.wolves,w.hens,w.buildings,w.arrows])for(const o of list)top=Math.max(top,o.id);
+    if(w.guest)top=Math.max(top,w.guest.id);
     if(w.king)top=Math.max(top,w.king.id);if(w.fox)top=Math.max(top,w.fox.id);
     if(!(Number.isSafeInteger(w.nextId)&&w.nextId>top))w.nextId=top+1;
   }
 
-  const api={V:2,STAGE,STAGE_MAX,routes,BRIDGE,bridgeAt,FLOW,flowOn,flowQuestion,flowCorrect,flowAdd,flowYard,flowCap,flowPile,flowIdle,flowLayers,TEMPO,tempoInterval,mulOf,KING,FOX,king,kingHit,fox,foxShoo,retreat,peaceOff,TICK,RADIUS,EDGE,SPAWNS,WOLF,AGE,THREAT,PACK,TRICKLE,SLOW,slowEase,KINDS,MIX,BOSS_EVERY,TOWER,POWER,POWER_STEP,FLOOR,ROAR,HP,FENCE_HP,MEND,REBUILD,HEN,DASH,RUSH,MERCY,MERCY_CAP,INNER,SIDE_REACH,INTERVAL,MAX_WOLVES,TRAVEL,GUARD,answered,
+  const api={V:2,STAGE,STAGE_MAX,routes,BRIDGE,bridgeAt,FLOW,flowOn,flowQuestion,flowCorrect,flowAdd,flowYard,flowCap,flowPile,flowIdle,flowLayers,TEMPO,tempoInterval,mulOf,KING,FOX,GUEST,king,kingHit,fox,foxShoo,guest,guestGreet,guestGone,retreat,peaceOff,TICK,RADIUS,EDGE,SPAWNS,WOLF,AGE,THREAT,PACK,TRICKLE,SLOW,slowEase,KINDS,MIX,BOSS_EVERY,TOWER,POWER,POWER_STEP,FLOOR,ROAR,HP,FENCE_HP,MEND,REBUILD,HEN,DASH,RUSH,MERCY,MERCY_CAP,INNER,SIDE_REACH,INTERVAL,MAX_WOLVES,TRAVEL,GUARD,answered,
     TOWER_SLOTS,RINGS,ALL_SLOTS,SLOT_COUNT,TOWER_UNITS,PLACE,HOMES,HENS_MAX,HOME,towerSlots,fenceLayers,
     intervalFor,create,sync,step,volley,volleyArrows,dashTicks,built,threat,repairAll,brokenCount,brokenKinds,marketDown,wolvesInside,towerUnits,barLeft,secondsLeft,packSize,trickleGap,kindsAt,restore,radius,sectorOf,rand,range,cooldown,damage,towerDamage,towerRange,power,ageOf};
   if(typeof module!=='undefined')module.exports=api;
