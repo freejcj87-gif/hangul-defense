@@ -509,7 +509,7 @@ async function start(){
  const HCAP=MAXH+3,henMesh=instanced(G.hen,HCAP,false),henShade=shadowOnly(solid([['sphere',0,[0,.36,-.03],[.3,.28,.36]],['sphere',0,[0,.68,.16],[.16,.19,.16]]]),HCAP);
  const henSlots=[];for(let i=0;i<MAXH;i++)henSlots.push({i,a:proxy(.9+(i*37%10)*.012),id:null,on:false,h:null,fx:0,fz:0,tx:0,tz:0,born:-9,fxDone:true,phase:i*1.7,face:i*2.1,featherT:0,lastX:0,lastZ:0});
  const peeks=[0,1,2].map(()=>proxy(.76));
- const PLAIN=new THREE.Color(1,1,1),FLASH=new THREE.Color(2.1,1.9,1.5),SHY=new THREE.Color(.72,.78,.9),DEAD=new THREE.Color(.62,.62,.68);
+ const PLAIN=new THREE.Color(1,1,1),SHINY_TINT=new THREE.Color(1.45,1.3,.75),FLASH=new THREE.Color(2.1,1.9,1.5),SHY=new THREE.Color(.72,.78,.9),DEAD=new THREE.Color(.62,.62,.68);
  for(let i=0;i<HCAP;i++)henMesh.setColorAt(i,PLAIN);
 
  /* ----- monsters: one rigged instanced mesh per kind (head, jaw, tail and legs move in the vertex shader) and one shared,
@@ -1453,7 +1453,7 @@ async function start(){
    rp.set(o.x+o.kx+Math.sin(o.ry)*fwd*S,P.y*S+o.ky+ay,o.z+o.kz+Math.cos(o.ry)*fwd*S).add(rv2).sub(rv);
    o.mat.compose(rp,rq,rs.set(S*P.sx,S*P.sy,S*P.sz));o.phy=P.hy;o.php=P.hp;o.phr=P.hr;
    const Hd=herd[o.kind],i=Hd.n++;o.mat.toArray(Hd.mesh.instanceMatrix.array,i*16);if(R.tp0){P.tp+=R.tp0;writePose(Hd.pose,i,P,o);P.tp-=R.tp0}else writePose(Hd.pose,i,P,o);
-   Hd.mesh.setColorAt(i,o.hit>0?FLASH:st==='dead'?DEAD:lit&&!less&&Math.sin(time*9)>0?HL:PLAIN);
+   Hd.mesh.setColorAt(i,o.hit>0?FLASH:st==='dead'?DEAD:lit&&!less&&Math.sin(time*9)>0?HL:curS&&curS.world&&curS.world.guest&&o.id===curS.world.guest.id?SHINY_TINT:PLAIN);   // 수첩 MVP: 반짝 손님은 밝은 금빛
    if(!o.ghost)wolfKinds[o.kind]++;
    if(st!=='dead'||o.deadAge<.9){const j=shade.n++,fit=SHADE_FIT[o.kind];if(fit){rm.copy(o.mat).scale(fit);rm.toArray(shade.mesh.instanceMatrix.array,j*16)}else o.mat.toArray(shade.mesh.instanceMatrix.array,j*16);writePose(shade.pose,j,P,o)}
   }
