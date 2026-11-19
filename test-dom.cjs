@@ -1686,7 +1686,7 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   const sideAt=a=>W.sectorOf(Math.cos(a),Math.sin(a)),mid=a=>{const x=a.slice().sort((p,q)=>p-q);return x.length?x[x.length>>1]:NaN};
   /* F-1 손잡이: 기본 켬, 주소 ?forms=0으로 끔, 농가(8방향) · 단계 끔 · 길 끔이면 쓰지 않음. 차례 (n + ⌊n/4⌋) mod 4 */
   {eq(C.FLAGS.FORMS,true,'0.15.2 무리 대형 기본 켬');ok(/\[\?&\]forms=0\\b/.test(src)&&src.includes('Combat.FLAGS.FORMS=false'),'주소 ?forms=0으로 끄는 손잡이');
-   eq([FM.names,FM.L,FM.arc,FM.ring,FM.run,FM.pick],[['곧장','휘어 오기','갈라지기','따라 돌기'],5,10,2,2.5,'load'],'대형 4가지 · 옆 거리 5 · 띠 위 거리 10 · 띠 반지름 + 2 · 걸음 최대 2.5배 · 따라 돌기는 덜 붐빈 면');
+   eq([FM.names,FM.L,FM.arc,FM.full,FM.ring,FM.run,FM.pick],[['곧장','휘어 오기','갈라지기','따라 돌기'],5,10,22,2,2.5,'load'],'대형 4가지 · 성(반지름 22)에서 옆 거리 5 · 띠 위 거리 10(작은 마을은 반지름 비례) · 띠 반지름 + 2 · 걸음 최대 2.5배 · 따라 돌기는 덜 붐빈 면');
    eq(Array.from({length:12},(_,n)=>W.packForm(n)),[0,1,2,3,1,2,3,0,2,3,0,1],'대형 차례: 첫 무리 곧장, 네 무리마다 넷이 한 번씩, 한 칸씩 밀림');
    const w0=W.sync(W.create({seed:1}),built(3)),w1=W.sync(W.create({seed:1}),built(8));eq([w0.stage,w1.stage,W.formsOn(w0),W.formsOn(w1)],[0,1,false,true],'농가(8방향)는 대형 없음, 마을부터');
    for(const f of [{FORMS:false},{ROUTES:false},{STAGES:false}])withFlags(f,()=>ok(!W.formsOn(w1),'끄면 대형 없음: '+JSON.stringify(f)))}
@@ -1749,20 +1749,23 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   {const mkWolf=(w,deg,back)=>{const a=deg*Math.PI/180,r=W.radius(w)+W.EDGE+(back||0),v={id:9000+w.wolves.length,kind:'wolf',x:Math.cos(a)*r,z:Math.sin(a)*r,sx:Math.cos(a)*r,sz:Math.sin(a)*r,hp:1e6,max:1e6,speed:1,state:'walk',target:0,timer:0,inside:0,hen:0};w.wolves.push(v);return v};
    const crowd=(w,side,k)=>{for(let i=0;i<k;i++){const v=mkWolf(w,side*60+30,20+i);v.fm=1;v.fa=(side*60+30)*Math.PI/180}};
    const aimOf=v=>v.fm?sideAt(v.fa):W.sectorOf(v.sx,v.sz),quiet=w=>{w.wolves=[];w.trickle=1e9;w.wave.arrive=1e9;w.wave.spawned=true;return w};
-   /* 장터 마을(단계 2, 길 0 · 2 · 4, 울타리 6면): 0번 길(22.5°) 30°에서 나온 따라 돌기. 띠(반지름 13.5) 위 거리 10 = 42° 안에 2번 길 면(1번 면, 모서리 + 5° = 65°)이 든다 */
-   const s2=built(14);s2.fence=6;C.grow(s2);const mk2=()=>quiet(W.sync(W.create({seed:1,interval:150}),s2));eq([C.stage(s2),W.routes(mk2())],[2,[0,2,4]],'(장터 마을 · 울타리 6면)');
-   {const w=mk2(),v=mkWolf(w,30);W.formWolf(w,v,0,3,0,3);eq([v.fm,aimOf(v)],[3,0],'아무도 없으면 제 면(0번 면)을 따라 돎')}
-   {const w=mk2();crowd(w,0,2);const v=mkWolf(w,30);W.formWolf(w,v,0,3,0,3);eq([v.fm,aimOf(v),Math.round(v.fa*180/Math.PI)],[3,1,65],'제 면으로 늑대 2마리가 걸어오면 옆 길 면(1번 면 모서리 + 5° = 65°)으로 돈다')}
-   {const w=mk2();crowd(w,0,2);const f=w.buildings.find(b=>b.kind==='fence'&&b.side===1);f.broken=true;f.hp=0;const v=mkWolf(w,30);W.formWolf(w,v,0,3,0,3);eq(aimOf(v),0,'옆 면 울타리가 부서져 있으면(붐빔 2로 같아짐) 제 면')}
-   {const w=mk2();crowd(w,0,1);const f=w.buildings.find(b=>b.kind==='fence'&&b.side===1);f.hp=Math.round(f.max/2);const v=mkWolf(w,30);W.formWolf(w,v,0,3,0,3);eq(aimOf(v),1,'제 면 1마리 대 옆 면 울타리 절반 깎임(0.5): 옆 면')}
-   {const w=mk2();crowd(w,0,3);const v=mkWolf(w,10);W.formWolf(w,v,0,3,0,3);ok(v.fm===3&&aimOf(v)===0,'옆 면이 띠 위 거리 상한(42°) 밖이면(10° → 65° = 55°) 붐벼도 제 면')}
-   withFlags({},()=>{const keep=FM.pick;try{FM.pick='own';const w=mk2();crowd(w,0,2);const v=mkWolf(w,30);W.formWolf(w,v,0,3,0,3);eq(aimOf(v),0,'(손잡이 pick own = 기획 추천 같은 면만)')}finally{FM.pick=keep}});
+   /* 성곽 마을(단계 4, 반지름 18, 길 0 · 2 · 3 · 4 · 6, 울타리 6면): 2번 길(112.5°) 112°에서 나온 따라 돌기. 띠(반지름 20) 위 거리 10 × 18/22 = 8.2(23.4°) 안에
+      3번 길 면(2번 면, 모서리 + 5° = 125°)이 든다. 제 면 쪽은 시계 방향(남은 각이 큰 쪽)으로 23.4° */
+   const s4=built(36),mk4=()=>quiet(W.sync(W.create({seed:1,interval:150}),s4));eq([C.stage(s4),W.routes(mk4()),mk4().buildings.filter(b=>b.kind==='fence').length],[4,[0,2,3,4,6],6],'(성곽 마을 · 울타리 6면)');
+   {const w=mk4(),v=mkWolf(w,112);W.formWolf(w,v,2,3,0,3);eq([v.fm,aimOf(v)],[3,1],'아무도 없으면 제 면(1번 면)을 따라 돎')}
+   {const w=mk4();crowd(w,1,2);const v=mkWolf(w,112);W.formWolf(w,v,2,3,0,3);eq([v.fm,aimOf(v),Math.round(v.fa*180/Math.PI)],[3,2,125],'제 면으로 늑대 2마리가 걸어오면 옆 길 면(2번 면 모서리 + 5° = 125°)으로 돈다')}
+   {const w=mk4();crowd(w,1,2);const f=w.buildings.find(b=>b.kind==='fence'&&b.side===2);f.broken=true;f.hp=0;const v=mkWolf(w,112);W.formWolf(w,v,2,3,0,3);eq(aimOf(v),1,'옆 면 울타리가 부서져 있으면(붐빔 2로 같아짐) 제 면')}
+   {const w=mk4();crowd(w,1,1);const f=w.buildings.find(b=>b.kind==='fence'&&b.side===2);f.hp=Math.round(f.max/2);const v=mkWolf(w,112);W.formWolf(w,v,2,3,0,3);eq(aimOf(v),2,'제 면 1마리 대 옆 면 울타리 절반 깎임(0.5): 옆 면')}
+   {const w=mk4();crowd(w,1,3);const v=mkWolf(w,100);W.formWolf(w,v,2,3,0,3);ok(v.fm===3&&aimOf(v)===1,'옆 면이 도는 각도 상한(23.4°) 밖이면(100° → 125° = 25°) 붐벼도 제 면')}
+   withFlags({},()=>{const keep=FM.pick;try{FM.pick='own';const w=mk4();crowd(w,1,2);const v=mkWolf(w,112);W.formWolf(w,v,2,3,0,3);eq(aimOf(v),1,'(손잡이 pick own = 기획 추천 같은 면만)')}finally{FM.pick=keep}});
+   /* 장터 마을(길 사이 90°)에서는 띠 위 거리(10 × 11.5/22 = 5.2, 22°)가 옆 길 면(65°)까지 닿지 않아 붐벼도 제 면 */
+   {const s2=built(14);s2.fence=6;C.grow(s2);const w=quiet(W.sync(W.create({seed:1,interval:150}),s2));crowd(w,0,3);const v=mkWolf(w,30);W.formWolf(w,v,0,3,0,3);eq([C.stage(s2),v.fm,aimOf(v)],[2,3,0],'장터 마을: 옆 길 면이 멀어(35°) 붐벼도 제 면')}
    /* 강: 성(단계 5) 7번 길 318°에서 시계 방향(4번 면 = 다리 길 면, 295°)으로 돌면 띠가 강을 지난다 → 그쪽으로는 돌지 않는다(제 면 쪽 305°도 둑에 0.3까지 붙어 버림). 강을 끄면 4번 면으로 돈다 */
    const s5=built(50),mk5=()=>quiet(W.sync(W.create({seed:1,interval:150}),s5));
    {const w=mk5();crowd(w,5,3);const v=mkWolf(w,318);W.formWolf(w,v,7,3,0,2);ok(!(v.fm===3&&aimOf(v)===4),'강: 7번 길에서 강을 지나 4번 면으로 돌지 않음('+(v.fm?FM.names[v.fm]+' '+aimOf(v)+'번 면':'곧장')+')')}
    withFlags({RIVER:false,BRIDGE:false},()=>{const w=mk5();crowd(w,5,3);const v=mkWolf(w,318);W.formWolf(w,v,7,3,0,2);eq([v.fm,aimOf(v)],[3,4],'(강을 끄면 같은 늑대가 4번 면으로 돎 = 위 결과는 강 때문)')});
-   /* 물레방아 마을(단계 3) 4번 길 213°에서 다리 길 면(4번 면, 245°)으로: 강 띠에서 1 넘게 떨어져 돈다. 혼자 걸려 보면 한 번도 강 띠에 들지 않고 4번 면에 닿는다 */
-   {const s3=built(24),w=quiet(W.sync(W.create({seed:1,interval:150}),s3));crowd(w,3,2);const v=mkWolf(w,213);W.formWolf(w,v,4,3,0,2);eq([v.fm,aimOf(v)],[3,4],'4번 길 → 다리 길 면(4번 면)으로 돎(강 안쪽)');
+   /* 성곽 마을(단계 4) 4번 길 223°에서 다리 길 면(4번 면, 245°)으로: 강 띠에서 1.5 넘게 떨어져 돈다. 혼자 걸려 보면 한 번도 강 띠에 들지 않고 4번 면에 닿는다 */
+   {const s3=built(36),w=quiet(W.sync(W.create({seed:1,interval:150}),s3));crowd(w,3,2);const v=mkWolf(w,223);W.formWolf(w,v,4,3,0,2);eq([v.fm,aimOf(v)],[3,4],'4번 길 → 다리 길 면(4번 면)으로 돎(강 안쪽)');
     w.wolves=[v];for(const b of w.buildings)if(b.kind==='tower')b.cd=1e9;const R=W.radius(w);let dry=true,t=0;while(v.state==='walk'&&t<400){W.step(w,s3);t++;if(W.riverGap(R,v.x,v.z)<=0)dry=false}
     ok(dry&&v.state==='smash'&&W.sectorOf(v.x,v.z)===4,'혼자 걸려 보면 강 띠에 들지 않고 '+t+'틱에 4번 면 울타리에 닿음')}}
   /* F-6 저장: 걷는 도중 저장 → 복원 → 1,000틱 뒤 세계가 같다(걸음 배수는 저장하지 않고 출현 좌표에서 다시 셈). 모양이 틀린 칸은 지워 곧장, 옛 저장(칸 없음)은 곧장 */

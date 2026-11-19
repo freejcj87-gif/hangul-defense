@@ -31,18 +31,24 @@
   /* ---------- 0.15.2 늑대 무리 대형(기획 work\verification-20261113\design\wolf-paths-plan-20261119.md 안 B, 프로듀서 결정 '26.11.19, game-plan §17) ----------
      무리마다 대형 하나: 0 곧장 · 1 휘어 오기 · 2 갈라지기 · 3 따라 돌기. 차례 = (무리 번호 n + ⌊n/4⌋) mod 4: 첫 무리는 곧장, 네 무리마다 넷이 한 번씩 나오고 차례가 한 칸씩 밀린다.
      낙오 늑대는 번호가 홀수면 휘어 오기. 난수를 부르지 않는다(무리 번호 · 줄 번호 · 늑대 번호로 정함) → 같은 씨앗이면 출현점 · 종류 · 빠르기 · 체력이 끔과 같다.
-     휘어 오기(묶음 전체가 한쪽으로, 가운데쯤 가장 많이 휨) · 갈라지기(줄마다 좌우 번갈아 일찍 벌어짐)는 출현한 길의 울타리 면 안에서만 옆으로 최대 L.
+     휘어 오기(묶음 전체가 한쪽으로, 가운데쯤 가장 많이 휨) · 갈라지기(줄마다 좌우 번갈아 일찍 벌어짐)는 출현한 길의 울타리 면 안에서만 옆으로 최대 L(반지름에 비례, 아래 FORM).
      따라 돌기는 울타리 바깥 띠(반지름 + ring)까지 곧게 와서 띠를 따라 달리다 꺾어 들어온다. 프로듀서 결정 2: 옆 열린 길의 울타리 면까지 갈 수 있다.
        목표 면 = 제 면 · 옆 길 면 가운데 가장 덜 붐비고 덜 부서진 면(그 면으로 걷는 늑대 + 부수는 늑대 + 울타리: 없거나 부서졌으면 2, 서 있으면 깎인 비율 0~1). 같으면 제 면 → 휘는 쪽 옆 면 → 반대쪽.
-       도는 각도 상한: 띠 위 거리 arc 이하 · turn 이하(성 단계 반지름 22에서 약 24°라 옆 면 모서리 가까이 나온 늑대만 옆 면까지 간다). 옆 면에서는 모서리 + margin 자리로 들어온다.
+       도는 각도 상한: 띠 위 거리 arc(반지름에 비례) 이하 · turn 이하(띠에서 약 23°). 길 사이가 45°인 성곽 마을 · 성에서 옆 면 모서리 가까이 나온 늑대만 옆 면까지 가고,
+       길 사이가 90°인 장터 · 물레방아 마을에서는 닿지 않는다. 옆 면에서는 모서리 + margin 자리로 들어온다.
      강(단계 3부터): 고른 대형으로 걸을 길을 출현할 때 끝까지 미리 걸어 보고(formTrace) 강 띠(물 + 둑 + 여유 river)에 들거나 고른 면에 닿지 않으면 그 대형을 버린다(따라 돌기는 다음 후보, 없으면 곧장).
        그래서 4 · 6번 길 사이처럼 강을 지나야 하는 쪽으로는 돌지 않는다. 다리 길(6번, 단계 3부터)은 대형에서 빼서 한 줄 그대로(0.15 결정). 우두머리(불씨 왕)도 곧장. 늑대 왕 · 여우는 늑대 목록 밖이라 원래 없다.
      걸음: 길어진 만큼 빨리 걸어 울타리에 닿는 때를 곧장과 맞춘다(늑대마다 대형 경로 ÷ 곧은 거리, 1~run배, formPace). 기획 시제품의 고정 배수(1.16 · 1.5 · 1.7)는
        늑대마다 재 보니 휘어 오기가 4~9% 늦고 갈라지기가 10~19% 일찍 닿아 바꿨다. 울타리에 닿은 뒤(부수기 · 사냥 · 돌아가기)는 그대로.
      늑대 칸(선택): fm 대형 1~3(없으면 곧장) · fa 울타리에서 닿을 각(rad) · fp 따라 돌기 단계(0 띠로 · 1 띠를 따라 · 2 안으로).
      열린 길이 있는 단계(마을부터)에서 Combat.FLAGS.FORMS가 켜졌을 때만 정하고 읽는다. 끄면(FORMS=false, 주소 ?forms=0) 칸이 생기지 않고 있던 칸은 무시해 곧게 걷는다 = 0.15.1과 한 글자도 다르지 않다 */
-  /* pick: 따라 돌기 목표 면 고르기 'load' = 덜 붐비고 덜 부서진 면(기본) · 'own' = 제 면 안에서만(기획 추천, 비교용) · 'near' = 붐빔을 보지 않고 늘 옆 면 먼저(몰림 비교용) */
-  const FORM={names:['곧장','휘어 오기','갈라지기','따라 돌기'],L:5,arc:10,ring:2,turn:Math.PI/3,margin:5*Math.PI/180,min:4*Math.PI/180,run:2.5,river:.4,pick:'load',use:[1,2,3],pace:1,from:1,full:0,arcFull:0};
+  /* L · arc: 성(반지름 full = 22)에서의 옆 거리 · 띠 위 거리. 작은 마을은 반지름에 비례해 줄인다(마을 9에서 2.0 · 4.1, 물레방아 14.5에서 3.3 · 6.6).
+       화면 카메라도 반지름을 따라 물러나므로 모든 단계에서 화면상 같은 크기(휘어 · 갈라 옆각 약 13°, 돌기 약 23°)로 보인다.
+       기획의 고정 5 · 10으로는 마을 · 장터(반지름 9 · 11.5)에서 면 길이의 절반이 넘게 흩어져 뭉쳐 오던 늑대가 펑 화살을 덜 맞고,
+       20분까지 울타리 부서짐이 보통 아이 +11~14% · 찍기 아이 +38~63%였다(시뮬, game-plan §17.4). 비례로 줄이면 −2 ~ +4% · +5 ~ +17%
+     pick: 따라 돌기 목표 면 고르기 'load' = 덜 붐비고 덜 부서진 면(기본) · 'own' = 제 면 안에서만(기획 추천, 비교용) · 'near' = 붐빔을 보지 않고 늘 옆 면 먼저(몰림 비교용)
+     use · pace · from(조율 · 되돌리기 손잡이): 쓰는 대형 · 걸음 보정 비율(1 = 곧장과 같은 때) · 대형을 쓰기 시작하는 단계 */
+  const FORM={names:['곧장','휘어 오기','갈라지기','따라 돌기'],L:5,arc:10,full:22,ring:2,turn:Math.PI/3,margin:5*Math.PI/180,min:4*Math.PI/180,run:2.5,river:.4,pick:'load',use:[1,2,3],pace:1,from:1};
   /* 강 띠(src/layout.js RIVER와 같은 수, test-dom이 대조): 마을 중심에서 가장 가까운 점의 방향 280° · 거리 반지름 + 1.3(물 가운데 줄), 물 1.8 · 둑 0.35. 단계 3부터 */
   const RIVER={dir:280,dist:1.3,water:1.8,bank:.35,stage:3};
   const formsOn=w=>{const C=combat();return !!(C&&C.FLAGS&&C.FLAGS.FORMS&&C.FLAGS.STAGES)&&!!routes(w)&&w.stage>=FORM.from};
@@ -102,9 +108,9 @@
   /* 막 출현한 늑대 v(길 p, 무리 번호 n, 묶음 안 줄 row)에 대형 fm을 붙인다. 못 하면(다리 길 · 우두머리 · 면 안에 남은 각이 작음 · 강 · 면을 벗어남) 칸 없이 곧장 */
   function formWolf(w,v,p,fm,row,n){
     if(!fm||!FORM.use.includes(fm)||bridgeAt(w,p)||kindOf(v).boss)return;
-    const R=radius(w),as=Math.atan2(v.sz,v.sx),k0=sideOf(as),g=turnOf(p,n),cand=[],size=FORM.full>0?Math.min(1,R/FORM.full):1,sizeArc=FORM.arcFull>0?Math.min(1,R/FORM.arcFull):1;
+    const R=radius(w),as=Math.atan2(v.sz,v.sx),k0=sideOf(as),g=turnOf(p,n),cand=[],size=FORM.full>0?Math.min(1,R/FORM.full):1;
     if(fm===3){
-      const Rc=R+FORM.ring,lim=Math.min(FORM.turn,FORM.arc*sizeArc/Rc),d=Math.min(roomTo(as,g)-FORM.margin,lim);
+      const Rc=R+FORM.ring,lim=Math.min(FORM.turn,FORM.arc*size/Rc),d=Math.min(roomTo(as,g)-FORM.margin,lim);
       if(d>=FORM.min)cand.push({fa:as+g*d,side:k0});
       const o=FORM.pick!=='own'&&routes(w),i=o?o.indexOf(p):-1;
       if(i>=0&&o.length>1)for(const s of [g,-g]){
