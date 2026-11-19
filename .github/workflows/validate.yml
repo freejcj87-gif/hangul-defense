@@ -12,7 +12,7 @@ permissions:
 jobs:
   prototype:
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -30,4 +30,17 @@ jobs:
         with:
           name: browser-screenshots
           path: test-results/
+          retention-days: 7
+      # 수첩 MVP 화면 캡처(눈으로 보는 용도): 실패해도 위 검사 결과를 가리지 않는다
+      - name: Notebook screenshots
+        if: always()
+        continue-on-error: true
+        timeout-minutes: 12
+        run: node scripts/book-shots.cjs book-shots
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: book-shots
+          path: book-shots/
+          if-no-files-found: warn
           retention-days: 7
