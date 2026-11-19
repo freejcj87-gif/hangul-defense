@@ -42,7 +42,7 @@
      늑대 칸(선택): fm 대형 1~3(없으면 곧장) · fa 울타리에서 닿을 각(rad) · fp 따라 돌기 단계(0 띠로 · 1 띠를 따라 · 2 안으로).
      열린 길이 있는 단계(마을부터)에서 Combat.FLAGS.FORMS가 켜졌을 때만 정하고 읽는다. 끄면(FORMS=false, 주소 ?forms=0) 칸이 생기지 않고 있던 칸은 무시해 곧게 걷는다 = 0.15.1과 한 글자도 다르지 않다 */
   /* pick: 따라 돌기 목표 면 고르기 'load' = 덜 붐비고 덜 부서진 면(기본) · 'own' = 제 면 안에서만(기획 추천, 비교용) · 'near' = 붐빔을 보지 않고 늘 옆 면 먼저(몰림 비교용) */
-  const FORM={names:['곧장','휘어 오기','갈라지기','따라 돌기'],L:5,arc:10,ring:2,turn:Math.PI/3,margin:5*Math.PI/180,min:4*Math.PI/180,run:2.5,river:.4,pick:'load',use:[1,2,3],pace:1,from:1};
+  const FORM={names:['곧장','휘어 오기','갈라지기','따라 돌기'],L:5,arc:10,ring:2,turn:Math.PI/3,margin:5*Math.PI/180,min:4*Math.PI/180,run:2.5,river:.4,pick:'load',use:[1,2,3],pace:1,from:1,full:0,arcFull:0};
   /* 강 띠(src/layout.js RIVER와 같은 수, test-dom이 대조): 마을 중심에서 가장 가까운 점의 방향 280° · 거리 반지름 + 1.3(물 가운데 줄), 물 1.8 · 둑 0.35. 단계 3부터 */
   const RIVER={dir:280,dist:1.3,water:1.8,bank:.35,stage:3};
   const formsOn=w=>{const C=combat();return !!(C&&C.FLAGS&&C.FLAGS.FORMS&&C.FLAGS.STAGES)&&!!routes(w)&&w.stage>=FORM.from};
@@ -102,9 +102,9 @@
   /* 막 출현한 늑대 v(길 p, 무리 번호 n, 묶음 안 줄 row)에 대형 fm을 붙인다. 못 하면(다리 길 · 우두머리 · 면 안에 남은 각이 작음 · 강 · 면을 벗어남) 칸 없이 곧장 */
   function formWolf(w,v,p,fm,row,n){
     if(!fm||!FORM.use.includes(fm)||bridgeAt(w,p)||kindOf(v).boss)return;
-    const R=radius(w),as=Math.atan2(v.sz,v.sx),k0=sideOf(as),g=turnOf(p,n),cand=[];
+    const R=radius(w),as=Math.atan2(v.sz,v.sx),k0=sideOf(as),g=turnOf(p,n),cand=[],size=FORM.full>0?Math.min(1,R/FORM.full):1,sizeArc=FORM.arcFull>0?Math.min(1,R/FORM.arcFull):1;
     if(fm===3){
-      const Rc=R+FORM.ring,lim=Math.min(FORM.turn,FORM.arc/Rc),d=Math.min(roomTo(as,g)-FORM.margin,lim);
+      const Rc=R+FORM.ring,lim=Math.min(FORM.turn,FORM.arc*sizeArc/Rc),d=Math.min(roomTo(as,g)-FORM.margin,lim);
       if(d>=FORM.min)cand.push({fa:as+g*d,side:k0});
       const o=FORM.pick!=='own'&&routes(w),i=o?o.indexOf(p):-1;
       if(i>=0&&o.length>1)for(const s of [g,-g]){
@@ -114,7 +114,7 @@
         if(Math.sign(dq)===s&&Math.abs(dq)<=lim)cand.push({fa,side:kq})}
       if(cand.length>1&&FORM.pick==='near'){const j=cand.findIndex(c=>c.side!==k0);if(j>0)cand.unshift(cand.splice(j,1)[0])}
       else if(cand.length>1){const L=formLoad(w,v);let best=0;for(let j=1;j<cand.length;j++)if(L[cand[j].side]<L[cand[best].side])best=j;if(best)cand.unshift(cand.splice(best,1)[0])}
-    }else{const s=fm===2&&row%2===1?-g:g,d=Math.min(roomTo(as,s)-FORM.margin,FORM.L/R);if(d>=FORM.min)cand.push({fa:as+s*d,side:k0})}
+    }else{const s=fm===2&&row%2===1?-g:g,d=Math.min(roomTo(as,s)-FORM.margin,FORM.L*size/R);if(d>=FORM.min)cand.push({fa:as+s*d,side:k0})}
     for(const c of cand)if(formTrace(w,v,fm,c.fa,c.side,R)){v.fm=fm;v.fa=aDiff(c.fa,0);if(fm===3)v.fp=0;return}
   }
   /* 출현 지점 하나를 고른다. 난수는 길이 열려 있든 아니든 한 번만 쓴다(결정성, 0단계는 0.13과 같은 결과) */
@@ -745,7 +745,7 @@
     if(!(Number.isSafeInteger(w.nextId)&&w.nextId>top))w.nextId=top+1;
   }
 
-  const api={V:2,STAGE,STAGE_MAX,routes,BRIDGE,bridgeAt,FORM,RIVER,formsOn,riverOn,riverGap,packForm,formLoad,callPack,FLOW,flowOn,flowQuestion,flowCorrect,flowAdd,flowYard,flowCap,flowPile,flowIdle,flowLayers,TEMPO,tempoInterval,mulOf,KING,FOX,king,kingHit,fox,foxShoo,retreat,peaceOff,TICK,RADIUS,EDGE,SPAWNS,WOLF,AGE,THREAT,PACK,TRICKLE,SLOW,slowEase,KINDS,MIX,BOSS_EVERY,TOWER,POWER,POWER_STEP,FLOOR,ROAR,HP,FENCE_HP,MEND,REBUILD,HEN,DASH,RUSH,MERCY,MERCY_CAP,INNER,SIDE_REACH,INTERVAL,MAX_WOLVES,TRAVEL,GUARD,answered,
+  const api={V:2,STAGE,STAGE_MAX,routes,BRIDGE,bridgeAt,FORM,RIVER,formsOn,riverOn,riverGap,packForm,formLoad,formWolf,formPace,callPack,FLOW,flowOn,flowQuestion,flowCorrect,flowAdd,flowYard,flowCap,flowPile,flowIdle,flowLayers,TEMPO,tempoInterval,mulOf,KING,FOX,king,kingHit,fox,foxShoo,retreat,peaceOff,TICK,RADIUS,EDGE,SPAWNS,WOLF,AGE,THREAT,PACK,TRICKLE,SLOW,slowEase,KINDS,MIX,BOSS_EVERY,TOWER,POWER,POWER_STEP,FLOOR,ROAR,HP,FENCE_HP,MEND,REBUILD,HEN,DASH,RUSH,MERCY,MERCY_CAP,INNER,SIDE_REACH,INTERVAL,MAX_WOLVES,TRAVEL,GUARD,answered,
     TOWER_SLOTS,RINGS,ALL_SLOTS,SLOT_COUNT,TOWER_UNITS,PLACE,HOMES,HENS_MAX,HOME,towerSlots,fenceLayers,
     intervalFor,create,sync,step,volley,volleyArrows,dashTicks,built,threat,repairAll,brokenCount,brokenKinds,marketDown,wolvesInside,towerUnits,barLeft,secondsLeft,packSize,trickleGap,kindsAt,restore,radius,sectorOf,rand,range,cooldown,damage,towerDamage,towerRange,power,ageOf};
   if(typeof module!=='undefined')module.exports=api;

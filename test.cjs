@@ -677,14 +677,45 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
    await begin(page,{age:8},true);await page.evaluate(()=>{world.wolves=[];world.trickle=1e9});await answer(page,true,true);await frames(page,3);const m=(await insp(page)).mill;
    eq([m.turns,m.kicks],[0,0],'mill: reduced motion: the wheel does not turn');eq(errors,[],'mill reduced page errors');await ctx.close()}
   /* 0.15 다리 길(프로듀서 결정: 다리로 한 줄로): 물레방아 마을에서 6번 길 늑대는 다리로만 건너온다(들어오는 늑대 중 물을 건넌 수 0).
-     ?bridge=0이면 넓게 와서 물을 건너고 물보라가 인다. 한 순간이 아니라 도는 동안 모은 누적 수로 본다(늑대마다 한 번) */
+     ?bridge=0이면 넓게 와서 물을 건너고 물보라가 인다. 한 순간이 아니라 도는 동안 모은 누적 수로 본다(늑대마다 한 번).
+     0.15.2 간헐 실패 수정(CI 'bridged 0'): 세계 씨앗이 실행 시각(Date.now)이라 낙오 늑대 길이 매번 달랐고, 물레방아 마을 타워(사거리 15.25)가
+     6번 길 늑대를 물가(반지름 약 17) 앞에서 화살 두 발로 쓰러뜨리면 300틱 안에 다리를 건넌 늑대가 0일 때가 있었다.
+     → 씨앗을 고정하고 타워를 쉬게 해(cd) 걷기만 보고, 6번 길 늑대가 3마리 건널 때까지 조건으로 기다린다(최대 400번 = 800틱).
+     대형(0.15.2)이 다리 길 한 줄과 부딪히지 않는지도 본다: 6번 길 늑대는 대형 칸이 없고, 다른 길 대형 늑대는 물에 들지 않는다(wadedIn 0) */
   for(const [label,query] of [['bridge',''],['wade','/?bridge=0']]){
    const {ctx,page,errors}=await open({width:1366,height:768,query});await seed(page,{age:8,index:0,wins:0,gold:300,farmers:0,power:0,pond:0,hall:0,...VILLAGE[3]});await page.waitForFunction(()=>window.VillageView?.inspect().ready,{},{timeout:45000});
-   await begin(page,{age:8},true);await page.evaluate(()=>{window.VillageView.debug({hold:true});world.wolves=[]});let r=null;
-   for(let i=0;i<150;i++){await page.evaluate(()=>{world.trickle=Math.min(world.trickle,world.t+1)});await roll(page,1);r=(await insp(page)).river;if(label==='bridge'?r.bridged>=3:(r.waded>=2&&r.splashes>=1))break}
-   if(label==='bridge')ok(r.bridged>=3&&r.wadedIn===0,'bridge: road-6 wolves cross on the bridge, none wades in: '+JSON.stringify(r));
+   await begin(page,{age:8},true);
+   await page.evaluate(()=>{window.VillageView.debug({hold:true});world.wolves=[];world.rng=20261119;for(const b of world.buildings)if(b.kind==='tower')b.cd=1e9;window.__six={seen:{},spawned:0,formed:0}});let r=null,six=null;
+   for(let i=0;i<400;i++){await page.evaluate(()=>{world.trickle=Math.min(world.trickle,world.t+1)});await roll(page,1);
+    six=await page.evaluate(()=>{const S=window.__six,a6=6.5*Math.PI/4-Math.PI*2;for(const v of world.wolves){if(S.seen[v.id])continue;S.seen[v.id]=1;let d=Math.atan2(v.sz,v.sx)-a6;d=Math.atan2(Math.sin(d),Math.cos(d));if(Math.abs(d)<.3){S.spawned++;if(v.fm)S.formed++}}return {spawned:S.spawned,formed:S.formed}});
+    r=(await insp(page)).river;if(label==='bridge'?r.bridged>=3:(r.waded>=2&&r.splashes>=1))break}
+   if(label==='bridge'){ok(r.bridged>=3&&r.wadedIn===0,'bridge: road-6 wolves cross on the bridge, none wades in: '+JSON.stringify(r)+' road 6 '+JSON.stringify(six));
+    ok(six.spawned>=3&&six.formed===0,'bridge: road-6 wolves keep the one-line rule, no formation (0.15.2): '+JSON.stringify(six))}
    else ok(r.waded>=1&&r.splashes>=1,'bridge=0: wolves wade across with splashes: '+JSON.stringify(r));
    await shot(page.locator('.stage-card'),'river-'+label);eq(errors,[],'river '+label+' page errors');await ctx.close()}
+  /* 0.15.2 무리 대형(기획 wolf-paths-plan §3.6 test.cjs 1): 물레방아 마을 · 성에서 시계를 세우고(debug hold) 타워를 쉬게 한 뒤 따라 돌기 · 갈라지기 · 휘어 오기 무리를 차례로 불러
+     (무리 번호 3 · 2 · 1, 차례 (n + ⌊n/4⌋) mod 4), 3D 늑대 방향(ry)이 걷는 동안 바뀐 양을 늑대마다 모은다. 한 순간 값이 아니라 누적 값(0.14 간헐 실패 교훈).
+     대형 늑대는 중앙 20° 넘게 돌고, 곧장 늑대와 ?forms=0은 거의 0°(8° 미만) */
+  for(const [k,query] of [[3,''],[5,''],[3,'/?forms=0']]){
+   const tag='forms stage '+k+(query?' '+query:''),{ctx,page,errors}=await open({width:1366,height:768,query});
+   await seed(page,{age:8,index:0,wins:0,gold:300,farmers:0,power:0,pond:0,hall:0,...VILLAGE[k]});await page.waitForFunction(()=>window.VillageView?.inspect().ready,{},{timeout:45000});
+   await begin(page,{age:8},true);
+   await page.evaluate(()=>{window.VillageView.debug({hold:true});world.wolves=[];world.trickle=1e9;for(const b of world.buildings)if(b.kind==='tower')b.cd=1e9;window.__turn={}});
+   let born=0;
+   for(const n of [3,2,1]){
+    await page.evaluate(n=>{world.wolves=[];world.wave.n=n;world.wave.spawned=false;World.callPack(world)},n);
+    for(let i=0;i<150;i++){await roll(page,1);
+     const st=await page.evaluate(()=>{const T=window.__turn,v=window.VillageView.inspect();for(const [id,ry,state] of v.wolfFace){const o=T[id]||(T[id]={ry,turn:0,n:0,fm:0}),wv=world.wolves.find(x=>x.id===id);if(wv)o.fm=wv.fm|0;
+       if(state==='walk'&&o.n>0){let d=ry-o.ry;d=Math.atan2(Math.sin(d),Math.cos(d));o.turn+=Math.abs(d)}o.ry=ry;o.n++}
+      return {born:world.wolves.length,walking:world.wolves.filter(x=>x.state==='walk').length}});
+     if(st.born>0&&st.walking===0){born+=st.born;break}}}
+   const res=await page.evaluate(()=>{const T=window.__turn,out={formed:[],straight:[]};for(const id in T){const o=T[id];if(o.n<3)continue;(o.fm?out.formed:out.straight).push(+(o.turn*180/Math.PI).toFixed(1))}for(const k in out)out[k].sort((p,q)=>p-q);return out});
+   const med=a=>a.length?a[a.length>>1]:NaN,max=a=>a.length?a[a.length-1]:0;
+   ok(born>=6,tag+': three packs came out and reached the fence ('+born+' wolves)');
+   if(query){eq(res.formed.length,0,tag+': no formation fields');ok(res.straight.length>=6&&max(res.straight)<8,tag+': every wolf walks straight (largest turn '+max(res.straight)+'°)')}
+   else{ok(res.formed.length>=6&&med(res.formed)>20,tag+': formation wolves turn while they walk, median '+med(res.formed)+'° ('+res.formed.length+' wolves)');
+    ok(!res.straight.length||max(res.straight)<8,tag+': the straight ones stay straight (largest '+max(res.straight)+'°)')}
+   await shot(page.locator('.stage-card'),'forms-stage'+k+(query?'-off':''));eq(errors,[],tag+' page errors');await ctx.close()}
   /* 0.15 전환: 장터 마을 → 물레방아 마을이 되는 정답 뒤 강이 길이 방향으로 흘러들고(0.9초) 바퀴가 집과 함께 솟는다. 정답 연출(1.6초) 안에 끝난다 */
   {const {ctx,page,errors}=await open({width:1366,height:768});await seed(page,{age:8,index:0,wins:0,gold:900,farmers:0,power:0,pond:0,hall:0,level:19,fence:4,chickens:1});await page.waitForFunction(()=>window.VillageView?.inspect().ready,{},{timeout:45000});
    await begin(page,{age:8},true);await page.evaluate(()=>{world.wolves=[];world.peace=-1;window.VillageView.debug({hold:true})});await roll(page,2);
@@ -803,12 +834,13 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
    ok(await page.locator('#testBar').isVisible()&&(await page.locator('header .tm-head').textContent())==='🧪 테스트 모드',tag+': bar and header tag on the start screen');
    await page.locator('#tmNext').click();await phaseIs(page,'ask');await page.evaluate(()=>{const g=window.__game();if(g.round.lock>0)window.__tick(g.round.lock)});
    const b=await page.evaluate(()=>{const perfText=window.__testmode.perfNow(),r=id=>{const x=document.getElementById(id).getBoundingClientRect();return {top:x.top,bottom:x.bottom,left:x.left,right:x.right}};
-    return {bar:r('testBar'),shop:r('shopWrap'),answers:r('answers'),next:r('tmNext'),wrong:r('tmWrong'),perf:r('tmPerf'),perfText,h:innerHeight,w:innerWidth,sw:document.documentElement.scrollWidth}});
+    return {bar:r('testBar'),shop:r('shopWrap'),answers:r('answers'),next:r('tmNext'),wrong:r('tmWrong'),perf:r('tmPerf'),pack:r('tmPack'),perfText,h:innerHeight,w:innerWidth,sw:document.documentElement.scrollWidth}});
    const apart=(p,q)=>p.right<=q.left+.5||q.right<=p.left+.5||p.bottom<=q.top+.5||q.bottom<=p.top+.5;
    ok(b.perf.bottom<=b.bar.top+.5&&b.perf.left>=0&&b.perf.right<=b.w+.5&&apart(b.perf,b.shop)&&apart(b.perf,b.answers),tag+': performance chip above the bar, clear of the shop and answers');
    ok(/^🎞 .+fps · 그림 화면 · 🏡 농가$/.test(b.perfText),tag+': performance chip (GLB blocked = picture view) '+b.perfText);
    ok(b.bar.bottom<=b.h+.5&&b.bar.top>=b.h-80&&b.bar.left<=.5&&b.bar.right>=b.w-.5,tag+': one strip along the bottom (top '+Math.round(b.bar.top)+')');
    ok(b.next.right<=b.w+.5&&b.next.bottom<=b.h+.5&&b.next.right-b.next.left>=100&&b.next.bottom-b.next.top>=44,tag+': next button at the bottom right, big enough');
+   ok(b.pack.top>=b.bar.top-.5&&b.pack.bottom<=b.bar.bottom+.5&&b.pack.right-b.pack.left>=44&&b.pack.bottom-b.pack.top>=44,tag+': 0.15.2 wolf-pack button (🐺) sits in the one-strip bar, big enough: '+JSON.stringify(b.pack));
    ok(b.shop.bottom<=b.bar.top+.5,tag+': shop above the bar ('+Math.round(b.shop.bottom)+' <= '+Math.round(b.bar.top)+')');ok(b.answers.bottom<=b.bar.top+.5,tag+': answers above the bar ('+Math.round(b.answers.bottom)+')');
    ok(b.sw<=b.w,tag+': no horizontal overflow');await shot(page,'testmode-'+w+'x'+h);eq(errors,[],tag+' page errors');await ctx.close()}
   {const {ctx,page,errors}=await open('/?test=1',1366,768);await page.locator('#tmNext').click();await phaseIs(page,'ask');
