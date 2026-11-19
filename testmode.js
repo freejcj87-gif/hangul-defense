@@ -9,6 +9,10 @@
    - 자동 넘기기: 빨리 감기 없이, 읽는 시간이 실제 시계로 지난 순간 저절로 정답(정답 배우기도 초록 답이 열리면 저절로).
    - 🗺️ 단계로: 농가 · 마을 · 장터 마을 · 물레방아 마을 · 성곽 마을 · 성 · 결전 직전(종 열림) 가운데 고르면, 지금 나이로 그 단계에 막 들어선 마을에서 새로 시작(확인 한 번).
    - 📊 성능 표시(기본 켬): 막대 위 작은 글에 FPS · 3D 그리기 호출 · 삼각형 · 지금 단계. 그림 화면이면 '그림 화면'. 0.5초에 한 번 화면 쪽 숫자만 읽는다.
+     0.15.2: 마을(단계 1)부터는 끝에 지금 무리의 대형(🐺 곧장 · 휘어 오기 · 갈라지기 · 따라 돌기, 대형을 끄면 '대형 끔')을 붙인다.
+   - 🐺 무리 부르기(0.15.2): 다음 무리를 지금 숲에 내보낸다(World.callPack, 다음 틱에 나온다). 대형 차례는 무리 번호를 따르므로 4~7번 부르면 넷이 다 나온다.
+   - 🗺️ 칸 맨 끝 "🐺 대형 끄기/켜기"(0.15.2): Combat.FLAGS.FORMS를 같은 탭에서 바로 바꾼다(새로고침 없음). 끄면 걷던 대형 늑대도 곧게 걷고, 켜면 다음 무리부터.
+     막대 자리가 모자라(패드 세로 820에서 남는 폭 약 70px) 버튼은 🐺 하나만 두고 켬/끔은 메뉴에 넣었다. 저장하지 않는다(새로고침하면 주소 ?forms=0 또는 기본 켬).
    게임은 이 답을 그 시간에 푼 답으로 센다: 빨리 감기는 게임의 tick()(검사 훅 window.__tick과 같은 길)을 돌려 round.t가 실제 틱으로 흐르고,
    누르는 것은 화면의 보기 버튼이라 찍기 막기(Combat.guard)·읽기 속도(trackPace)·번개(isFast) 판정이 아이가 그 시간에 누른 것과 같다.
    규칙·세계 숫자는 건드리지 않는다. 가게는 사람이 직접 산다(자동 구매 없음). 저장은 index.html이 '-test' 열쇠로 따로 한다.
@@ -25,7 +29,7 @@
  try{const o=JSON.parse(localStorage.getItem(OPT_KEY));if(o&&typeof o==='object'){if(SPEED[o.speed])opt.speed=o.speed;opt.auto=!!o.auto;if('perf' in o)opt.perf=!!o.perf}}catch{}
  const saveOpt=()=>{try{localStorage.setItem(OPT_KEY,JSON.stringify(opt))}catch{}};
  /* job: 진행 중인 빨리 감기 · last: 마지막으로 누른 답(게임이 매긴 값) · done: 마지막 빨리 감기(틱·프레임 수) */
- const T={job:null,last:null,done:null,note:'',tok:null,wrongAt:null,nudged:false};
+ const T={job:null,last:null,done:null,note:'',tok:null,wrongAt:null,nudged:false,form:null,packs:0};/* form: 마지막으로 나온 무리의 대형(0~3, 대형 없이 나왔으면 null) · packs: 나온 무리 수 */
  const sec=t=>(Math.max(0,t|0)/10).toFixed(1);
  const set=(e,v)=>{if(e.textContent!==v)e.textContent=v};
  const el=(tag,attrs,text)=>{const e=document.createElement(tag);for(const k in attrs||{}){if(k==='class')e.className=attrs[k];else e.setAttribute(k,attrs[k])}if(text!==undefined)e.textContent=text;return e};
@@ -166,7 +170,7 @@
   const J=JUMPS.find(j=>j[0]===String(key));if(!J||T.job)return false;
   if(ask!==false&&!confirm('🧪 '+J[1]+'에 막 들어선 마을로 새로 시작할까요?\n지금 테스트 판은 사라져요(아이 저장은 그대로예요).'))return false;
   state=jumpState(J[0],state.age);world=freshWorld();resetView();$('ending').hidden=true;$('start').hidden=true;
-  T.last=null;T.tok=null;T.wrongAt=null;newRound();
+  T.last=null;T.tok=null;T.wrongAt=null;T.form=null;newRound();
   if(state.run.bell===1){syncKing(true);bellOpen()}
   T.note='🧪 '+J[1]+'에 막 들어선 마을로 시작했어요';save();render();show();return true;
  }

@@ -1670,7 +1670,7 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
    ok(same+differ===A.w.wolves.length,'6번 길이 아닌 늑대는 자리까지 같음, 6번 길 늑대만 자리가 다름('+differ+'마리 다름, '+same+'마리 같음)');
    eq(JSON.stringify(mk({}).w),JSON.stringify(A.w),'켬: 같은 씨앗 · 같은 입력 → 같은 세계(결정적)')}
   /* RIVER를 끄면 다리 규칙도 꺼진다(= 0.14 세계) */
-  {const s=built(36),a=spawns(s,{RIVER:false},2000,5).w,b=spawns(s,{BRIDGE:false},2000,5).w;eq(JSON.stringify(a),JSON.stringify(b),'RIVER 끔 = BRIDGE 끔(둘 다 0.14 세계)')}}
+  {const s=built(36),a=spawns(s,{RIVER:false,FORMS:false},2000,5).w,b=spawns(s,{BRIDGE:false,FORMS:false},2000,5).w;eq(JSON.stringify(a),JSON.stringify(b),'RIVER 끔 = BRIDGE 끔(둘 다 0.14 세계. 0.15.2 대형은 강을 피하는 길만 골라 강을 끄면 달라지므로 대형도 끄고 견줌)')}}
  /* S-9-5 화면: 단계 3이 되는 띠 알림에 다리 길 한 줄, getVillageState가 강 · 다리 켬을 넘긴다 */
  {const v23=built(23),base={age:8,level:v23.level,fence:v23.fence,chickens:v23.chickens,farmers:v23.farmers,gold:3000,seed:5};
   const up=(flags,label,want)=>withFlags(flags,()=>{const a=seed(base,{view:true});a.go();calmWorld(a);eq(a.game().stage.now,2,label+': (지은 수 23 = 장터 마을)');a.unlock();a.right();a.tick(5);a.buy('fence');
