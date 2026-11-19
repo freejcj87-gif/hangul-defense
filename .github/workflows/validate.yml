@@ -21,8 +21,18 @@ jobs:
       - run: node test-questions.cjs
       - run: node test-dom.cjs
       - run: npm install --no-save --package-lock=false playwright@1.56.1 three@0.180.0 esbuild@0.25.10
-      - name: Install browsers (retry once if the download stalls)
-        run: timeout 420 npx playwright install --with-deps chromium webkit || timeout 420 npx playwright install --with-deps chromium webkit
+      - name: Install browsers (kill a stalled download and retry, up to 3 times)
+        run: |
+          for attempt in 1 2 3; do
+            if timeout -k 10 300 npx playwright install --with-deps chromium webkit; then exit 0; fi
+            echo "install attempt $attempt failed or stalled; cleaning up apt and retrying"
+            sudo pkill -9 -f apt-get || true
+            sudo pkill -9 dpkg || true
+            sudo rm -f /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/lib/apt/lists/lock /var/cache/apt/archives/lock
+            sudo dpkg --configure -a || true
+            sleep 5
+          done
+          exit 1
       - run: node scripts/build-pages.cjs
       - run: node test.cjs
       - uses: actions/upload-artifact@v4
