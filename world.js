@@ -28,6 +28,101 @@
      Combat.FLAGS.RIVER(강 · 다리 그림)과 BRIDGE(이 규칙)가 모두 켜져 있고 단계 · 길이 켜져 있을 때만. 끄면 0.14와 한 글자도 다르지 않다 */
   const BRIDGE={road:6,from:3,spread:.06};
   const bridgeAt=(w,p)=>{const C=combat();return p===BRIDGE.road&&hasStage(w)&&w.stage>=BRIDGE.from&&!!(C&&C.FLAGS&&C.FLAGS.STAGES&&C.FLAGS.ROUTES&&C.FLAGS.RIVER&&C.FLAGS.BRIDGE)};
+  /* ---------- 0.15.2 늑대 무리 대형(기획 work\verification-20261113\design\wolf-paths-plan-20261119.md 안 B, 프로듀서 결정 '26.11.19, game-plan §17) ----------
+     무리마다 대형 하나: 0 곧장 · 1 휘어 오기 · 2 갈라지기 · 3 따라 돌기. 차례 = (무리 번호 n + ⌊n/4⌋) mod 4: 첫 무리는 곧장, 네 무리마다 넷이 한 번씩 나오고 차례가 한 칸씩 밀린다.
+     낙오 늑대는 번호가 홀수면 휘어 오기. 난수를 부르지 않는다(무리 번호 · 줄 번호 · 늑대 번호로 정함) → 같은 씨앗이면 출현점 · 종류 · 빠르기 · 체력이 끔과 같다.
+     휘어 오기(묶음 전체가 한쪽으로, 가운데쯤 가장 많이 휨) · 갈라지기(줄마다 좌우 번갈아 일찍 벌어짐)는 출현한 길의 울타리 면 안에서만 옆으로 최대 L(반지름에 비례, 아래 FORM).
+     따라 돌기는 울타리 바깥 띠(반지름 + ring)까지 곧게 와서 띠를 따라 달리다 꺾어 들어온다. 프로듀서 결정 2: 옆 열린 길의 울타리 면까지 갈 수 있다.
+       목표 면 = 제 면 · 옆 길 면 가운데 가장 덜 붐비고 덜 부서진 면(그 면으로 걷는 늑대 + 부수는 늑대 + 울타리: 없거나 부서졌으면 2, 서 있으면 깎인 비율 0~1). 같으면 제 면 → 휘는 쪽 옆 면 → 반대쪽.
+       도는 각도 상한: 띠 위 거리 arc(반지름에 비례) 이하 · turn 이하(띠에서 약 23°). 길 사이가 45°인 성곽 마을 · 성에서 옆 면 모서리 가까이 나온 늑대만 옆 면까지 가고,
+       길 사이가 90°인 장터 · 물레방아 마을에서는 닿지 않는다. 옆 면에서는 모서리 + margin 자리로 들어온다.
+     강(단계 3부터): 고른 대형으로 걸을 길을 출현할 때 끝까지 미리 걸어 보고(formTrace) 강 띠(물 + 둑 + 여유 river)에 들거나 고른 면에 닿지 않으면 그 대형을 버린다(따라 돌기는 다음 후보, 없으면 곧장).
+       그래서 4 · 6번 길 사이처럼 강을 지나야 하는 쪽으로는 돌지 않는다. 다리 길(6번, 단계 3부터)은 대형에서 빼서 한 줄 그대로(0.15 결정). 우두머리(불씨 왕)도 곧장. 늑대 왕 · 여우는 늑대 목록 밖이라 원래 없다.
+     걸음: 길어진 만큼 빨리 걸어 울타리에 닿는 때를 곧장과 맞춘다(늑대마다 대형 경로 ÷ 곧은 거리, 1~run배, formPace). 기획 시제품의 고정 배수(1.16 · 1.5 · 1.7)는
+       늑대마다 재 보니 휘어 오기가 4~9% 늦고 갈라지기가 10~19% 일찍 닿아 바꿨다. 울타리에 닿은 뒤(부수기 · 사냥 · 돌아가기)는 그대로.
+     늑대 칸(선택): fm 대형 1~3(없으면 곧장) · fa 울타리에서 닿을 각(rad) · fp 따라 돌기 단계(0 띠로 · 1 띠를 따라 · 2 안으로).
+     열린 길이 있는 단계(마을부터)에서 Combat.FLAGS.FORMS가 켜졌을 때만 정하고 읽는다. 끄면(FORMS=false, 주소 ?forms=0) 칸이 생기지 않고 있던 칸은 무시해 곧게 걷는다 = 0.15.1과 한 글자도 다르지 않다 */
+  /* L · arc: 성(반지름 full = 22)에서의 옆 거리 · 띠 위 거리. 작은 마을은 반지름에 비례해 줄인다(마을 9에서 2.0 · 4.1, 물레방아 14.5에서 3.3 · 6.6).
+       화면 카메라도 반지름을 따라 물러나므로 모든 단계에서 화면상 같은 크기(휘어 · 갈라 옆각 약 13°, 돌기 약 23°)로 보인다.
+       기획의 고정 5 · 10으로는 마을 · 장터(반지름 9 · 11.5)에서 면 길이의 절반이 넘게 흩어져 뭉쳐 오던 늑대가 펑 화살을 덜 맞고,
+       20분까지 울타리 부서짐이 보통 아이 +11~14% · 찍기 아이 +38~63%였다(시뮬, game-plan §17.4). 비례로 줄이면 −2 ~ +4% · +5 ~ +17%
+     pick: 따라 돌기 목표 면 고르기 'load' = 덜 붐비고 덜 부서진 면(기본) · 'own' = 제 면 안에서만(기획 추천, 비교용) · 'near' = 붐빔을 보지 않고 늘 옆 면 먼저(몰림 비교용)
+     use · pace · from(조율 · 되돌리기 손잡이): 쓰는 대형 · 걸음 보정 비율(1 = 곧장과 같은 때) · 대형을 쓰기 시작하는 단계 */
+  const FORM={names:['곧장','휘어 오기','갈라지기','따라 돌기'],L:5,arc:10,full:22,ring:2,turn:Math.PI/3,margin:5*Math.PI/180,min:4*Math.PI/180,run:2.5,river:.4,pick:'load',use:[1,2,3],pace:1,from:1};
+  /* 강 띠(src/layout.js RIVER와 같은 수, test-dom이 대조): 마을 중심에서 가장 가까운 점의 방향 280° · 거리 반지름 + 1.3(물 가운데 줄), 물 1.8 · 둑 0.35. 단계 3부터 */
+  const RIVER={dir:280,dist:1.3,water:1.8,bank:.35,stage:3};
+  const formsOn=w=>{const C=combat();return !!(C&&C.FLAGS&&C.FLAGS.FORMS&&C.FLAGS.STAGES)&&!!routes(w)&&w.stage>=FORM.from};
+  const riverOn=w=>{const C=combat();return hasStage(w)&&w.stage>=RIVER.stage&&!!(C&&C.FLAGS&&C.FLAGS.STAGES&&C.FLAGS.ROUTES&&C.FLAGS.RIVER)};
+  const riverGap=(R,x,z)=>{const a=RIVER.dir*Math.PI/180;return Math.abs(x*Math.cos(a)+z*Math.sin(a)-R-RIVER.dist)-RIVER.water/2-RIVER.bank};
+  const packForm=n=>(n+Math.floor(n/4))%4;
+  const TAU=Math.PI*2,SIDE=Math.PI/3;
+  const aDiff=(a,b)=>{let d=(a-b)%TAU;if(d>Math.PI)d-=TAU;else if(d<=-Math.PI)d+=TAU;return d};   /* a − b를 (−π, π]로 */
+  const sideOf=a=>{let x=a%TAU;if(x<0)x+=TAU;return Math.floor(x/SIDE)%6};                       /* 각 a가 드는 울타리 면(sectorOf와 같음) */
+  const roomTo=(a,s)=>{let x=a%TAU;if(x<0)x+=TAU;const lo=Math.floor(x/SIDE)*SIDE;return s>0?lo+SIDE-x:x-lo};  /* 각 a에서 그 면 끝까지 남은 각(s = +1 반시계 · −1 시계) */
+  const axis=p=>(p+.5)*TAU/SPAWNS;
+  /* 휘는 쪽(+1 = 반시계): 길 축에서 그 면 안에 남은 각이 큰 쪽. 양쪽 다 15° 넘게 남으면 홀수 무리는 반대쪽 */
+  const turnOf=(p,n)=>{const a=axis(p),lo=roomTo(a,-1),hi=roomTo(a,1);let g=hi>=lo?1:-1;if(lo>15*Math.PI/180&&hi>15*Math.PI/180&&n%2===1)g=-g;return g};
+  /* 대형 걸음 배수 = 그 늑대의 대형 경로 길이 ÷ 출현 → 울타리 곧은 거리(1~run). 따라 돌기는 (출현 → 띠 + 띠 위 + 띠 → 울타리)로 셈하고,
+     휘어 오기 · 갈라지기는 출현 지점에서 같은 걸음으로 끝까지 걸어 본 길이(늑대 객체마다 한 번, 반지름이 바뀌면 다시)다.
+     값은 출현 좌표 · 대형 칸 · 반지름만으로 정해져 저장 · 복원 뒤에도 같다(저장하지 않는 계산 캐시) */
+  const paceMemo=new WeakMap();
+  function formPace(o,R){
+    const r0=Math.hypot(o.sx,o.sz),line=Math.max(.5,r0-R-.3);
+    if(o.fm===3){const Rc=R+FORM.ring,path=Math.max(0,r0-Rc)+Rc*Math.abs(aDiff(o.fa,Math.atan2(o.sz,o.sx)))+Rc-R-.3;return Math.max(1,Math.min(FORM.run,1+(path/line-1)*FORM.pace))}
+    const m=paceMemo.get(o);if(m&&m.R===R&&m.fa===o.fa&&m.fm===o.fm)return m.k;
+    const t={x:o.sx,z:o.sz,sx:o.sx,sz:o.sz,fm:o.fm,fa:o.fa};let len=0;
+    for(let i=0;i<3000;i++){const r=Math.hypot(t.x,t.z);if(r<=R+.3)break;const x=t.x,z=t.z;formStep(t,r,R,1);len+=Math.hypot(t.x-x,t.z-z)}
+    const k=Math.max(1,Math.min(FORM.run,1+(len/line-1)*FORM.pace));paceMemo.set(o,{R,fa:o.fa,fm:o.fm,k});return k;
+  }
+  /* 대형 한 걸음(울타리 줄 바깥 r > R + 0.3에서만 부른다). o = 늑대 또는 미리 걸어 보는 사본. 휘어 오기 · 갈라지기는 1 앞(반지름 r − 1)의 곡선 위 점을 겨냥한다 */
+  function formStep(o,r,R,sp){
+    const as=Math.atan2(o.sz,o.sx);
+    if(o.fm===3){const Rc=R+FORM.ring;
+      if(!o.fp){if(r>Rc+.1&&!move(o,Math.cos(as)*Rc,Math.sin(as)*Rc,sp,.1))return;o.fp=1;if(r>Rc+.1)return}
+      if(o.fp===1){const a=Math.atan2(o.z,o.x),d=aDiff(o.fa,a);
+        if(Math.abs(d)*Rc>=.15){const t=a+Math.sign(d)*Math.min(Math.abs(d),1/Rc);move(o,Math.cos(t)*Rc,Math.sin(t)*Rc,sp);return}
+        o.fp=2}
+      move(o,0,0,sp);return}
+    const r0=Math.hypot(o.sx,o.sz),rr=Math.max(R,r-1),u=Math.max(0,Math.min(1,(r0-rr)/Math.max(.001,r0-R))),e=o.fm===1?u*u*(3-2*u):1-(1-u)*(1-u),t=as+aDiff(o.fa,as)*e;
+    move(o,Math.cos(t)*rr,Math.sin(t)*rr,sp);
+  }
+  /* 고른 대형으로 끝까지 미리 걸어 본다: 울타리 줄에 닿는 면이 side이고 (강이 있으면) 강 띠 + 여유에 한 번도 들지 않아야 true. 난수 · 세계를 건드리지 않는다 */
+  function formTrace(w,v,fm,fa,side,R){
+    const o={x:v.x,z:v.z,sx:v.sx,sz:v.sz,fm,fa},sp=v.speed*formPace(o,R),wet=riverOn(w);
+    for(let i=0;i<3000;i++){const r=Math.hypot(o.x,o.z);
+      if(r<=R+.3)return sectorOf(o.x,o.z)===side;
+      if(wet&&riverGap(R,o.x,o.z)<=FORM.river)return false;
+      formStep(o,r,R,sp)}
+    return false;
+  }
+  /* 면(0~5)별 붐빔: 그 면으로 걷는 늑대 + 그 면 울타리를 부수는 늑대 + 울타리(없거나 부서졌으면 2, 서 있으면 깎인 비율 0~1) */
+  function formLoad(w,self){
+    const n=[0,0,0,0,0,0],fence=new Map(),has=[0,0,0,0,0,0];
+    for(const b of w.buildings)if(b.kind==='fence'){fence.set(b.id,b);has[b.side]=1;n[b.side]+=b.broken?2:1-b.hp/b.max}
+    for(let k=0;k<6;k++)if(!has[k])n[k]+=2;
+    for(const v of w.wolves){if(v===self||!alive(v))continue;
+      if(v.state==='walk')n[v.fm>0&&Number.isFinite(v.fa)?sideOf(v.fa):sectorOf(v.x,v.z)]++;
+      else if(v.state==='smash'&&fence.has(v.target))n[fence.get(v.target).side]++}
+    return n;
+  }
+  /* 막 출현한 늑대 v(길 p, 무리 번호 n, 묶음 안 줄 row)에 대형 fm을 붙인다. 못 하면(다리 길 · 우두머리 · 면 안에 남은 각이 작음 · 강 · 면을 벗어남) 칸 없이 곧장 */
+  function formWolf(w,v,p,fm,row,n){
+    if(!fm||!FORM.use.includes(fm)||bridgeAt(w,p)||kindOf(v).boss)return;
+    const R=radius(w),as=Math.atan2(v.sz,v.sx),k0=sideOf(as),g=turnOf(p,n),cand=[],size=FORM.full>0?Math.min(1,R/FORM.full):1;
+    if(fm===3){
+      const Rc=R+FORM.ring,lim=Math.min(FORM.turn,FORM.arc*size/Rc),d=Math.min(roomTo(as,g)-FORM.margin,lim);
+      if(d>=FORM.min)cand.push({fa:as+g*d,side:k0});
+      const o=FORM.pick!=='own'&&routes(w),i=o?o.indexOf(p):-1;
+      if(i>=0&&o.length>1)for(const s of [g,-g]){
+        const q=o[(i+(s>0?1:o.length-1))%o.length],kq=sideOf(axis(q));
+        if(q===p||kq===k0||Math.sign(aDiff(axis(q),axis(p)))!==s)continue;
+        const fa=s>0?kq*SIDE+FORM.margin:(kq+1)*SIDE-FORM.margin,dq=aDiff(fa,as);
+        if(Math.sign(dq)===s&&Math.abs(dq)<=lim)cand.push({fa,side:kq})}
+      if(cand.length>1&&FORM.pick==='near'){const j=cand.findIndex(c=>c.side!==k0);if(j>0)cand.unshift(cand.splice(j,1)[0])}
+      else if(cand.length>1){const L=formLoad(w,v);let best=0;for(let j=1;j<cand.length;j++)if(L[cand[j].side]<L[cand[best].side])best=j;if(best)cand.unshift(cand.splice(best,1)[0])}
+    }else{const s=fm===2&&row%2===1?-g:g,d=Math.min(roomTo(as,s)-FORM.margin,FORM.L*size/R);if(d>=FORM.min)cand.push({fa:as+s*d,side:k0})}
+    for(const c of cand)if(formTrace(w,v,fm,c.fa,c.side,R)){v.fm=fm;v.fa=aDiff(c.fa,0);if(fm===3)v.fp=0;return}
+  }
   /* 출현 지점 하나를 고른다. 난수는 길이 열려 있든 아니든 한 번만 쓴다(결정성, 0단계는 0.13과 같은 결과) */
   const spawnPoint=w=>{const o=routes(w),r=rand(w);return o?o[Math.min(o.length-1,Math.floor(r*o.length))]:Math.floor(r*SPAWNS)};
   const EDGE=7;                    /* 출현 지점 = 마을 반지름 + 7(숲 가장자리). 나오자마자 화면에 보인다 */
@@ -304,18 +399,24 @@
     const n=Math.min(packSize(w,s),MAX_WOLVES-w.wolves.length);if(n<=0)return;
     const R=radius(w)+EDGE,groups=Math.min(3,1+Math.floor(n/5)),points=[];
     for(let g=0;g<groups;g++)points.push(spawnPoint(w));
+    const formed=formsOn(w),fm=formed?packForm(w.wave.n):0; /* 0.15.2 대형(난수를 부르지 않는다. 출현 · 종류 · 빠르기는 끔과 같은 순서) */
     for(let i=0;i<n;i++){
       const p=points[i%groups],a=(p+.5)*Math.PI*2/SPAWNS+(rand(w)-.5)*(bridgeAt(w,p)?BRIDGE.spread:.4),back=Math.floor(i/groups)*.75;
-      addWolf(w,s,pickKind(w,s,boss&&i===0),Math.cos(a)*(R+back),Math.sin(a)*(R+back));
+      const v=addWolf(w,s,pickKind(w,s,boss&&i===0),Math.cos(a)*(R+back),Math.sin(a)*(R+back));
+      if(fm)formWolf(w,v,p,fm,Math.floor(i/groups),w.wave.n);
     }
-    w.events.push({type:'pack',n,points:points.slice(),boss});
+    w.events.push(formed?{type:'pack',n,points:points.slice(),boss,form:fm}:{type:'pack',n,points:points.slice(),boss});
   }
   function spawnStraggler(w,s){
     const cap=Math.round(MAX_WOLVES*.8);if(w.wolves.length>=cap)return;
-    const n=1+(rand(w)<Math.min(.5,threat(s)/TRICKLE.pair)?1:0),p=spawnPoint(w),R=radius(w)+EDGE;
-    for(let i=0;i<n;i++){const a=(p+.5)*Math.PI*2/SPAWNS+(rand(w)-.5)*(bridgeAt(w,p)?BRIDGE.spread:.5);addWolf(w,s,pickKind(w,s,false),Math.cos(a)*(R+i*.8),Math.sin(a)*(R+i*.8))}
+    const n=1+(rand(w)<Math.min(.5,threat(s)/TRICKLE.pair)?1:0),p=spawnPoint(w),R=radius(w)+EDGE,formed=formsOn(w);
+    for(let i=0;i<n;i++){const a=(p+.5)*Math.PI*2/SPAWNS+(rand(w)-.5)*(bridgeAt(w,p)?BRIDGE.spread:.5),v=addWolf(w,s,pickKind(w,s,false),Math.cos(a)*(R+i*.8),Math.sin(a)*(R+i*.8));
+      if(formed&&v.id%2===1)formWolf(w,v,p,1,0,w.wave.n)} /* 0.15.2: 번호가 홀수인 낙오 늑대는 휘어 오기 */
     w.events.push({type:'straggler',n,point:p});
   }
+  /* 테스트 모드 "🐺 무리 부르기"(0.15.2): 다음 무리를 지금 숲에 내보낸다(다음 틱에 나와 TRAVEL틱 뒤 마을에 닿는다). 이미 나와 걷는 무리가 있으면
+     그 무리는 도착한 것으로 치고 다음 무리를 부른다. 난수를 부르지 않는다. 물러남(peace) 중에는 나오지 않는다(규칙 그대로). → 부를 무리 번호 */
+  function callPack(w){if(w.wave.spawned){w.wave.n++;w.stats.waves++;w.wave.spawned=false}w.wave.arrive=w.t+1+TRAVEL;return w.wave.n}
 
   /* ---------- 한 틱 ---------- */
   function step(w,s){
@@ -366,6 +467,7 @@
           f.state='flee'}
       }else if(move(f,f.sx,f.sz,FOX.flee,.3)){w.fox=null;w.events.push({type:'foxGone',fox:f.id})}}
     /* 늑대·몬스터 */
+    const forming=formsOn(w);
     for(const v of w.wolves){
       if(!alive(v))continue;
       const K=kindOf(v);
@@ -375,6 +477,7 @@
         const r=Math.hypot(v.x,v.z);
         /* 울타리 줄에 닿으면 그 면 울타리를 부순다. 마을이 커져 이미 울타리 안쪽이면 바로 사냥 */
         if(r<=R+.3){const k=sectorOf(v.x,v.z),f=r>=R-INNER&&w.buildings.find(b=>b.kind==='fence'&&b.side===k&&!b.broken);if(f){v.state='smash';v.target=f.id}else v.state='hunt'}
+        else if(forming&&v.fm>0)formStep(v,r,R,v.speed*formPace(v,R)); /* 0.15.2 대형(끄면 칸을 무시하고 곧게) */
         else move(v,0,0,v.speed);
       }else if(v.state==='hunt'){
         if(++v.inside>WOLF.bored){v.state='leave';continue}
@@ -624,6 +727,8 @@
       if(!fin(v.sx)||!fin(v.sz)){v.sx=v.x;v.sz=v.z}
       for(const k of ['target','timer','inside','hen'])if(!fin(v[k]))v[k]=0;
       if(K.boss&&!fin(v.roar))v.roar=ROAR.every>>1;
+      /* 0.15.2 대형 칸(선택): 모양이 틀리면 지워 곧장 걷게 한다(대형 1~3, 닿을 각이 수, 따라 돌기만 단계 0~2) */
+      if(('fm' in v||'fa' in v||'fp' in v)&&!(int(v.fm,1,3)&&fin(v.fa)&&(v.fm===3?int(v.fp,0,2):!('fp' in v)))){delete v.fm;delete v.fa;delete v.fp}
     }
     w.hens=w.hens.filter(h=>isObj(h)&&Number.isSafeInteger(h.id)&&fin(h.x)&&fin(h.z)).slice(0,HENS_MAX);
     for(const h of w.hens){if(!HEN_STATES.includes(h.state))h.state='yard';if(!int(h.slot,0,HENS_MAX-1))h.slot=0;if(!fin(h.calm))h.calm=0;if('egg' in h&&!int(h.egg,0,FLOW.perHen))h.egg=Number.isSafeInteger(h.egg)&&h.egg>FLOW.perHen?FLOW.perHen:0}
@@ -646,7 +751,7 @@
     if(!(Number.isSafeInteger(w.nextId)&&w.nextId>top))w.nextId=top+1;
   }
 
-  const api={V:2,STAGE,STAGE_MAX,routes,BRIDGE,bridgeAt,FLOW,flowOn,flowQuestion,flowCorrect,flowAdd,flowYard,flowCap,flowPile,flowIdle,flowLayers,TEMPO,tempoInterval,mulOf,KING,FOX,king,kingHit,fox,foxShoo,retreat,peaceOff,TICK,RADIUS,EDGE,SPAWNS,WOLF,AGE,THREAT,PACK,TRICKLE,SLOW,slowEase,KINDS,MIX,BOSS_EVERY,TOWER,POWER,POWER_STEP,FLOOR,ROAR,HP,FENCE_HP,MEND,REBUILD,HEN,DASH,RUSH,MERCY,MERCY_CAP,INNER,SIDE_REACH,INTERVAL,MAX_WOLVES,TRAVEL,GUARD,answered,
+  const api={V:2,STAGE,STAGE_MAX,routes,BRIDGE,bridgeAt,FORM,RIVER,formsOn,riverOn,riverGap,packForm,formLoad,formWolf,formPace,callPack,FLOW,flowOn,flowQuestion,flowCorrect,flowAdd,flowYard,flowCap,flowPile,flowIdle,flowLayers,TEMPO,tempoInterval,mulOf,KING,FOX,king,kingHit,fox,foxShoo,retreat,peaceOff,TICK,RADIUS,EDGE,SPAWNS,WOLF,AGE,THREAT,PACK,TRICKLE,SLOW,slowEase,KINDS,MIX,BOSS_EVERY,TOWER,POWER,POWER_STEP,FLOOR,ROAR,HP,FENCE_HP,MEND,REBUILD,HEN,DASH,RUSH,MERCY,MERCY_CAP,INNER,SIDE_REACH,INTERVAL,MAX_WOLVES,TRAVEL,GUARD,answered,
     TOWER_SLOTS,RINGS,ALL_SLOTS,SLOT_COUNT,TOWER_UNITS,PLACE,HOMES,HENS_MAX,HOME,towerSlots,fenceLayers,
     intervalFor,create,sync,step,volley,volleyArrows,dashTicks,built,threat,repairAll,brokenCount,brokenKinds,marketDown,wolvesInside,towerUnits,barLeft,secondsLeft,packSize,trickleGap,kindsAt,restore,radius,sectorOf,rand,range,cooldown,damage,towerDamage,towerRange,power,ageOf};
   if(typeof module!=='undefined')module.exports=api;

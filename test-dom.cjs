@@ -674,8 +674,8 @@ a.tick(30);eq(a.api.round,null,'시작 화면에서는 문제 없음');eq(a.api.
 for(const id of ['battle','next','shield','combatInfo','buildPrompt','buyChicken','buyFence','timebar','timeFill','wolfHead','timeTag','choices','cards','skip','gainLine','gainParts'])ok(!html.includes('id="'+id+'"'),'없앤 요소: '+id);
 ok(!html.includes('소리 도움말'),'정답을 글자로 보여 주던 소리 도움말 제거');ok(!src.includes('다음 무리')&&!src.includes('barLeft')&&!src.includes('secondsLeft'),'늑대 시간 표시(초·막대) 코드 없음');
 ok(!src.includes('enterPick')&&!src.includes('picks')&&!src.includes('offers('),'카드 고르기 단계 코드 없음');
-ok(html.includes('src="combat.js?v=0.15.1"')&&html.includes('src="world.js?v=0.15.1"')&&html.includes('src="questions.js?v=0.15.1"')&&html.includes('src="village.js?v=0.15.1"')&&src.includes("s.src='testmode.js?v=0.15.1'")&&!html.includes('?v=0.12')&&!html.includes('?v=0.14'),'캐시 갱신용 ?v=0.15.1');
-ok(html.indexOf('src="questions-gen.js?v=0.15.1"')>0&&html.indexOf('src="questions-gen.js?v=0.15.1"')<html.indexOf('src="questions.js?v=0.15.1"'),'생성 문항 파일을 questions.js보다 먼저 불러옴');
+ok(html.includes('src="combat.js?v=0.15.2"')&&html.includes('src="world.js?v=0.15.2"')&&html.includes('src="questions.js?v=0.15.2"')&&html.includes('src="village.js?v=0.15.2"')&&src.includes("s.src='testmode.js?v=0.15.2'")&&!html.includes('?v=0.12')&&!html.includes('?v=0.14'),'캐시 갱신용 ?v=0.15.2');
+ok(html.indexOf('src="questions-gen.js?v=0.15.2"')>0&&html.indexOf('src="questions-gen.js?v=0.15.2"')<html.indexOf('src="questions.js?v=0.15.2"'),'생성 문항 파일을 questions.js보다 먼저 불러옴');
 /* 0.11: 듣고 고르기 모드 폐쇄. 시작 화면·설정에 모드 고르기가 없고, 스크립트에 소리 모드 분기가 없다 */
 for(const id of ['startSound','startStory','mode'])ok(!html.includes('id="'+id+'"'),'없앤 모드 버튼: '+id);
 ok(!html.includes('mode-row')&&!html.replace(/<script>[\s\S]*?<\/script>/,'').includes('듣고 고르기'),'화면에 모드 고르기·듣고 고르기 문구 없음');
@@ -1587,7 +1587,7 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   const vs=a.window.getVillageState();eq([vs.stage,vs.routes,vs.hall],[-1,null,1],'끔: 3D에는 단계·길을 넘기지 않음(8갈래 발자국 길)');
   a.unload();const again=JSON.parse(saved[KEY]);ok(!('stage' in again.world)&&!('stage' in again),'끔: 저장에 단계 칸 없음')});
  ok(/\[\?&\]stages=0\\b/.test(src)&&/\[\?&\]routes=0\\b/.test(src),'주소 ?stages=0 · ?routes=0으로 끄는 손잡이');
- ok(html.includes('id="appVersion">꼬꼬마을 0.15.1<')&&!html.includes('?v=0.14')&&!html.includes('?v=0.15"'),'버전 표기(설정 서랍 맨 아래)와 캐시 문자열이 0.15.1');
+ ok(html.includes('id="appVersion">꼬꼬마을 0.15.2<')&&!html.includes('?v=0.14')&&!html.includes('?v=0.15"'),'버전 표기(설정 서랍 맨 아래)와 캐시 문자열이 0.15.2');
  ok(html.includes('<title>꼬꼬마을: 한글 읽기로 마을 지키기</title>')&&html.includes('<small>한글 읽기로 마을 지키기</small>')&&html.includes('<h2>꼬꼬마을: 한글 읽기로 마을 지키기</h2>')&&!html.includes('읽어서 지켜요')&&!html.includes('한글 디펜스'),'앱 이름: 꼬꼬마을: 한글 읽기로 마을 지키기(머리글은 제목 + 부제 줄)');
  ok(html.includes('게임 기록은 이 브라우저에 저장되고, 개발자에게 보내지 않아요.'),'바닥글: 정책 기준 문장(웹판)');
  /* S-8 3D 단계 소품 자리(src/layout.js): 맨 끝에서 모듈을 불러 확인 */
@@ -1670,7 +1670,7 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
    ok(same+differ===A.w.wolves.length,'6번 길이 아닌 늑대는 자리까지 같음, 6번 길 늑대만 자리가 다름('+differ+'마리 다름, '+same+'마리 같음)');
    eq(JSON.stringify(mk({}).w),JSON.stringify(A.w),'켬: 같은 씨앗 · 같은 입력 → 같은 세계(결정적)')}
   /* RIVER를 끄면 다리 규칙도 꺼진다(= 0.14 세계) */
-  {const s=built(36),a=spawns(s,{RIVER:false},2000,5).w,b=spawns(s,{BRIDGE:false},2000,5).w;eq(JSON.stringify(a),JSON.stringify(b),'RIVER 끔 = BRIDGE 끔(둘 다 0.14 세계)')}}
+  {const s=built(36),a=spawns(s,{RIVER:false,FORMS:false},2000,5).w,b=spawns(s,{BRIDGE:false,FORMS:false},2000,5).w;eq(JSON.stringify(a),JSON.stringify(b),'RIVER 끔 = BRIDGE 끔(둘 다 0.14 세계. 0.15.2 대형은 강을 피하는 길만 골라 강을 끄면 달라지므로 대형도 끄고 견줌)')}}
  /* S-9-5 화면: 단계 3이 되는 띠 알림에 다리 길 한 줄, getVillageState가 강 · 다리 켬을 넘긴다 */
  {const v23=built(23),base={age:8,level:v23.level,fence:v23.fence,chickens:v23.chickens,farmers:v23.farmers,gold:3000,seed:5};
   const up=(flags,label,want)=>withFlags(flags,()=>{const a=seed(base,{view:true});a.go();calmWorld(a);eq(a.game().stage.now,2,label+': (지은 수 23 = 장터 마을)');a.unlock();a.right();a.tick(5);a.buy('fence');
@@ -1680,6 +1680,114 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   vs=up({RIVER:false,BRIDGE:false},'강 끔','💧물레방아 마을이 되었어요!땅이 넓어졌어요 · 늑대는 길 4곳으로 와요');eq([vs.river,vs.bridge],[false,false],'강을 끄면 0.14 띠 알림 · 강 없음');
   withFlags({ROUTES:false},()=>{const a=seed(base,{view:true});a.go();const s=a.window.getVillageState();eq([s.river,s.bridge],[false,false],'길을 끄면(?routes=0) 강 · 다리 없음')});
   withFlags(OFF,()=>{const a=seed(base,{view:true});a.go();const s=a.window.getVillageState();eq([s.river,s.bridge],[false,false],'단계를 끄면(?stages=0) 강 · 다리 없음')})}
+ /* ======================= F 0.15.2 늑대 무리 대형(기획 wolf-paths-plan-20261119 §3.6, 프로듀서 결정 '26.11.19: 무리 대형부터, 따라 도는 늑대는 옆 길 울타리 면까지) ======================= */
+ {const crypto=require('node:crypto'),FM=W.FORM,TAU=Math.PI*2,dAng=(a,b)=>{let d=(a-b)%TAU;if(d>Math.PI)d-=TAU;if(d<=-Math.PI)d+=TAU;return d},axisOf=p=>(p+.5)*Math.PI/4;
+  const roadOf=v=>{const a=Math.atan2(v.sz,v.sx);let p=0;for(let q=1;q<8;q++)if(Math.abs(dAng(a,axisOf(q)))<Math.abs(dAng(a,axisOf(p))))p=q;return p};
+  const sideAt=a=>W.sectorOf(Math.cos(a),Math.sin(a)),mid=a=>{const x=a.slice().sort((p,q)=>p-q);return x.length?x[x.length>>1]:NaN};
+  /* F-1 손잡이: 기본 켬, 주소 ?forms=0으로 끔, 농가(8방향) · 단계 끔 · 길 끔이면 쓰지 않음. 차례 (n + ⌊n/4⌋) mod 4 */
+  {eq(C.FLAGS.FORMS,true,'0.15.2 무리 대형 기본 켬');ok(/\[\?&\]forms=0\\b/.test(src)&&src.includes('Combat.FLAGS.FORMS=false'),'주소 ?forms=0으로 끄는 손잡이');
+   eq([FM.names,FM.L,FM.arc,FM.full,FM.ring,FM.run,FM.pick],[['곧장','휘어 오기','갈라지기','따라 돌기'],5,10,22,2,2.5,'load'],'대형 4가지 · 성(반지름 22)에서 옆 거리 5 · 띠 위 거리 10(작은 마을은 반지름 비례) · 띠 반지름 + 2 · 걸음 최대 2.5배 · 따라 돌기는 덜 붐빈 면');
+   eq(Array.from({length:12},(_,n)=>W.packForm(n)),[0,1,2,3,1,2,3,0,2,3,0,1],'대형 차례: 첫 무리 곧장, 네 무리마다 넷이 한 번씩, 한 칸씩 밀림');
+   const w0=W.sync(W.create({seed:1}),built(3)),w1=W.sync(W.create({seed:1}),built(8));eq([w0.stage,w1.stage,W.formsOn(w0),W.formsOn(w1)],[0,1,false,true],'농가(8방향)는 대형 없음, 마을부터');
+   for(const f of [{FORMS:false},{ROUTES:false},{STAGES:false}])withFlags(f,()=>ok(!W.formsOn(w1),'끄면 대형 없음: '+JSON.stringify(f)))}
+  /* F-2 끄면 0.15.1과 한 글자도 같다: 지은 수 5 · 14 · 24 · 36 · 50 × 씨앗, 6,000틱(300틱마다 일제 사격, 1,000틱마다 하나 사기)의 세계 JSON 지문이 0.15.1(main 940c71a)에서 잰 값과 같다 */
+  {const tour=f=>withFlags(f,()=>{const keys=['level','fence','chickens','farmers','power'],shop={level:'tower',chickens:'chicken',farmers:'farmer',fence:'fence',power:'power'},out=[];
+    for(const [n,sd] of [[5,3],[14,5],[24,7],[36,11],[50,13]]){const s=built(n),w=W.sync(W.create({seed:sd,interval:150}),s);
+     for(let i=1;i<=6000;i++){W.step(w,s);if(i%300===0)W.volley(w,s,{scale:1});if(i%1000===0){const k=keys[(i/1000)%keys.length];s[k]=Math.min(C.max(shop[k]),s[k]+1);C.grow(s);W.sync(w,s)}}
+     out.push(w)}
+    return out}),print=ws=>crypto.createHash('sha256').update(JSON.stringify(ws)).digest('hex').slice(0,16);
+   const off=tour({FORMS:false}),on=tour({});eq(print(off),'5c6f00898a3c7d3d','대형 끔: 세계 지문이 0.15.1과 같음(5단계 × 6,000틱)');ok(print(on)!==print(off),'대형 켬: 세계가 달라짐');
+   ok(off.every(w=>w.wolves.every(v=>!('fm' in v)&&!('fa' in v)&&!('fp' in v))),'끄면 늑대에 대형 칸이 생기지 않음');ok(on.some(w=>w.wolves.some(v=>v.fm>0)),'(켜면 대형 칸이 있는 늑대가 있음)')}
+  /* F-3 난수 호출 수 그대로: 켬 · 끔 같은 씨앗이면 나오는 늑대(종류 · 체력 · 최대 체력 · 빠르기 · 출현 좌표)와 w.rng가 같다.
+     새 판 보호로 잃는 것이 없어 완충이 그대로인 세계, 늑대 상한(90 · 낙오 72)에 닿기 전 구간(상한 판정은 0.15.1 규칙 그대로라 살아 있는 늑대 수가 다르면 그 뒤로 갈린다) */
+  {let rows=0;for(const [n,T,seeds] of [[5,3000,[3,11,29]],[14,3000,[3,11,29]],[24,3000,[3,11,29]],[36,900,[3,11,29]],[50,900,[11]]])for(const sd of seeds){
+    const mk=f=>withFlags(f,()=>{const s=built(n),w=W.sync(W.create({seed:sd,interval:150,guard:true}),s),list=[],seen=new Set();let formed=0;
+     for(let t=0;t<T;t++){W.step(w,s);for(const v of w.wolves)if(!seen.has(v.id)){seen.add(v.id);list.push([v.kind,v.hp,v.max,v.speed,v.sx,v.sz].join(','));if(v.fm)formed++}}return {rng:w.rng,list:list.join(';'),n:list.length,formed}});
+    const a=mk({}),b=mk({FORMS:false});ok(a.rng===b.rng&&a.list===b.list&&a.formed>0,'지은 수 '+n+' 씨앗 '+sd+': 켬 · 끔 같은 늑대 '+a.n+'마리(그중 대형 '+a.formed+') · 같은 난수 상태');rows++}
+   eq(rows,13,'(난수 비교 13판)')}
+  /* F-4 단계 1~5 × 씨앗 12개 × 3,000틱(150틱마다 일제 사격)에서 늑대를 따라가며: 닿는 면 · 옆 면 · 강 · 다리 길 · 도는 각도 · 방향 바뀐 합 · 닿는 때 */
+  {const walk={};let rows=0,wetFormed=0,road6=0,road6Formed=0,badSide=0,badNear=0,river74=0,arcOver=0,bossFormed=0,bosses=0,strayBad=0,strays=0,splitPacks=0,splitBoth=0;
+   for(const n of [5,14,24,36,50])for(let sd=1;sd<=12;sd++){const s=built(n),w=W.sync(W.create({seed:sd*101+n,interval:150}),s),R=W.radius(w),open=W.routes(w),tr=new Map(),pk=new Map();
+    for(let t=1;t<=3000;t++){W.step(w,s);if(t%150===0)W.volley(w,s,{scale:1});
+     const strayTick=w.events.some(e=>e.type==='straggler')&&!w.events.some(e=>e.type==='pack');
+     for(const v of w.wolves){let o=tr.get(v.id);
+      if(!o){if(v.state!=='walk')continue;const p=roadOf(v),as=Math.atan2(v.sz,v.sx);
+       o={fm:v.fm|0,t0:t,p,side0:W.sectorOf(v.sx,v.sz),aim:v.fm?sideAt(v.fa):W.sectorOf(v.sx,v.sz),px:v.x,pz:v.z,h:null,turn:0,line:(Math.hypot(v.sx,v.sz)-R-.3)/(v.speed*W.TICK),done:false,wet:false};tr.set(v.id,o);
+       if(p===6&&w.stage>=3){road6++;if(v.fm)road6Formed++}
+       if(W.KINDS[v.kind].boss){bosses++;if(v.fm)bossFormed++}
+       if(strayTick){strays++;if(v.fm&&(v.fm!==1||v.id%2!==1))strayBad++}
+       if(v.fm===3&&Math.abs(dAng(v.fa,as))*(R+FM.ring)>FM.arc+1e-9)arcOver++;
+       if(v.fm===2){const e=pk.get(t)||{pos:0,neg:0};if(dAng(v.fa,as)>0)e.pos++;else e.neg++;pk.set(t,e)}
+       continue}
+      if(o.done)continue;
+      if(v.state==='walk'){const dx=v.x-o.px,dz=v.z-o.pz;if(Math.hypot(dx,dz)>1e-9){const h=Math.atan2(dz,dx);if(o.h!==null)o.turn+=Math.abs(dAng(h,o.h));o.h=h}o.px=v.x;o.pz=v.z;
+       if(o.fm&&!o.wet&&W.riverOn(w)&&W.riverGap(R,v.x,v.z)<=0){o.wet=true;wetFormed++}continue}
+      o.done=true;if(v.state!=='smash'&&v.state!=='hunt')continue;
+      const side=W.sectorOf(v.x,v.z),k=walk[o.fm]||(walk[o.fm]={n:0,turn:[],ratio:[],own:0,near:0});k.n++;k.turn.push(o.turn*180/Math.PI);k.ratio.push((t-o.t0)/o.line);
+      if(side!==o.aim)badSide++;
+      if(side===o.side0)k.own++;else{k.near++;const i=open.indexOf(o.p),nb=[open[(i+1)%open.length],open[(i+open.length-1)%open.length]].map(q=>sideAt(axisOf(q)));
+       if(o.fm!==3||!nb.includes(side))badNear++;if(o.p===7&&side===4&&W.riverOn(w))river74++}}}
+    for(const e of pk.values())if(e.pos+e.neg>=4){splitPacks++;if(e.pos&&e.neg)splitBoth++}
+    rows++}
+   eq(rows,60,'(단계 1~5 × 씨앗 12)');ok([0,1,2,3].every(k=>walk[k]&&walk[k].n>=50),'네 대형이 모두 울타리까지 옴: '+[0,1,2,3].map(k=>walk[k]?walk[k].n:0).join(' · '));
+   const formed=walk[1].n+walk[2].n+walk[3].n;ok(formed>=walk[0].n,'단계 1 이후 울타리에 닿은 늑대의 절반 이상이 휘거나 갈라지거나 돎('+formed+' 대 곧장 '+walk[0].n+')');
+   eq(badSide,0,'울타리 줄에 닿은 늑대는 모두 정한 면에 닿음(곧장 · 휘어 · 갈라는 출현 면, 따라 돌기는 고른 면)');
+   eq([walk[0].near,walk[1].near,walk[2].near],[0,0,0],'곧장 · 휘어 오기 · 갈라지기는 출현한 면 안에서만');
+   ok(walk[3].near>=30&&walk[3].own>walk[3].near,'따라 돌기는 옆 길 면까지 가기도 함(프로듀서 결정 2): 옆 면 '+walk[3].near+' · 제 면 '+walk[3].own);
+   eq(badNear,0,'다른 면으로 간 늑대는 모두 따라 돌기이고, 그 면은 옆 열린 길의 면');
+   eq(arcOver,0,'도는 각도 상한: 띠 위 거리 ≤ '+FM.arc+'(성 단계 반지름 22에서 약 24°)');
+   eq(wetFormed,0,'대형 늑대는 걷는 동안 강 띠(물 + 둑)에 들지 않음');eq(river74,0,'7번 길 늑대가 강 건너 4번 면(다리 길 면)으로 돌아오지 않음');
+   ok(road6>=100&&road6Formed===0,'다리 길(6번) 늑대 '+road6+'마리는 대형 없이 한 줄(0.15 결정)');
+   ok(bosses>=5&&bossFormed===0,'불씨 왕 '+bosses+'마리는 대형 없음');ok(strays>=50&&strayBad===0,'낙오 늑대 '+strays+'마리: 번호가 홀수일 때만 휘어 오기');
+   ok(splitPacks>=10&&splitBoth>=splitPacks*.6,'갈라지기 무리는 좌우 양쪽으로 갈라짐('+splitBoth+'/'+splitPacks+'무리, 한쪽 면 끝이 가까운 길은 그쪽 줄이 곧장)');
+   for(const fm of [1,2,3]){const r=mid(walk[fm].ratio);ok(r>=.95&&r<=1.05,FM.names[fm]+': 울타리에 닿는 때 ÷ 곧장으로 왔을 때 중앙 '+r.toFixed(3)+'(길어진 만큼 빨리 걸음)')}
+   ok(Math.abs(mid(walk[0].ratio)-1)<.03,'곧장: '+mid(walk[0].ratio).toFixed(3));
+   ok(mid(walk[0].turn)<1,'곧장: 걷는 동안 방향 바뀐 합 중앙 '+mid(walk[0].turn).toFixed(1)+'°');
+   ok(mid(walk[1].turn)>=30&&mid(walk[2].turn)>=30,'휘어 오기 · 갈라지기는 실제로 휜다(방향 바뀐 합 중앙 '+mid(walk[1].turn).toFixed(0)+'° · '+mid(walk[2].turn).toFixed(0)+'°)');
+   ok(mid(walk[3].turn)>=120,'따라 돌기는 띠로 꺾어 따라 돌고 다시 꺾는다(중앙 '+mid(walk[3].turn).toFixed(0)+'°)')}
+  /* F-5 따라 돌기 목표 면 고르기: 제 면과 옆 길 면 가운데 덜 붐비고 덜 부서진 면(같으면 제 면). 강을 지나야 하는 쪽으로는 돌지 않는다 */
+  {const mkWolf=(w,deg,back)=>{const a=deg*Math.PI/180,r=W.radius(w)+W.EDGE+(back||0),v={id:9000+w.wolves.length,kind:'wolf',x:Math.cos(a)*r,z:Math.sin(a)*r,sx:Math.cos(a)*r,sz:Math.sin(a)*r,hp:1e6,max:1e6,speed:1,state:'walk',target:0,timer:0,inside:0,hen:0};w.wolves.push(v);return v};
+   const crowd=(w,side,k)=>{for(let i=0;i<k;i++){const v=mkWolf(w,side*60+30,20+i);v.fm=1;v.fa=(side*60+30)*Math.PI/180}};
+   const aimOf=v=>v.fm?sideAt(v.fa):W.sectorOf(v.sx,v.sz),quiet=w=>{w.wolves=[];w.trickle=1e9;w.wave.arrive=1e9;w.wave.spawned=true;return w};
+   /* 성곽 마을(단계 4, 반지름 18, 길 0 · 2 · 3 · 4 · 6, 울타리 6면): 2번 길(112.5°) 112°에서 나온 따라 돌기. 띠(반지름 20) 위 거리 10 × 18/22 = 8.2(23.4°) 안에
+      3번 길 면(2번 면, 모서리 + 5° = 125°)이 든다. 제 면 쪽은 시계 방향(남은 각이 큰 쪽)으로 23.4° */
+   const s4=built(36),mk4=()=>quiet(W.sync(W.create({seed:1,interval:150}),s4));eq([C.stage(s4),W.routes(mk4()),mk4().buildings.filter(b=>b.kind==='fence').length],[4,[0,2,3,4,6],6],'(성곽 마을 · 울타리 6면)');
+   {const w=mk4(),v=mkWolf(w,112);W.formWolf(w,v,2,3,0,3);eq([v.fm,aimOf(v)],[3,1],'아무도 없으면 제 면(1번 면)을 따라 돎')}
+   {const w=mk4();crowd(w,1,2);const v=mkWolf(w,112);W.formWolf(w,v,2,3,0,3);eq([v.fm,aimOf(v),Math.round(v.fa*180/Math.PI)],[3,2,125],'제 면으로 늑대 2마리가 걸어오면 옆 길 면(2번 면 모서리 + 5° = 125°)으로 돈다')}
+   {const w=mk4();crowd(w,1,2);const f=w.buildings.find(b=>b.kind==='fence'&&b.side===2);f.broken=true;f.hp=0;const v=mkWolf(w,112);W.formWolf(w,v,2,3,0,3);eq(aimOf(v),1,'옆 면 울타리가 부서져 있으면(붐빔 2로 같아짐) 제 면')}
+   {const w=mk4();crowd(w,1,1);const f=w.buildings.find(b=>b.kind==='fence'&&b.side===2);f.hp=Math.round(f.max/2);const v=mkWolf(w,112);W.formWolf(w,v,2,3,0,3);eq(aimOf(v),2,'제 면 1마리 대 옆 면 울타리 절반 깎임(0.5): 옆 면')}
+   {const w=mk4();crowd(w,1,3);const v=mkWolf(w,100);W.formWolf(w,v,2,3,0,3);ok(v.fm===3&&aimOf(v)===1,'옆 면이 도는 각도 상한(23.4°) 밖이면(100° → 125° = 25°) 붐벼도 제 면')}
+   withFlags({},()=>{const keep=FM.pick;try{FM.pick='own';const w=mk4();crowd(w,1,2);const v=mkWolf(w,112);W.formWolf(w,v,2,3,0,3);eq(aimOf(v),1,'(손잡이 pick own = 기획 추천 같은 면만)')}finally{FM.pick=keep}});
+   /* 장터 마을(길 사이 90°)에서는 띠 위 거리(10 × 11.5/22 = 5.2, 22°)가 옆 길 면(65°)까지 닿지 않아 붐벼도 제 면 */
+   {const s2=built(14);s2.fence=6;C.grow(s2);const w=quiet(W.sync(W.create({seed:1,interval:150}),s2));crowd(w,0,3);const v=mkWolf(w,30);W.formWolf(w,v,0,3,0,3);eq([C.stage(s2),v.fm,aimOf(v)],[2,3,0],'장터 마을: 옆 길 면이 멀어(35°) 붐벼도 제 면')}
+   /* 강: 성(단계 5) 7번 길 318°에서 시계 방향(4번 면 = 다리 길 면, 295°)으로 돌면 띠가 강을 지난다 → 그쪽으로는 돌지 않는다(제 면 쪽 305°도 둑에 0.3까지 붙어 버림). 강을 끄면 4번 면으로 돈다 */
+   const s5=built(50),mk5=()=>quiet(W.sync(W.create({seed:1,interval:150}),s5));
+   {const w=mk5();crowd(w,5,3);const v=mkWolf(w,318);W.formWolf(w,v,7,3,0,2);ok(!(v.fm===3&&aimOf(v)===4),'강: 7번 길에서 강을 지나 4번 면으로 돌지 않음('+(v.fm?FM.names[v.fm]+' '+aimOf(v)+'번 면':'곧장')+')')}
+   withFlags({RIVER:false,BRIDGE:false},()=>{const w=mk5();crowd(w,5,3);const v=mkWolf(w,318);W.formWolf(w,v,7,3,0,2);eq([v.fm,aimOf(v)],[3,4],'(강을 끄면 같은 늑대가 4번 면으로 돎 = 위 결과는 강 때문)')});
+   /* 성곽 마을(단계 4) 4번 길 223°에서 다리 길 면(4번 면, 245°)으로: 강 띠에서 1.5 넘게 떨어져 돈다. 혼자 걸려 보면 한 번도 강 띠에 들지 않고 4번 면에 닿는다 */
+   {const s3=built(36),w=quiet(W.sync(W.create({seed:1,interval:150}),s3));crowd(w,3,2);const v=mkWolf(w,223);W.formWolf(w,v,4,3,0,2);eq([v.fm,aimOf(v)],[3,4],'4번 길 → 다리 길 면(4번 면)으로 돎(강 안쪽)');
+    w.wolves=[v];for(const b of w.buildings)if(b.kind==='tower')b.cd=1e9;const R=W.radius(w);let dry=true,t=0;while(v.state==='walk'&&t<400){W.step(w,s3);t++;if(W.riverGap(R,v.x,v.z)<=0)dry=false}
+    ok(dry&&v.state==='smash'&&W.sectorOf(v.x,v.z)===4,'혼자 걸려 보면 강 띠에 들지 않고 '+t+'틱에 4번 면 울타리에 닿음')}}
+  /* F-6 저장: 걷는 도중 저장 → 복원 → 1,000틱 뒤 세계가 같다(걸음 배수는 저장하지 않고 출현 좌표에서 다시 셈). 모양이 틀린 칸은 지워 곧장, 옛 저장(칸 없음)은 곧장 */
+  {const s=built(36),w=W.sync(W.create({seed:7,interval:150}),s);let t=0;while(t<6000&&!(w.wolves.some(v=>v.fm===3&&v.fp===1&&v.state==='walk')&&w.wolves.some(v=>(v.fm===1||v.fm===2)&&v.state==='walk'))){W.step(w,s);t++}
+   ok(t<6000,'(따라 돌기로 띠를 도는 늑대와 휘어 · 갈라 걷는 늑대가 함께 있는 순간: '+t+'틱)');
+   const b=W.restore(JSON.parse(JSON.stringify(w))),bare=x=>JSON.stringify({...x,events:[]});eq(bare(b),bare(w),'멀쩡한 저장은 한 글자도 바뀌지 않음(대형 칸 그대로)');
+   for(let i=0;i<1000;i++){W.step(w,s);W.step(b,s)}eq(JSON.stringify(b),JSON.stringify(w),'복원한 세계와 1,000틱 뒤까지 같음');
+   const w2=W.sync(W.create({seed:7,interval:150}),s);t=0;while(t<6000&&w2.wolves.filter(v=>v.fm&&v.state==='walk').length<3){W.step(w2,s);t++}
+   const raw=JSON.parse(JSON.stringify(w2)),fw=raw.wolves.filter(v=>v.fm&&v.state==='walk').slice(0,3);fw[0].fm=9;fw[1].fa=NaN;if(fw[2].fm===3)fw[2].fp=-1;else fw[2].fp=1;
+   const ids=fw.map(v=>v.id),r=W.restore(JSON.parse(JSON.stringify(raw)));eq(r.wolves.filter(v=>ids.includes(v.id)).map(v=>['fm','fa','fp'].some(k=>k in v)),[false,false,false],'모양이 틀린 대형 칸(fm 9 · fa NaN · fp 틀림)은 지워 곧장');
+   const old=JSON.parse(JSON.stringify(w2));for(const v of old.wolves){delete v.fm;delete v.fa;delete v.fp}const o=W.restore(old),v=o.wolves.find(x=>x.state==='walk');const a0=Math.atan2(v.z,v.x);W.step(o,s);
+   ok(Math.abs(dAng(Math.atan2(v.z,v.x),a0))<1e-9,'옛 저장(대형 칸 없음)의 걷는 늑대는 곧게(방향 그대로)')}
+  /* F-7 단계 전환: 걷는 도중 반지름이 커져도(물레방아 → 성곽, 14.5 → 18) 걷던 늑대는 400틱 안에 모두 울타리에 닿거나 사냥으로 바뀐다(멈춘 늑대 0) */
+  {const s=built(30),w=W.sync(W.create({seed:9,interval:150}),s);let t=0;while(t<3000&&w.wolves.filter(v=>v.state==='walk'&&v.fm).length<5){W.step(w,s);t++}
+   const ids=new Set(w.wolves.filter(v=>v.state==='walk').map(v=>v.id)),fp=w.wolves.filter(v=>v.state==='walk'&&v.fm===3).length,s2=built(40);W.sync(w,s2);eq(w.stage,4,'(걷는 도중 성곽 마을로)');
+   for(let i=0;i<400;i++)W.step(w,s2);eq(w.wolves.filter(v=>ids.has(v.id)&&v.state==='walk').length,0,'반지름이 커져도 걷던 늑대 '+ids.size+'마리(따라 돌기 '+fp+')가 400틱 안에 모두 닿거나 사냥으로 바뀜')}
+  /* F-8 화면: getVillageState().forms(마을부터 켬), ?forms=0이면 끔 */
+  {const base={age:8,level:9,fence:2,chickens:2,gold:300,seed:5};
+   const a=seed(base,{view:true});a.go();eq([a.game().stage.now,a.window.getVillageState().forms],[1,true],'getVillageState().forms: 마을에서 켬');
+   withFlags({},()=>{const b=seed(base,{view:true,query:'?forms=0'});b.go();eq([C.FLAGS.FORMS,b.window.getVillageState().forms],[false,false],'?forms=0: 대형 끔')});
+   const c=seed({age:8,gold:300,seed:5},{view:true});c.go();eq(c.window.getVillageState().forms,false,'농가는 대형 없음')}
+ }
  /* ---------- 0.14.2 리뷰 수정(work\verification-20261113\review-v014\report.md 1·3·5·7·10번) ---------- */
  const towersOf=w=>w.buildings.filter(b=>b.kind==='tower').map(b=>[b.slot,b.floor]).sort((p,q)=>p[0]-q[0]);
  const ring=(n,f)=>Array.from({length:n},(_,i)=>[i,f?f(i):1]);
@@ -1785,7 +1893,7 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
  {const b=seed({age:7,seed:4242});b.go();b.unlock();b.rightNow();ok(b.api.round.info.guard<1,'대조: 열리자마자 누르면 찍기 막기 배수 '+b.api.round.info.guard.toFixed(2)+' < 1')}
  /* TM-2 켜짐: 막대, 따로 저장, 시작 화면에서 다음 ▶ = 시작하기 */
  saved={[KEY]:kid};const a=boot({query:TQ}),T=a.window.__testmode,u=UI(a);
- ok(T&&u.bar&&a.document.body.classList.contains('test-mode'),'test=1: 화면 아래 막대와 훅');ok(a.document.body.children.some(e=>e.tagName==='script'&&e.src==='testmode.js?v=0.15.1'),'test=1: testmode.js를 불러옴');
+ ok(T&&u.bar&&a.document.body.classList.contains('test-mode'),'test=1: 화면 아래 막대와 훅');ok(a.document.body.children.some(e=>e.tagName==='script'&&e.src==='testmode.js?v=0.15.2'),'test=1: testmode.js를 불러옴');
  eq([a.api.KEY,a.api.state.gold],[TKEY,20],'저장 열쇠는 -test, 아이 저장(금화 777)을 읽지 않고 새 판');
  eq([T.speed,T.auto,Object.keys(T.SPEED),Object.values(T.SPEED).map(s=>s.k),T.RETRY],['typ',false,['slow','typ','fast'],[1.8,1,.62],.35],'아이 속도 느림·보통·빠름 = 시뮬 아이 모형(× 1.8 · 1 · 0.62, 두 번째 × 0.35), 기본 보통·자동 끔');
  eq([u.speed('typ').getAttribute('aria-pressed'),u.auto.textContent,u.wrong.disabled,u.now()],['true','⏯ 자동 끔',true,'시작 화면 · 다음 ▶ = 시작하기'],'막대 처음 모습');
@@ -1861,7 +1969,7 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
  {const HALL=[0,0,1,1,2,3];let rows=0;
   for(const age of [8,7,9,10]){
    saved={[KEY]:kid};const b=boot({query:TQ}),M=b.window.__testmode,U=UI(b),sel=U.bar.children.find(e=>e.attrs.id==='tmJump');
-   if(age===8)eq(sel.children.map(o=>o.textContent),['🗺️ 단계로','🏡 농가','🏘️ 마을','🏪 장터 마을','💧 물레방아 마을','🧱 성곽 마을','🏰 성','🔔 결전 직전(종 열림)'],'바로 가기 칸: 6단계 + 결전 직전');
+   if(age===8)eq(sel.children.map(o=>o.textContent),['🗺️ 단계로','🏡 농가','🏘️ 마을','🏪 장터 마을','💧 물레방아 마을','🧱 성곽 마을','🏰 성','🔔 결전 직전(종 열림)','🐺 대형 끄기'],'바로 가기 칸: 6단계 + 결전 직전 + 맨 끝 대형 켬/끔(0.15.2)');
    if(age!==8)b.n.ageRow.children.find(x=>x.dataset.age===String(age)).click();
    for(const [key,name] of M.JUMPS){const tag=age+'세 '+name;
     sel.value=key;sel.onchange();
@@ -1880,6 +1988,23 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
    ok(b.api.state.run.bell===2&&b.api.state.run.fpick.length===C.FINALE.shields&&b.api.state.run.fpick.some(i=>i>=0),age+'세: 종을 울리면 결전(판 기록에서 문제를 고름) '+JSON.stringify(b.api.state.run.fpick));
    b.unload();eq(saved[KEY],kid,age+'세 바로 가기: 아이 저장 그대로');eq(JSON.parse(saved[TKEY]).age,age,age+'세: 테스트 저장에 바로 간 판')}
   eq(rows,28,'나이 4 × 바로 가기 7')}
+ /* TM-12 0.15.2 무리 대형: 막대의 🐺 = 무리 부르기(다음 틱에 무리가 숲에서 나옴), 🗺️ 칸 맨 끝 "🐺 대형 끄기/켜기"는 같은 탭에서 바로 바뀜(새로고침 없음),
+    📊 줄 끝에 지금 무리 대형(마을부터, 농가는 붙이지 않음). 아이 저장은 그대로 */
+ {saved={[KEY]:kid};const b=boot({query:TQ}),M=b.window.__testmode,U=UI(b),pk=U.bar.children.find(e=>e.attrs.id==='tmPack'),sel=U.bar.children.find(e=>e.attrs.id==='tmJump');
+  ok(!!pk&&pk.textContent==='🐺'&&U.bar.children.indexOf(pk)===U.bar.children.findIndex(e=>e.attrs.id==='tmPerfBtn')+1,'막대에 🐺(무리 부르기) 버튼, 📊 바로 뒤');
+  eq([M.callPack(),M.note],[false,'시작한 뒤에 부를 수 있어요'],'시작 화면에서는 부르지 않음');
+  U.next.click();b.n.scene.dataset.renderer='fallback';ok(/ · 🏡 농가$/.test(M.perfNow()),'농가: 📊 줄에 대형 이름을 붙이지 않음(8방향 · 대형 없음)');
+  sel.value='3';sel.onchange();const w=b.api.world;eq([w.stage,W.formsOn(w),M.form],[3,true,null],'(물레방아 마을로 바로 감, 아직 무리 없음)');ok(/ · 💧 물레방아 마을 · 🐺 대형 켬$/.test(M.perfNow()),'📊 줄: 아직 무리가 없으면 "대형 켬": '+M.perfNow());
+  calmWorld(b);w.wave.spawned=false;w.wave.n=2;w.rng=20261119;/* 세계 씨앗은 실행 시각이라 길 고르기를 고정 */const p0=M.packs;pk.click();eq(M.note,'🐺 무리를 불렀어요 · 갈라지기','🐺: 부를 무리의 대형을 알려 줌');b.tick(1);
+  ok(M.packs===p0+1&&w.wolves.length>0&&w.wolves.some(v=>v.fm===2),'🐺: 다음 틱에 갈라지기 무리가 숲에서 나옴('+w.wolves.length+'마리)');eq(M.form,2,'지금 무리 대형 = 갈라지기');
+  ok(/ · 💧 물레방아 마을 · 🐺 갈라지기$/.test(M.perfNow()),'📊 줄 끝에 지금 무리 대형: '+M.perfNow());
+  const last=sel.children[sel.children.length-1];eq([last.getAttribute('value'),last.textContent],['forms','🐺 대형 끄기'],'🗺️ 칸 맨 끝에 대형 끄기');
+  const fv=w.wolves.find(v=>v.fm===2&&v.state==='walk');sel.value='forms';sel.onchange();eq([C.FLAGS.FORMS,sel.value,last.textContent],[false,'','🐺 대형 켜기'],'대형 끄기: 같은 탭에서 바로(메뉴 글은 켜기로)');
+  ok(/ · 🐺 대형 끔$/.test(M.perfNow()),'📊 줄: 대형 끔');
+  {ok(!!fv,'(걷는 갈라지기 늑대)');const a0=fv?Math.atan2(fv.z,fv.x):0;b.tick(2);ok(fv&&(fv.state!=='walk'||Math.abs(Math.atan2(fv.z,fv.x)-a0)<1e-9),'끄면 걷던 대형 늑대도 바로 곧게(방향 그대로)')}
+  calmWorld(b);pk.click();eq(M.note,'🐺 무리를 불렀어요 · 대형 끔','끈 뒤 부르면 대형 끔');b.tick(1);ok(w.wolves.length>0&&w.wolves.every(v=>!('fm' in v)),'끈 뒤 부른 무리는 곧장(대형 칸 없음)');eq(M.form,null,'(대형 없는 무리)');
+  sel.value='forms';sel.onchange();eq([C.FLAGS.FORMS,last.textContent],[true,'🐺 대형 끄기'],'대형 켜기');
+  b.unload();eq(saved[KEY],kid,'대형 손잡이 · 무리 부르기를 써도 아이 저장 그대로');C.FLAGS.FORMS=true;delete b.n.scene.dataset.renderer}
 }
 /* ======================= 0.15 아트 들여오기(계획서 §2, S-9 6) =======================
    묶음 원본 outputs\art-v015-v016-20261117을 art-handoff/v015-v016/에 그대로 복사했다. 파일이 바뀌거나 빠지면(복사 실수·줄바꿈 변환) 해시로 잡는다.

@@ -70,6 +70,8 @@
        단계 · 길(STAGES · ROUTES)이 켜져 있을 때만 쓴다. 저장 형식은 그대로(새 칸 없음) */
     RIVER:true,               /* true = 물레방아 마을(단계 3)부터 강 · 다리 · 물레방아 바퀴를 그린다(화면 전용). false = 0.14 화면(?river=0, 다리 규칙도 꺼짐) */
     BRIDGE:true,              /* true = 단계 3부터 6번 길(다리 길) 늑대가 출현 각도 흔들림 ±0.03rad로 다리 위에 줄지어 온다(World.BRIDGE). false = 0.14처럼 넓게(?bridge=0) */
+    /* ---------- 0.15.2 늑대 무리 대형(기획 wolf-paths-plan-20261119 안 B, 프로듀서 결정 '26.11.19: 무리 대형부터, 따라 도는 늑대는 옆 길 울타리 면까지, 예고는 2차) ---------- */
+    FORMS:true,               /* true = 마을(단계 1)부터 무리마다 곧장 · 휘어 오기 · 갈라지기 · 따라 돌기 가운데 하나로 온다(World.FORM). false = 0.15.1처럼 곧게(?forms=0). 저장 형식은 그대로 */
   };
   /* 흐르는 농장의 경제 쪽 상수(세계 쪽 상수는 world.js FLOW). 값은 scripts/sim-flow.cjs로 맞춤(2026-11-14, game-plan §13.2)
      beat: 박(틱) = 그 문제 필요 시간 × beat × max(paceFloor, pace)/100. 박 하나에 농부 한 명이 World.FLOW.carry알을 나른다
