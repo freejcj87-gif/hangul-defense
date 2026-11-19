@@ -45,7 +45,11 @@ const TYPES={'.js':'text/javascript; charset=utf-8','.html':'text/html; charset=
     {const b=rich();b.rv[0].due=0;b.rv[0].box=1;const {ctx,page}=await open(w,h,b,run({}));await page.locator('#go').click();await page.waitForFunction(()=>window.__game().phase==='ask');await page.evaluate(()=>window.__tick(40));await shot(page,'09-review-question',w,h);await ctx.close()}
     /* 4 반짝 손님: 마을 둘레를 걷는 손님, 인사 뒤 띠 */
     {const b=rich();b.shiny.guest='bramble';b.shiny.run=1;const {ctx,page}=await open(w,h,b,run({}));await page.locator('#go').click();await page.waitForFunction(()=>window.__game().phase==='ask');
-     await page.evaluate(()=>window.__tick(160));await page.waitForTimeout(900);await shot(page,'10-shiny-guest',w,h);await answer(page);await page.evaluate(()=>window.__tick(40));await page.waitForFunction(()=>window.__game().phase==='ask');await answer(page);await page.evaluate(()=>window.__tick(4));await page.waitForFunction(()=>[...document.querySelectorAll('#effects .banner')].some(e=>/반짝/.test(e.textContent)),{},{timeout:3000}).catch(()=>page.evaluate(()=>window.__tick(34)));await page.waitForTimeout(500);await shot(page,'11-shiny-met',w,h);/* 앞에 줄 선 띠(새 몬스터 등)가 있으면 그것이 지나간 뒤 *//* 반짝 띠는 읽는 동안 미뤘다가 다음 정답 때 뜬다 */await ctx.close()}
+     await page.evaluate(()=>window.__tick(160));await page.waitForTimeout(900);await shot(page,'10-shiny-guest',w,h);/* 정답 화살이 손님에게 닿으면(shinyMet) 띠가 뜬다. 정답 연출 중에 닿으면 바로, 읽는 중에 닿으면 다음 정답 때. 2틱씩 돌리며 띠가 보이는 순간을 찍는다 */
+     const seen=()=>page.evaluate(()=>[...document.querySelectorAll('#effects .banner')].some(e=>/반짝 손님/.test(e.textContent)&&!e.classList.contains('later')));
+     let got=false;for(let round=0;round<3&&!got;round++){await page.waitForFunction(()=>window.__game().phase==='ask');await answer(page);for(let k=0;k<40&&!(got=await seen());k++)await page.evaluate(()=>window.__tick(2))}
+     console.log('  반짝 손님: 띠 '+(got?'보임':'안 보임')+' · '+JSON.stringify(await page.evaluate(()=>{const b=window.__game().book;return {guest:b.guest&&b.guest.state,shiny:Object.keys(b.data.mon).filter(k=>b.data.mon[k].shiny>0),miss:b.data.shiny.miss}})));
+     await page.waitForTimeout(500);await shot(page,'11-shiny-met',w,h);await ctx.close()}
     /* 5 하루 시간 쉬기 화면 */
     {const b=rich();b.today={d:day,s:1800,ext:0};const {ctx,page}=await open(w,h,b,run({}));await page.locator('#go').click();await page.waitForTimeout(300);await shot(page,'12-sleepy',w,h);await ctx.close()}
     /* 6 엔딩 카드 */
