@@ -239,7 +239,7 @@ body.paused *,body.paused *:before,body.paused *:after{animation-play-state:paus
 #endNew{width:100%;font-size:19px;min-height:58px;background:linear-gradient(#f8d255,#e0a21a);color:#4a3200;border-color:#b8860b}#endStay{width:100%;margin-top:8px;min-height:46px;font-size:16px}
 /* ---------- 수첩 MVP: 쪽지 문제 칸 · 친구 카드 · 반짝 손님 · 수첩 · 보호자 화면 ---------- */
 #enemies .enemy.shiny img{filter:hue-rotate(150deg) saturate(1.8) brightness(1.25)!important}
-#quiz.note-q{background:repeating-linear-gradient(#fffdf2 0 31px,#efe4c4 31px 32px);border:2px dashed #c9b27a;border-radius:16px;padding:8px 10px}
+#quiz.note-q{background:linear-gradient(#fff8e2,#fffdf4 40px);border:2px dashed #c9b27a;border-radius:16px;padding:8px 10px;box-shadow:inset 0 0 0 4px #fffdf4}/* 줄 무늬는 글자를 가로질러서 뺌(CI 캡처 2026-11-19) */
 .fx.fx-note{font-size:26px;animation:noteFall .9s ease-in forwards}@keyframes noteFall{from{transform:translate(-50%,-60px) rotate(-25deg);opacity:0}30%{opacity:1}to{transform:translate(-50%,40px) rotate(20deg);opacity:0}}
 .friend-card{position:absolute;left:50%;top:46%;translate:-50% -50%;z-index:9;display:grid;justify-items:center;gap:2px;padding:14px 24px;border-radius:18px;background:#fffaf0;border:3px solid #f2b931;box-shadow:0 6px 0 #0004;font-weight:900;font-size:20px;white-space:nowrap;animation:cardFlip .6s ease-out}
 .friend-card b{font-size:46px;line-height:1.1}.friend-card small{font-size:15px;color:#3c6b3f}.friend-card.still{animation:none}
@@ -270,6 +270,9 @@ body.paused *,body.paused *:before,body.paused *:after{animation-play-state:paus
 .gate-code{margin:8px 0;font-size:30px;font-weight:900;letter-spacing:2px}.gate-in{margin:0 0 8px;font-size:26px;font-weight:900;letter-spacing:6px}
 .gate-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px}.gate-pad button{min-height:54px;font-size:22px}.gate-pad button[data-d="back"]{grid-column:1/-1;font-size:15px;min-height:44px}
 #gate{z-index:60}#guardian{z-index:55}#bookScreen{z-index:55}#sleepy{z-index:52}
+/* 낮은 화면(노트북 1366×640): 시작 화면·엔딩 카드가 한 화면에 들어오게 줄인다(수첩 단추·쉬기 권유가 더해져 아래 단추가 잘렸음, CI 캡처 2026-11-19) */
+@media(max-height:700px){.start-card{padding:14px 18px}.start-card>img{width:44px;height:44px}.start-card h2{margin:2px 0 6px;font-size:20px}.rules{line-height:1.5;font-size:13px;padding:7px 11px;margin-bottom:8px}
+ .end-stars{gap:4px;margin:6px 0;font-size:15px}.end-stars li{padding:4px 10px}.map-row{margin:4px 0 6px}.end-rest{margin:2px 0 6px;font-size:18px}#endQuit,#endNew{min-height:50px}#endStay,#endBookBtn{min-height:44px;margin-top:6px}.book-row{margin-bottom:6px}.book-row button{min-height:44px}#go{min-height:52px}.start-card small{margin-top:4px}.linkish{margin-top:4px}}
 </style></head><body><main>
 <header><div><small>한글 읽기로 마을 지키기</small><h1><img class="brand-chicken" src="art-handoff/coopnight/browser/characters/chicken.png" alt="">꼬꼬마을</h1></div><button id="pause">잠깐 쉬기</button></header>
 <div class="game-layout"><section class="stage-card" id="stageCard" aria-label="우리 마을">

@@ -45,7 +45,7 @@ const TYPES={'.js':'text/javascript; charset=utf-8','.html':'text/html; charset=
     {const b=rich();b.rv[0].due=0;b.rv[0].box=1;const {ctx,page}=await open(w,h,b,run({}));await page.locator('#go').click();await page.waitForFunction(()=>window.__game().phase==='ask');await page.evaluate(()=>window.__tick(40));await shot(page,'09-review-question',w,h);await ctx.close()}
     /* 4 반짝 손님: 마을 둘레를 걷는 손님, 인사 뒤 띠 */
     {const b=rich();b.shiny.guest='bramble';b.shiny.run=1;const {ctx,page}=await open(w,h,b,run({}));await page.locator('#go').click();await page.waitForFunction(()=>window.__game().phase==='ask');
-     await page.evaluate(()=>window.__tick(160));await page.waitForTimeout(900);await shot(page,'10-shiny-guest',w,h);await answer(page);await page.evaluate(()=>window.__tick(8));await page.waitForTimeout(600);await shot(page,'11-shiny-met',w,h);await ctx.close()}
+     await page.evaluate(()=>window.__tick(160));await page.waitForTimeout(900);await shot(page,'10-shiny-guest',w,h);await answer(page);await page.evaluate(()=>window.__tick(40));await page.waitForFunction(()=>window.__game().phase==='ask');await answer(page);await page.evaluate(()=>window.__tick(4));await page.waitForTimeout(600);await shot(page,'11-shiny-met',w,h);/* 반짝 띠는 읽는 동안 미뤘다가 다음 정답 때 뜬다 */await ctx.close()}
     /* 5 하루 시간 쉬기 화면 */
     {const b=rich();b.today={d:day,s:1800,ext:0};const {ctx,page}=await open(w,h,b,run({}));await page.locator('#go').click();await page.waitForTimeout(300);await shot(page,'12-sleepy',w,h);await ctx.close()}
     /* 6 엔딩 카드 */

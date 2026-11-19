@@ -95,7 +95,7 @@
     if(bookH.locked&&bookH.status==='memory'&&!DEMO)para(box,'저장 공간을 쓸 수 없어 지금 놀이는 저장되지 않아요.','g-warn');
     para(box,'이번 주(최근 7일): 푼 문제 '+w.q+' · 한 번에 맞힌 문제 '+w.f+' · 처음 맞힌 새 글 '+w.nw+' · 논 시간 '+min(w.s)+'분 · 논 날 '+w.days+'일');
     para(box,'전체: 놀이 '+a.plays+'번 · 푼 문제 '+a.q+' · 한 번에 맞힌 문제 '+a.f+' · 논 날 '+a.days+'일 · 지킨 마을 '+a.villages+'곳');
-    para(box,'분류별 한 번에 맞힌 문제(최근 놀이 30번): 한글 읽기 '+r.rate.rd[1]+' / '+r.rate.rd[0]+' · 상식·수학 '+r.rate.qz[1]+' / '+r.rate.qz[0]+' · 영어 '+r.rate.en[1]+' / '+r.rate.en[0]);
+    para(box,'분류별 한 번에 맞힌 문제(최근 놀이 30번): '+(r.rate.rd[0]+r.rate.qz[0]+r.rate.en[0]?'한글 읽기 '+r.rate.rd[1]+' / '+r.rate.rd[0]+' · 상식·수학 '+r.rate.qz[1]+' / '+r.rate.qz[0]+' · 영어 '+r.rate.en[1]+' / '+r.rate.en[0]:'아직 기록이 없어요.'));
     para(box,'기억 늑대로 다시 맞힌 글: '+r.again+'개');
     para(box,'자주 놓친 글','g-h');
     if(!r.missed.length)para(box,'아직 없어요.');

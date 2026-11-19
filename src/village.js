@@ -1691,6 +1691,9 @@ async function start(){
   if(less)for(const b of booms)if(time-b.t0<.6)decal(CELL.ring,b.x,b.z,b.r*2.5,ORANGE,.85,.5,.08);   // reduced motion: a still ring instead of the fireball
   for(const o of wolfVis.values()){
    if(o.state==='dead')continue;const s=o.size;
+   /* 수첩 MVP 반짝 손님: 색은 평소와 같아(인스턴스 색 바꾸기는 카드 그림 작업과 함께) 발밑에 숨 쉬는 금빛 고리와 머리 위 반짝이로 알아보게 한다 */
+   if(curS&&curS.world&&curS.world.guest&&o.id===curS.world.guest.id&&o.state!=='leave'){const p=less?1:.5+.5*Math.sin(time*4);decal(CELL.halo,o.x,o.z,2.4*s*(1+.2*p),GOLD,.9,.6);decal(CELL.glow,o.x,o.z,3*s,GOLD,.45,.8);
+    topOf(o,tv);const b=.6*Math.max(1,fxScale*.85);sprite(CELL.sparkle,tv.x,tv.y+.45+(less?0:.1*Math.sin(time*5)),tv.z,b,b,WHITE,.95,.6,less?0:time*2)}
    const crown=beast[o.kind]&&RIG[o.kind].crown;
    if(o.K.boss&&crown){const p=less?1:.85+.15*Math.sin(time*4);decal(CELL.glow,o.x,o.z,2.7*s*p,GOLD,.42,.7);   // 0.15 GLB wolf king: a golden floor glow and a twinkling crown instead of flames
     for(let i=0;i<crown.length;i++){const [x,y,z]=crown[i],tw=less?.8:Math.max(0,Math.sin(time*4.2+i*1.9));if(tw<.05)continue;tv.set(x,y,z).applyMatrix4(o.mat);
