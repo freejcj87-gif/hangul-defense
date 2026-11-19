@@ -639,18 +639,19 @@ function boot(opts={}){
  return h;
 }
 const fresh=o=>{saved={};return boot(o)};
-const seed=(s,o)=>{saved={[KEY]:JSON.stringify({version:3,...C.fresh(8),...s})};return boot(o)};
+/* 검사용 저장은 최신 문제은행 판으로(예전 저장 이행은 2-9b에서 따로 봄) */
+const seed=(s,o)=>{saved={[KEY]:JSON.stringify({version:3,...C.fresh(8),bank:Q.BANK_VERSION,...s})};return boot(o)};
 const REWARD=12,LAND=24;/* 한 번에 맞힌 뒤: 1.2초 뒤 다음 문제, 2.4초 안에 동전이 다 닿음 */
 /* 화면에 나온 문제 = 그 나이의 index번째 문제(상식·수학·영어가 섞인 순서, Questions.at) */
 /* 그 나이 읽기 문항 기준 무리 간격(index.html waveInterval과 같은 식) */
 /* 0.12: 그 판(씨앗)에 실제로 나올 다음 120문제의 평균 기본 시간 × 1.3 (13~45초) */
-const ivFor=(age,seed,index=0)=>{let sum=0;for(let i=0;i<120;i++)sum+=C.baseSeconds(Q.at(age,'story',index+i,seed));return W.tempoInterval(sum/120)};
+const ivFor=(age,seed,index=0,bank)=>{let sum=0;for(let i=0;i<120;i++)sum+=C.baseSeconds(Q.at(age,'story',index+i,seed,bank));return W.tempoInterval(sum/120)};
 /* 7세 상식·수학·영어 칸에서 시작하는 저장(예전에는 질문을 읽어 주던 문제) */
 const SEED7=777,I7=Array.from({length:60},(_,k)=>k).find(k=>Q.at(7,'story',k,SEED7).mode==='quiz'),L7={age:7,index:I7,seed:SEED7};
 const fastAt=q=>Math.ceil(C.FAST_MIN*C.needSeconds(q)/C.TICK);/* 번개를 받을 수 있는 가장 이른 틱 */
 const live=w=>w.wolves.filter(v=>v.state!=='dead'&&v.state!=='gone').length;
 function shows(a,age,mode,index,msg){
- const q=Q.at(age,mode,index,a.api.state.seed),list=a.n.answers;/* 0.10: 그 판의 문제 순서 씨앗 */
+ const q=Q.at(age,mode,index,a.api.state.seed,a.api.state.bank),list=a.n.answers;/* 0.10: 그 판의 문제 순서 씨앗 */
  eq([list.dataset.qid,list.dataset.age,list.dataset.mode],[q.id,String(age),q.mode],msg+' 문항 '+q.id);
  eq(a.n.prompt.textContent,q.prompt,msg+' 질문');eq(a.n.passage.textContent,q.passage||'',msg+' 지문');
  eq([...list.children].map(b=>b._t).sort(),q.choices.slice().sort(),msg+' 보기');
@@ -673,8 +674,8 @@ a.tick(30);eq(a.api.round,null,'시작 화면에서는 문제 없음');eq(a.api.
 for(const id of ['battle','next','shield','combatInfo','buildPrompt','buyChicken','buyFence','timebar','timeFill','wolfHead','timeTag','choices','cards','skip','gainLine','gainParts'])ok(!html.includes('id="'+id+'"'),'없앤 요소: '+id);
 ok(!html.includes('소리 도움말'),'정답을 글자로 보여 주던 소리 도움말 제거');ok(!src.includes('다음 무리')&&!src.includes('barLeft')&&!src.includes('secondsLeft'),'늑대 시간 표시(초·막대) 코드 없음');
 ok(!src.includes('enterPick')&&!src.includes('picks')&&!src.includes('offers('),'카드 고르기 단계 코드 없음');
-ok(html.includes('src="combat.js?v=0.15"')&&html.includes('src="world.js?v=0.15"')&&html.includes('src="questions.js?v=0.15"')&&html.includes('src="village.js?v=0.15"')&&src.includes("s.src='testmode.js?v=0.15'")&&!html.includes('?v=0.12')&&!html.includes('?v=0.14'),'캐시 갱신용 ?v=0.15');
-ok(html.indexOf('src="questions-gen.js?v=0.15"')>0&&html.indexOf('src="questions-gen.js?v=0.15"')<html.indexOf('src="questions.js?v=0.15"'),'생성 문항 파일을 questions.js보다 먼저 불러옴');
+ok(html.includes('src="combat.js?v=0.15.1"')&&html.includes('src="world.js?v=0.15.1"')&&html.includes('src="questions.js?v=0.15.1"')&&html.includes('src="village.js?v=0.15.1"')&&src.includes("s.src='testmode.js?v=0.15.1'")&&!html.includes('?v=0.12')&&!html.includes('?v=0.14'),'캐시 갱신용 ?v=0.15.1');
+ok(html.indexOf('src="questions-gen.js?v=0.15.1"')>0&&html.indexOf('src="questions-gen.js?v=0.15.1"')<html.indexOf('src="questions.js?v=0.15.1"'),'생성 문항 파일을 questions.js보다 먼저 불러옴');
 /* 0.11: 듣고 고르기 모드 폐쇄. 시작 화면·설정에 모드 고르기가 없고, 스크립트에 소리 모드 분기가 없다 */
 for(const id of ['startSound','startStory','mode'])ok(!html.includes('id="'+id+'"'),'없앤 모드 버튼: '+id);
 ok(!html.includes('mode-row')&&!html.replace(/<script>[\s\S]*?<\/script>/,'').includes('듣고 고르기'),'화면에 모드 고르기·듣고 고르기 문구 없음');
@@ -776,6 +777,16 @@ a=fresh();a.go();a.unlock();a.right();a.n.age.value='7';a.n.age.onchange();shows
  const before=a.n.answers.children.map(b=>b._t);a.n.pause.click();const b2=boot();b2.go();eq(b2.n.answers.children.map(b=>b._t),before,'이어서 하기: 같은 보기 순서');eq(b2.api.round.q.answer,q.answer,'이어서 하기: 같은 정답 자리');
  b2.unlock();b2.right();eq(b2.api.round.result,'first','이어서 한 문제를 정답으로 판정')}
 
+/* 2-8b 문제은행 판 이행: bank 없는 예전 저장은 판 1(예전 문항·순서)로 이어 가고, 새 판부터 최신 판 */
+{saved={[KEY]:JSON.stringify({version:3,...C.fresh(8),seed:77,index:40})};const o=boot();o.go();
+ eq(o.api.state.bank,1,'bank 없는 예전 저장 → 판 1');eq(o.n.answers.dataset.qid,Q.at(8,'story',40,77,1).id,'예전 저장의 40번 = 판 1의 40번 문항');shows(o,8,'story',40,'예전 저장 이어하기');
+ ok(/-(\d\d|g(0\d\d|1[0-7]\d|18[0-5]))$/.test(o.n.answers.dataset.qid)||o.n.answers.dataset.mode==='quiz','판 1에는 새 문항(g186 이후)이 없음');
+ o.n.pause.click();eq(JSON.parse(saved[KEY]).bank,1,'판 번호를 저장함');const o2=boot();o2.go();eq([o2.api.state.bank,o2.n.answers.dataset.qid],[1,Q.at(8,'story',40,77,1).id],'다시 열어도 판 1');
+ const f=fresh();f.go();eq(f.api.state.bank,Q.BANK_VERSION,'새로 시작한 판 = 최신 판');eq(f.n.answers.dataset.qid,Q.at(8,'story',0,f.api.state.seed,Q.BANK_VERSION).id,'새 판 0번 = 최신 판 0번');
+ const s1=C.fresh(8);s1.bank=1;s1.seed=5;eq(C.restore({...s1,version:3},Q.AGES).bank,1,'Combat.restore가 bank를 이어받음');eq(C.restore({...C.fresh(8),version:3},Q.AGES).bank,0,'bank 없으면 0(화면이 예전 저장 = 1, 새 판 = 최신으로 정함)');
+ /* 결전 문제 번호(fpick)는 번호 목록이라 판이 같으면 같은 문항: 판 1 저장의 번호 12는 최신 판의 12번과 다를 수 있어도 판 1의 12번과는 같다 */
+ eq(Q.at(8,'story',12,77,1).id,Q.at(8,'story',12,77,1).id,'판 1 번호 → 문항 결정적');ok(Array.from({length:60},(_,i)=>Q.at(8,'story',i,77,1).id).join()!==Array.from({length:60},(_,i)=>Q.at(8,'story',i,77).id).join(),'(판 1과 최신 판은 같은 번호에 다른 문항이 섞임 = 판을 저장해야 하는 까닭)')}
+
 /* 2-9 저장·복원(늑대 세계 포함) */
 a=fresh();a.go();a.unlock();a.right();g0=a.api.state.gold;eq(JSON.parse(saved[KEY]).round,null,'판매 연출 중 저장: 하던 문제 없음(금화는 이미 받음)');
 let b=boot();eq(b.n.go.textContent,'시작하기 ▶','다시 열면 다음 문제부터');b.go();eq([b.api.phase,b.api.state.gold,b.api.state.index],['ask',g0,1],'새로고침해도 금화 이중 지급 없음');shows(b,8,'story',1,'연출 중 새로고침 → 다음 문제');
@@ -856,7 +867,7 @@ a=fresh();a.go();a.tick(300);ok(a.n.enemies.children.filter(x=>!x.classList.cont
  eq(shown.map(x=>x.dataset.kind),liv.map(v=>v.kind),'그림 마을 몬스터 종류 = 세계');ok(liv.some(v=>v.kind!=='wolf'),'2단계 마을에 새 몬스터');
  /* 0.7 저장(세계 v1) 이어받기 */
  saved={[KEY]:JSON.stringify({version:1,...C.fresh(8),level:1,world:{v:1,t:900,rng:5,hall:0,interval:270,wave:{n:3,arrive:1110,spawned:false},wolves:[{id:40,x:12,z:0,sx:17,sz:0,hp:20,max:20,speed:.8,state:'walk',target:0,timer:0,inside:0,hen:0}],hens:[],buildings:[],arrows:[],nextId:50,stats:{kills:5,henLost:0,henSaved:0,broken:0,waves:3},events:[]}})};
- const b2=boot();eq([b2.api.world.interval,b2.api.world.wolves[0].kind,b2.api.world.stats.kills],[ivFor(8,b2.api.state.seed,b2.api.state.index),'wolf',5],'0.7 세계 저장을 이어받음');ok(b2.api.world.wave.arrive<=b2.api.world.t+b2.api.world.interval,'다음 무리를 새 간격으로 당김');b2.go();b2.tick(50);ok(b2.api.world.t===950,'이어서 진행');
+ const b2=boot();eq([b2.api.world.interval,b2.api.world.wolves[0].kind,b2.api.world.stats.kills],[ivFor(8,b2.api.state.seed,b2.api.state.index,b2.api.state.bank),'wolf',5],'0.7 세계 저장을 이어받음');ok(b2.api.world.wave.arrive<=b2.api.world.t+b2.api.world.interval,'다음 무리를 새 간격으로 당김');b2.go();b2.tick(50);ok(b2.api.world.t===950,'이어서 진행');
 }
 
 /* 2-13 0.9 가게: 2줄 × 4칸이 늘 열려 있고, 듣기·풀기·연출·배우기 중 언제든 한 번 눌러 바로 산다(세계는 멈추지 않음) */
@@ -1576,7 +1587,9 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   const vs=a.window.getVillageState();eq([vs.stage,vs.routes,vs.hall],[-1,null,1],'끔: 3D에는 단계·길을 넘기지 않음(8갈래 발자국 길)');
   a.unload();const again=JSON.parse(saved[KEY]);ok(!('stage' in again.world)&&!('stage' in again),'끔: 저장에 단계 칸 없음')});
  ok(/\[\?&\]stages=0\\b/.test(src)&&/\[\?&\]routes=0\\b/.test(src),'주소 ?stages=0 · ?routes=0으로 끄는 손잡이');
- ok(html.includes('늑대가 오기 전에 읽어요 0.15')&&!html.includes('?v=0.14'),'머리글과 캐시 문자열이 0.15');
+ ok(html.includes('id="appVersion">꼬꼬마을 0.15.1<')&&!html.includes('?v=0.14')&&!html.includes('?v=0.15"'),'버전 표기(설정 서랍 맨 아래)와 캐시 문자열이 0.15.1');
+ ok(html.includes('<title>꼬꼬마을: 한글 읽기로 마을 지키기</title>')&&html.includes('<small>한글 읽기로 마을 지키기</small>')&&html.includes('<h2>꼬꼬마을: 한글 읽기로 마을 지키기</h2>')&&!html.includes('읽어서 지켜요')&&!html.includes('한글 디펜스'),'앱 이름: 꼬꼬마을: 한글 읽기로 마을 지키기(머리글은 제목 + 부제 줄)');
+ ok(html.includes('게임 기록은 이 브라우저에 저장되고, 개발자에게 보내지 않아요.'),'바닥글: 정책 기준 문장(웹판)');
  /* S-8 3D 단계 소품 자리(src/layout.js): 맨 끝에서 모듈을 불러 확인 */
  stageLayout.push(L=>{
   const SIZE={coop:1.4,market:1.6,nursery:1,barn:1.6},d2=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]),seg=(p,[x0,z0,x1,z1])=>{const dx=x1-x0,dz=z1-z0,t=Math.max(0,Math.min(1,((p[0]-x0)*dx+(p[1]-z0)*dz)/(dx*dx+dz*dz)));return Math.hypot(p[0]-x0-dx*t,p[1]-z0-dz*t)};
@@ -1772,7 +1785,7 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
  {const b=seed({age:7,seed:4242});b.go();b.unlock();b.rightNow();ok(b.api.round.info.guard<1,'대조: 열리자마자 누르면 찍기 막기 배수 '+b.api.round.info.guard.toFixed(2)+' < 1')}
  /* TM-2 켜짐: 막대, 따로 저장, 시작 화면에서 다음 ▶ = 시작하기 */
  saved={[KEY]:kid};const a=boot({query:TQ}),T=a.window.__testmode,u=UI(a);
- ok(T&&u.bar&&a.document.body.classList.contains('test-mode'),'test=1: 화면 아래 막대와 훅');ok(a.document.body.children.some(e=>e.tagName==='script'&&e.src==='testmode.js?v=0.15'),'test=1: testmode.js를 불러옴');
+ ok(T&&u.bar&&a.document.body.classList.contains('test-mode'),'test=1: 화면 아래 막대와 훅');ok(a.document.body.children.some(e=>e.tagName==='script'&&e.src==='testmode.js?v=0.15.1'),'test=1: testmode.js를 불러옴');
  eq([a.api.KEY,a.api.state.gold],[TKEY,20],'저장 열쇠는 -test, 아이 저장(금화 777)을 읽지 않고 새 판');
  eq([T.speed,T.auto,Object.keys(T.SPEED),Object.values(T.SPEED).map(s=>s.k),T.RETRY],['typ',false,['slow','typ','fast'],[1.8,1,.62],.35],'아이 속도 느림·보통·빠름 = 시뮬 아이 모형(× 1.8 · 1 · 0.62, 두 번째 × 0.35), 기본 보통·자동 끔');
  eq([u.speed('typ').getAttribute('aria-pressed'),u.auto.textContent,u.wrong.disabled,u.now()],['true','⏯ 자동 끔',true,'시작 화면 · 다음 ▶ = 시작하기'],'막대 처음 모습');

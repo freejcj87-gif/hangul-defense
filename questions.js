@@ -388,6 +388,25 @@
   }
   const QPOOL={};
   for(const a of AGES){QPOOL[a]={};for(const c of Object.keys(CATS))QPOOL[a][c]=BANK[a].quiz.filter(q=>q.cat===c);}
+  /* ---------- 문제은행 판(edition) ----------
+     문항을 더하면 묶음 크기가 달라져 번호 → 문항 순서가 통째로 바뀐다. 그래서 진행 중인 판은 시작할 때의 은행 판을 저장(state.bank)해
+     끝날 때까지 그 판의 문항만으로 예전과 똑같은 순서를 쓴다. 새 판(새 마을·처음부터)부터 최신 판을 쓴다.
+     규칙: 새 문항은 생성 구간 맨 뒤에만 붙인다(scripts/bank-add.cjs). questions-gen.js의 editions[k] = 판 k+1의 생성 문항 수(나이·묶음별).
+     판 v의 묶음 = 손 문항 + 생성 문항 앞쪽 editions[v-1]개. BANK_VERSION = editions 수 + 1(최신 판 = 전부). bank 없는 예전 저장 = 판 1 */
+  const EDITIONS=GEN&&Array.isArray(GEN.editions)?GEN.editions:[],BANK_VERSION=EDITIONS.length+1;
+  const normBank=b=>Number.isInteger(b)&&b>=1&&b<BANK_VERSION?b:BANK_VERSION;
+  const POOLS={};
+  function pools(v){
+    if(POOLS[v])return POOLS[v];
+    const o={};
+    for(const a of AGES){
+      const e=v<BANK_VERSION&&EDITIONS[v-1]&&EDITIONS[v-1][a],cut=(list,n)=>e&&Number.isInteger(n)?list.slice(0,list.filter(q=>!/-g\d+$/.test(q.id)).length+n):list;
+      const story=cut(BANK[a].story,e&&e.story),quiz=cut(BANK[a].quiz,e&&e.quiz),q={};
+      for(const c of Object.keys(CATS))q[c]=quiz.filter(x=>x.cat===c);
+      o[a]={story,q};
+    }
+    return POOLS[v]=o;
+  }
 
   /* 전체 검사(인자 없으면 내장 은행). 손 문항 뒤 생성 문항, 정답 위치 3연속은 구간별 */
   function validate(bank){
@@ -483,7 +502,7 @@
   const memo=(key,f)=>{if(MEMO.has(key))return MEMO.get(key);if(MEMO.size>MEMO_MAX)MEMO.clear();const v=f();MEMO.set(key,v);return v};
   function rawOrder(age,pool,list,seed,lap){
     return memo('r|'+age+'|'+pool+'|'+seed+'|'+lap,()=>{
-      const r=rng(hash(age+'|'+pool+'|'+seed+'|'+lap)),n=list.length,w=list.map(q=>r()+((q.level||2)-1)*STEP);
+      const r=rng(hash(age+'|'+pool.replace(/@\d+$/,'')+'|'+seed+'|'+lap))/* '@판'은 캐시 열쇠에만: 예전 판의 순서는 그때와 같은 난수 */,n=list.length,w=list.map(q=>r()+((q.level||2)-1)*STEP);
       /* 같은 묶음의 둘째·셋째 문항은 첫째 자리 + TIER씩 뒤로: 묶음마다 하나씩 다 나온 뒤에야 둘째가 나온다 */
       const first=new Map();
       [...Array(n).keys()].sort((x,y)=>w[x]-w[y]||x-y).forEach(x=>{const g=grp(list[x]),f=first.get(g);if(f)w[x]=f[0]+TIER*f[1]++;else first.set(g,[w[x],1])});
@@ -534,17 +553,17 @@
   }
 
   /* index번째 칸: kind, cat, 묶음 안 순번 seq, 바퀴 lap, 순열 자리 pos, 묶음 크기 size */
-  function slot(age,mode,index,seed){
-    const a=normAge(age),m=normMode(mode),i=normIndex(index),s=normSeed(seed);
+  function slot(age,mode,index,seed,bank){
+    const a=normAge(age),m=normMode(mode),i=normIndex(index),s=normSeed(seed),P=pools(normBank(bank))[a],QP=P.q;
     if(isQuiz(a,i)){
       const k=quizBefore(a,i),cy=CYCLE[a],off=hash('o|'+s)%20;
       let cat=cy[(k+off)%20],c=Math.floor(k/20)*QUIZ_MIX[a][cat];
       for(let t=0;t<k%20;t++)if(cy[(off+t)%20]===cat)c++;
-      if(!QPOOL[a][cat].length){cat=Object.keys(CATS).find(x=>QPOOL[a][x].length);c=k}
-      const n=QPOOL[a][cat].length;
+      if(!QP[cat].length){cat=Object.keys(CATS).find(x=>QP[x].length);c=k}
+      const n=QP[cat].length;
       return {kind:'quiz',cat,seq:c,lap:Math.floor(c/n),pos:c%n,size:n};
     }
-    const j=i-quizBefore(a,i),n=BANK[a][m].length;
+    const j=i-quizBefore(a,i),n=P.story.length;
     return {kind:m,seq:j,lap:Math.floor(j/n),pos:j%n,size:n};
   }
 
@@ -566,15 +585,15 @@
       return qcopy(list[((i%n)+n)%n],false);
     },
     /* 게임 문제(seed는 0 이상 정수, 기본 0): 같은 입력 = 같은 문항·같은 보기 순서, lap = 몇 바퀴째. 보기는 화면에 보일 순서(arrange). mode는 무엇을 넣어도 읽기(story) */
-    at(age,mode,index,seed){
-      const a=normAge(age),m=normMode(mode),s=normSeed(seed),i=normIndex(index),t=slot(a,m,i,s);
-      if(t.kind==='quiz'){const list=QPOOL[a][t.cat],q=qcopy(list[lapOrder(a,'q-'+t.cat,list,s,t.lap)[t.pos]],false);q.lap=t.lap;return arrange(q,a,s,i)}
-      const list=BANK[a][m],q=copy(list[lapOrder(a,m,list,s,t.lap)[t.pos]],false);q.lap=t.lap;return arrange(q,a,s,i);
+    at(age,mode,index,seed,bank){
+      const a=normAge(age),m=normMode(mode),s=normSeed(seed),i=normIndex(index),v=normBank(bank),t=slot(a,m,i,s,v),P=pools(v)[a],K=v===BANK_VERSION?'':'@'+v;
+      if(t.kind==='quiz'){const list=P.q[t.cat],q=qcopy(list[lapOrder(a,'q-'+t.cat+K,list,s,t.lap)[t.pos]],false);q.lap=t.lap;return arrange(q,a,s,i)}
+      const list=P.story,q=copy(list[lapOrder(a,m+K,list,s,t.lap)[t.pos]],false);q.lap=t.lap;return arrange(q,a,s,i);
     },
     /* 퀴즈 칸인지(모드·시드 무관), 그 20칸 묶음의 퀴즈 칸 수 */
     isQuiz(age,index){return isQuiz(normAge(age),normIndex(index));},
     quizPer20(age,index){return qIn(normAge(age),Math.floor(normIndex(index)/20));},
-    QUIZ_PHASE,QUIZ_MIX,slot,
+    QUIZ_PHASE,QUIZ_MIX,slot,BANK_VERSION,bankCount(age,bank){const P=pools(normBank(bank))[normAge(age)];return {story:P.story.length,common:P.q.common.length,math:P.q.math.length,english:P.q.english.length}},
     hangul,checkLevel,checkCommon,checkQuiz,genRejected,
     snapshot(){const o={};for(const a of AGES){o[a]={};for(const m of MODES)o[a][m]=BANK[a][m].map(q=>copy(q,true));o[a].quiz=BANK[a].quiz.map(q=>qcopy(q,true));}return o;}
   };

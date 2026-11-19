@@ -11,6 +11,8 @@
    봇은 추천 말풍선을 따르고, 한 번에 맞힐 때마다 하나를 산다(sim-village.cjs playEnd와 같은 방식). 결과 정본: docs/game-plan.md §13 */
 const path=require('node:path'),ROOT=path.join(__dirname,'..');
 const C=require(path.join(ROOT,'combat.js')),W=require(path.join(ROOT,'world.js')),Q=require(path.join(ROOT,'questions.js'));
+/* 문제은행 판 고르기: BANK=1 node scripts/sim-flow.cjs … (없으면 최신 판) */
+if(process.env.BANK){const at=Q.at;Q.at=(a,m,i,s)=>at(a,m,i,s,+process.env.BANK)}
 const mulberry=a=>()=>{a=(a+0x6D2B79F5)>>>0;let t=Math.imul(a^a>>>15,a|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296};
 const SPEEDK={slow:1.8,typ:1,fast:.62,guess:1,wrong:1,vslow:2.2,nofarmer:1,randbuy:1},ACC1={slow:.75,typ:.85,fast:.95,vslow:.75,nofarmer:.85,randbuy:.85};
 const CHEAP=['repair','chicken','tower','farmer','fence','power','pond','feast'];
