@@ -2,7 +2,7 @@
    명세: launch/design/02-MVP-구현명세-20261118.md §3.1·§4. 글은 모두 새로 쓴 것(교재·동화 인용 없음). 문구는 콘텐츠 검수에서 확정 [가정].
    쪽지 문항은 평소 출제에 섞이지 않는다(쪽지가 떨어졌을 때만 Book.nextSpecial이 꺼냄). 모양은 평소 읽기 문항과 같고 kind(몬스터 키)·card(카드 한 줄)를 더한다.
    영어 이름 문항은 평소 영어 퀴즈 묶음에 들어갈 문항이다. 문제은행 판(edition) 규칙상 새 문항은 생성 구간 맨 뒤에만 붙이므로
-   여기에는 id 없이 두고, 연결 단계에서 scripts/bank-add.cjs로 questions-gen.js에 붙인다(docs/book-mvp-progress.md). */
+   여기에는 id 없이 원본을 두고, scripts/bank-add.cjs로 questions-gen.js에 붙였다(은행 판 3, 2026-11-19). 문구를 고칠 때는 여기와 questions-gen.js를 함께 고친다(test-book.cjs가 같은지 확인) */
 (function(root){
   const AGES=[7,8,9,10],KINDS=['wolf','bramble','boar','granite','frost','ember','fox','king'];
   /* 종 이름(게임 띠와 같음) · 개인 이름(받침 없음) · 영어 이름(쉬운 낱말, 'Shiny' 표기 금지) · 한 줄 소개 */

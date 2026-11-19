@@ -55,6 +55,18 @@
 
 ## 실제 규칙과 한계
 
+### 수첩 MVP (브랜치 `claude/book-mvp`, worktree `work\claude-book`, 0.15.1 위. 버전 번호는 리드가 정함)
+
+발자국 수첩 · 지킴이 훈장 · 기억 늑대 · 반짝 손님 · 보호자 화면 · 진행 파일입니다. 정본은 [docs/game-plan.md](docs/game-plan.md) §17, 연결 지점·시뮬·남은 일은 [docs/book-mvp-progress.md](docs/book-mvp-progress.md)(§9가 최신).
+
+- 파일: `book.js`(기록 v1과 규칙, 순수 함수) · `notes.js`(몬스터 카드 8종, 쪽지 64문항, 영어 이름 48문항 원본, 개인정보처리방침 본문) · `bookui.js`(수첩·보호자·쉬기 화면). `index.html`은 `notes.js`·`book.js`를 인라인 스크립트 앞에, `bookui.js`를 뒤에 불러온다.
+- 저장: 판 저장(`hangul-defense-v1`)은 그대로, 기록은 `hangul-defense-book`. 판 저장 → 기록 순서로 쓰고, 기록은 문제 사이·30초·강제(쉬기·탭 숨김·창 닫기)에만 쓴다. 앱보다 새 버전의 기록은 덮어쓰지 않는다.
+- 규칙 연결: `makeRound`의 `Book.nextSpecial`(특별 문제는 문제 번호를 넘기지 않음, 표 `X<id>`), `bookFirst`·`bookOther`, 세계 사건 `by:'volley'`·`shinyMet`, `nextQuestion()`(하루 시간), `ordOff()`·`ordDone()`(이어 순서), `applyMix()`(영어 비중).
+- 다른 파일: `world.js`(화살 `v`, 늑대 `vh`, 반짝 손님 `w.guest`), `combat.js`(`track`의 `extra`, `settle`의 `keepStreak`, `API` 5), `questions.js`(`at(…, bank, off)`·`used`·`byId`·`setMix`), `questions-gen.js`(은행 판 3 = 영어 이름 48문항).
+- 끄기: `?book=0`이면 0.15.1과 같다. `test-dom.cjs`의 기존 절과 `test.cjs`의 기존 구간은 수첩 없이 돈다(회귀).
+- 검사: `node test-book.cjs`(3,178건), `test-dom.cjs`의 "MVP 수첩" 절, `test.cjs`의 `book` 구간(아직 한 번도 실행 못 함), 시뮬 `node scripts/sim-flow.cjs book`. 테스트 모드(`?test=1`)의 📒 단추로 쪽지 자격·반짝 기회·놀이 +1·기록 비우기.
+- 한계: 브라우저·실기기 미확인, 카드 그림 없음(그림 문자), 이어 순서로 7세 한 판이 12 → 14.8분(§17 시뮬).
+
 ### 0.15 (현재)
 
 강 · 다리 · 물레방아와 늑대 왕 · 도둑 여우 새 모델입니다(브랜치 `claude/v015-river`, worktree `work\claude-v013`, main 0.14 `11fca3c` 기준). 정본은 [docs/game-plan.md](docs/game-plan.md) §15, 구현 계획서는 저장소 밖 `work\verification-20261113\design\v015-plan.md`, 커밋별 기록은 [docs/v015-progress.md](docs/v015-progress.md)입니다. 병합 · 배포 전입니다.
