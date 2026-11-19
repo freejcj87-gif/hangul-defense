@@ -399,7 +399,7 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
    await page.evaluate(()=>{Combat.ringBell(state,{});state.run.shields=2;state.run.fpick=state.run.fpick.slice(2);syncKing(true);render()});await tick(page,30);await frames(page,40);
    i=await page.evaluate(()=>window.VillageView.inspect());ok(i.king&&i.king.state==='stand','3D: the king stands at the stop point');ok(Math.hypot(i.cameraFocus[0],i.cameraFocus[1])>.5,'3D: finale camera leans toward the king: '+i.cameraFocus);
    ok(await page.locator('#finale').isVisible(),'3D: star shields shown');await shot(page.locator('.scene'),'king-finale-3d-390');
-   await page.evaluate(()=>{World.fox(world,state,400,{})});await tick(page,300);await frames(page,8);i=await page.evaluate(()=>window.VillageView.inspect());ok(i.fox&&i.fox.state==='come','3D draws the thief fox: '+JSON.stringify(i.fox));await shot(page.locator('.scene'),'fox-3d-390');
+   await page.evaluate(()=>{world.fox=null;World.fox(world,state,400,{})});await tick(page,300);await frames(page,8);i=await page.evaluate(()=>window.VillageView.inspect());ok(i.fox&&i.fox.state==='come','3D draws the thief fox: '+JSON.stringify(i.fox));await shot(page.locator('.scene'),'fox-3d-390');
    await page.evaluate(()=>{World.king(world,'none');state.run=Combat.freshRun();world.fox=null;render()});
   }
   eq(await page.evaluate(()=>localStorage.getItem('hangul-defense-v1')),null,'demo never touches the real save');ok(await page.evaluate(()=>!!localStorage.getItem('hangul-defense-demo3')),'demo has its own save');
@@ -816,7 +816,7 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
    await tick(page,5);await page.evaluate(()=>window.VillageView.debug({advance:.5}));await frames(page,2);
    let v=await insp(page);eq((await beasts(page)).art,label==='glb'?GLB.art:CODE.art,'art15 '+label+': finale models');
    ok(v.king&&v.king.state==='wait'&&v.king.size>3&&v.wolfKinds.king===1,'art15 '+label+': the waiting wolf king is drawn, as big as before: '+JSON.stringify([v.king,v.wolfKinds]));
-   await page.evaluate(()=>{World.king(world,'none');state.run=Combat.freshRun();World.fox(world,state,400,{});render()});
+   await page.evaluate(()=>{World.king(world,'none');state.run=Combat.freshRun();world.fox=null;World.fox(world,state,400,{});render()});
    for(let i=0;i<10;i++){await tick(page,30);await page.evaluate(()=>window.VillageView.debug({advance:.3}))}await frames(page,2);
    v=await insp(page);ok(v.fox&&v.fox.state==='come'&&v.wolfKinds.fox===1&&!v.king,'art15 '+label+': the thief fox is drawn: '+JSON.stringify([v.fox,v.wolfKinds]));
    await shot(page.locator('.scene'),'art15-'+label+'-fox');eq(errors,[],'art15 '+label+' finale page errors');await ctx.close()}
