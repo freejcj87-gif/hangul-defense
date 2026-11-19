@@ -2,7 +2,7 @@ const {chromium,webkit}=require('playwright');
 const assert=require('node:assert/strict'),http=require('node:http'),fs=require('node:fs'),path=require('node:path');
 const Questions=require('./questions.js'),Combat=require('./combat.js'),World=require('./world.js');
 const INTERIM=process.env.INTERIM_NO_3D_BUILD==='1',FULL_SHOTS=process.env.FULL_SHOTS==='1';
-const ONLY=process.env.ONLY||'',run=part=>!ONLY||ONLY.split(',').includes(part);/* ONLY=matrix,clock,feel,fallback,demo,flow,farm,stage,art,testmode 중 일부만 돌릴 때(개발용). CI는 전부 돌린다. */
+const ONLY=process.env.ONLY||'',run=part=>!ONLY||ONLY.split(',').includes(part);/* ONLY=matrix,clock,feel,fallback,demo,flow,farm,stage,art,testmode,book 중 일부만 돌릴 때(개발용). CI는 전부 돌린다. */
 /* 0.13: 아래 matrix·clock·feel·fallback·demo·flow 구간은 0.12 경제 회귀 검사라 주소에 flow=0을 붙여 연다(OLD). 흐르는 농장(기본 켬)은 맨 끝 farm 구간이 본다 */
 /* 0.14: 같은 까닭으로 그 구간들은 stages=0도 붙인다(단계를 끄면 0.13.2 화면·규칙 그대로라는 회귀 검사). 단계(기본 켬)는 맨 끝 stage 구간이 본다. farm 구간은 단계를 켠 채 돈다 */
 const OLD='/?flow=0&stages=0';Combat.FLAGS.FLOW=false;Combat.FLAGS.STAGES=false;Combat.FLAGS.ROUTES=false;/* 이 파일의 기대값 계산(Node 쪽 Combat)도 0.12 경제·단계 끔으로. farm·stage 구간은 상수만 읽는다 */
@@ -21,9 +21,12 @@ const ivFor=(age,seed,index=0)=>{let sum=0;for(let i=0;i<120;i++)sum+=Combat.bas
 const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
 (async()=>{
  const output=path.join(__dirname,'.pages-build'),shots=path.join(__dirname,'test-results');
+ /* 수첩 MVP: 아래 matrix~testmode 구간은 수첩 없는 0.15 회귀 검사다. 주소에 book=1이 없는 페이지에는 book.js를 주지 않는다(index.html은 Book이 없으면 ?book=0과 같은 길로 돈다).
+    수첩을 켠 화면은 맨 끝 book 구간이 본다(주소 /?book=1) */
+ const withBook=req=>/[?&]book=1\b/.test(String(req.headers.referer||''));
  const server=http.createServer((req,res)=>{
  const pathname=new URL(req.url,'http://localhost').pathname;
- const file=pathname==='/'?'index.html':['/combat.js','/world.js','/questions-gen.js','/questions.js','/village.js','/testmode.js'].includes(pathname)?pathname.slice(1):pathname==='/art-handoff/coopnight/source-3d/models/environment-pack.glb'?pathname.slice(1):/^\/art-handoff\/coopnight\/browser\/[a-z/-]+[0-9a-z-]*\.png$/.test(pathname)?pathname.slice(1):/^\/art-handoff\/v015-v016\/(glb\/[a-z-]+\.glb|png\/[a-z-]+\.png)$/.test(pathname)?pathname.slice(1):null;
+ const file=pathname==='/'?'index.html':['/combat.js','/world.js','/questions-gen.js','/questions.js','/village.js','/testmode.js','/notes.js','/bookui.js'].includes(pathname)||pathname==='/book.js'&&withBook(req)?pathname.slice(1):pathname==='/art-handoff/coopnight/source-3d/models/environment-pack.glb'?pathname.slice(1):/^\/art-handoff\/coopnight\/browser\/[a-z/-]+[0-9a-z-]*\.png$/.test(pathname)?pathname.slice(1):/^\/art-handoff\/v015-v016\/(glb\/[a-z-]+\.glb|png\/[a-z-]+\.png)$/.test(pathname)?pathname.slice(1):null;
  if(!file||!fs.existsSync(path.join(output,file))){res.writeHead(404);return res.end()}
  res.setHeader('Content-Type',file.endsWith('.glb')?'model/gltf-binary':file.endsWith('.png')?'image/png':file.endsWith('.js')?'text/javascript; charset=utf-8':'text/html; charset=utf-8');
  res.end(fs.readFileSync(path.join(output,file)));
@@ -857,6 +860,49 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
    await page.evaluate(()=>save());eq(await page.evaluate(()=>localStorage.getItem('hangul-defense-v1')),null,'test mode never writes the child save');ok(await page.evaluate(()=>!!localStorage.getItem('hangul-defense-v1-test')),'test mode has its own save');
    eq(errors,[],'test mode page errors');await ctx.close()}
  }}finally{await tmBrowser.close()}
+ /* ---------- 수첩 MVP(book 구간): 수첩 · 보호자 화면이 기준 화면 3종에서 넘치지 않고 단추가 44px 이상, 쪽지 문제 칸, 바깥 요청 없음 ---------- */
+ if(run('book')){const bookBrowser=await chromium.launch({headless:true,args:SWIFT});
+  try{
+   const BOOK_KEY='hangul-defense-book';
+   const open=async(w,h,seed)=>{const ctx=await bookBrowser.newContext({viewport:{width:w,height:h},hasTouch:true,reducedMotion:'reduce'});await ctx.addInitScript(HOLD);await ctx.addInitScript(FAKE_TTS);
+    if(seed)await ctx.addInitScript(s=>{if(!localStorage.getItem(s.key)){localStorage.setItem(s.key,s.book);localStorage.setItem('hangul-defense-v1',s.run)}},seed);
+    const page=await ctx.newPage(),errors=[],outside=[];page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(!r.url().startsWith(url)&&!r.url().startsWith('data:')&&!r.url().startsWith('blob:'))outside.push(r.url())});
+    await page.route('**/environment-pack.glb',r=>r.abort());await page.goto(url+'/?book=1');await ready(page);return {ctx,page,errors,outside}};
+   /* 보호자 단추를 길게 누르고 글로 적힌 수를 눌러 문턱을 지난다 */
+   const passGate=async page=>{await page.evaluate(()=>{const code=document.getElementById('gateCode').textContent,N={이:2,삼:3,사:4,오:5,육:6,칠:7,팔:8,구:9},m=/^(.)백(.)십(.)$/.exec(code);for(const c of [m[1],m[2],m[3]])[...document.getElementById('gatePad').children].find(b=>b.dataset.d===String(N[c])).click()})};
+   const longPress=async(page,id)=>{await page.evaluate(id=>{const b=document.getElementById(id),now=Date.now;b.onpointerdown();Date.now=()=>now()+2500;b.onpointerup();Date.now=now},id)};
+   const fits=async(page,id)=>page.evaluate(id=>{const card=document.getElementById(id).querySelector('.start-card'),r=card.getBoundingClientRect(),small=[...card.querySelectorAll('button')].filter(b=>b.offsetParent!==null).map(b=>b.getBoundingClientRect()).filter(x=>x.height<43.5||x.width<43.5).length;
+    return {left:r.left,right:r.right,w:innerWidth,sw:document.documentElement.scrollWidth,small}},id);
+   const book=await page0Book();
+   async function page0Book(){const Bk=require('./book.js'),b=Bk.fresh(Date.now(),4242),t=Date.now();
+    Object.assign(b.mon.wolf,{foot:t,card:t,note:3,plays:3,kills:50,rib:{n:1,last:2}});Object.assign(b.mon.bramble,{foot:t,plays:2,last:1,kills:40,note:1});b.drop={kind:'bramble',at:1};b.pq=6;b.medal.one.n=60;b.medal.one.at=[t,0,0];
+    return {key:BOOK_KEY,book:JSON.stringify(b),run:JSON.stringify({version:3,...Combat.fresh(8),seed:4242,index:20})}}
+   for(const [w,h] of [[1366,640],[1180,820],[820,1180]]){const tag='book '+w+'x'+h,{ctx,page,errors,outside}=await open(w,h,book);
+    ok(await page.locator('#bookRow').isVisible()&&await page.locator('#openBook').isVisible()&&await page.locator('#openGuard').isVisible(),tag+': start screen shows the notebook and guardian buttons');
+    await page.locator('#openBook').click();ok(await page.locator('#bookScreen').isVisible(),tag+': notebook opens from the start screen');
+    eq(await page.locator('#bookPages .book-page').count(),8,tag+': 8 pages');eq(await page.locator('#bookMedals .medal').count(),12,tag+': 12 medals');
+    ok((await page.locator('#bookTitle').textContent()).includes('3 / 32'),tag+': cover count');
+    let f=await fits(page,'bookScreen');ok(f.left>=-.5&&f.right<=f.w+.5&&f.sw<=f.w&&f.small===0,tag+': notebook fits the width, buttons at least 44px '+JSON.stringify(f));
+    await shot(page,'book-notebook-'+w+'x'+h);await page.locator('#bookClose').click();
+    await longPress(page,'openGuard');ok(await page.locator('#gate').isVisible()&&!/\d/.test(await page.locator('#gateCode').textContent()),tag+': long press opens the adult check, the number is written in words');
+    f=await fits(page,'gate');ok(f.sw<=f.w&&f.small===0,tag+': adult check fits, keys at least 44px');await shot(page,'book-gate-'+w+'x'+h);
+    await passGate(page);ok(await page.locator('#guardian').isVisible()&&!(await page.locator('#gate').isVisible()),tag+': guardian screen opens after the right number');
+    for(const tab of ['log','set','file','help']){await page.locator('#gTabs button[data-tab="'+tab+'"]').click();f=await fits(page,'guardian');ok(f.left>=-.5&&f.right<=f.w+.5&&f.sw<=f.w&&f.small===0,tag+': guardian tab '+tab+' fits, buttons at least 44px '+JSON.stringify(f));
+     eq(await page.locator('#guardian a').count(),0,tag+': guardian tab '+tab+' has no links');await shot(page,'book-guardian-'+tab+'-'+w+'x'+h)}
+    await page.locator('#guardClose').click();
+    /* 쪽지 문제 칸: 떨어진 쪽지가 다음 문제로(문제 번호는 그대로) */
+    await page.locator('#go').click();await phaseIs(page,'ask');const g=await game(page);
+    eq([g.round.token,g.state.index,await page.locator('#levelChip').textContent()],['8:story:Xa8-note-bramble-1',20,'📜 이름 쪽지'],tag+': the dropped name note is the next question, the index stays');
+    ok(await page.locator('#quiz.note-q').isVisible()&&!(await page.locator('#pauseBook').isVisible()),tag+': note card, no notebook button while reading');
+    await page.evaluate(()=>{const g=window.__game();window.__tick(Math.max(g.round.lock,40));document.querySelector('#answers button[data-i="'+g.round.answer+'"]').click()});
+    const r=await game(page);eq([r.phase,r.state.index,r.book.data.mon.bramble.note],['reward',20,3],tag+': first-try answer makes a friend, the index still stays');
+    ok(await page.locator('.friend-card').isVisible(),tag+': friend card');await shot(page,'book-friend-'+w+'x'+h);
+    await page.locator('#pause').click();ok(await page.locator('#pauseBook').isVisible(),tag+': notebook button while paused');
+    eq(outside,[],tag+': no request leaves the page origin');eq(errors,[],tag+' page errors');await ctx.close()}
+   /* 수첩을 끄면(?book=0과 같은 길: book.js 없음) 수첩 단추가 없다 */
+   {const ctx=await bookBrowser.newContext({viewport:{width:1366,height:640}});await ctx.addInitScript(HOLD);const page=await ctx.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.route('**/environment-pack.glb',r=>r.abort());await page.goto(url+'/?book=0');await ready(page);
+    ok(!(await page.locator('#bookRow').isVisible())&&!(await page.locator('#openInfo').isVisible())&&(await page.locator('#reset').textContent())==='처음부터 시작','book=0: no notebook buttons, the 0.15 reset label');eq((await game(page)).book.on,false,'book=0: no record');eq(errors,[],'book=0 page errors');await ctx.close()}
+  }finally{await bookBrowser.close()}}
  console.log((ONLY?'PARTIAL('+ONLY+') ':'')+'PASS '+checks+' browser assertions (Chromium/WebKit, desktop + mobile emulation, held clock + one real-clock run). Physical audio/device validation remains manual.');
  }finally{server.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});

@@ -15,7 +15,7 @@ jobs:
     container:
       image: mcr.microsoft.com/playwright:v1.56.1-noble
       options: --ipc=host
-    timeout-minutes: 45
+    timeout-minutes: 60   # 0.16: 0.15.2 대형 검사 + 수첩 검사·캡처가 더해져 느린 러너에서 39분(2026-11-19 실행 44480823614)까지 걸려 여유를 둠
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -23,6 +23,7 @@ jobs:
           node-version: '22'
       - run: node test-questions.cjs
       - run: node test-dom.cjs
+      - run: node test-book.cjs
       - run: npm install --no-save --package-lock=false playwright@1.56.1 three@0.180.0 esbuild@0.25.10
       - run: node scripts/build-pages.cjs
       - run: node test.cjs
@@ -31,4 +32,17 @@ jobs:
         with:
           name: browser-screenshots
           path: test-results/
+          retention-days: 7
+      # 수첩 MVP 화면 캡처(눈으로 보는 용도): 실패해도 위 검사 결과를 가리지 않는다
+      - name: Notebook screenshots
+        if: always()
+        continue-on-error: true
+        timeout-minutes: 10
+        run: node scripts/book-shots.cjs book-shots
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: book-shots
+          path: book-shots/
+          if-no-files-found: warn
           retention-days: 7

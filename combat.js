@@ -265,7 +265,8 @@
   /* 이번 판 기록: 푼 문제 수·한 번에 맞힌 수, 결전에 쓸 문제 번호 목록(결전 문제 자체는 넣지 않는다), 처음으로 한 번에 맞힌 문항(q.id, 별 3) */
   const pushCap=(list,v,cap)=>{if(!list.includes(v)){list.push(v);if(list.length>cap)list.splice(0,list.length-cap)}};
   function track(s,q,result,opt){
-    const r=runOf(s),m=metaOf(s),fin=!!(opt&&opt.finale);r.asked++;
+    /* opt.extra(수첩 MVP): 문제 번호를 넘기지 않고 끼워 넣은 특별 문제(쪽지·기억 늑대). 푼 수·한 번에 맞힌 수·새 글에는 세고, 결전 문제 후보 목록(ok·miss)에는 넣지 않는다 */
+    const r=runOf(s),m=metaOf(s),fin=!!(opt&&(opt.finale||opt.extra));r.asked++;
     if(result==='first'){r.first++;if(!fin)pushCap(r.ok,s.index|0,CAPS.ok);
       if(q&&typeof q.id==='string'&&!m.seenOk.includes(q.id)){m.seenOk.push(q.id);r.newOk++;if(m.seenOk.length>CAPS.seenOk)m.seenOk.splice(0,m.seenOk.length-CAPS.seenOk)}}
     else if(!fin)pushCap(r.miss,s.index|0,CAPS.miss);
@@ -280,7 +281,8 @@
       if(FLAGS.BELL_WINS_CAP)grow(s);
       return Object.assign({result,back},inc);
     }
-    s.streak=0;
+    /* opt.keepStreak(수첩 MVP): 기억 늑대가 다시 들고 온 글은 놓쳐도 연속(신바람)을 끊지 않는다. 한 번 놓친 글이라 또 놓치기 쉬운데, 그 때문에 평소 읽기의 신바람·금화가 줄지 않게(복습은 벌이 아니다) */
+    if(!o.keepStreak)s.streak=0;
     if(result==='second'){s.late=0;return {result}}
     const r=raid(s);s.hidden+=r.scared;s.misses++;
     if(o.timeout){s.late++;if(s.late>=2){s.help=Math.min(MAX_HELP,s.help+1);s.late=0}}else s.late=0;
@@ -536,7 +538,7 @@
     return s;
   }
 
-  const api={API:4,SAVE_VERSION:3,STAGE_NAME,STAGE_MAX,stage,stageAt,stageCount,stageByCount,hallStage,stageInfo,FLAGS,FLOW,flowOn,beatTicks,flowGain,sellEggs,FINALE,FOX,MIGRATE,START_PACK,WOLF_MUL,VILLAGES,VILLAGE_NAME,villageOf,CAPS,FEAST,freshRun,freshMeta,builtNew,autoHall,bellBuilt,bellDue,grow,goldScale,track,lostHen,
+  const api={API:5,SAVE_VERSION:3,STAGE_NAME,STAGE_MAX,stage,stageAt,stageCount,stageByCount,hallStage,stageInfo,FLAGS,FLOW,flowOn,beatTicks,flowGain,sellEggs,FINALE,FOX,MIGRATE,START_PACK,WOLF_MUL,VILLAGES,VILLAGE_NAME,villageOf,CAPS,FEAST,freshRun,freshMeta,builtNew,autoHall,bellBuilt,bellDue,grow,goldScale,track,lostHen,
     bellPrompted,ringBell,finaleNow,finaleSettle,stars,finish,keepPlaying,nextMul,nextRun,foxDue,foxTicks,foxScareOnly,foxCame,foxEnded,restoreRun,restoreMeta,TICK,SPEED,MIN_SEC,MAX_SEC,SLACK,FENCE,HELP,FAST,FAST_BONUS,FAST_MIN,isFast,STREAK,BOUNTY,combo,DASH,DASH_TICKS,MAX_WOLVES,PACE,PAY,REPAIR,CURVE,ITEMS,SHOP,ORDER,POWER_NOTE,THINK,LINES,REC,units,
     HENS_MAX,TOWERS_MAX,FARMERS_MAX,syl,fresh,max,count,needSeconds,baseSeconds,limit,reveal,LEARN,learnTicks,scale,picks,built,wolves,basket,eggPrice,income,raid,settle,price,open,canBuy,buy,shopKeys,shop,recommend,offers,restore,
     GUARD,guard,guardFloor,guardPow,trackPace};

@@ -67,7 +67,9 @@ for(const a of Q.AGES){
 }
 for(const a of Q.AGES)ok(GEN[a].quiz.filter(q=>q.cat==='math').length>=45,`${a}세 수학 생성 45개 이상`);
 for(const a of [9,10])ok(GEN[a].quiz.filter(q=>q.cat==='english').length>=45,`${a}세 영어 생성 45개 이상`);
-eq(GEN[7].quiz.filter(q=>q.cat==='english').length+GEN[8].quiz.filter(q=>q.cat==='english').length,0,'7·8세 영어는 생성하지 않음');
+/* 수첩 MVP(은행 판 3): 7·8세 생성 영어는 몬스터 영어 이름 문항 8개씩뿐(영어 보기 없이 그림·한국어 뜻으로 고름) */
+for(const a of [7,8]){const e=GEN[a].quiz.filter(q=>q.cat==='english');eq(e.length,8,a+'세 생성 영어는 영어 이름 문항 8개뿐')}
+for(const a of [9,10])ok(GEN[a].quiz.filter(q=>q.cat==='english'&&/wolf|fox|frost|fire|king|boar|bush|rock/i.test(q.passage+q.choices[q.answer])).length>=16,a+'세 영어 이름 문항 16개');
 
 /* 3. get 계약: 형태·순환·불변 */
 const ids=new Set();
@@ -312,7 +314,7 @@ ok(hit(s=>{s[9].quiz[1].passage=null;},'a9-quiz-02','passage'),'퀴즈 passage �
 ok(hit(s=>{s[10].quiz[0].answer=4;},'a10-quiz-01','answer'),'퀴즈 answer 범위');
 ok(hit(s=>{const c=s[10].quiz[1].choices;c[0]=c[1];},'a10-quiz-02','보기 중복'),'퀴즈 보기 중복');
 ok(hit(s=>{s[8].quiz[0].age=9;},'a8-quiz-01','age/mode'),'퀴즈 age 불일치');
-ok(hit(s=>{s[8].quiz.find(q=>q.cat==='english').cat='common';},'8세 quiz','영어 8문항'),'퀴즈 분류별 최소 문항');
+ok(hit(s=>{s[8].quiz.filter(q=>q.cat==='english').slice(7).forEach(q=>{q.cat='common'});},'8세 quiz','영어 8문항'),'퀴즈 분류별 최소 문항');
 ok(hit(s=>{for(const q of s[9].quiz.slice(0,3)){const a=q.choices[q.answer];q.choices=[a].concat(q.choices.filter(c=>c!==a));q.answer=0;}},'a9-quiz-03','연속'),'퀴즈 정답 위치 3연속');
 ok(hit(s=>{for(const q of s[7].quiz){const a=q.choices[q.answer];q.choices=[a].concat(q.choices.filter(c=>c!==a));q.answer=0;}},'7세 quiz','50%'),'퀴즈 정답 위치 쏠림');
 ok(hit(s=>{delete s[10].quiz;},'10세 quiz','묶음 없음'),'퀴즈 묶음 누락');
@@ -321,7 +323,8 @@ ok(Q.checkQuiz(8,Q.quiz(9,0)).length>0&&Q.checkQuiz(9,Q.quiz(8,0)).length>0,'che
 /* 9-1. 퀴즈 내용 검수 회귀 */
 const PIC=/\p{Extended_Pictographic}/u;
 /* 유니코드 9.0(Emoji 3.0) 이하이면서 작게 봐도 뜻이 하나인 그림 문자만. 새 그림은 iOS·Android·Windows에서 확인하고 더한다(생성기 export-v010.cjs SAFE와 같게). 시계(🕐~🕧) 금지 */
-const SAFE_PIC=new Set([...'🌙🌞🌈🍎🎈⛄☔🐶🍓⭐✋🐱🐰🐥🐔🐘🐟🍪🥚🐦🐢🐷👂👃👀🐞🦋🐝🚗🚲🚢🔴🐯'+
+/* 수첩 MVP 영어 이름 문항: 🐺 늑대 · 👑 왕 · 🐗 멧돼지 · 🌿 덤불(모두 유니코드 6.0). 실기기(Android·iOS·Windows) 표시는 사람이 확인 대기 */
+const SAFE_PIC=new Set([...'🐺👑🐗🌿'+'🌙🌞🌈🍎🎈⛄☔🐶🍓⭐✋🐱🐰🐥🐔🐘🐟🍪🥚🐦🐢🐷👂👃👀🐞🦋🐝🚗🚲🚢🔴🐯'+
   '💙💜💛🌸🍉❄🚶🛑🏃🍌🥛🍰🔵⚫🍇🔺⬛'+
   '🐮🐴🐵🐻🦁🦊🦆🍞🥕🥔🍬🍖📕🎒⚽✏🔑☂🚪🛏📱📦✂🥄👟🌳🌧☁⛰🌊🔥👁👄🚂✈👶🏠🚌🍕']);
 const DIGIT='영일이삼사오육칠팔구';
@@ -691,7 +694,8 @@ for(const a of Q.AGES)for(const s of [0,1]){
 {const crypto=require('node:crypto');
  const BANK_PRINT={
   1:{"7":"1cddae1b212cf7d3","8":"bb984b66b6f6440a","9":"c4adfc2173d53aef","10":"c17593284c4b32ca"},
-  2:{"7":"f4ce17ea386ddc1c","8":"94f2fe2fc27d7cd5","9":"052a2183c5b219a8","10":"30c7d21fbf598113"}
+  2:{"7":"f4ce17ea386ddc1c","8":"94f2fe2fc27d7cd5","9":"052a2183c5b219a8","10":"30c7d21fbf598113"},
+  3:{"7":"46858a27fecbc8d7","8":"4f55121708b27c3f","9":"bd6bece8c0a1bdb6","10":"489431f831d1171b"}
  };
  const print=v=>{const o={};for(const a of Q.AGES){const h=crypto.createHash('sha1');for(const s of [0,1,7,42,123456])for(let i=0;i<600;i++){const q=Q.at(a,'story',i,s,v);h.update(q.id+'|'+q.choices.join('/')+'|'+q.answer+'|'+q.lap+'\n')}o[String(a)]=h.digest('hex').slice(0,16)}return o};
  eq(Q.BANK_VERSION,Object.keys(BANK_PRINT).length,'은행 판 수 = 지문 표의 줄 수(문항을 붙였으면 BANK_PRINT에 새 판 줄을 더한다)');

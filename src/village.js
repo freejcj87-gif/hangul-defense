@@ -509,7 +509,7 @@ async function start(){
  const HCAP=MAXH+3,henMesh=instanced(G.hen,HCAP,false),henShade=shadowOnly(solid([['sphere',0,[0,.36,-.03],[.3,.28,.36]],['sphere',0,[0,.68,.16],[.16,.19,.16]]]),HCAP);
  const henSlots=[];for(let i=0;i<MAXH;i++)henSlots.push({i,a:proxy(.9+(i*37%10)*.012),id:null,on:false,h:null,fx:0,fz:0,tx:0,tz:0,born:-9,fxDone:true,phase:i*1.7,face:i*2.1,featherT:0,lastX:0,lastZ:0});
  const peeks=[0,1,2].map(()=>proxy(.76));
- const PLAIN=new THREE.Color(1,1,1),FLASH=new THREE.Color(2.1,1.9,1.5),SHY=new THREE.Color(.72,.78,.9),DEAD=new THREE.Color(.62,.62,.68);
+ const PLAIN=new THREE.Color(1,1,1),SHINY_TINT=new THREE.Color(1.45,1.3,.75),FLASH=new THREE.Color(2.1,1.9,1.5),SHY=new THREE.Color(.72,.78,.9),DEAD=new THREE.Color(.62,.62,.68);
  for(let i=0;i<HCAP;i++)henMesh.setColorAt(i,PLAIN);
 
  /* ----- monsters: one rigged instanced mesh per kind (head, jaw, tail and legs move in the vertex shader) and one shared,
@@ -803,8 +803,8 @@ async function start(){
  // king · fox (0.12) are not in World.KINDS: they live in world.king / world.fox, one seat each, and are drawn through the same herd as pseudo-wolves.
  const KIND_FALLBACK={wolf:{size:1,speed:1},bramble:{size:.85,speed:1.3},boar:{size:1.1,speed:.85},granite:{size:1.25,speed:.6},frost:{size:.95,speed:1.7},ember:{size:1.8,speed:.7,boss:true},
   king:{size:3.6,speed:.7,boss:true},fox:{size:1.15,speed:1.6}};
- const kingV={},foxV={},extraWolves=[];
- const pseudo=(o,src,kind)=>{o.id=src.id;o.kind=kind;o.x=num(src.x);o.z=num(src.z);o.state=src.state==='flee'?'leave':'walk';o.hp=1;o.max=1;o.target=0;o.hen=0;return o};
+ const kingV={},foxV={},guestV={},extraWolves=[];let guestSparkAt=-9;   // 수첩 MVP: the shiny guest (world.guest) is one more pseudo-wolf, with a slow trail of gold sparkles
+ const pseudo=(o,src,kind)=>{o.id=src.id;o.kind=kind;o.x=num(src.x);o.z=num(src.z);o.state=src.state==='flee'||src.state==='leave'?'leave':'walk';o.hp=1;o.max=1;o.target=0;o.hen=0;return o};
  const kindInfo=k=>{const K=W('KINDS');return (K&&K[k])||KIND_FALLBACK[k]||KIND_FALLBACK.wolf};
  const deathEnd=o=>o.K.boss?1.75:1.45;   // seconds of world time the fall + poof + sink takes
  function newWolf(v){
@@ -819,6 +819,7 @@ async function start(){
   extraWolves.length=0;
   if(w.king&&typeof w.king==='object')extraWolves.push(pseudo(kingV,w.king,'king'));
   if(w.fox&&typeof w.fox==='object')extraWolves.push(pseudo(foxV,w.fox,'fox'));
+  if(w.guest&&typeof w.guest==='object'){extraWolves.push(pseudo(guestV,w.guest,RIG[w.guest.kind]?w.guest.kind:'wolf'));if(!less&&time-guestSparkAt>.45){guestSparkAt=time;sparkles(num(w.guest.x),1.1,num(w.guest.z),2,.5,GOLD,0,.5)}}
   const pack=Array.isArray(w.wolves)?w.wolves:[];
   for(const v of extraWolves.length?pack.concat(extraWolves):pack){
    if(!v||typeof v!=='object'||v.state==='gone')continue;
@@ -1156,6 +1157,11 @@ async function start(){
     case 'fox':{const R=Rgoal+num(W('EDGE')),a=spawnAngle(num(e.point)),x=Math.cos(a)*R,z=Math.sin(a)*R;warns.push({x,z,t0:time,color:ORANGE,life:2.4});dustBurst(x,z,6,.7);break}
     case 'foxSaved':{const fx=s.world&&s.world.fox;if(fx){const x=num(fx.x),z=num(fx.z);flashAt(x,.7,z,2.2,GOLD,.1);starBurst(x,.8,z,10,.9,[GOLD,WHITE],.1)}break}
     case 'foxScare':featherBurst(0,.6,0,8,.8);break;
+    // 수첩 MVP cues: the shiny guest bows when the answer arrow reaches it, a friend card and a dropped name note get a small sparkle (no banner, no sound here)
+    case 'shinyMet':{const g=s.world&&s.world.guest;if(g){const x=num(g.x),z=num(g.z);flashAt(x,.9,z,2.2,GOLD,.1);starBurst(x,1,z,12,1,[GOLD,WHITE],.1)}break}
+    case 'guest':{const g=s.world&&s.world.guest;if(g)sparkles(num(g.x),1.2,num(g.z),8,.8,GOLD,0,.6);break}
+    case 'friend':sparkles(0,2.5,0,12,Math.max(2,Rgoal*.4),GOLD,0,.9);break;
+    case 'noteDrop':sparkles(0,2.2,0,6,Math.max(2,Rgoal*.3),WHITE,0,.8);break;
     case 'dash':{let k=0;for(const o of wolfVis.values()){if(o.state==='dead'||o.ghost)continue;knock(o,0,0,0,2.2);if(k<24){dustBurst(o.x,o.z,4,.6,k*.02);k++}}shake(.06);break}
     default:break;   // 'broken', 'carry' and the rest are drawn from the pulled state
    }
@@ -1448,7 +1454,7 @@ async function start(){
    rp.set(o.x+o.kx+Math.sin(o.ry)*fwd*S,P.y*S+o.ky+ay,o.z+o.kz+Math.cos(o.ry)*fwd*S).add(rv2).sub(rv);
    o.mat.compose(rp,rq,rs.set(S*P.sx,S*P.sy,S*P.sz));o.phy=P.hy;o.php=P.hp;o.phr=P.hr;
    const Hd=herd[o.kind],i=Hd.n++;o.mat.toArray(Hd.mesh.instanceMatrix.array,i*16);if(R.tp0){P.tp+=R.tp0;writePose(Hd.pose,i,P,o);P.tp-=R.tp0}else writePose(Hd.pose,i,P,o);
-   Hd.mesh.setColorAt(i,o.hit>0?FLASH:st==='dead'?DEAD:lit&&!less&&Math.sin(time*9)>0?HL:PLAIN);
+   Hd.mesh.setColorAt(i,o.hit>0?FLASH:st==='dead'?DEAD:lit&&!less&&Math.sin(time*9)>0?HL:curS&&curS.world&&curS.world.guest&&o.id===curS.world.guest.id?SHINY_TINT:PLAIN);   // 수첩 MVP: 반짝 손님은 밝은 금빛
    if(!o.ghost)wolfKinds[o.kind]++;
    if(st!=='dead'||o.deadAge<.9){const j=shade.n++,fit=SHADE_FIT[o.kind];if(fit){rm.copy(o.mat).scale(fit);rm.toArray(shade.mesh.instanceMatrix.array,j*16)}else o.mat.toArray(shade.mesh.instanceMatrix.array,j*16);writePose(shade.pose,j,P,o)}
   }
@@ -1686,6 +1692,9 @@ async function start(){
   if(less)for(const b of booms)if(time-b.t0<.6)decal(CELL.ring,b.x,b.z,b.r*2.5,ORANGE,.85,.5,.08);   // reduced motion: a still ring instead of the fireball
   for(const o of wolfVis.values()){
    if(o.state==='dead')continue;const s=o.size;
+   /* 수첩 MVP 반짝 손님: 색은 평소와 같아(인스턴스 색 바꾸기는 카드 그림 작업과 함께) 발밑에 숨 쉬는 금빛 고리와 머리 위 반짝이로 알아보게 한다 */
+   if(curS&&curS.world&&curS.world.guest&&o.id===curS.world.guest.id&&o.state!=='leave'){const p=less?1:.5+.5*Math.sin(time*4);decal(CELL.halo,o.x,o.z,2.4*s*(1+.2*p),GOLD,.9,.6);decal(CELL.glow,o.x,o.z,3*s,GOLD,.45,.8);
+    topOf(o,tv);const b=.6*Math.max(1,fxScale*.85);sprite(CELL.sparkle,tv.x,tv.y+.45+(less?0:.1*Math.sin(time*5)),tv.z,b,b,WHITE,.95,.6,less?0:time*2)}
    const crown=beast[o.kind]&&RIG[o.kind].crown;
    if(o.K.boss&&crown){const p=less?1:.85+.15*Math.sin(time*4);decal(CELL.glow,o.x,o.z,2.7*s*p,GOLD,.42,.7);   // 0.15 GLB wolf king: a golden floor glow and a twinkling crown instead of flames
     for(let i=0;i<crown.length;i++){const [x,y,z]=crown[i],tw=less?.8:Math.max(0,Math.sin(time*4.2+i*1.9));if(tw<.05)continue;tv.set(x,y,z).applyMatrix4(o.mat);

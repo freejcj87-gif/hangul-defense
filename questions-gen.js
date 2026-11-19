@@ -338,7 +338,15 @@ const DATA={
    {"id":"a7-quiz-g117","age":7,"mode":"quiz","cat":"math","prompt":"남은 것은 몇 개일까요?","passage":"🍓🍓🍓🍓\n🍓\n− 🍓🍓","speak":"그림에서 빼고 남은 것은 몇 개일까요?","choices":["4","7","3"],"answer":2,"note":"","level":1},
    {"id":"a7-quiz-g118","age":7,"mode":"quiz","cat":"math","prompt":"남은 것은 몇 개일까요?","passage":"🎈🎈🎈🎈\n− 🎈","speak":"그림에서 빼고 남은 것은 몇 개일까요?","choices":["3","4","5"],"answer":0,"note":"","level":1},
    {"id":"a7-quiz-g119","age":7,"mode":"quiz","cat":"math","prompt":"남은 것은 몇 개일까요?","passage":"🥕🥕🥕🥕\n🥕🥕\n− 🥕🥕🥕🥕","speak":"그림에서 빼고 남은 것은 몇 개일까요?","choices":["3","2","10"],"answer":1,"note":"","level":2},
-   {"id":"a7-quiz-g120","age":7,"mode":"quiz","cat":"math","prompt":"남은 것은 몇 마리일까요?","passage":"🐥🐥🐥🐥\n− 🐥🐥🐥","speak":"그림에서 빼고 남은 것은 몇 마리일까요?","choices":["2","7","1"],"answer":2,"note":"","level":1}
+   {"id":"a7-quiz-g120","age":7,"mode":"quiz","cat":"math","prompt":"남은 것은 몇 마리일까요?","passage":"🐥🐥🐥🐥\n− 🐥🐥🐥","speak":"그림에서 빼고 남은 것은 몇 마리일까요?","choices":["2","7","1"],"answer":2,"note":"","level":1},
+   {"id":"a7-quiz-g121","age":7,"mode":"quiz","cat":"english","prompt":"알맞은 그림은?","passage":"wolf 울프","speak":"영어 울프는 어떤 그림일까요?","choices":["🐺","🐱","🐰"],"answer":0,"note":"","level":1},
+   {"id":"a7-quiz-g122","age":7,"mode":"quiz","cat":"english","prompt":"알맞은 그림은?","passage":"fox 폭스","speak":"영어 폭스는 어떤 그림일까요?","choices":["🐶","🦊","🐷"],"answer":1,"note":"","level":1},
+   {"id":"a7-quiz-g123","age":7,"mode":"quiz","cat":"english","prompt":"알맞은 그림은?","passage":"frost 프로스트","speak":"영어 프로스트는 어떤 그림일까요?","choices":["🔥","🌙","❄️"],"answer":2,"note":"","level":1},
+   {"id":"a7-quiz-g124","age":7,"mode":"quiz","cat":"english","prompt":"알맞은 그림은?","passage":"fire 파이어","speak":"영어 파이어는 어떤 그림일까요?","choices":["🔥","🌊","⭐"],"answer":0,"note":"","level":1},
+   {"id":"a7-quiz-g125","age":7,"mode":"quiz","cat":"english","prompt":"알맞은 그림은?","passage":"king 킹","speak":"영어 킹은 어떤 그림일까요?","choices":["🎈","👑","🚗"],"answer":1,"note":"","level":1},
+   {"id":"a7-quiz-g126","age":7,"mode":"quiz","cat":"english","prompt":"알맞은 그림은?","passage":"boar 보어","speak":"영어 보어는 어떤 그림일까요?","choices":["🐟","🐦","🐗"],"answer":2,"note":"","level":1},
+   {"id":"a7-quiz-g127","age":7,"mode":"quiz","cat":"english","prompt":"알맞은 그림은?","passage":"bush 부시","speak":"영어 부시는 어떤 그림일까요?","choices":["🌿","🌊","🔥"],"answer":0,"note":"","level":1},
+   {"id":"a7-quiz-g128","age":7,"mode":"quiz","cat":"english","prompt":"무슨 뜻일까요?","passage":"rock 록","speak":"영어 록은 무슨 뜻일까요?","choices":["나무","바위","바다"],"answer":1,"note":"","level":1}
   ]
  },
  8:{
@@ -797,7 +805,15 @@ const DATA={
    {"id":"a8-quiz-g087","age":8,"mode":"quiz","cat":"common","prompt":"추석은 어느 계절일까요?","passage":"","speak":"추석은 어느 계절일까요?","choices":["봄","여름","가을"],"answer":2,"note":"","level":1},
    {"id":"a8-quiz-g088","age":8,"mode":"quiz","cat":"common","prompt":"십이월 다음 달은 몇 월일까요?","passage":"","speak":"십이월 다음 달은 몇 월일까요?","choices":["일월","이월","십일월"],"answer":0,"note":"","level":2},
    {"id":"a8-quiz-g089","age":8,"mode":"quiz","cat":"common","prompt":"일요일 다음 날은 무슨 요일일까요?","passage":"","speak":"일요일 다음 날은 무슨 요일일까요?","choices":["토요일","월요일","화요일"],"answer":1,"note":"","level":3},
-   {"id":"a8-quiz-g090","age":8,"mode":"quiz","cat":"common","prompt":"밥을 다 먹고 하는 인사는 무엇일까요?","passage":"","speak":"밥을 다 먹고 하는 인사는 무엇일까요?","choices":["안녕히 주무세요","다녀왔습니다","잘 먹었습니다"],"answer":2,"note":"","level":1}
+   {"id":"a8-quiz-g090","age":8,"mode":"quiz","cat":"common","prompt":"밥을 다 먹고 하는 인사는 무엇일까요?","passage":"","speak":"밥을 다 먹고 하는 인사는 무엇일까요?","choices":["안녕히 주무세요","다녀왔습니다","잘 먹었습니다"],"answer":2,"note":"","level":1},
+   {"id":"a8-quiz-g091","age":8,"mode":"quiz","cat":"english","prompt":"무슨 뜻일까요?","passage":"wolf","speak":"영어 울프는 무슨 뜻일까요?","choices":["늑대","여우","토끼"],"answer":0,"note":"","level":1},
+   {"id":"a8-quiz-g092","age":8,"mode":"quiz","cat":"english","prompt":"무슨 뜻일까요?","passage":"fox","speak":"영어 폭스는 무슨 뜻일까요?","choices":["오리","여우","늑대"],"answer":1,"note":"","level":1},
+   {"id":"a8-quiz-g093","age":8,"mode":"quiz","cat":"english","prompt":"무슨 뜻일까요?","passage":"frost","speak":"영어 프로스트는 무슨 뜻일까요?","choices":["비","불","서리"],"answer":2,"note":"","level":1},
+   {"id":"a8-quiz-g094","age":8,"mode":"quiz","cat":"english","prompt":"무슨 뜻일까요?","passage":"fire","speak":"영어 파이어는 무슨 뜻일까요?","choices":["불","물","눈"],"answer":0,"note":"","level":1},
+   {"id":"a8-quiz-g095","age":8,"mode":"quiz","cat":"english","prompt":"무슨 뜻일까요?","passage":"king","speak":"영어 킹은 무슨 뜻일까요?","choices":["농부","왕","아기"],"answer":1,"note":"","level":1},
+   {"id":"a8-quiz-g096","age":8,"mode":"quiz","cat":"english","prompt":"무슨 뜻일까요?","passage":"boar","speak":"영어 보어는 무슨 뜻일까요?","choices":["강아지","고양이","멧돼지"],"answer":2,"note":"","level":1},
+   {"id":"a8-quiz-g097","age":8,"mode":"quiz","cat":"english","prompt":"무슨 뜻일까요?","passage":"bush","speak":"영어 부시는 무슨 뜻일까요?","choices":["덤불","바위","모래"],"answer":0,"note":"","level":1},
+   {"id":"a8-quiz-g098","age":8,"mode":"quiz","cat":"english","prompt":"무슨 뜻일까요?","passage":"rock","speak":"영어 록은 무슨 뜻일까요?","choices":["구름","바위","나무"],"answer":1,"note":"","level":1}
   ]
  },
  9:{
@@ -1257,7 +1273,23 @@ const DATA={
    {"id":"a9-quiz-g164","age":9,"mode":"quiz","cat":"english","prompt":"무슨 뜻일까요?","passage":"happy","speak":"영어 해피는 무슨 뜻일까요?","choices":["작은","행복한","차가운","예쁜"],"answer":1,"note":"","level":1},
    {"id":"a9-quiz-g165","age":9,"mode":"quiz","cat":"english","prompt":"알맞은 영어 낱말은 무엇일까요?","passage":"20","speak":"스물을 영어로 하면 무엇일까요?","choices":["nine","eight","twenty","seven"],"answer":2,"note":"","level":2},
    {"id":"a9-quiz-g166","age":9,"mode":"quiz","cat":"english","prompt":"무슨 뜻일까요?","passage":"chair","speak":"영어 체어는 무슨 뜻일까요?","choices":["장난감","책","상자","의자"],"answer":3,"note":"","level":1},
-   {"id":"a9-quiz-g167","age":9,"mode":"quiz","cat":"english","prompt":"알맞은 영어 낱말은 무엇일까요?","passage":"🌞","speak":"해를 영어로 하면 무엇일까요?","choices":["sun","moon","rain","lake"],"answer":0,"note":"","level":2}
+   {"id":"a9-quiz-g167","age":9,"mode":"quiz","cat":"english","prompt":"알맞은 영어 낱말은 무엇일까요?","passage":"🌞","speak":"해를 영어로 하면 무엇일까요?","choices":["sun","moon","rain","lake"],"answer":0,"note":"","level":2},
+   {"id":"a9-quiz-g168","age":9,"mode":"quiz","cat":"english","prompt":"무슨 뜻일까요?","passage":"wolf","speak":"영어 울프는 무슨 뜻일까요?","choices":["늑대","여우","토끼","곰"],"answer":0,"note":"","level":1},
+   {"id":"a9-quiz-g169","age":9,"mode":"quiz","cat":"english","prompt":"무슨 뜻일까요?","passage":"fox","speak":"영어 폭스는 무슨 뜻일까요?","choices":["늑대","고양이","여우","사슴"],"answer":2,"note":"","level":1},
+   {"id":"a9-quiz-g170","age":9,"mode":"quiz","cat":"english","prompt":"무슨 뜻일까요?","passage":"frost","speak":"영어 프로스트는 무슨 뜻일까요?","choices":["비","서리","바람","구름"],"answer":1,"note":"","level":1},
+   {"id":"a9-quiz-g171","age":9,"mode":"quiz","cat":"english","prompt":"무슨 뜻일까요?","passage":"fire","speak":"영어 파이어는 무슨 뜻일까요?","choices":["물","돌","흙","불"],"answer":3,"note":"","level":1},
+   {"id":"a9-quiz-g172","age":9,"mode":"quiz","cat":"english","prompt":"무슨 뜻일까요?","passage":"king","speak":"영어 킹은 무슨 뜻일까요?","choices":["농부","왕","아기","의사"],"answer":1,"note":"","level":1},
+   {"id":"a9-quiz-g173","age":9,"mode":"quiz","cat":"english","prompt":"무슨 뜻일까요?","passage":"boar","speak":"영어 보어는 무슨 뜻일까요?","choices":["강아지","염소","오리","멧돼지"],"answer":3,"note":"","level":1},
+   {"id":"a9-quiz-g174","age":9,"mode":"quiz","cat":"english","prompt":"무슨 뜻일까요?","passage":"bush","speak":"영어 부시는 무슨 뜻일까요?","choices":["덤불","바위","강","언덕"],"answer":0,"note":"","level":1},
+   {"id":"a9-quiz-g175","age":9,"mode":"quiz","cat":"english","prompt":"무슨 뜻일까요?","passage":"rock","speak":"영어 록은 무슨 뜻일까요?","choices":["나무","모래","바위","구름"],"answer":2,"note":"","level":1},
+   {"id":"a9-quiz-g176","age":9,"mode":"quiz","cat":"english","prompt":"알맞은 영어 낱말은 무엇일까요?","passage":"🦊","speak":"여우를 영어로 하면 무엇일까요?","choices":["dog","cat","fox","wolf"],"answer":2,"note":"","level":2},
+   {"id":"a9-quiz-g177","age":9,"mode":"quiz","cat":"english","prompt":"알맞은 영어 낱말은 무엇일까요?","passage":"🔥","speak":"불을 영어로 하면 무엇일까요?","choices":["fire","water","wind","star"],"answer":0,"note":"","level":2},
+   {"id":"a9-quiz-g178","age":9,"mode":"quiz","cat":"english","prompt":"알맞은 영어 낱말은 무엇일까요?","passage":"서리","speak":"서리를 영어로 하면 무엇일까요?","choices":["rain","sun","moon","frost"],"answer":3,"note":"","level":2},
+   {"id":"a9-quiz-g179","age":9,"mode":"quiz","cat":"english","prompt":"알맞은 영어 낱말은 무엇일까요?","passage":"늑대","speak":"늑대를 영어로 하면 무엇일까요?","choices":["fox","wolf","bear","lion"],"answer":1,"note":"","level":2},
+   {"id":"a9-quiz-g180","age":9,"mode":"quiz","cat":"english","prompt":"알맞은 영어 낱말은 무엇일까요?","passage":"왕","speak":"왕을 영어로 하면 무엇일까요?","choices":["queen","baby","friend","king"],"answer":3,"note":"","level":2},
+   {"id":"a9-quiz-g181","age":9,"mode":"quiz","cat":"english","prompt":"알맞은 영어 낱말은 무엇일까요?","passage":"멧돼지","speak":"멧돼지를 영어로 하면 무엇일까요?","choices":["bear","boar","bee","bird"],"answer":1,"note":"","level":2},
+   {"id":"a9-quiz-g182","age":9,"mode":"quiz","cat":"english","prompt":"알맞은 영어 낱말은 무엇일까요?","passage":"덤불","speak":"덤불을 영어로 하면 무엇일까요?","choices":["bus","book","bush","ball"],"answer":2,"note":"","level":2},
+   {"id":"a9-quiz-g183","age":9,"mode":"quiz","cat":"english","prompt":"알맞은 영어 낱말은 무엇일까요?","passage":"바위","speak":"바위를 영어로 하면 무엇일까요?","choices":["rock","rain","road","river"],"answer":0,"note":"","level":2}
   ]
  },
  10:{
@@ -1730,13 +1762,30 @@ const DATA={
    {"id":"a10-quiz-g187","age":10,"mode":"quiz","cat":"english","prompt":"무슨 뜻일까요?","passage":"bed","speak":"이 영어 낱말은 무슨 뜻일까요?","choices":["신발","침대","열쇠","가위"],"answer":1,"note":"","level":1},
    {"id":"a10-quiz-g188","age":10,"mode":"quiz","cat":"english","prompt":"무슨 뜻일까요?","passage":"I can cook.","speak":"이 영어 문장은 무슨 뜻일까요?","choices":["나는 날 수 있어요.","너는 요리할 수 있어요.","나는 요리할 수 있어요.","나는 요리할 수 없어요."],"answer":2,"note":"","level":2},
    {"id":"a10-quiz-g189","age":10,"mode":"quiz","cat":"english","prompt":"무슨 뜻일까요?","passage":"boy","speak":"이 영어 낱말은 무슨 뜻일까요?","choices":["왕","아기","소년","경찰"],"answer":2,"note":"","level":1},
-   {"id":"a10-quiz-g190","age":10,"mode":"quiz","cat":"english","prompt":"무슨 뜻일까요?","passage":"I like grapes.","speak":"이 영어 문장은 무슨 뜻일까요?","choices":["나는 포도를 좋아해요.","너는 포도를 좋아해요.","나는 포도를 싫어해요.","나는 책을 좋아해요."],"answer":0,"note":"","level":2}
+   {"id":"a10-quiz-g190","age":10,"mode":"quiz","cat":"english","prompt":"무슨 뜻일까요?","passage":"I like grapes.","speak":"이 영어 문장은 무슨 뜻일까요?","choices":["나는 포도를 좋아해요.","너는 포도를 좋아해요.","나는 포도를 싫어해요.","나는 책을 좋아해요."],"answer":0,"note":"","level":2},
+   {"id":"a10-quiz-g191","age":10,"mode":"quiz","cat":"english","prompt":"무슨 뜻일까요?","passage":"Bush Wolf","speak":"이 영어 이름은 무슨 뜻일까요?","choices":["덤불 늑대","바위 늑대","서리 늑대","불 늑대"],"answer":0,"note":"","level":1},
+   {"id":"a10-quiz-g192","age":10,"mode":"quiz","cat":"english","prompt":"무슨 뜻일까요?","passage":"Rock Wolf","speak":"이 영어 이름은 무슨 뜻일까요?","choices":["덤불 늑대","서리 늑대","바위 늑대","늑대 왕"],"answer":2,"note":"","level":1},
+   {"id":"a10-quiz-g193","age":10,"mode":"quiz","cat":"english","prompt":"무슨 뜻일까요?","passage":"Frost Wolf","speak":"이 영어 이름은 무슨 뜻일까요?","choices":["불 늑대","서리 늑대","바위 늑대","서리 여우"],"answer":1,"note":"","level":1},
+   {"id":"a10-quiz-g194","age":10,"mode":"quiz","cat":"english","prompt":"무슨 뜻일까요?","passage":"Fire King","speak":"이 영어 이름은 무슨 뜻일까요?","choices":["서리의 왕","불 늑대","늑대의 왕","불의 왕"],"answer":3,"note":"","level":1},
+   {"id":"a10-quiz-g195","age":10,"mode":"quiz","cat":"english","prompt":"무슨 뜻일까요?","passage":"Wolf King","speak":"이 영어 이름은 무슨 뜻일까요?","choices":["여우 왕","늑대 왕","멧돼지 왕","서리 왕"],"answer":1,"note":"","level":1},
+   {"id":"a10-quiz-g196","age":10,"mode":"quiz","cat":"english","prompt":"무슨 뜻일까요?","passage":"Wild Boar","speak":"이 영어 이름은 무슨 뜻일까요?","choices":["늑대","여우","곰","멧돼지"],"answer":3,"note":"","level":1},
+   {"id":"a10-quiz-g197","age":10,"mode":"quiz","cat":"english","prompt":"무슨 뜻일까요?","passage":"wolf","speak":"이 영어 낱말은 무슨 뜻일까요?","choices":["늑대","여우","곰","호랑이"],"answer":0,"note":"","level":1},
+   {"id":"a10-quiz-g198","age":10,"mode":"quiz","cat":"english","prompt":"무슨 뜻일까요?","passage":"fox","speak":"이 영어 낱말은 무슨 뜻일까요?","choices":["늑대","고양이","여우","토끼"],"answer":2,"note":"","level":1},
+   {"id":"a10-quiz-g199","age":10,"mode":"quiz","cat":"english","prompt":"알맞은 영어 이름은 무엇일까요?","passage":"덤불 늑대","speak":"덤불 늑대를 영어로 하면 무엇일까요?","choices":["Rock Wolf","Frost Wolf","Bush Wolf","Bush King"],"answer":2,"note":"","level":2},
+   {"id":"a10-quiz-g200","age":10,"mode":"quiz","cat":"english","prompt":"알맞은 영어 이름은 무엇일까요?","passage":"바위 늑대","speak":"바위 늑대를 영어로 하면 무엇일까요?","choices":["Rock Wolf","Rock King","Bush Wolf","Fire Wolf"],"answer":0,"note":"","level":2},
+   {"id":"a10-quiz-g201","age":10,"mode":"quiz","cat":"english","prompt":"알맞은 영어 이름은 무엇일까요?","passage":"서리 늑대","speak":"서리 늑대를 영어로 하면 무엇일까요?","choices":["Frost Fox","Fire Wolf","Rock Wolf","Frost Wolf"],"answer":3,"note":"","level":2},
+   {"id":"a10-quiz-g202","age":10,"mode":"quiz","cat":"english","prompt":"알맞은 영어 이름은 무엇일까요?","passage":"불의 왕","speak":"불의 왕을 영어로 하면 무엇일까요?","choices":["Fire Wolf","Fire King","Frost King","Wolf King"],"answer":1,"note":"","level":2},
+   {"id":"a10-quiz-g203","age":10,"mode":"quiz","cat":"english","prompt":"알맞은 영어 이름은 무엇일까요?","passage":"늑대 왕","speak":"늑대 왕을 영어로 하면 무엇일까요?","choices":["Fox King","Fire King","Frost King","Wolf King"],"answer":3,"note":"","level":2},
+   {"id":"a10-quiz-g204","age":10,"mode":"quiz","cat":"english","prompt":"알맞은 영어 이름은 무엇일까요?","passage":"멧돼지","speak":"멧돼지를 영어로 하면 무엇일까요?","choices":["Wild Wolf","Wild Boar","Rock Boar","Frost Fox"],"answer":1,"note":"","level":2},
+   {"id":"a10-quiz-g205","age":10,"mode":"quiz","cat":"english","prompt":"알맞은 영어 이름은 무엇일까요?","passage":"늑대","speak":"늑대를 영어로 하면 무엇일까요?","choices":["fox","bear","wolf","lion"],"answer":2,"note":"","level":2},
+   {"id":"a10-quiz-g206","age":10,"mode":"quiz","cat":"english","prompt":"알맞은 영어 이름은 무엇일까요?","passage":"여우","speak":"여우를 영어로 하면 무엇일까요?","choices":["fox","wolf","dog","cat"],"answer":0,"note":"","level":2}
   ]
  }
 };
 /* 은행 판: editions[k] = 판 k+1의 생성 문항 수(scripts/bank-add.cjs가 붙일 때마다 한 줄 더함. 손으로 고치지 않는다) */
 DATA.editions=[
- {"7":{"story":197,"quiz":51},"8":{"story":185,"quiz":50},"9":{"story":95,"quiz":100},"10":{"story":73,"quiz":100}}
+ {"7":{"story":197,"quiz":51},"8":{"story":185,"quiz":50},"9":{"story":95,"quiz":100},"10":{"story":73,"quiz":100}},
+ {"7":{"story":209,"quiz":120},"8":{"story":363,"quiz":90},"9":{"story":287,"quiz":167},"10":{"story":277,"quiz":190}}
 ];
 if(typeof module!=='undefined'&&module.exports)module.exports=DATA;else root.QUESTIONS_GEN=DATA;
 })(typeof window!=='undefined'?window:globalThis);
