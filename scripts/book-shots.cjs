@@ -46,8 +46,9 @@ const TYPES={'.js':'text/javascript; charset=utf-8','.html':'text/html; charset=
     /* 4 반짝 손님: 마을 둘레를 걷는 손님, 인사 뒤 띠 */
     {const b=rich();b.shiny.guest='bramble';b.shiny.run=1;const {ctx,page}=await open(w,h,b,run({}));await page.locator('#go').click();await page.waitForFunction(()=>window.__game().phase==='ask');
      await page.evaluate(()=>window.__tick(160));await page.waitForTimeout(900);await shot(page,'10-shiny-guest',w,h);/* 정답 화살이 손님에게 닿으면(shinyMet) 띠가 뜬다. 정답 연출 중에 닿으면 바로, 읽는 중에 닿으면 다음 정답 때. 2틱씩 돌리며 띠가 보이는 순간을 찍는다 */
-     /* 띠는 CSS 애니메이션(실제 시간 3.2초)으로 나타났다 사라지므로, 보이는(불투명) 순간 바로 찍는다 */
-     const seen=()=>page.evaluate(()=>[...document.querySelectorAll('#effects .banner')].some(e=>/반짝 손님/.test(e.textContent)&&!e.classList.contains('later')&&parseFloat(getComputedStyle(e).opacity)>.6));
+     /* 띠의 CSS 애니메이션(실제 시간 3.2초, 나타났다 사라짐)은 느린 러너에서 찍는 때를 맞출 수 없어, 이 장면만 애니메이션을 끄고 띠가 떠 있는(DOM, later 아님) 순간 바로 찍는다(배치 확인용) */
+     await page.addStyleTag({content:'#effects .banner{animation:none!important;opacity:1!important}'});
+     const seen=()=>page.evaluate(()=>[...document.querySelectorAll('#effects .banner')].some(e=>/반짝 손님/.test(e.textContent)&&!e.classList.contains('later')));
      let got=false;for(let round=0;round<3&&!got;round++){await page.waitForFunction(()=>window.__game().phase==='ask');await answer(page);for(let k=0;k<40&&!(got=await seen());k++)await page.evaluate(()=>window.__tick(2))}
      if(got)await shot(page,'11-shiny-met',w,h);
      console.log('  반짝 손님: 띠 '+(got?'보임':'안 보임')+' · '+JSON.stringify(await page.evaluate(()=>{const b=window.__game().book;return {guest:b.guest&&b.guest.state,shiny:Object.keys(b.data.mon).filter(k=>b.data.mon[k].shiny>0),miss:b.data.shiny.miss}})));
