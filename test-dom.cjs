@@ -1794,7 +1794,7 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
  {const pb=u.bar.children.find(e=>e.attrs.id==='tmPerfBtn'),pe=a.document.body.children.find(e=>e.attrs&&e.attrs.id==='tmPerf'),w0=a.api.world.t,r0=a.api.round.t;
   eq([T.perf,!!pe,pe&&pe.hidden,pb.getAttribute('aria-pressed'),a.intervals.length],[true,true,false,'true',2],'성능 표시: 있음, 기본 켬, 게임 시계와 다른 타이머');
   for(let i=0;i<5;i++)a.intervals[1]();eq([a.api.world.t,a.api.round.t],[w0,r0],'성능 타이머는 세계·풀이 시계를 움직이지 않음');
-  a.n.scene.dataset.renderer='fallback';ok(/^🎞 .+fps · 그림 화면 · 🏡 농가$/.test(T.perfNow())&&pe.textContent===T.perfNow(),'그림 화면이면 "그림 화면"과 단계: '+pe.textContent);
+  a.n.scene.dataset.renderer='fallback';a.intervals[1]();ok(/^🎞 .+fps · 그림 화면 · 🏡 농가$/.test(T.perfNow())&&/^🎞 .+fps · 그림 화면 · 🏡 농가$/.test(pe.textContent),'그림 화면이면 "그림 화면"과 단계: '+pe.textContent);
   a.n.scene.dataset.renderer='three';a.window.VillageView={inspect:()=>({ready:true,frames:120,drawCalls:34,triangles:285000})};
   ok(/^🎞 .+fps\(최대 30\) · 그리기 34 · 삼각형 28\.5만 · 🏡 농가$/.test(T.perfNow()),'3D: FPS · 그리기 호출 · 삼각형(renderer.info) · 단계: '+pe.textContent);
   pb.click();eq([T.perf,pe.hidden,pb.getAttribute('aria-pressed'),JSON.parse(saved[TKEY+'-opts']).perf],[false,true,'false',false],'📊 누르면 숨김(테스트 설정 저장)');
