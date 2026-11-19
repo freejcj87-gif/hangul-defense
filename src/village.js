@@ -1208,6 +1208,7 @@ async function start(){
     wolvesVisible:shownW,wolvesOnScreen:onScreenW,wolfStates:states,wolfKinds:kinds,wolfGhosts:ghosts,maxWolvesDrawn,wolfCap:WCAP,highlighted:[...hl.values()].filter(t=>t>time).length,
     power:powerShown,stunnedTowers:stunned,splashFx:{active:booms.filter(b=>time-b.t0<.8).length,total:boomTotal,scorches:scorches.length},
     arrowsVisible:arrowsDrawn,fireArrows:fireDrawn,wolfPos:[...wolfVis.values()].filter(o=>!o.ghost).slice(0,8).map(o=>[Math.round(o.x*100)/100,Math.round(o.z*100)/100]),
+    wolfFace:[...wolfVis.values()].filter(o=>!o.ghost).map(o=>[o.id,+o.ry.toFixed(4),o.state]),   // 0.15.2: every drawn monster's heading (ry) and state, to add up how much a formation turns
     chickens:(()=>{const st=read();return st.world&&Array.isArray(st.world.hens)?st.world.hens.length:st.chickens|0})(),
     hensVisible:hensDrawn,hensHidden,hensPeeking:peeking,hensCarried:carriedDrawn,
     buildingsBroken:[...BUILDINGS,...sides].filter(sl=>sl.on&&sl.b&&sl.b.broken).length,

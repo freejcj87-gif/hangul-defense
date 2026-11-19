@@ -1,5 +1,7 @@
 # Claude Code 작업 인계
 
+0.15.2(2026-11-19, 브랜치 `claude/wolf-forms`): 늑대 무리 대형(곧장 · 휘어 오기 · 갈라지기 · 따라 돌기, 따라 돌기는 성곽 · 성에서 옆 길 면까지, `?forms=0`이면 0.15.1과 같음), 테스트 모드 🐺 무리 부르기 · 대형 켬/끔, 0.15 다리 검사 간헐 실패 수정. 정본 기획서 §17, 시뮬 원자료 `work\verification-20261113\wolf-forms-sim\`.
+
 기준일: 2026-11-19. 최신은 0.15.1 문제은행 확장(브랜치 `claude/bank-expand`, 0.15 위에 새 문항 852개, 문제은행 판 `state.bank`, 앱 이름 "꼬꼬마을: 한글 읽기로 마을 지키기", 정본 기획서 §16, 이 문서 맨 끝 절)입니다. 그 앞 기록: 지금 작업은 0.14(보이는 단계 6개 · 넓어지는 영역 · 길, 브랜치 `claude/v014-stages`, worktree `work\claude-v013`)이고 아래 "실제 규칙과 한계 → 0.14"와 "확인된 검증과 배포 → 0.14"가 최신입니다. 그 뒤 문장은 2026-11-13 기준입니다. 0.12(엔딩·경제 개편, 브랜치 `claude/ending-economy`, worktree `work\claude-v012-ending`) 기준으로 갱신했습니다. 0.11은 듣고 고르기 폐쇄·읽어 주기 삭제(브랜치 `claude/no-sound`)입니다. 0.9는 상점·알 경제(브랜치 `claude/shop-economy`)입니다. 0.8은 PR #9(main `4700136`), 0.7은 PR #7(main `08e8ec7`)입니다. 0.6은 PR #5(main `d8d95f5`), 0.5는 [PR #3](https://github.com/freejcj87-gif/hangul-defense/pull/3)(main `965ad4e`)입니다. 0.4 인계 시점의 기록은 main `800f3f9` 기준이며 아래 “확인된 검증과 배포”에 그대로 남겼습니다. 문서 커밋 자체는 이후 이력에서 확인하세요.
 
 ## 먼저 알아야 할 것
@@ -55,17 +57,18 @@
 
 ## 실제 규칙과 한계
 
-### 수첩 MVP (브랜치 `claude/book-mvp`, worktree `work\claude-book`, 0.15.1 위. 버전 번호는 리드가 정함)
+### 0.16 수첩 · 훈장 · 보호자 화면 (브랜치 `claude/book-mvp`, worktree `work\claude-book`, 0.15.2 위. PR #28 초안)
 
-발자국 수첩 · 지킴이 훈장 · 기억 늑대 · 반짝 손님 · 보호자 화면 · 진행 파일입니다. 정본은 [docs/game-plan.md](docs/game-plan.md) §17, 연결 지점·시뮬·남은 일은 [docs/book-mvp-progress.md](docs/book-mvp-progress.md)(§9가 최신).
+발자국 수첩 · 지킴이 훈장 · 기억 늑대 · 반짝 손님 · 보호자 화면 · 진행 파일입니다. 정본은 [docs/game-plan.md](docs/game-plan.md) §18, 연결 지점·시뮬·남은 일은 [docs/book-mvp-progress.md](docs/book-mvp-progress.md)(§9가 최신).
 
 - 파일: `book.js`(기록 v1과 규칙, 순수 함수) · `notes.js`(몬스터 카드 8종, 쪽지 64문항, 영어 이름 48문항 원본, 개인정보처리방침 본문) · `bookui.js`(수첩·보호자·쉬기 화면). `index.html`은 `notes.js`·`book.js`를 인라인 스크립트 앞에, `bookui.js`를 뒤에 불러온다.
 - 저장: 판 저장(`hangul-defense-v1`)은 그대로, 기록은 `hangul-defense-book`. 판 저장 → 기록 순서로 쓰고, 기록은 문제 사이·30초·강제(쉬기·탭 숨김·창 닫기)에만 쓴다. 앱보다 새 버전의 기록은 덮어쓰지 않는다.
 - 규칙 연결: `makeRound`의 `Book.nextSpecial`(특별 문제는 문제 번호를 넘기지 않음, 표 `X<id>`), `bookFirst`·`bookOther`, 세계 사건 `by:'volley'`·`shinyMet`, `nextQuestion()`(하루 시간), `ordOff()`·`ordDone()`(이어 순서), `applyMix()`(영어 비중).
 - 다른 파일: `world.js`(화살 `v`, 늑대 `vh`, 반짝 손님 `w.guest`), `combat.js`(`track`의 `extra`, `settle`의 `keepStreak`, `API` 5), `questions.js`(`at(…, bank, off)`·`used`·`byId`·`setMix`), `questions-gen.js`(은행 판 3 = 영어 이름 48문항).
-- 끄기: `?book=0`이면 0.15.1과 같다. `test-dom.cjs`의 기존 절과 `test.cjs`의 기존 구간은 수첩 없이 돈다(회귀).
-- 검사: `node test-book.cjs`(3,178건), `test-dom.cjs`의 "MVP 수첩" 절, `test.cjs`의 `book` 구간(아직 한 번도 실행 못 함), 시뮬 `node scripts/sim-flow.cjs book`. 테스트 모드(`?test=1`)의 📒 단추로 쪽지 자격·반짝 기회·놀이 +1·기록 비우기.
-- 한계: 브라우저·실기기 미확인, 카드 그림 없음(그림 문자), 이어 순서로 7세 한 판이 12 → 14.8분(§17 시뮬).
+- 끄기: `?book=0`이면 0.15.2와 같다. `test-dom.cjs`의 기존 절과 `test.cjs`의 기존 구간은 수첩 없이 돈다(회귀). 대형 끔 세계 지문 검사는 수첩 기록 칸(`v`·`vh`·`by`·`volleyKills`)을 빼고 잰다.
+- 검사: `node test-book.cjs`(3,178건), `test-dom.cjs`의 "MVP 수첩" 절, `test.cjs`의 `book` 구간(CI 통과), 캡처 `scripts/book-shots.cjs`(CI 아티팩트 `book-shots`), 시뮬 `node scripts/sim-flow.cjs book`. 테스트 모드(`?test=1`) 🗺️ 칸 끝의 📜·✨·🗓️·🧹 항목으로 쪽지 자격·반짝 기회·놀이 +1·수첩 기록 비우기(막대 폭 때문에 단추를 따로 두지 않음).
+- 반짝 손님은 0.15.2 따라 돌기 늑대 띠(반지름 + 2)보다 바깥(반지름 + 4.5)을 돌고, 금빛 몸 색·발밑 고리로 구별한다.
+- 한계: 실기기 미확인, 카드 그림 없음(그림 문자), 이어 순서로 7세 한 판이 길어짐(§18 시뮬).
 
 ### 0.15 (현재)
 

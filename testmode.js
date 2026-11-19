@@ -9,6 +9,10 @@
    - 자동 넘기기: 빨리 감기 없이, 읽는 시간이 실제 시계로 지난 순간 저절로 정답(정답 배우기도 초록 답이 열리면 저절로).
    - 🗺️ 단계로: 농가 · 마을 · 장터 마을 · 물레방아 마을 · 성곽 마을 · 성 · 결전 직전(종 열림) 가운데 고르면, 지금 나이로 그 단계에 막 들어선 마을에서 새로 시작(확인 한 번).
    - 📊 성능 표시(기본 켬): 막대 위 작은 글에 FPS · 3D 그리기 호출 · 삼각형 · 지금 단계. 그림 화면이면 '그림 화면'. 0.5초에 한 번 화면 쪽 숫자만 읽는다.
+     0.15.2: 마을(단계 1)부터는 끝에 지금 무리의 대형(🐺 곧장 · 휘어 오기 · 갈라지기 · 따라 돌기, 대형을 끄면 '대형 끔')을 붙인다.
+   - 🐺 무리 부르기(0.15.2): 다음 무리를 지금 숲에 내보낸다(World.callPack, 다음 틱에 나온다). 대형 차례는 무리 번호를 따르므로 4~7번 부르면 넷이 다 나온다.
+   - 🗺️ 칸 맨 끝 "🐺 대형 끄기/켜기"(0.15.2): Combat.FLAGS.FORMS를 같은 탭에서 바로 바꾼다(새로고침 없음). 끄면 걷던 대형 늑대도 곧게 걷고, 켜면 다음 무리부터.
+     막대 자리가 모자라(패드 세로 820에서 남는 폭 약 70px) 버튼은 🐺 하나만 두고 켬/끔은 메뉴에 넣었다. 저장하지 않는다(새로고침하면 주소 ?forms=0 또는 기본 켬).
    게임은 이 답을 그 시간에 푼 답으로 센다: 빨리 감기는 게임의 tick()(검사 훅 window.__tick과 같은 길)을 돌려 round.t가 실제 틱으로 흐르고,
    누르는 것은 화면의 보기 버튼이라 찍기 막기(Combat.guard)·읽기 속도(trackPace)·번개(isFast) 판정이 아이가 그 시간에 누른 것과 같다.
    규칙·세계 숫자는 건드리지 않는다. 가게는 사람이 직접 산다(자동 구매 없음). 저장은 index.html이 '-test' 열쇠로 따로 한다.
@@ -25,7 +29,7 @@
  try{const o=JSON.parse(localStorage.getItem(OPT_KEY));if(o&&typeof o==='object'){if(SPEED[o.speed])opt.speed=o.speed;opt.auto=!!o.auto;if('perf' in o)opt.perf=!!o.perf}}catch{}
  const saveOpt=()=>{try{localStorage.setItem(OPT_KEY,JSON.stringify(opt))}catch{}};
  /* job: 진행 중인 빨리 감기 · last: 마지막으로 누른 답(게임이 매긴 값) · done: 마지막 빨리 감기(틱·프레임 수) */
- const T={job:null,last:null,done:null,note:'',tok:null,wrongAt:null,nudged:false};
+ const T={job:null,last:null,done:null,note:'',tok:null,wrongAt:null,nudged:false,form:null,packs:0};/* form: 마지막으로 나온 무리의 대형(0~3, 대형 없이 나왔으면 null) · packs: 나온 무리 수 */
  const sec=t=>(Math.max(0,t|0)/10).toFixed(1);
  const set=(e,v)=>{if(e.textContent!==v)e.textContent=v};
  const el=(tag,attrs,text)=>{const e=document.createElement(tag);for(const k in attrs||{}){if(k==='class')e.className=attrs[k];else e.setAttribute(k,attrs[k])}if(text!==undefined)e.textContent=text;return e};
@@ -162,11 +166,23 @@
   for(let i=0;i<s.index;i++)(i%7===3?R.miss:R.ok).push(i);R.ok=R.ok.slice(-Combat.CAPS.ok);R.miss=R.miss.slice(-Combat.CAPS.miss);
   return s;
  }
+ /* ---------- 0.15.2 무리 대형: 🐺 무리 부르기 · 대형 켬/끔 · 지금 무리 대형 ---------- */
+ const FORM_OPT='forms';/* 🗺️ 칸 메뉴 끝 항목의 값 */
+ function callPack(){
+  if(T.job)return false;
+  if(phase==='start'||phase==='ending'){T.note='시작한 뒤에 부를 수 있어요';show();return false}
+  const n=World.callPack(world),f=World.formsOn(world);
+  T.note='🐺 무리를 불렀어요'+(f?' · '+World.FORM.names[World.packForm(n)]:Combat.FLAGS.FORMS?' · 농가는 곧장':' · 대형 끔');show();return true;
+ }
+ /* 같은 탭에서 바로: 끄면 걷던 대형 늑대도 곧게(세계가 틱마다 손잡이를 읽는다), 켜면 다음 무리부터 */
+ function setForms(v){Combat.FLAGS.FORMS=!!v;T.note=v?'🐺 대형 켬: 다음 무리부터 대형으로 와요':'🐺 대형 끔: 0.15.1처럼 곧게 와요';show();perfTick();return Combat.FLAGS.FORMS}
+ /* 📊 줄 끝: 마을(단계 1)부터 지금 무리의 대형. 농가 · 단계 끔이면 빈 글 */
+ function formText(){try{if(typeof world==='undefined'||!World.routes(world))return '';if(!Combat.FLAGS.FORMS)return '🐺 대형 끔';return '🐺 '+(T.form===null?'대형 켬':World.FORM.names[T.form])}catch{return ''}}
  function jump(key,ask){
   const J=JUMPS.find(j=>j[0]===String(key));if(!J||T.job)return false;
   if(ask!==false&&!confirm('🧪 '+J[1]+'에 막 들어선 마을로 새로 시작할까요?\n지금 테스트 판은 사라져요(아이 저장은 그대로예요).'))return false;
   state=jumpState(J[0],state.age);world=freshWorld();resetView();$('ending').hidden=true;$('start').hidden=true;
-  T.last=null;T.tok=null;T.wrongAt=null;newRound();
+  T.last=null;T.tok=null;T.wrongAt=null;T.form=null;newRound();
   if(state.run.bell===1){syncKing(true);bellOpen()}
   T.note='🧪 '+J[1]+'에 막 들어선 마을로 시작했어요';save();render();show();return true;
  }
@@ -182,7 +198,7 @@
   '#testBar .tm-speed button[aria-pressed="true"]{background:linear-gradient(#ffe7a0,#f2c44f);color:#4a3200}'+
   '#testBar #tmAuto[aria-pressed="true"]{background:linear-gradient(#d8f2d8,#8fd19a);border-color:#4f9a72}'+
   '#testBar #tmNext{min-width:112px;font-size:17px;background:linear-gradient(#4f9a72,#2d6650);color:#fff;border-color:#255741}'+
-  '#testBar #tmPerfBtn{min-width:46px;padding:6px 8px}#testBar #tmPerfBtn[aria-pressed="true"]{background:linear-gradient(#e3ecff,#a9c3f2);border-color:#5d7fb8}'+
+  '#testBar #tmPerfBtn,#testBar #tmPack{min-width:46px;padding:6px 8px}#testBar #tmPerfBtn[aria-pressed="true"]{background:linear-gradient(#e3ecff,#a9c3f2);border-color:#5d7fb8}'+
   '#tmPerf{position:fixed;right:10px;bottom:68px;z-index:60;padding:3px 9px;border-radius:9px;background:#14231dd9;color:#e9f3df;font:700 11.5px/1.4 system-ui,sans-serif;font-variant-numeric:tabular-nums;white-space:nowrap;pointer-events:none}#tmPerf[hidden]{display:none}'+
   'header .tm-head{white-space:nowrap;color:#ffd84a;font-weight:800}'+
   /* 막대 높이만큼: 장면을 줄여(가로 넓은 화면은 가게가, 세로 패드는 보기가 막대 위에 든다) 아래 여백과 보기 맞춤 여백을 준다. 폰(760 이하)은 깨지지 않게 여백만 */
@@ -193,7 +209,7 @@
   '@media(min-width:761px) and (max-aspect-ratio:1/1){body.test-mode .scene{height:clamp(380px,calc(48svh - 64px),760px)}body.test-mode.long-read .scene{height:clamp(320px,calc(38svh - 64px),620px)}}'+
   '#testBar #tmJump,#testBar #tmBook{flex:none;min-height:44px;max-width:150px;padding:6px 8px;font-size:14px;font-weight:700;border-radius:12px;color:#31503d}'+
   /* 좁은 넓은 화면(패드 세로 820 등): 한 줄에 들도록 이름표는 🧪만(머리글에 '테스트 모드'가 있다), 글 칸·속도 칸을 줄인다 */
-  '@media(max-width:1020px){#testBar .tm-label{display:none}#testBar .tm-tag{font-size:0;padding:3px 7px}#testBar .tm-tag:before{content:"🧪";font-size:14px}#testBar .tm-info{flex-basis:60px}#testBar .tm-speed button{min-width:44px;padding:6px 7px}#testBar #tmJump{max-width:104px}}'+
+  '@media(max-width:1020px){#testBar .tm-label{display:none}#testBar .tm-tag{font-size:0;padding:3px 7px}#testBar .tm-tag:before{content:"🧪";font-size:14px}#testBar .tm-info{flex-basis:60px}#testBar .tm-speed button{min-width:44px;padding:6px 7px}#testBar #tmJump{max-width:96px}}'+
   '@media(max-width:760px){html.test-mode{scroll-padding-bottom:150px}body.test-mode main{padding-bottom:160px}#testBar{gap:6px;padding:6px 8px}#testBar .tm-info{flex-basis:100%;order:2}#testBar button{min-height:40px;padding:5px 9px}#testBar #tmNext{min-width:90px}#tmPerf{bottom:122px}}';
  {const st=el('style');st.textContent=css;(document.head||document.body).append(st)}
  document.body.classList.add('test-mode');try{document.documentElement.classList.add('test-mode')}catch{}
@@ -207,13 +223,14 @@
  const wrongBtn=el('button',{type:'button',id:'tmWrong',title:'읽는 시간을 채운 뒤 틀린 보기를 눌러요'},'✖ 틀리기');wrongBtn.onclick=wrong;
  const nextBtn=el('button',{type:'button',id:'tmNext',title:'읽는 시간을 빨리 감은 뒤 정답을 눌러요'},'다음 ▶');nextBtn.onclick=next;
  const perfBtn=el('button',{type:'button',id:'tmPerfBtn',title:'성능 표시(FPS · 그리기 호출 · 삼각형 · 단계) 켜기/끄기','aria-label':'성능 표시'},'📊');perfBtn.onclick=()=>setPerf(!opt.perf);
- const jumpSel=el('select',{id:'tmJump','aria-label':'단계로 바로 가기',title:'그 단계에 막 들어선 마을로 새로 시작해요(확인 한 번)'});
+ const packBtn=el('button',{type:'button',id:'tmPack',title:'무리 부르기: 다음 늑대 무리를 지금 숲에 내보내요(대형 이름은 📊 줄 끝)','aria-label':'무리 부르기'},'🐺');packBtn.onclick=callPack;
+ const jumpSel=el('select',{id:'tmJump','aria-label':'단계로 바로 가기 · 대형 켬/끔',title:'그 단계에 막 들어선 마을로 새로 시작해요(확인 한 번). 맨 끝은 늑대 대형 켬/끔'});
  jumpSel.append(el('option',{value:''},'🗺️ 단계로'));for(const [k,n] of JUMPS)jumpSel.append(el('option',{value:k},n));
- jumpSel.onchange=()=>{const k=jumpSel.value;jumpSel.value='';if(k)jump(k)};
- /* 수첩 MVP: 프로듀서가 수첩을 바로 확인하는 단추(수첩이 켜져 있을 때만). 모두 시험 열쇠(-test)의 기록만 바꾼다 */
- const bookSel=el('select',{id:'tmBook','aria-label':'수첩 시험',title:'수첩을 바로 확인해요(시험 기록만 바뀜)'});
- bookSel.append(el('option',{value:''},'📒 수첩'));for(const [k,n] of [['note','📜 쪽지 자격 주기'],['shiny','✨ 반짝 기회'],['play','🗓️ 놀이 +1'],['wipe','🧹 기록 비우기']])bookSel.append(el('option',{value:k},n));
- bookSel.onchange=()=>{const k=bookSel.value;bookSel.value='';if(k)bookTest(k)};
+ const formOpt=el('option',{value:FORM_OPT},'🐺 대형 끄기');jumpSel.append(formOpt);
+ /* 수첩: 프로듀서가 수첩을 바로 확인하는 항목은 🗺️ 칸 끝에 둔다(패드 세로 820에서 막대에 남는 폭이 약 70px라 단추를 따로 두지 않음). 수첩이 켜져 있을 때만, 시험 열쇠(-test)의 기록만 바꾼다 */
+ const BOOK_OPTS=[['book:note','📜 쪽지 자격 주기'],['book:shiny','✨ 반짝 기회'],['book:play','🗓️ 놀이 +1'],['book:wipe','🧹 수첩 기록 비우기']];
+ if(typeof book!=='undefined'&&book)for(const [v,n] of BOOK_OPTS)jumpSel.append(el('option',{value:v},n));
+ jumpSel.onchange=()=>{const k=jumpSel.value;jumpSel.value='';if(k===FORM_OPT)setForms(!Combat.FLAGS.FORMS);else if(k.startsWith('book:'))bookTest(k.slice(5));else if(k)jump(k)};
  function bookTest(k){
   if(typeof book==='undefined'||!book)return false;const now=Date.now();
   if(k==='note'){
@@ -232,7 +249,7 @@
   bookDirty=true;save(true);render();return true;
  }
  T.book=bookTest;
- bar.append(tag,info,label,speedBox,autoBtn,perfBtn,jumpSel);if(typeof book!=='undefined'&&book)bar.append(bookSel);bar.append(wrongBtn,nextBtn);document.body.append(bar);
+ bar.append(tag,info,label,speedBox,autoBtn,perfBtn,packBtn,jumpSel,wrongBtn,nextBtn);document.body.append(bar);
  const perfEl=el('div',{id:'tmPerf',role:'status','aria-label':'성능'});document.body.append(perfEl);
  try{const h=document.querySelector&&document.querySelector('header small');if(h){const s=el('span',{class:'tm-head'},'🧪 테스트 모드');h.append(' · ',s)}}catch{}
 
@@ -255,7 +272,7 @@
   set(nowEl,s);set(lastEl,T.note||lastText());
   for(const k of ORDER){const v=String(opt.speed===k);if(speedBtns[k].getAttribute('aria-pressed')!==v)speedBtns[k].setAttribute('aria-pressed',v)}
   set(autoBtn,opt.auto?'⏯ 자동 켬':'⏯ 자동 끔');autoBtn.setAttribute('aria-pressed',String(opt.auto));
-  nextBtn.disabled=!!j;wrongBtn.disabled=!!j||paused||phase!=='ask';jumpSel.disabled=!!j;
+  nextBtn.disabled=!!j;wrongBtn.disabled=!!j||paused||phase!=='ask';jumpSel.disabled=!!j;packBtn.disabled=!!j;set(formOpt,Combat.FLAGS.FORMS?'🐺 대형 끄기':'🐺 대형 켜기');
   perfBtn.setAttribute('aria-pressed',String(opt.perf));perfEl.hidden=!opt.perf;
  }
 
@@ -275,8 +292,8 @@
   if(P.last&&P.last.mode===mode&&now>P.last.t){P.samples.push({n:n-P.last.n,ms:now-P.last.t});if(P.samples.length>3)P.samples.shift()}else P.samples=[];
   P.last={mode,n,t:now};
   const ms=P.samples.reduce((a,s)=>a+s.ms,0),fps=ms>0?Math.round(P.samples.reduce((a,s)=>a+s.n,0)*10000/ms)/10:null,f='🎞 '+(fps===null?'…':fps.toFixed(fps>=10?0:1))+'fps';
-  const st=stageText();
-  P.text=i?f+'(최대 30) · 그리기 '+(i.drawCalls|0)+' · 삼각형 '+big(i.triangles)+(st?' · '+st:''):r==='fallback'?f+' · 그림 화면'+(st?' · '+st:''):'화면 준비 중'+(st?' · '+st:'');
+  const st=stageText(),fm=formText(),tail=(st?' · '+st:'')+(fm?' · '+fm:'');
+  P.text=i?f+'(최대 30) · 그리기 '+(i.drawCalls|0)+' · 삼각형 '+big(i.triangles)+tail:r==='fallback'?f+' · 그림 화면'+tail:'화면 준비 중'+tail;
   set(perfEl,P.text);return P.text;
  }
  function setPerf(v){opt.perf=!!v;saveOpt();if(opt.perf){P.samples=[];P.last=null;startRaf();perfTick()}show();return opt.perf}
@@ -285,9 +302,12 @@
  /* 게임 시계 tick()을 감싼다: 틱마다 틀린 순간을 기억하고, 자동 넘기기를 보고, 막대 글을 고친다. 빨리 감기는 감싸지 않은 원래 tick(baseTick)을 돌린다 */
  const baseTick=tick;
  tick=function(){baseTick();watch();if(opt.auto&&!T.job)autoStep();show()};
+ /* 0.15.2: 세계 한 틱을 감싸 나온 무리의 대형을 적는다(사건 pack의 form, 대형 없이 나오면 null). 규칙 · 세계는 건드리지 않는다 */
+ const baseWorldStep=worldStep;
+ worldStep=function(){baseWorldStep();for(const e of world.events)if(e.type==='pack'){T.packs++;T.form=Number.isInteger(e.form)&&World.formsOn(world)?e.form:null}};
  show();
  /* 검사·프로듀서 콘솔용 */
- window.__testmode={bookTest,get speed(){return opt.speed},get auto(){return opt.auto},get perf(){return opt.perf},setPerf,perfNow:perfTick,jump,jumpState,JUMP_BASE:JSON.parse(JSON.stringify(JUMP_BASE)),JUMPS:JUMPS.map(j=>j.slice()),get job(){return T.job&&{...T.job}},get last(){return T.last&&{...T.last}},get done(){return T.done&&{...T.done}},get note(){return T.note},
+ window.__testmode={bookTest,get speed(){return opt.speed},get auto(){return opt.auto},get perf(){return opt.perf},setPerf,perfNow:perfTick,jump,jumpState,callPack,setForms,formText,get form(){return T.form},get packs(){return T.packs},JUMP_BASE:JSON.parse(JSON.stringify(JUMP_BASE)),JUMPS:JUMPS.map(j=>j.slice()),get job(){return T.job&&{...T.job}},get last(){return T.last&&{...T.last}},get done(){return T.done&&{...T.done}},get note(){return T.note},
   next,wrong,setSpeed,setAuto,plan:()=>phase==='ask'&&round?{t:round.t,target:target(),tries:round.tries,lock:round.lock,dash:round.dash}:null,
   frame(){if(T.job)ffFrame();return !!T.job},drain(max){let n=0;while(T.job&&n<(max||5000)){ffFrame();n++}return n},SPEED:JSON.parse(JSON.stringify(SPEED)),RETRY,AFTER_LOCK,OPT_KEY};
 })();
