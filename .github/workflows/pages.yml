@@ -16,7 +16,10 @@ on:
       - art-handoff/coopnight/source-3d/models/environment-pack.glb
       - art-handoff/coopnight/browser/**
       - art-handoff/v015-v016/**
+      - privacy/**
       - scripts/build-pages.cjs
+      - scripts/privacy-page.cjs
+      - scripts/check-release.cjs
       - .github/workflows/pages.yml
   workflow_dispatch:
 permissions:
@@ -39,6 +42,8 @@ jobs:
         run: node test-dom.cjs
       - name: Validate notebook records and content
         run: node test-book.cjs
+      - name: Release placeholders (warning only)
+        run: node scripts/check-release.cjs
       - run: npm install --no-save --package-lock=false three@0.180.0 esbuild@0.25.10
       - name: Package game and used artwork
         run: node scripts/build-pages.cjs
@@ -103,6 +108,11 @@ jobs:
           for name in art15:
               assert fetch('art-handoff/v015-v016/glb/' + name + '.glb').startswith(b'glTF'), name
               assert fetch('art-handoff/v015-v016/png/' + name + '.png').startswith(bytes.fromhex('89504e470d0a1a0a')), name
-          print('PASS: live HTML, combat + questions + village scripts, deployed commit, ' + str(1 + len(art15)) + ' GLB and ' + str(len(images) + len(art15)) + ' PNG assets.')
+          policy = fetch('privacy/').decode('utf-8')
+          title = policy.split('<title>', 1)[1].split('</title>', 1)[0] if '<title>' in policy else ''
+          assert '개인정보처리방침' in title, 'privacy title: ' + title
+          assert '수집하는 개인정보: 없습니다' in policy and '<script' not in policy.lower(), 'privacy body'
+          print('PASS: live HTML, combat + questions + village scripts, deployed commit, ' + str(1 + len(art15)) + ' GLB and ' + str(len(images) + len(art15)) + ' PNG assets, privacy policy page.')
           print('Playable URL: ' + base)
+          print('Privacy policy URL: ' + base + 'privacy/')
           PY

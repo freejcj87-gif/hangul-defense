@@ -17,7 +17,9 @@ on:
       - art-handoff/coopnight/browser/**
       - art-handoff/coopnight/source-3d/models/environment-pack.glb
       - art-handoff/v015-v016/**
+      - privacy/**
       - scripts/build-pages.cjs
+      - scripts/privacy-page.cjs
       - .github/workflows/package-test.yml
 permissions:
   contents: read

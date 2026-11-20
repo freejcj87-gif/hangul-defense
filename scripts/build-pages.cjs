@@ -41,6 +41,12 @@ const files = ['index.html', 'combat.js', 'world.js', 'questions-gen.js', 'quest
   ...art15.flatMap(name => [ART15_DIR + 'glb/' + name + '.glb', ART15_DIR + 'png/' + name + '.png'])];
 /* 수첩 MVP: 기록 모듈과 쪽지·카드 콘텐츠 */
 files.push('book.js', 'notes.js', 'bookui.js');
+/* 출시 준비: 개인정보처리방침 페이지(주소 …/hangul-defense/privacy/, launch/policy/03 §3). privacy/ 아래 파일을 모두 묶는다(개정 때 남기는 지난 판 privacy/YYYY-MM-DD.html도 함께).
+   글은 scripts/privacy-page.cjs가 notes.js의 앱 안 본문에서 만든다. 둘이 어긋나면 빌드를 멈춘다(build) */
+const PRIVACY_DIR = 'privacy';
+const walk = dir => fs.readdirSync(path.join(root, dir), { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
+  .flatMap(e => (e.isDirectory() ? walk(dir + '/' + e.name) : [dir + '/' + e.name]));
+if (fs.existsSync(path.join(root, PRIVACY_DIR))) files.push(...walk(PRIVACY_DIR));
 // 페이지(index.html)와 3D 스크립트(src/*.js)가 글자 그대로 적은 아트 경로. 참조했는데 묶지 않은 파일이 있으면 빌드를 멈춘다
 // (실제 주소에서는 깨진 그림이나 코드 도형으로만 드러나서 놓치기 쉽다). 경로는 조각내지 말고 한 문자열로 적는다.
 const ART_REF = /art-handoff\/(?:coopnight\/browser|coopnight\/source-3d\/models|v015-v016\/(?:glb|png))\/[a-zA-Z0-9/_-]+\.(?:png|glb)/g;
@@ -54,6 +60,8 @@ function references() {
 }
 function build() {
   for (const [file, from] of references()) assert(files.includes(file), 'Missing artwork in Pages package: ' + file + ' (referenced by ' + from + ')');
+  assert(files.includes('privacy/index.html'), 'Missing privacy policy page: privacy/index.html');
+  assert(require('./privacy-page.cjs').same(), 'privacy/index.html differs from the in-app policy (notes.js). Run: node scripts/privacy-page.cjs');
   fs.mkdirSync(out, { recursive: true });
   for (const file of files) {
     const source = path.join(root, file);
@@ -65,7 +73,8 @@ function build() {
   require('esbuild').buildSync({entryPoints:[path.join(root,'src/village.js')],bundle:true,format:'iife',target:'es2020',minify:true,legalComments:'eof',outfile:path.join(out,'village.js')});
   fs.copyFileSync(path.join(root,'node_modules/three/LICENSE'),path.join(out,'THREE-LICENSE.txt'));
   fs.writeFileSync(path.join(out, '.nojekyll'), '');
-  fs.writeFileSync(path.join(out, 'robots.txt'), 'User-agent: *\nDisallow: /\n');
+  // 방침 경로만 열어 둔다(store/05 §1.1. 하위 경로 robots는 크롤러가 읽는 자리가 아니라 정책상 차단 요인은 아님, policy/03 §3)
+  fs.writeFileSync(path.join(out, 'robots.txt'), 'User-agent: *\nAllow: /hangul-defense/privacy/\nDisallow: /\n');
   fs.writeFileSync(path.join(out, 'version.json'), JSON.stringify({commit:process.env.GITHUB_SHA || null, title:'꼬꼬마을: 한글 읽기로 마을 지키기'}, null, 2)+'\n');
   console.log('Packaged ' + files.length + ' runtime files for GitHub Pages.');
 }
