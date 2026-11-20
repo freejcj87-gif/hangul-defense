@@ -437,8 +437,21 @@
        {n 무리 번호, at 나오는 틱, left 남은 틱, size 늑대 수, groups 묶음별 길, points 서로 다른 길(묶음 순서), forms 길마다 대형(다리 길 · 대형 끔 = 0), form 무리 대형, boss 불씨 왕 무리}
      HERALD(시점 · 길이를 여기 한곳에): lead = 무리가 숲에 나오기 몇 틱 전부터(60 = 6초. 걸어오는 TRAVEL 7초를 더하면 울타리까지 약 13초 앞).
        무리 간격이 가장 짧아도(13초) 앞 무리가 마을에 닿은 뒤(간격 − TRAVEL = 6초)에 시작하므로 두 예고가 겹치지 않는다(예고는 무리가 나와 걷는 동안에는 없다).
-       arrive · leave = 3D 까마귀가 날아들고 · 날아가는 초, 깃발이 서고 · 눕는 초(그림 화면은 바로). 움직임 줄이기면 연출 없이 바로 */
-  const HERALD={lead:60,arrive:.8,leave:.9};
+       arrive · leave = 3D 까마귀가 날아들고 · 날아가는 초, 깃발이 서고 · 눕는 초(그림 화면은 바로). 움직임 줄이기면 연출 없이 바로
+     look: 깃발 그림 표(그림 화면 SVG와 3D가 같은 표를 읽는다). 24 × 32 칸(y는 아래로), 깃대는 x 3 · y 2 → 31(땅). 대형마다 천 모양 · 색 · 흰 그림이 다르다:
+       0 곧장 = 빨간 네모 + 곧은 화살 · 1 휘어 오기 = 주황 물결 + 휜 화살 · 2 갈라지기 = 보라 제비꼬리 + 갈래 화살 · 3 따라 돌기 = 파란 동그라미 + 도는 화살.
+       cloth = 천 다각형, line = 흰 굵은 선(폭 stroke), head = 흰 세모(화살촉). crow = 까마귀 색 */
+  const lookPts=(n,f)=>{const o=[];for(let i=0;i<=n;i++){const [x,y]=f(i/n);o.push(Math.round(x*100)/100,Math.round(y*100)/100)}return o};
+  const bez=(a,b,c,d)=>u=>{const v=1-u;return [v*v*v*a[0]+3*v*v*u*b[0]+3*v*u*u*c[0]+u*u*u*d[0],v*v*v*a[1]+3*v*v*u*b[1]+3*v*u*u*c[1]+u*u*u*d[1]]};
+  const arcAt=(cx,cy,r,a0,a1)=>u=>{const a=(a0+(a1-a0)*u)*Math.PI/180;return [cx+r*Math.cos(a),cy+r*Math.sin(a)]};
+  const HERALD={lead:60,arrive:.8,leave:.9,
+    look:{pole:'#8a5a2b',knob:'#ffd24a',crow:'#2a2833',stroke:2,color:['#e8473b','#f39a1e','#8a4fd8','#2b8be6'],
+      cloth:[[3.8,3.5,21.5,3.5,21.5,15.5,3.8,15.5],
+        lookPts(8,u=>[3.8+17.7*u,3.5+1.3*Math.sin(2*Math.PI*u)]).concat(lookPts(8,u=>[21.5-17.7*u,15.5+1.3*Math.sin(2*Math.PI*(1-u))])),
+        [3.8,3.5,21.5,3.5,16.8,9.5,21.5,15.5,3.8,15.5],
+        [3.8,7.6].concat(lookPts(22,arcAt(12.4,9.5,7.4,-165,165)),[3.8,11.4])],
+      line:[[[12.6,6,12.6,11.6]],[lookPts(8,bez([9,6],[16.2,6],[16.2,11],[12.2,12]))],[[10.6,5.5,10.6,8.6],[10.6,8.6,7.6,11.4],[10.6,8.6,13.6,11.4]],[lookPts(12,arcAt(12.4,9.5,3.9,-90,200))]],
+      head:[[[9.4,11,15.8,11,12.6,14.6]],[[10.45,12.44,12.9,13.58,12.08,10.28]],[[6.1,11,9.1,11,7.6,14],[12.1,11,15.1,11,13.6,14]],[[9.35,6.47,10.23,9.03,7.03,7.87]]]}};
   const heraldOn=()=>{const C=combat();return !!(C&&C.FLAGS&&C.FLAGS.HERALD)};
   function herald(w,s,lead){
     if(!heraldOn()||!w||!isObj(w.wave)||w.wave.spawned||!s)return null;
