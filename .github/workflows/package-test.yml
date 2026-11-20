@@ -13,6 +13,8 @@ on:
       - book.js
       - notes.js
       - bookui.js
+      - cards.js
+      - art/cards/**
       - src/**
       - art-handoff/coopnight/browser/**
       - art-handoff/coopnight/source-3d/models/environment-pack.glb
