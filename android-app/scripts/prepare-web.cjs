@@ -56,6 +56,16 @@ for (const [file, text, needle] of hooks) {
   assert.equal(count, 1, file + '에서 앱 껍데기가 쓰는 자리 "' + needle + '"가 ' + count + '번 나와요(1번이어야 함). shell/app-shell.js와 이 목록을 함께 고쳐 주세요.');
 }
 
+/* 아동 앱: 게임 코드에 바깥 주소가 없어야 한다(바깥 링크·외부 요청 없음, 정책 04 §3·등급 설문 "바깥 링크 없음"). three.js를 묶은 village.js는 뺀다
+   (라이브러리 안의 XML 이름공간 문자열 등). 개인정보처리방침 본문(notes.js NOTES.PRIVACY)도 여기서 함께 걸린다. */
+for (const file of ['index.html', 'combat.js', 'world.js', 'questions.js', 'questions-gen.js', 'book.js', 'notes.js', 'bookui.js', 'testmode.js']) {
+  const found = fs.readFileSync(path.join(www, file), 'utf8').match(/https?:\/\/[^\s"'`)<]*/g);
+  assert(!found, file + '에 바깥 주소가 있어요: ' + (found || []).slice(0, 3).join(', ') + ' (앱 안에서 바깥으로 나가는 길이 생기지 않게 확인해 주세요)');
+}
+/* 처리방침 본문의 빈칸(대괄호: 시행일·개발자 이름·문의처 등)은 게시 전에 사람이 채운다. 빌드는 막지 않고 알린다 */
+const blanks = [...new Set((require(path.join(www, 'notes.js')).PRIVACY.flat(2).join('\n').match(/\[[^\]]+\]/g) || []))];
+if (blanks.length) console.log((process.env.GITHUB_ACTIONS ? '::warning::' : '') + 'Privacy text still has blanks to fill before release: ' + blanks.join(' '));
+
 require('esbuild').buildSync({
   entryPoints: [path.join(appRoot, 'shell', 'app-shell.js')],
   bundle: true, format: 'iife', target: 'es2020', minify: true, legalComments: 'eof',
