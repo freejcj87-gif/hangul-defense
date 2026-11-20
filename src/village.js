@@ -1767,15 +1767,18 @@ async function start(){
  const heraldScale=()=>Math.max(1,fxScale*.8);
  const inView=(x,y,z,m)=>{ndc.set(x,y,z).project(camera);return Math.abs(ndc.x)<=m&&ndc.y<=m&&ndc.y>=-m};
  const ndcOf=(x,y,z)=>{ndc.set(x,y,z).project(camera);return [+ndc.x.toFixed(3),+ndc.y.toFixed(3)]};
- // where a road's herald stands: the flag on the road outside the fence (the furthest point whose foot and top are on screen, at least radius + 3.2: clear of the
- // bridge and the road markers; radius + 2.6 only when nothing further out is on screen), the crows over the forest end of the same road (the furthest point on
- // screen beyond the flag; on a road running to the top of the screen they fly lower before they come closer)
+ // where a road's herald stands: the flag on the road outside the fence (the furthest point whose foot and top are on screen between radius + 6 and + 3.2: clear of
+ // the bridge and the road markers; if none is, the furthest on-screen point down to radius + 1.2, just outside the fence: on a pad the side roads of the castle
+ // show only about 2 beyond the fence, wolf-paths-plan §1.2), the crows over the forest end of the same road (the furthest point on screen beyond the flag; on a road
+ // running off the top or the side of the screen they fly lower, then come in over the flag, then over the road inside it)
  function heraldPlace(p,sc){
-  const a=spawnAngle(p),c=Math.cos(a),s=Math.sin(a),R=Rd,E=num(W('EDGE'))||7,H=2.3*sc,flagOk=r=>inView(c*r,0,s*r,.86)&&inView(c*r,H,s*r,.86);let rf=R+2.6,rc=0,yC=0;
-  for(let r=R+E-1;r>=R+3.2;r-=.5)if(flagOk(r)){rf=r;break}
-  if(rf<R+3.2&&!flagOk(rf))rf=R+3.2;
-  find:for(const yk of [3.1,2.4,1.8]){yC=yk*sc;for(let r=R+E+1.5;r>=rf+.8;r-=.5)if(inView(c*r,yC,s*r,.7)){rc=r;break find}}
-  if(!rc){rc=rf+.8;yC=1.8*sc}
+  const a=spawnAngle(p),c=Math.cos(a),s=Math.sin(a),R=Rd,E=num(W('EDGE'))||7,H=2.3*sc,flagOk=r=>inView(c*r,0,s*r,.86)&&inView(c*r,H,s*r,.86);let rf=0,rc=0,yC=0;
+  for(let r=R+E-1;r>=R+3.2-1e-9&&!rf;r-=.5)if(flagOk(r))rf=r;
+  for(let r=R+2.8;r>=R+1.2-1e-9&&!rf;r-=.4)if(flagOk(r))rf=r;
+  if(!rf)rf=R+1.2;
+  find:{for(const yk of [3.1,2.4,1.8]){yC=yk*sc;for(let r=R+E+1.5;r>=rf+.8-1e-9;r-=.5)if(inView(c*r,yC,s*r,.72)){rc=r;break find}}
+   yC=2.4*sc;for(let r=rf;r>=R-1e-9;r-=.5)if(inView(c*r,yC,s*r,.72)){rc=r;break find}
+   rc=rf;yC=1.8*sc}
   return {fx:c*rf,fz:s*rf,cx:c*rc,cz:s*rc,yC,H};
  }
  function heraldStep(fdt,less){if(!HLOOK)return;try{heraldMove(fdt,less)}catch(error){heraldOff(error)}}
