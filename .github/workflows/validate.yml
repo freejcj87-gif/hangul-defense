@@ -46,3 +46,30 @@ jobs:
           path: book-shots/
           if-no-files-found: warn
           retention-days: 7
+  # 폰 화면(2026-11-20 폰 배포 결정): 기준 폰 화면 검사(test.cjs phone 구간)와 눈 검수용 캡처. 큰 검사와 나란히 돌아 10분 안팎에 끝난다
+  phone:
+    runs-on: ubuntu-24.04
+    container:
+      image: mcr.microsoft.com/playwright:v1.56.1-noble
+      options: --ipc=host
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-save --package-lock=false playwright@1.56.1 three@0.180.0 esbuild@0.25.10
+      - run: node scripts/build-pages.cjs
+      # 캡처는 통과·실패를 판정하지 않는다(눈 검수 + metrics.json). 실패해도 아래 검사 결과를 가리지 않는다
+      - name: Phone screenshots
+        if: always()
+        continue-on-error: true
+        timeout-minutes: 20
+        run: node scripts/phone-shots.cjs phone-shots
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: phone-shots
+          path: phone-shots/
+          if-no-files-found: warn
+          retention-days: 7
