@@ -19,6 +19,7 @@ on:
       - privacy/**
       - scripts/build-pages.cjs
       - scripts/privacy-page.cjs
+      - scripts/check-release.cjs
       - .github/workflows/pages.yml
   workflow_dispatch:
 permissions:
@@ -41,6 +42,8 @@ jobs:
         run: node test-dom.cjs
       - name: Validate notebook records and content
         run: node test-book.cjs
+      - name: Release placeholders (warning only)
+        run: node scripts/check-release.cjs
       - run: npm install --no-save --package-lock=false three@0.180.0 esbuild@0.25.10
       - name: Package game and used artwork
         run: node scripts/build-pages.cjs
