@@ -13,6 +13,8 @@ const easeOut=u=>1-(1-u)*(1-u),easeIn=u=>u*u;
 const read=()=>{try{const s=window.getBook3dState&&window.getBook3dState();return s&&typeof s==='object'?s:null}catch{return null}};
 const POSE=['aPoseA','aPoseB','aPoseC','aPoseD'];
 const FALL=1.4,READ=.7,GONE=.4,SIGN_FALL=.45,SIGN_LIE=1.1,SIGN_SHRINK=.35,FADE=.5;   // seconds (view clock)
+// Model sizes: the first CI shots (run 44651957130, 1180×820) showed the paper at about 13 px and the sign at about 20 px, too small for a child to spot.
+const PAPER_SIZE=2.2,SIGN_SIZE=1.5;
 
 // v: {scene, camera, herd(kind) → the herd's InstancedMesh, peek(wolfId) → {x,y,z (top of the head), fx, fz (feet), size, state} | null,
 //     fx:{sparkles, starBurst, ringWave, dustBurst, flashAt}, sprite, decal (always-on sprites, only inside the village's ambient pass),
@@ -34,9 +36,9 @@ export function book3d(v){
   Object.assign(p,{id,kind,x,z,mode:fall&&!reduced()?'fall':'rest',t0:time,tap:-9,landed:!fall||reduced()});stats.papers++;return p;
  }
  function drawPaper(p){
-  const t=time-p.t0,sc=clamp(v.scale(),1,1.9),m=p.m;let y=.02,ry=p.id*1.7,rx=0,rz=0,s=sc,sx=0,sz=0;
+  const t=time-p.t0,sc=clamp(v.scale(),1,1.9)*PAPER_SIZE,m=p.m;let y=.02,ry=p.id*1.7,rx=0,rz=0,s=sc,sx=0,sz=0;
   if(p.mode==='fall'){const u=Math.min(1,t/FALL);y=.02+1.6*(1-easeOut(u));const w=Math.sin(t*5.2)*.32*(1-u);sx=Math.cos(toCam)*w;sz=-Math.sin(toCam)*w;ry+=t*2.4;rz=Math.sin(t*6.3)*.7*(1-u);rx=Math.sin(t*4.1)*.4*(1-u);
-   if(u>=1){p.mode='rest';p.t0=time;if(!p.landed){p.landed=true;fx.ringWave(p.x,p.z,1.1*sc,C.CREAM,.45);fx.sparkles(p.x,.4,p.z,4,.35,C.WHITE,0,.3)}}}
+   if(u>=1){p.mode='rest';p.t0=time;if(!p.landed){p.landed=true;fx.ringWave(p.x,p.z,.9*sc,C.CREAM,.45);fx.sparkles(p.x,.5,p.z,5,.5,C.WHITE,0,.3)}}}
   else if(p.mode==='rest'){if(!reduced()){y+=.025*(1+Math.sin(time*2.2+p.id));ry+=Math.sin(time*1.3+p.id)*.22;rx=Math.sin(time*3.1+p.id)*.07}
    const h=time-p.tap;if(h>=0&&h<.45&&!reduced())y+=.5*4*(h/.45)*(1-h/.45)}
   else if(p.mode==='read'){const u=Math.min(1,t/READ);y=.02+2.4*easeIn(u);ry+=t*9;s=sc*(1-.75*u);if(u>=1)p.mode='off'}
@@ -52,7 +54,7 @@ export function book3d(v){
  const sign={wolf:0,mode:'off',t0:0,x:0,y:0,z:0,fx:0,fz:0,size:1,done:0};   // done = the wolf whose sign already came down (never picked up again)
  const at=p=>{sign.x=p.x;sign.y=p.y;sign.z=p.z;sign.fx=p.fx;sign.fz=p.fz;sign.size=p.size};
  function drawSign(){
-  const g=state&&state.sign,sc=clamp(v.scale()*.85,1,1.7);
+  const g=state&&state.sign,sc=clamp(v.scale()*.85,1,1.7)*SIGN_SIZE;
   if(g&&g.wolf&&!g.down&&g.wolf!==sign.done&&(sign.mode==='off'||sign.wolf!==g.wolf)){const p=peek(g.wolf);
    if(p&&p.state!=='dead'){sign.wolf=g.wolf;sign.mode='carry';sign.t0=time;at(p);stats.signs++}else sign.done=g.wolf}   // a wolf that is already down never gets one
   if(sign.mode==='carry'){
@@ -61,9 +63,9 @@ export function book3d(v){
    else if(g.down||!p||p.state==='dead'){sign.mode='drop';sign.t0=time;sign.done=sign.wolf}   // put down (right answer) or the wolf fell
    else at(p);
   }
-  let y=sign.y+.32*sc,rx=-.35,rz=0,s=sc,x=sign.x,z=sign.z;const t=time-sign.t0;
+  let y=sign.y+.55*sc,rx=-.35,rz=0,s=sc,x=sign.x,z=sign.z;const t=time-sign.t0;   // the post (0.48 below the board's middle) ends just above the head: it floats
   if(sign.mode==='carry'){if(!reduced()){y+=.08*Math.sin(time*3.4);rz=Math.sin(time*4.2)*.08}}
-  else if(sign.mode==='drop'){if(reduced()){sign.mode='off'}else{const u=Math.min(1,t/SIGN_FALL);x=sign.x+(sign.fx-sign.x)*u;z=sign.z+(sign.fz-sign.z)*u;y=(sign.y+.32*sc)*(1-easeIn(u))+.12*u;rx=-.35-1.2*easeIn(u);
+  else if(sign.mode==='drop'){if(reduced()){sign.mode='off'}else{const u=Math.min(1,t/SIGN_FALL);x=sign.x+(sign.fx-sign.x)*u;z=sign.z+(sign.fz-sign.z)*u;y=(sign.y+.55*sc)*(1-easeIn(u))+.12*u;rx=-.35-1.2*easeIn(u);
    if(t>SIGN_FALL+SIGN_LIE)s=sc*Math.max(0,1-(t-SIGN_FALL-SIGN_LIE)/SIGN_SHRINK);if(t>SIGN_FALL+SIGN_LIE+SIGN_SHRINK)sign.mode='off'}}
   else if(sign.mode==='gone'){const u=Math.min(1,t/SIGN_SHRINK);s=sc*(1-u);if(u>=1||reduced())sign.mode='off'}
   signMesh.visible=sign.mode!=='off'&&s>.01;
@@ -158,8 +160,8 @@ export function book3d(v){
  }
  /* ----- always-on sprites (inside the village's ambient pass): a soft glow under the note, a blue ring under the sign wolf, a pink ring under a friend ----- */
  function sprites(less){
-  for(const p of papers)if(p.mode==='rest'||p.mode==='fall'){const k=less?1:.75+.25*Math.sin(time*3+p.id);decal(CELL.glow,p.x,p.z,1.5*clamp(v.scale(),1,1.9),C.CREAM,.55*k,.7,.03);
-   if(!less&&p.mode==='rest'){const tw=Math.max(0,Math.sin(time*2.4+p.id*2));if(tw>.05)sprite(CELL.sparkle,p.x+.15,.55+p.y,p.z,.32*tw,.32*tw,C.WHITE,.9*tw,.6,time)}}
+  for(const p of papers)if(p.mode==='rest'||p.mode==='fall'){const k=less?1:.75+.25*Math.sin(time*3+p.id),sz=clamp(v.scale(),1,1.9);decal(CELL.glow,p.x,p.z,2.6*sz,C.CREAM,.6*k,.7,.03);decal(CELL.halo,p.x,p.z,1.9*sz*(less?1:1+.08*Math.sin(time*3+p.id)),C.GOLD,.55,.5,.032);
+   if(!less&&p.mode==='rest'){const tw=Math.max(0,Math.sin(time*2.4+p.id*2));if(tw>.05)sprite(CELL.sparkle,p.x+.3,.7+p.y,p.z,.45*tw*sz,.45*tw*sz,C.WHITE,.9*tw,.6,time)}}
   if(sign.mode==='carry'){const s=clamp(sign.size,.8,1.6),pl=less?1:.6+.4*Math.sin(time*4);decal(CELL.halo,sign.fx,sign.fz,2.1*s*(1+.12*pl),C.SKY,.75,.5);decal(CELL.glow,sign.fx,sign.fz,2.4*s,C.SKY,.3,.7)}
   if(friend&&friend.fade<0){const s=size(friend),pl=less?1:.6+.4*Math.sin(time*3);decal(CELL.halo,friend.x,friend.z,1.9*s*(1+.1*pl),C.PINK,.7,.5);decal(CELL.glow,friend.x,friend.z,2.2*s,C.PINK,.3,.7);
    if(friend.act==='hello'&&!less){const tw=Math.max(0,Math.sin(time*5));sprite(CELL.sparkle,friend.x,(friend.top||1.6)+.35,friend.z,.45*tw+.1,.45*tw+.1,C.PINK,.95,.6,time*2)}}
