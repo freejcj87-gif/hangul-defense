@@ -1687,7 +1687,7 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   /* 마을 하나를 손으로: 타워 · 울타리 · 닭 · 농부 수(지은 수 = 1 + 합) */
   const mk=o=>{const s=Object.assign(C.fresh(8),o);C.grow(s);return s};
   /* S-10-1 손잡이: 기본 켬, 주소로 끔, 단계 · 길을 끄면 둘 다 쓰지 않음 */
-  {eq([C.FLAGS.WALLS,C.FLAGS.TOWER_RING],[true,true],'0.17 성벽 · 바깥 고리 기본 켬');eq([WL,W.SLOT_R],[{from:4,add:70},{4:[10.5,14.5],5:[10.5,14.5,17.5]}],'성벽: 성곽 마을(단계 4)부터 6면 +70, 고리 반지름표(단계 4 · 5)');
+  {eq([C.FLAGS.WALLS,C.FLAGS.TOWER_RING],[true,true],'0.17 성벽 · 바깥 고리 기본 켬');eq([WL,W.SLOT_R],[{from:4,add:70},{4:[10,13],5:[10,13,16]}],'성벽: 성곽 마을(단계 4)부터 6면 +70, 고리 반지름표(단계 4 · 5)');
    ok(/\[\?&\]walls=0\\b/.test(src)&&/\[\?&\]ring=0\\b/.test(src)&&/\[\?&\]art16=0\\b/.test(src)&&src.includes('Combat.FLAGS.WALLS=false')&&src.includes('Combat.FLAGS.TOWER_RING=false'),'주소 ?walls=0 · ?ring=0 · ?art16=0 손잡이');
    const w4=W.sync(W.create({seed:1}),built(36)),w3=W.sync(W.create({seed:1}),built(35));eq([w4.stage,w3.stage,W.walled(w4),W.walled(w3),W.ringOn(w4)],[4,3,true,false,true],'성벽은 성곽 마을부터');
    for(const f of [{WALLS:false},{ROUTES:false},{STAGES:false}])withFlags(f,()=>ok(!W.walled(w4),'끄면 성벽 없음: '+JSON.stringify(f)));
@@ -1714,13 +1714,13 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
    /* 끄면(?walls=0) layer 0 건물이 사라지고 0.16 최대 체력 */
    withFlags({WALLS:false},()=>{W.sync(w,s);eq(fences(w),[[1,70,70,false],[1,70,70,false],[1,70,70,false],null,null,null],'성벽을 끄면 layer 0 건물이 사라지고 0.16 최대 체력(70)으로')});
    W.sync(w,s);eq(fences(w).map(f=>f&&f.slice(0,2)),[[1,140],[1,140],[1,140],[0,70],[0,70],[0,70]],'다시 켜면 다음 맞추기에서 성벽')}
-  /* S-10-3 저장: 성벽 세계 저장 → 복원 → 저장이 같음, 0.16 성 단계 세계(성벽 · 고리 끔으로 만든 것)를 켜고 불러오면 +70 · 고리 3 좌표 17.5 */
+  /* S-10-3 저장: 성벽 세계 저장 → 복원 → 저장이 같음, 0.16 성 단계 세계(성벽 · 고리 끔으로 만든 것)를 켜고 불러오면 +70 · 고리 3 좌표 16 */
   {const s=mk({level:19,fence:2,chickens:20,farmers:9,power:5}),w=W.sync(W.create({seed:5,interval:150}),s);for(let i=1;i<=900;i++){W.step(w,s);if(i%300===0)W.volley(w,s,{scale:1})}
    const raw=JSON.stringify({...w,events:[]}),back=W.restore(JSON.parse(raw));eq(JSON.stringify({...back,events:[]}),raw,'성벽 · 고리 세계: 저장 → 복원 → 저장이 같음(다듬기가 layer 0 · 옮긴 좌표를 받음)');
    const old=withFlags({WALLS:false,TOWER_RING:false},()=>W.sync(W.create({seed:5}),s)),econ=JSON.stringify(s),t3=old.buildings.filter(b=>b.kind==='tower'&&b.slot>=14);
    eq([old.stage,t3.length,t3.every(b=>Math.abs(Math.hypot(b.x,b.z)-14.5)<.01),fences(old).filter(Boolean).every(f=>f[1]===FH[f[0]-1])&&fences(old).filter(Boolean).length===2],[5,6,true,true],'(0.16 성 단계 세계: 고리 3 반지름 14.5, 울타리 최대 체력 = 겹 체력)');
    const now=W.sync(W.restore(JSON.parse(JSON.stringify(old))),s),u3=now.buildings.filter(b=>b.kind==='tower'&&b.slot>=14);
-   eq([u3.map(b=>b.slot),u3.every(b=>Math.abs(Math.hypot(b.x,b.z)-17.5)<.011),fences(now).every(f=>f&&f[1]===(f[0]>0?FH[f[0]-1]:0)+70)],[t3.map(b=>b.slot),true,true],'0.16 저장을 켜고 불러오면: 자리 · 층 그대로, 고리 3이 17.5로, 울타리 6면 +70(안 산 4면은 70짜리 성벽이 새로 섬)');
+   eq([u3.map(b=>b.slot),u3.every(b=>Math.abs(Math.hypot(b.x,b.z)-16)<.011),fences(now).every(f=>f&&f[1]===(f[0]>0?FH[f[0]-1]:0)+70)],[t3.map(b=>b.slot),true,true],'0.16 저장을 켜고 불러오면: 자리 · 층 그대로, 고리 3이 16으로, 울타리 6면 +70(안 산 4면은 70짜리 성벽이 새로 섬)');
    eq(JSON.stringify(s),econ,'경제 저장(state)은 한 글자도 바뀌지 않음');
    eq(old.buildings.filter(b=>b.kind==='tower').map(b=>[b.slot,b.floor]),now.buildings.filter(b=>b.kind==='tower').map(b=>[b.slot,b.floor]),'타워 자리 번호 · 층 그대로');
    const bad=JSON.parse(raw);bad.buildings.find(b=>b.kind==='fence'&&b.layer>0).layer=0;delete bad.buildings.find(b=>b.kind==='fence').max;const fixed=W.restore(bad);ok(fixed.buildings.filter(b=>b.kind==='fence').every(b=>b.layer>=0&&b.layer<=3&&b.max>0),'다듬기: layer 0 · 빠진 최대 체력을 받아 채움');
@@ -1728,13 +1728,13 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   /* S-10-4 고리: 단계 0~3은 ALL_SLOTS, 단계 4 · 5 표, 단계가 올라도 타워 수 · 층 합 = 1 + level */
   {for(let st=0;st<=3;st++)eq(W.ALL_SLOTS.map((p,i)=>W.slotAtStage(i,st)),W.ALL_SLOTS.map(p=>p),'단계 '+st+': 자리 좌표 = ALL_SLOTS');
    const R=(st,i)=>+Math.hypot(...W.slotAtStage(i,st)).toFixed(2),ang=(st,i)=>Math.atan2(W.slotAtStage(i,st)[1],W.slotAtStage(i,st)[0]);
-   eq([4,5].map(st=>[0,6,9,10,13,14,19].map(i=>R(st,i))),[[1.84,10.5,10.5,14.5,14.5,14.5,14.5],[1.84,10.5,10.5,14.5,14.5,17.5,17.5]],'단계 4: 고리 1 · 2 = 10.5 · 14.5(고리 3은 회관 3에서 열림), 단계 5: 고리 3 = 17.5, 가운데 자리는 그대로');
+   eq([4,5].map(st=>[0,6,9,10,13,14,19].map(i=>R(st,i))),[[1.84,10,10,13,13,14.5,14.5],[1.84,10,10,13,13,16,16]],'단계 4: 고리 1 · 2 = 10 · 13(고리 3은 회관 3에서 열림), 단계 5: 고리 3 = 16, 가운데 자리는 그대로');
    ok(W.ALL_SLOTS.every((p,i)=>i<6||Math.abs(ang(5,i)-Math.atan2(p[1],p[0]))<.005),'고리 자리의 각도는 ALL_SLOTS 그대로');
    for(const n of [35,36,49,50,62]){const s=built(n),w=W.sync(W.create({seed:2}),s),tw=w.buildings.filter(b=>b.kind==='tower');
     ok(W.towerUnits(w)===1+s.level&&tw.every(b=>{const p=W.slotAt(b.slot,w);return b.x===p[0]&&b.z===p[1]}),'지은 수 '+n+'(단계 '+w.stage+'): 타워 '+tw.length+'채 · 층 합 = 1 + level, 좌표 = 그 단계 자리')}
    /* 읽는 중(보류)에 단계가 오를 참이면 좌표도 그대로, 풀면 새 자리 */
    {const s=built(35),w=W.sync(W.create({seed:2}),s),x0=JSON.stringify(w.buildings.filter(b=>b.kind==='tower').map(b=>[b.x,b.z]));s.chickens++;C.grow(s);W.sync(w,s,{hold:true});
-    eq([w.stage,JSON.stringify(w.buildings.filter(b=>b.kind==='tower').map(b=>[b.x,b.z]))],[3,x0],'보류 중: 단계 · 타워 좌표 그대로');W.sync(w,s);ok(w.stage===4&&w.buildings.some(b=>b.kind==='tower'&&b.slot>=6&&Math.abs(Math.hypot(b.x,b.z)-10.5)<.01),'보류를 풀면 고리 1이 10.5로')}
+    eq([w.stage,JSON.stringify(w.buildings.filter(b=>b.kind==='tower').map(b=>[b.x,b.z]))],[3,x0],'보류 중: 단계 · 타워 좌표 그대로');W.sync(w,s);ok(w.stage===4&&w.buildings.some(b=>b.kind==='tower'&&b.slot>=6&&Math.abs(Math.hypot(b.x,b.z)-10)<.01),'보류를 풀면 고리 1이 10으로')}
    withFlags({TOWER_RING:false},()=>{const s=built(55),w=W.sync(W.create({seed:2}),s);ok(w.buildings.filter(b=>b.kind==='tower').every(b=>{const p=W.ALL_SLOTS[b.slot];return b.x===p[0]&&b.z===p[1]}),'고리를 끄면(?ring=0) ALL_SLOTS 좌표')});
    {const s=built(55),w=W.sync(W.create({seed:2}),s);withFlags({TOWER_RING:false},()=>W.sync(w,s));ok(w.buildings.filter(b=>b.kind==='tower').every(b=>{const p=W.ALL_SLOTS[b.slot];return b.x===p[0]&&b.z===p[1]}),'켠 채 옮긴 좌표도 끄고 맞추면 ALL_SLOTS로 돌아감')}}
   /* S-10-6 늑대 왕: 성벽 단계에는 정문(2번 길) 밖 반지름 + 5에서 기다리고 반지름 + 4.0에 선다. 두 번 틀려도 다가서지 않고 걸음 수만 센다 */
@@ -1748,6 +1748,58 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
    const front=R+W.KING.wall.stop-king.world_bounds_max[2]*W.KING.size,face=R-.5+gate.world_bounds_max[2]*1.15;ok(front>=face+.25,'왕 앞발 반지름 + '+(front-R).toFixed(2)+' ≥ 정문 바깥면 + '+(face-R).toFixed(2)+' + 0.25');
    withFlags({WALLS:false},()=>{const x=W.sync(W.create({seed:4}),s);W.king(x,'fight',2,true);eq(+x.king.r.toFixed(3),R+W.KING.stop-2*W.KING.step,'성벽을 끄면 0.16처럼 다가섬')});
    const m=W.sync(W.create({seed:4}),built(30));W.king(m,'fight',0,true);eq(+m.king.r.toFixed(3),W.radius(m)+W.KING.stop,'성벽 전(물레방아 마을)은 0.16 멈춤 지점')}
+  /* S-10-5 src/layout.js WALLS · wallPlan · CASTLE(맨 끝에서 모듈을 불러 확인): 조각 · 성문 · 성탑 수, 성탑과 성문 틈, 6번 성문과 다리, 성벽과 강 · 집, 수문, 성 회관 바닥, 고리 자리 간격 */
+  stageLayout.push(L=>{const Wl=L.WALLS,d2=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]),seg=(p,[x0,z0,x1,z1])=>{const dx=x1-x0,dz=z1-z0,t=Math.max(0,Math.min(1,((p[0]-x0)*dx+(p[1]-z0)*dz)/(dx*dx+dz*dz)));return Math.hypot(p[0]-x0-dx*t,p[1]-z0-dz*t)};
+   eq([Wl.from,Wl.in,Wl.gateIn],[W.WALL.from,.4,.5],'성벽: 성곽 마을부터(world.js WALL.from과 같음), 성벽 줄 반지름 − 0.4, 성문 반지름 − 0.5');
+   {const m=/const FALLBACK_WALL=(\{[^}]*\});/.exec(src),F=m&&new Function('return '+m[1])();eq(F,{from:Wl.from,gateIn:Wl.gateIn,in:Wl.in},'그림 화면 FALLBACK_WALL = layout.js WALLS')}
+   const man=JSON.parse(fs.readFileSync(__dirname+'/art-handoff/v015-v016/manifest.json','utf8')),M=k=>man.find(a=>a.asset===k);
+   eq([Wl.segW,Wl.segH,Wl.segD,Wl.gateW,Wl.gateH,Wl.towerR,Wl.towerH],[M('wall-segment').world_bounds_max[0]*2,M('wall-segment').world_bounds_max[1],+(M('wall-segment').world_bounds_max[2]*2).toFixed(2),+(M('castle-gate').world_bounds_max[0]*2).toFixed(2),M('castle-gate').world_bounds_max[1],M('watchtower').world_bounds_max[0],M('watchtower').world_bounds_max[1]],'성벽 치수 = manifest(조각 2.0 × 1.405 × 0.57 · 성문 3.18 × 2.73 · 성탑 반폭 0.787 × 3.32)');
+   eq(Wl.gateD,[M('castle-gate').world_bounds_min[2],M('castle-gate').world_bounds_max[2]],'성문 깊이(원점 기준) = manifest');
+   for(const st of [4,5]){const R=W.STAGE.radius[st],open=W.STAGE.open[st],P=L.wallPlan(R,open),tag='단계 '+st+'(반지름 '+R+')',line=R-Wl.in,gh=g=>Wl.gateW/2*g.s,th=Wl.towerR*Wl.towerScale;
+    eq([P.gates.map(g=>g.p),P.towers.length,P.segs.length,[0,1,2,3,4,5].map(k=>P.segs.filter(s=>s.side===k).length)],[open,6,st===4?48:59,st===4?[8,7,8,8,8,9]:[10,9,10,10,10,10]],tag+': 성문 = 열린 길, 성탑 6, 조각 '+(st===4?'48(8·7·8·8·8·9)':'59(10·9·10 …)')+'(정문은 1.15배라 그 면이 하나 적음)');
+    /* 조각은 그 면 안에서 성문을 비켜 서고, 폭 맞춤 배수는 0.8 ~ 1.25(이웃 조각과 이어 보임) */
+    for(const s of P.segs){const a=((s.a%(2*Math.PI))+2*Math.PI)%(2*Math.PI);ok(Math.floor(a/(Math.PI/3))===s.side&&s.len/Wl.segW>=.25&&s.len/Wl.segW<=1.25,tag+': 조각 (면 '+s.side+', '+(a*180/Math.PI).toFixed(1)+'°) 폭 배수 '+(s.len/Wl.segW).toFixed(2));
+     for(const g of P.gates){let d=s.a-g.a;d=Math.atan2(Math.sin(d),Math.cos(d));ok(Math.abs(d)*line>=gh(g)+s.len/2-.01,tag+': 조각이 '+g.p+'번 성문과 겹치지 않음')}}
+    /* 성탑과 성문 틈 ≥ 0.04(비킨 뒤), 성탑끼리는 면 경계에서 3° 안 */
+    for(const t of P.towers){for(const g of P.gates){let d=t.a-g.a;d=Math.atan2(Math.sin(d),Math.cos(d));ok(Math.abs(d)*line-gh(g)-th>=.04,tag+': 성탑 '+(t.a*180/Math.PI).toFixed(2)+'°과 '+g.p+'번 성문 틈 '+(Math.abs(d)*line-gh(g)-th).toFixed(2))}
+     ok(Math.abs(Math.atan2(Math.sin(t.a-Math.round(t.a/(Math.PI/3))*Math.PI/3),Math.cos(t.a-Math.round(t.a/(Math.PI/3))*Math.PI/3)))<3*Math.PI/180,tag+': 성탑은 면 경계 가까이')}
+    /* 6번 성문 바깥면과 다리 안쪽 끝 ≥ 0.05, 성벽 바깥면과 강 안쪽 둑 ≥ 0.1 */
+    {const g=P.gates.find(x=>x.p===L.RIVER.road),b=L.bridgeSpot(R),face=R-Wl.gateIn+Wl.gateD[1]*g.s;ok(b.r-L.BRIDGE.len/2-face>=.05,tag+': 6번 성문 바깥면과 다리 안쪽 끝 틈 '+(b.r-L.BRIDGE.len/2-face).toFixed(3));
+     const bank=R+L.RIVER.dist-L.RIVER.water/2-L.RIVER.bank;ok(bank-(line+Wl.segD/2)>=.1,tag+': 성벽 바깥면과 강 안쪽 둑 틈 '+(bank-line-Wl.segD/2).toFixed(3))}
+    /* 집 · 우물 · 물레방아와 성벽 안쪽면 ≥ 0.6, 성탑 · 성문과 집 ≥ 0.3 */
+    for(const c of L.COTTAGES.filter(c=>c.stage<=st)){ok(line-Wl.segD/2-(Math.hypot(...c.at)+L.COTTAGE_R)>=.6,tag+': 집 ('+c.at+')과 성벽 안쪽면 ≥ 0.6');
+     for(const t of P.towers)ok(d2(c.at,[t.x,t.z])-th-L.COTTAGE_R>=.3,tag+': 성탑과 집 ('+c.at+') 틈 '+(d2(c.at,[t.x,t.z])-th-L.COTTAGE_R).toFixed(2));
+     for(const g of P.gates)ok(d2(c.at,[g.x,g.z])-gh(g)-L.COTTAGE_R>=.3,tag+': 성문과 집 ('+c.at+') 떨어짐')}
+    for(const t of [L.WELL,L.MILL])ok(line-Wl.segD/2-(Math.hypot(...t.at)+t.r)>=.6,tag+': '+(t===L.WELL?'우물':'물레방아')+'이 성벽 안쪽');
+    /* 수문: 물레방아 수로(247.5°)가 성벽 줄을 지나는 자리 */
+    {const [x0,z0,x1,z1]=L.millRace(R),r0=Math.hypot(x0,z0),r1=Math.hypot(x1,z1);ok(r0<line&&r1>line&&Math.abs(Math.atan2(P.sluice.z,P.sluice.x)-Math.atan2(z1-z0,x1-x0))<1e-3&&Math.abs(Math.hypot(P.sluice.x,P.sluice.z)-line)<.01,tag+': 수문은 수로가 성벽 줄을 지나는 자리(247.5°)')}
+    /* 고리 자리(이 단계 회관의 자리): 집 · 우물 · 물레방아 · 수로 · 강 · 열린 길 · 흙길과 1.2 이상, 자리끼리 1.2 이상, 성벽 안쪽면과 2.5 이상 */
+    {const hall=C.FLAGS.STAGE_HALL.filter(s=>s<=st).length,slots=W.towerSlots(hall).map((p,i)=>W.slotAtStage(i,st)),race=L.millRace(R);
+     for(const [i,p] of slots.entries()){if(i<6)continue;const tg=tag+' 자리 '+i+' ('+p+')';
+      for(const c of L.COTTAGES.filter(c=>c.stage<=st))ok(d2(p,c.at)-L.COTTAGE_R>=1.2,tg+': 집과 1.2 이상('+(d2(p,c.at)-L.COTTAGE_R).toFixed(2)+')');
+      ok(d2(p,L.WELL.at)-L.WELL.r>=1.2&&d2(p,L.MILL.at)-L.MILL.r>=1.2,tg+': 우물 · 물레방아와 1.2 이상');ok(seg(p,race)-race[4]/2>=1.2,tg+': 수로와 1.2 이상');
+      ok(Math.abs(L.riverOffset(R,...p))-L.RIVER.water/2-L.RIVER.bank>=1.2,tg+': 강과 1.2 이상');
+      for(const q of open){const a=(q+.5)*Math.PI/4;ok(seg(p,[Math.cos(a)*5,Math.sin(a)*5,Math.cos(a)*60,Math.sin(a)*60])-L.ROAD.edge/2>=1.2,tg+': '+q+'번 늑대 길과 1.2 이상')}
+      for(const pth of L.PATHS[Math.min(3,hall)]||[])ok(seg(p,pth)-pth[4]/2>=1.2,tg+': 마을 흙길과 1.2 이상');
+      for(const [j,q] of slots.entries())if(j!==i)ok(d2(p,q)>=1.2,tg+': 자리 '+j+'과 1.2 이상');
+      ok(line-Wl.segD/2-Math.hypot(...p)>=2.5,tg+': 성벽 안쪽면과 2.5 이상('+(line-Wl.segD/2-Math.hypot(...p)).toFixed(2)+')')}}}
+   /* 성 회관(castle-hall.glb × 0.9) 바닥: 헛간(세계 크기 1.6) · 둥지 · 닭 자리 · 타워 자리와 떨어짐. 문 자리는 바닥 앞면 안 */
+   {const K=L.CASTLE,mc=M('castle-hall'),hx=(mc.world_bounds_max[0]-mc.world_bounds_min[0])/2*K.s,hz=(mc.world_bounds_max[2]-mc.world_bounds_min[2])/2*K.s,box=p=>Math.hypot(Math.max(0,Math.abs(p[0]-K.at[0])-hx),Math.max(0,Math.abs(p[1]-K.at[1])-hz));
+    eq([K.at,K.s,K.h,K.stage],[W.PLACE.coop,.9,mc.world_bounds_max[1],5],'성 회관: 회관 자리, 축척 0.9, 높이 = manifest 4.13, 성(단계 5)');
+    ok(box(W.PLACE.barn)-1.6>=.05,'성 회관 바닥과 헛간(1.6) 틈 '+(box(W.PLACE.barn)-1.6).toFixed(2));ok(box(W.PLACE.nursery)-1>=.05,'성 회관과 작은 닭장 떨어짐');
+    for(const n of L.NESTS)ok(box(n)-.36>=.05,'성 회관과 둥지 ('+n+') 틈 '+(box(n)-.36).toFixed(2));
+    for(const h of W.HOMES)ok(box(h)-.3>=.15,'성 회관과 닭 자리 ('+h+') 틈 '+(box(h)-.3).toFixed(2));
+    for(const p of W.ALL_SLOTS)ok(box(p)-.45>=.15,'성 회관과 타워 자리 ('+p+') 틈 '+(box(p)-.45).toFixed(2));
+    ok(Math.abs(K.door.x)<hx&&K.door.z>0&&K.door.z*K.s<=hz+.05,'성 문 자리는 바닥 앞면(+z, 카메라 쪽)')}});
+  /* S-10-9 그림 화면(3D 실패)의 돌 성벽: 6면 호(면마다 돌 띠 2줄, 부서진 면은 점선 1줄), 열린 길마다 성문 그림, 성탑 그림 6, 울타리 말뚝 없음, 성의 회관 그림 */
+  {const pick=n=>{const v=built(n);return {age:8,level:v.level,fence:v.fence,chickens:v.chickens,farmers:v.farmers,gold:300,seed:5}};
+   const a=seed(pick(36));a.n.scene.dataset.renderer='fallback';a.go();calmWorld(a);a.tick(2);
+   const parts=()=>{const box=a.n.wallArt,html=box.innerHTML,imgs=box.children.filter(c=>c.tagName==='img');return [box.classList.contains('hidden'),(html.match(/<path /g)||[]).length,(html.match(/class="broken"/g)||[]).length,imgs.filter(e=>e.dataset.kind==='gate').length,imgs.filter(e=>e.dataset.kind==='watch').length,a.n.fenceRow.children.length]};
+   eq(parts(),[false,12,0,5,6,0],'그림 화면 성곽 마을: 6면 호(2줄씩) · 성문 5 · 성탑 6 · 울타리 말뚝 없음');
+   const f=a.api.world.buildings.find(x=>x.kind==='fence'&&x.side===2);f.broken=true;f.hp=0;f.rebuild=1e6;a.api.render();eq(parts().slice(1,3),[11,1],'부서진 면은 연회색 점선 한 줄(무너짐)');
+   ok(src.includes("ART16_PNG.gate")&&src.includes("ART16_PNG.watch"),'성문 · 성탑 그림은 0.16 묶음 PNG');
+   const b=seed(pick(50));b.n.scene.dataset.renderer='fallback';b.go();calmWorld(b);b.tick(2);eq([b.n.houseArt.src,b.n.wallArt.children.filter(c=>c.tagName==='img'&&c.dataset.kind==='gate').length],['art-handoff/v015-v016/png/castle-hall.png',6],'그림 화면 성: 회관 그림은 castle-hall.png, 성문 6');
+   withFlags({WALLS:false},()=>{const c=seed(pick(36));c.n.scene.dataset.renderer='fallback';c.go();c.tick(2);eq([c.n.wallArt.classList.contains('hidden'),c.n.fenceRow.children.length>0],[true,true],'성벽을 끄면 그림 화면도 0.16(울타리 말뚝)')})}
   /* S-10-7 추천 말풍선 · 띠 알림 · 화면 상태 */
   {const s=mk({level:18,fence:2,chickens:16,gold:5000}),r=C.recommend(s,{lostHenRecently:true,walled:true});
    eq(r&&[r.key,r.line],['tower','꼬꼬를 지키려면 타워가 더 필요해요!'],'(타워를 살 수 있으면 타워)');

@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { prep, solid, flat, merge } from './geo.js';
 import { MARKET_NEAR, TENTS, STREET_FLAGS, STREET_CRATES, GATE, PATHS, lanterns, LANTERN_BOX, FLAGS3, HAY3, NESTS, COTTAGES, WELL, MILL0, MILL, KEEP, ROAD_MARK, ROAD,
- RIVER, riverFrame, BRIDGE, bridgeSpot, deckY, millRace } from './layout.js';
+ RIVER, riverFrame, BRIDGE, bridgeSpot, deckY, millRace, WALLS, wallPlan } from './layout.js';
 
 const V3=THREE.Vector3;
 const rot=(x,y,z)=>[x,y,z];
@@ -234,24 +234,71 @@ function millHouseParts(){
  return [['box',0xb7a98a,[0,.06,0],[1.5,.12,1.25]],['box',0xe7d3a6,[0,.72,0],[1.36,1.2,1.1]],['box',0x9a6634,[0,1.34,0],[1.5,.07,1.24]],['cone',0x8a4f33,[0,1.78,0],[1.12,.86,.94],rot(0,Math.PI/6,0)],
   ['box',0x7a4a24,[.38,.42,.56],[.3,.6,.05]],['box',0x5c3a1c,[-.78,MILL.wheel.y,0],[.3,.14,.14]]];
 }
-const WHITE=new THREE.Color(1,1,1),placed=(g,x,z,ry)=>prep(g,new THREE.Matrix4().compose(new V3(x,0,z),new THREE.Quaternion().setFromAxisAngle(new V3(0,1,0),ry),new V3(1,1,1)),WHITE);
+const WHITE=new THREE.Color(1,1,1),placed=(g,x,z,ry,s=1)=>prep(g,new THREE.Matrix4().compose(new V3(x,0,z),new THREE.Quaternion().setFromAxisAngle(new V3(0,1,0),ry),new V3(s,s,s)),WHITE);
+/* ---------- 0.17 walls: code-drawn stand-ins (when a 0.16 GLB is missing) and the pieces merged into the stage props ---------- */
+// Gatehouse stand-in, local like castle-gate.glb: along x, 3.18 wide, opening 1.6 wide, +z out of the village. Two stone pillars and a lintel with battlements.
+export function codeGateGeometry(){
+ const stone=0xd9cfb6,dark=0xb7ab8f,parts=[];
+ for(const x of [-1.21,1.21])parts.push(['box',dark,[x,.08,0],[.76,.16,.92]],['box',stone,[x,1.2,0],[.67,2.3,.74]],['box',0xc9bea2,[x*1.06,2.42,0],[.5,.24,.7]]);
+ parts.push(['box',stone,[0,2.25,0],[3.16,.42,.75]],['box',dark,[0,2.02,0],[1.7,.1,.78]]);
+ for(const x of [-1.32,-.66,0,.66,1.32])parts.push(['box',stone,[x,2.6,0],[.36,.32,.51]]);
+ parts.push(['box',0x4e7775,[0,2.2,.4],[.3,.26,.06]],['sphere',0xffd24a,[0,2.21,.44],.07]);
+ return solid(parts);
+}
+// Watchtower stand-in: the 0.14 tall stone post (roadMark tier 4) without its flag, local at the origin.
+export function codeWatchGeometry(){
+ const h=2.3,r=.5,stone=0xd9cfb6,dark=0xb7ab8f,parts=[['cyl8',dark,[0,.08,0],[r*1.25,.16,r*1.25]],['taper',stone,[0,h/2,0],[r,h,r],rot(Math.PI,0,0)],['cyl8',dark,[0,h+.06,0],[r*1.2,.12,r*1.2]]];
+ for(let i=0;i<4;i++){const a=i*Math.PI/2+Math.PI/4;parts.push(['box',stone,[Math.cos(a)*r*.8,h+.22,Math.sin(a)*r*.8],[.2,.22,.2],rot(0,-a,0)])}
+ parts.push(['cone8',0xb5372c,[0,h+.75,0],[r*.95,.9,r*.95]]);
+ return solid(parts);
+}
+// The iron portcullis that drops into a gate's opening (local: along x, centred, from the ground up; village.js instances it per gate).
+export function portcullisGeometry(){
+ const w=WALLS.opening.w-.1,h=1.9,iron=0x4a4c54,parts=[];
+ for(let i=0;i<6;i++){const x=-w/2+.07+i*(w-.14)/5;parts.push(['box',iron,[x,h/2,0],[.07,h,.07]],['cone',0x6a6c74,[x,.04,0],[.06,.12,.06],rot(Math.PI,0,0)])}
+ for(const y of [.45,.95,1.45])parts.push(['box',iron,[0,y,0],[w,.07,.06]]);
+ parts.push(['box',0x3a2c22,[0,h-.04,0],[w+.08,.1,.1]]);
+ return solid(parts);
+}
+// The sluice: a dark arch on both faces of the wall over the mill race (local like a wall segment: along x, ±z the two faces).
+function sluice(x,z,ry){
+ const parts=[],c=Math.cos(ry),s=Math.sin(ry),at=(lx,lz)=>[x+lx*c+lz*s,z-lx*s+lz*c];
+ for(const f of [-1,1]){const [px,pz]=at(0,f*.3);parts.push(['box',0x2e2a26,[px,.32,pz],[.9,.62,.04],rot(0,ry,0)],['box',0x9d957f,[px,.68,pz],[1.1,.12,.06],rot(0,ry,0)])}
+ const [qx,qz]=at(0,0);parts.push(flat('plane',0x5fb2de,qx,qz,.8,.9,.05,-ry));
+ return parts;
+}
+// What the wall adds to the stage props at village radius R: gates on the open roads (castle-gate.glb or the code gate), watchtowers at the side ends
+// (watchtower.glb or the code post), red flags on the towers at the castle stage, the sluice. Wall segments themselves are instanced in village.js.
+function wallParts(stage,R,routes,opt){
+ const plan=wallPlan(R,routes),geo=[],parts=[],spots=[],tower=opt.watch||codeWatchGeometry(),gate=opt.gate||codeGateGeometry(),ts=opt.watch?WALLS.towerScale:1,th=opt.watch?WALLS.towerH*WALLS.towerScale:3.1;
+ for(const g of plan.gates){geo.push(placed(gate,g.x,g.z,g.ry,g.s));spots.push([g.x,g.z,WALLS.gateH*g.s])}
+ for(const t of plan.towers){geo.push(placed(tower,t.x,t.z,t.ry,ts));spots.push([t.x,t.z,th])}
+ if(stage>=5)plan.towers.forEach((t,k)=>parts.push(['cyl6',0xf4efe4,[t.x,th+.45,t.z],[.035,.9,.035]],['sphere',0xffd24a,[t.x,th+.92,t.z],.06],['box',0xe2332a,[t.x+.2,th+.72,t.z],[.38,.26,.02]],['cone',0xe2332a,[t.x+.42,th+.72,t.z],[.1,.14,.02],rot(0,0,-Math.PI/2)]));
+ if(opt.race)parts.push(...sluice(plan.sluice.x,plan.sluice.z,plan.sluice.ry));
+ if(parts.length)geo.push(solid(parts));
+ return {geo,spots,plan};
+}
 // What stands at 'stage' (0-5) for a village of 'radius' with the open 'routes' (array of spawn points, or null).
 // → {all, old, fresh}: geometries (null when empty) of everything, of what was already there at the stage before, and of what this stage adds
 //   (the road-entrance markers move out with the edge, so they are always fresh), plus spots [[x,z,height],…] of the fresh things for the effects.
 // 0.15 opt.river: from stage 3 the mill stands at MILL (opt.house = the baked mill house, else the code house; the wheel is drawn apart by village.js)
 // and the bridge on road 6 (opt.bridge = the baked bridge, else the code bridge) instead of road 6's two markers. Without opt.river: exactly the 0.14 props.
+// 0.17 opt.walls: from stage 4 the gates, watchtowers (opt.gate · opt.watch = the baked GLBs, else code shapes), tower flags (stage 5) and the sluice (with the river)
+// instead of the road-entrance markers; they step out with the wall, so they are always fresh. opt.castle: the castle hall GLB stands in for the 0.14 keep.
 export function stageProps(stage,radius,routes,opt={}){
  const old=[],fresh=[],oldG=[],freshG=[],spots=[],put=(at,parts,h,st)=>{if(st===stage){fresh.push(...parts);spots.push([at[0],at[1],h])}else old.push(...parts)};
- const river=!!opt.river&&stage>=RIVER.stage;
+ const river=!!opt.river&&stage>=RIVER.stage,walls=!!opt.walls&&stage>=WALLS.from&&!!routes;let wall=null;
  COTTAGES.forEach((c,k)=>{if(stage>=c.stage)put(c.at,cottage(c.at[0],c.at[1],c.roof,k),1.5,c.stage)});
  if(stage>=WELL.stage)put(WELL.at,well(...WELL.at),1.5,WELL.stage);
  if(river){const [x,z]=MILL.at,g=placed(opt.house||solid(millHouseParts()),x,z,MILL.ry);(stage===MILL.stage?freshG:oldG).push(g);if(stage===MILL.stage)spots.push([x,z,2.2]);
   const b=bridgeSpot(radius);freshG.push(placed(opt.bridge||codeBridgeGeometry(),b.at[0],b.at[1],b.ry));spots.push([b.at[0],b.at[1],1])}   // the bridge steps out with the river: always fresh
  else if(stage>=MILL0.stage)put(MILL0.at,mill(...MILL0.at),2.2,MILL0.stage);
- if(stage>=KEEP.stage)put(KEEP.at,keep(...KEEP.at),5,KEEP.stage);
+ if(stage>=KEEP.stage&&!opt.castle)put(KEEP.at,keep(...KEEP.at),5,KEEP.stage);
  let marks=0;
- if(stage>=1&&routes)for(const p of routes){if(river&&p===RIVER.road)continue;const a=spawnAngle(p),r=radius+ROAD_MARK.out,tier=stage<=2?1:stage-1;
+ if(stage>=1&&routes&&!walls)for(const p of routes){if(river&&p===RIVER.road)continue;const a=spawnAngle(p),r=radius+ROAD_MARK.out,tier=stage<=2?1:stage-1;
   [-1,1].forEach((sd,i)=>{const x=Math.cos(a)*r-Math.sin(a)*sd*ROAD_MARK.side,z=Math.sin(a)*r+Math.cos(a)*sd*ROAD_MARK.side;fresh.push(...roadMark(x,z,tier,i));marks++;if(tier>=3)spots.push([x,z,tier>=4?2.6:1.9])})}
+ if(walls){wall=wallParts(stage,radius,routes,{...opt,race:river});freshG.push(...wall.geo);spots.push(...wall.spots)}
  const geo=(list,extra)=>{const all=[...(list.length?[solid(list)]:[]),...extra];return all.length?(all.length===1?all[0]:merge(all)):null};
- return {all:geo([...old,...fresh],[...oldG,...freshG]),old:geo(old,oldG),fresh:geo(fresh,freshG),spots,houses:COTTAGES.filter(c=>stage>=c.stage).length,marks,river};
+ return {all:geo([...old,...fresh],[...oldG,...freshG]),old:geo(old,oldG),fresh:geo(fresh,freshG),spots,houses:COTTAGES.filter(c=>stage>=c.stage).length,marks,river,
+  walls:wall?{gates:wall.plan.gates.length,towers:wall.plan.towers.length,segs:wall.plan.segs.length,sluice:river}:null};
 }

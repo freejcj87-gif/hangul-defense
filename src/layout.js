@@ -114,3 +114,39 @@ export const KEEP={at:[-1.8,-3.9],r:.92,h:6.5,stage:5,art:'castle-hall'};
 // Road-entrance markers stand outside the village edge on both sides of every open wolf road: [distance beyond the radius, lateral offset]
 export const ROAD_MARK={out:.55,side:1.75,h:[0,1.2,2.3,2.7,3.8],art:'castle-gate'};   // h: height of the marker per tier (1 lamp stake · 2 flag pole · 3 stone post · 4 tall post with banner)
 export const ROAD={r0:7.9,r1:50,edge:2.0,width:1.45};   // an open wolf road (dirt), from inside the village edge out into the forest
+
+/* ---------- 0.17 stone walls, gates, watchtowers and the castle hall (계획서 work\verification-20261113\design\v016-plan.md §2, 프로듀서 결정 '26.11.20) ----------
+   From the walled village (stage 'from' = world.js WALL.from) the fence ring becomes a stone wall on the same line (radius − in). The rule is world.js's
+   (six fence buildings, +70 each); everything here is looks only. Art: art-handoff/v015-v016 wall-segment.glb (2.0 × 1.405 × 0.57), castle-gate.glb
+   (3.18 wide, 2.73 tall, its opening 1.6 wide and 1.99 high, emblem on +z = out of the village), watchtower.glb (1.57 across, 3.32 tall, door on +z = in).
+   - segments: per side n = round((arc − gate widths)/seg), each piece of the side between its ends and its gate gets its share, stretched to fit (× 1.01).
+   - gates: one per open road at radius − gateIn, turned out along the road (road 'main' = 2, the front gate, scale mainScale). From stage 3 road 6 has the bridge;
+     its gate stands just inside the bridge's inner end (gateIn 0.5 keeps 0.06 · 0.16 of air at radius 18 · 22).
+   - towers: at the six side ends (0°, 60° …) on the wall line, nudged off a gate when the gap is too small (stage 4: the front gate at 112.5° and road 6 at 292.5°).
+   - sluice: where the mill race (247.5°) crosses the wall line, a dark arch in the wall over the water.
+   - h: wall height scale (0.8: the far wall hides less of the wolves behind it, 계획서 §2.5; measured with inspect().walls.hiddenHeads). */
+export const WALLS={from:4,in:.4,gateIn:.5,seg:2.0,segW:2.0,segD:.57,segH:1.405,h:.8,gateW:3.18,gateD:[-.46,.537],gateH:2.73,opening:{w:1.6,h:1.99},main:2,mainScale:1.15,
+ towerScale:.9,towerR:.787,towerH:3.32,race:247.5,gap:.05};
+// The castle hall (stage 5): castle-hall.glb at the hall's place, front (+z) to the camera, scale 0.9 (1.0 would touch the barn). door: the doorway in the baked,
+// box-centred model (build_models.py door at z 1.08, x 0; the box centre is at x −0.03, z −0.04), in model units: hens hide through it.
+export const CASTLE={at:[-2.8,-2.8],s:.9,h:4.13,foot:[3.81,2.68],door:{x:.03,z:1.2,w:.66,h:.91},stage:5};
+const gateHalf=p=>WALLS.gateW/2*(p===WALLS.main?WALLS.mainScale:1);
+// The wall for village radius R with the open roads (array of spawn points). → {line, segs:[{side,a,len,k}], gates:[{p,a,x,z,ry,s}], towers:[{a,x,z,ry}], sluice:{a,x,z,ry}|null}
+// a = the piece's middle angle (radians, world x/z: x = cos a · r, z = sin a · r), len = its arc length on the wall line, k = its index along the side (rise order).
+export function wallPlan(R,routes){
+ const line=R-WALLS.in,gr=R-WALLS.gateIn,S=Math.PI/3,open=(routes||[]).slice().sort((a,b)=>a-b),gates=[],segs=[],towers=[];
+ for(const p of open){const a=(p+.5)*Math.PI/4,s=p===WALLS.main?WALLS.mainScale:1;gates.push({p,a,x:+(Math.cos(a)*gr).toFixed(3),z:+(Math.sin(a)*gr).toFixed(3),ry:Math.PI/2-a,s})}
+ for(let k=0;k<6;k++){
+  const a0=k*S,a1=a0+S,mine=gates.filter(g=>g.a>=a0&&g.a<a1).sort((x,y)=>x.a-y.a),pieces=[];let from=a0;
+  for(const g of mine){const h=gateHalf(g.p)/line;pieces.push([from,g.a-h]);from=g.a+h}pieces.push([from,a1]);
+  const free=pieces.reduce((s,[x,y])=>s+Math.max(0,y-x)*line,0),n=Math.max(1,Math.round(free/WALLS.seg));let left=n,idx=0;
+  pieces.forEach(([x,y],i)=>{const len=Math.max(0,y-x)*line,m=i===pieces.length-1?left:Math.min(left,len<1.2?0:Math.max(1,Math.round(n*len/free)));left-=m;
+   for(let j=0;j<m;j++){const a=x+(j+.5)*(y-x)/m;segs.push({side:k,a,len:len/m,k:idx++})}});
+ }
+ // watchtowers at the side ends, nudged away from a gate that leaves less than (gate half + tower half + gap) of wall line between them
+ for(let k=0;k<6;k++){let a=k*S;const need=WALLS.towerR*WALLS.towerScale+WALLS.gap;
+  for(const g of gates){let d=a-g.a;d=Math.atan2(Math.sin(d),Math.cos(d));const room=Math.abs(d)*line-gateHalf(g.p);if(room<need)a+=Math.sign(d||1)*(need-room)/line}
+  towers.push({a,x:+(Math.cos(a)*line).toFixed(3),z:+(Math.sin(a)*line).toFixed(3),ry:-a-Math.PI/2})}
+ const ra=WALLS.race*Math.PI/180,sluice={a:ra,x:+(Math.cos(ra)*line).toFixed(3),z:+(Math.sin(ra)*line).toFixed(3),ry:-ra-Math.PI/2};
+ return {line,R,segs,gates,towers,sluice};
+}
