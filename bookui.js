@@ -41,6 +41,10 @@
   }
   function askGate(cb){gate.cb=cb;if(Date.now()>=gate.until)gateNew();$('gate').hidden=false;gateDraw()}
   $('gateClose').onclick=()=>{gate.cb=null;$('gate').hidden=true};
+  /* 1초마다 보는 것(세계 시계와 따로: 시작 화면·쉬는 중에도 돈다) */
+  const watch=[];setInterval(()=>{for(const f of watch)try{f()}catch{}},1000);
+  /* 30초 쉼이 끝나면 문턱 화면 그대로 새 수와 숫자판을 다시 보인다. 전에는 "잠깐 쉬었다가 다시 해 주세요"에서 멈춰, 그만두기를 누르고 다시 길게 눌러야 했다(리뷰 0.16 R8) */
+  watch.push(()=>{if(!$('gate').hidden&&gate.until&&Date.now()>=gate.until){gate.until=0;gateNew();gateDraw()}});
 
   /* ---------- 발자국 수첩(세계가 멈춘 때만 열린다: 시작 화면 · 엔딩 카드 · 잠깐 쉬기) ---------- */
   function pageLine(p,M){

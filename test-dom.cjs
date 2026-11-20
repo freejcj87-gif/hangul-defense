@@ -2263,6 +2263,14 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   h.go();const qid=h.n.answers.dataset.qid;const h2=boot({book:true});h2.go();eq([h2.game().state.bank,h2.n.answers.dataset.qid],[Q.BANK_VERSION,qid],'지운 뒤 놀다가 다시 열어도 같은 판·같은 문제(예전 판 1로 바뀌지 않음)');
   saved={[KEY]:mine[0],[BOOK_KEY]:mine[1]};
  }
+ /* M-9c 리뷰 0.16 R8: 3번 틀려 30초 쉰 뒤에는 문턱 화면을 닫지 않아도 새 수와 숫자판이 돌아온다(bookui의 1초 타이머) */
+ {const g=bboot(null,{index:5}),sec=()=>g.intervals.slice(1).forEach(f=>f());press(g,'openGuard',2100);
+  const wrong=()=>{const d=gateDigits(g);gateType(g,[d[0]==='9'?'8':'9',d[1],d[2]])};wrong();wrong();wrong();
+  sec();ok(g.n.gatePad.children.length===0&&/잠깐 쉬었다가/.test(g.n.gateAsk.textContent),'쉬는 동안(30초 안)에는 숫자판 없음');
+  skew+=29000;sec();ok(g.n.gatePad.children.length===0,'29초 뒤에도 쉼');
+  skew+=2000;sec();ok(g.n.gatePad.children.length===10&&gateDigits(g)&&!/잠깐/.test(g.n.gateAsk.textContent),'30초가 지나면 문턱 화면 그대로 새 수와 숫자판');
+  wrong();ok(/수가 달라요/.test(g.n.gateAsk.textContent)&&g.n.gatePad.children.length===10,'쉰 뒤에는 다시 세 번 기회(한 번 틀려도 쉬지 않음)');
+  gatePass(g);ok(g.n.gate.hidden&&g.n.guardian.hidden===false,'맞히면 보호자 화면')}
  /* M-9b 리뷰 0.16 R1: 기록을 다시 읽은 뒤(진행 파일 바꾸기 · 되돌리기 · 모든 기록 지우기) 그 기록의 영어 설정이 문제은행에 바로 반영된다. 전에는 앞 기록의 비중이 다시 열 때까지 남았다 */
  {const src=Bk.fresh(Date.now(),77);src.set.en='off';const file=Bk.exportText(src,{...C.fresh(8),seed:77,bank:Q.BANK_VERSION,version:3},{now:Date.now()});
   const a=bboot(null,{index:1});eq(Q.QUIZ_MIX[8].english,2,'이 기기 기록: 영어 보통');
