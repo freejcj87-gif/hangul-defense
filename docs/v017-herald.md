@@ -56,7 +56,7 @@
 
 | 검사 | 결과 |
 |---|---|
-| `SOFT=1 node test-dom.cjs` | **PASS 19,768**(H절 · TM-13 포함). 같은 날 첫 실행 한 번은 "세계 step 평균 1.5ms 미만"이 1.70ms로 걸렸다(이 PC 메모리 부족 때 측정, 예고와 무관한 step 성능 검사). 다시 돌린 두 번은 305 · 425µs로 통과 |
+| `SOFT=1 node test-dom.cjs` | **PASS 19,768**(H절 · TM-13 포함). 같은 날 첫 실행 한 번은 "세계 step 평균 1.5ms 미만"이 1.70ms로 걸렸다(이 PC 메모리 부족 때 측정, 예고와 무관한 step 성능 검사). 그 뒤 세 번은 305 · 844 · 425µs로 통과(마지막 두 번이 전체 PASS) |
 | `node test-questions.cjs` | PASS 97,365 |
 | `node test-book.cjs` | PASS 3,178 |
 
