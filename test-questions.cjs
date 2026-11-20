@@ -695,7 +695,8 @@ for(const a of Q.AGES)for(const s of [0,1]){
  const BANK_PRINT={
   1:{"7":"1cddae1b212cf7d3","8":"bb984b66b6f6440a","9":"c4adfc2173d53aef","10":"c17593284c4b32ca"},
   2:{"7":"f4ce17ea386ddc1c","8":"94f2fe2fc27d7cd5","9":"052a2183c5b219a8","10":"30c7d21fbf598113"},
-  3:{"7":"46858a27fecbc8d7","8":"4f55121708b27c3f","9":"bd6bece8c0a1bdb6","10":"489431f831d1171b"}
+  3:{"7":"46858a27fecbc8d7","8":"4f55121708b27c3f","9":"bd6bece8c0a1bdb6","10":"489431f831d1171b"},
+  4:{"7":"0980eb91f56cb0ab","8":"5a3a4ab9ae39f3e3","9":"3d2ba0284da3200e","10":"fc0d2c77f488ca06"}
  };
  const print=v=>{const o={};for(const a of Q.AGES){const h=crypto.createHash('sha1');for(const s of [0,1,7,42,123456])for(let i=0;i<600;i++){const q=Q.at(a,'story',i,s,v);h.update(q.id+'|'+q.choices.join('/')+'|'+q.answer+'|'+q.lap+'\n')}o[String(a)]=h.digest('hex').slice(0,16)}return o};
  eq(Q.BANK_VERSION,Object.keys(BANK_PRINT).length,'은행 판 수 = 지문 표의 줄 수(문항을 붙였으면 BANK_PRINT에 새 판 줄을 더한다)');
@@ -726,7 +727,11 @@ const gfile=path.join(__dirname,'questions-gen.js'),gbuf=fs.readFileSync(gfile);
 /* 크기는 저장소·배포 기준(LF)으로 셈: Windows 체크아웃(autocrlf)의 CR은 빼고 */
 const lfSize=b=>Buffer.byteLength(b.toString('utf8').replace(/\r\n/g,'\n'));
 ok(lfSize(buf)<=60*1024,'questions.js 60KB 이하 ('+lfSize(buf)+')');
-ok(lfSize(gbuf)<=1024*1024,'questions-gen.js 1MB 이하 ('+lfSize(gbuf)+'). 은행 판 2에서 약 690KB(gzip 약 95KB)');
+/* 은행 판 4(2026-11-20): 한 파일 그대로 두고 한도를 1MB → 1.5MB로 올리고, 실제 전송 크기(gzip) 한도를 함께 둔다(근거 docs/bank-v4-20261120.md 2절).
+   GitHub Pages는 이 파일을 gzip으로 보낸다. 판 3 705,967B(gzip 96KB) → 판 4 1,020,688B(gzip 143KB). 첫 화면 묶음(png·glb·village.js) 약 12MB 가운데 1% 남짓 */
+{const lfBuf=Buffer.from(gbuf.toString('utf8').replace(/\r\n/g,'\n')),gz=require('node:zlib').gzipSync(lfBuf).length;
+ ok(lfBuf.length<=1536*1024,'questions-gen.js 1.5MB 이하 ('+lfBuf.length+')');
+ ok(gz<=220*1024,'questions-gen.js gzip 220KB 이하 ('+gz+'). 넘으면 나이별 파일 나누기(필요한 나이만 불러오기)를 검토')}
 for(const [name,b] of [['questions.js',buf],['questions-gen.js',gbuf]]){
   ok(!(b[0]===0xEF&&b[1]===0xBB&&b[2]===0xBF),name+' BOM 없음');
   ok(!b.toString('utf8').includes('�'),name+' UTF-8로 깨짐 없이 읽힘');
