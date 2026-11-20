@@ -2303,6 +2303,11 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   press(a,'drawerGuard',2100);gatePass(a);ok(/수첩 기록을 저장하지 못했어요/.test(a.n.gBody.textContent),'보호자 기록 탭에 쓰기 실패 경고');
   full=false;a.n.guardClose.click();a.n.pause.click();a.n.pause.click();press(a,'drawerGuard',2100);gatePass(a);ok(!/저장하지 못했어요/.test(a.n.gBody.textContent)&&JSON.parse(store[BOOK_KEY]).medal.one.n===1,'다시 써지면 경고가 사라짐');
   const ok2=bboot(null,{index:1});press(ok2,'openGuard',2100);gatePass(ok2);ok(!/저장하지 못했어요|저장되지 않아요/.test(ok2.n.gBody.textContent),'평소에는 경고 없음')}
+ /* M-9f 리뷰 0.16 N: 앱보다 새 버전 기록이 있는 기기에서는 진행 파일을 내보내지 않는다(메모리 안 빈 기록뿐이라 그 파일이 다른 기기의 진행을 비울 수 있었다) */
+ {const newer=JSON.stringify({...Bk.fresh(Date.now(),1),v:2,medal:{one:{n:777}}});saved={[KEY]:JSON.stringify({version:3,...C.fresh(8),seed:1}),[BOOK_KEY]:newer};
+  const a=boot({book:true});press(a,'openGuard',2100);gatePass(a);a.n.gTabs.children.find(b=>b.dataset.tab==='file').click();
+  ok(!a.n.gBody.children.some(c=>c.tagName==='button'&&c.textContent.startsWith('파일로 내보내기'))&&/이 앱에서는 내보낼 수 없어요/.test(a.n.gBody.textContent),'새 버전 기록: 내보내기 단추 대신 업데이트 안내');
+  ok(!a.window.__lastExport&&saved[BOOK_KEY]===newer&&a.n.gBody.children.some(c=>c.tagName==='button'&&c.textContent==='파일 불러오기'),'파일을 만들지 않고 기록은 글자 그대로(불러오기는 그대로 가능)')}
  /* M-9b 리뷰 0.16 R1: 기록을 다시 읽은 뒤(진행 파일 바꾸기 · 되돌리기 · 모든 기록 지우기) 그 기록의 영어 설정이 문제은행에 바로 반영된다. 전에는 앞 기록의 비중이 다시 열 때까지 남았다 */
  {const src=Bk.fresh(Date.now(),77);src.set.en='off';const file=Bk.exportText(src,{...C.fresh(8),seed:77,bank:Q.BANK_VERSION,version:3},{now:Date.now()});
   const a=bboot(null,{index:1});eq(Q.QUIZ_MIX[8].english,2,'이 기기 기록: 영어 보통');

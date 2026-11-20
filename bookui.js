@@ -149,7 +149,9 @@
   const pv=p=>'친구 카드 '+p.cards+' · 훈장 '+p.medals+' · 놀이 '+p.play+'번 · 마지막 '+p.last;
   function tabFile(box){
     para(box,STORE_LINE);
-    button(box,'파일로 내보내기',()=>askGate(exportNow));
+    /* 앱보다 새 버전 기록이 있으면 이 앱은 메모리 안 빈 기록만 들고 있어 내보내지 않는다. 전에는 빈 기록 파일을 만들어, 그 파일을 다른 기기에서 바꾸기 하면 진행이 비었다(리뷰 0.16 N) */
+    if(bookH.status==='newer')para(box,'새 버전에서 만든 기록이라 이 앱에서는 내보낼 수 없어요. 앱을 업데이트한 뒤 내보내 주세요.','g-warn');
+    else button(box,'파일로 내보내기',()=>askGate(exportNow));
     para(box,FILE_LINE,'g-note');para(box,'기기를 바꾸기 전에 진행 파일을 내보내 두세요.','g-note');
     button(box,'파일 불러오기',()=>{try{$('importFile').value='';$('importFile').click()}catch{}});
     if(incoming){
