@@ -7,6 +7,7 @@ on:
     branches: [claude/card-art]
     paths:
       - tools/**
+      - cards.js
       - scripts/card-shots.cjs
       - src/monsters.js
       - art-handoff/v015-v016/glb/wolf-king.glb
