@@ -87,6 +87,11 @@
   let guardAt=0,guardTab='log',guardInfo=false,incoming=null;
   const guardAlive=()=>{if(guardInfo)return true;if(Date.now()-guardAt>Book.BOOK.GATE.idle*100){closeGuard();return false}guardAt=Date.now();return true};
   function closeGuard(){$('guardian').hidden=true;incoming=null}
+  /* 보호자 화면을 3분 동안 손대지 않으면 닫는다(명세 §1.4 "3분 동안 손대지 않으면 닫힌다"). 전에는 다음 손길에야 닫혀 어른이 자리를 비운 뒤에도 열린 채 남았다(리뷰 0.16 R9).
+     문턱이 떠 있는 동안은 기다린다. 화면을 누르거나 글을 내려 읽으면(3분 안) 손댄 것으로 친다 */
+  const guardTouch=()=>{if(!guardInfo&&Date.now()-guardAt<=Book.BOOK.GATE.idle*100)guardAt=Date.now()};
+  $('guardian').onpointerdown=guardTouch;$('gBody').onscroll=guardTouch;
+  watch.push(()=>{if(!$('guardian').hidden&&!guardInfo&&$('gate').hidden&&Date.now()-guardAt>Book.BOOK.GATE.idle*100)closeGuard()});
   const para=(box,text,cls)=>{const p=el('p',cls||'',text);box.append(p);return p};
   const button=(box,text,fn,cls)=>{const b=el('button',cls||'',text);b.onclick=()=>{if(guardAlive())fn()};box.append(b);return b};
   const STORE_LINE="게임 기록은 이 기기에 저장되고, 개발자에게 보내지 않아요. 기기 백업을 켜 두면 이 기기의 Google 계정 백업에 함께 보관될 수 있어요(화면 잠금을 쓰는 기기에서만). 보호자가 '진행 파일 옮기기'로 직접 내보낼 수도 있어요.";

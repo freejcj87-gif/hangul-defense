@@ -2270,7 +2270,14 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   skew+=29000;sec();ok(g.n.gatePad.children.length===0,'29초 뒤에도 쉼');
   skew+=2000;sec();ok(g.n.gatePad.children.length===10&&gateDigits(g)&&!/잠깐/.test(g.n.gateAsk.textContent),'30초가 지나면 문턱 화면 그대로 새 수와 숫자판');
   wrong();ok(/수가 달라요/.test(g.n.gateAsk.textContent)&&g.n.gatePad.children.length===10,'쉰 뒤에는 다시 세 번 기회(한 번 틀려도 쉬지 않음)');
-  gatePass(g);ok(g.n.gate.hidden&&g.n.guardian.hidden===false,'맞히면 보호자 화면')}
+  gatePass(g);ok(g.n.gate.hidden&&g.n.guardian.hidden===false,'맞히면 보호자 화면');
+  /* 리뷰 0.16 R9: 보호자 화면을 3분 동안 손대지 않으면 닫힘(명세 §1.4). 전에는 다음 손길에야 닫혔다 */
+  skew+=170000;sec();ok(g.n.guardian.hidden===false,'2분 50초: 아직 열림');g.n.gBody.onscroll();skew+=20000;sec();ok(g.n.guardian.hidden===false,'글을 내려 읽으면 손댄 것으로 침');
+  skew+=181000;sec();ok(g.n.guardian.hidden===true,'3분 동안 손대지 않으면 저절로 닫힘');
+  press(g,'openGuard',2100);gatePass(g);g.n.gTabs.children.find(b=>b.dataset.tab==='set').click();g.n.gBody.children.find(c=>c.textContent==='모든 기록 지우기').click();
+  skew+=200000;sec();ok(g.n.guardian.hidden===false&&g.n.gate.hidden===false,'문턱이 떠 있는 동안은 닫지 않음');g.n.gateClose.click();sec();ok(g.n.guardian.hidden===true,'문턱을 닫으면 그때 닫힘');
+  skew+=181000;g.n.guardian.onpointerdown();g.n.guardian.hidden=false;sec();ok(g.n.guardian.hidden===true,'3분이 지난 뒤의 손길은 시간을 늘리지 않음');
+  g.n.openInfo.click();skew+=400000;sec();ok(g.n.guardian.hidden===false,'보호자 안내(방침 본문만)는 저절로 닫지 않음');g.n.guardClose.click()}
  /* M-9b 리뷰 0.16 R1: 기록을 다시 읽은 뒤(진행 파일 바꾸기 · 되돌리기 · 모든 기록 지우기) 그 기록의 영어 설정이 문제은행에 바로 반영된다. 전에는 앞 기록의 비중이 다시 열 때까지 남았다 */
  {const src=Bk.fresh(Date.now(),77);src.set.en='off';const file=Bk.exportText(src,{...C.fresh(8),seed:77,bank:Q.BANK_VERSION,version:3},{now:Date.now()});
   const a=bboot(null,{index:1});eq(Q.QUIZ_MIX[8].english,2,'이 기기 기록: 영어 보통');
