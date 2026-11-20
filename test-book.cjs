@@ -237,7 +237,7 @@ const played=(()=>{const b=mk(5);let t=T;
  ok(b.rng>0,'난수 상태 0은 기본값으로');
  eq(b.seen,['a8-story-01'],'seen 중복·모양 다듬기');
  eq([b.drop,b.pend],[null,null],'틀린 drop·pend는 비움');
- eq([b.mon.wolf.card,b.mon.wolf.note,b.mon.wolf.kills,b.mon.wolf.rib.n,b.mon.wolf.shiny],[0,0,1e7,0,0],'친구는 발자국이 있어야 인정, 누적 수 10^7 이하, 시각은 지금+1일 이하');
+ eq([b.mon.wolf.card,b.mon.wolf.note,b.mon.wolf.kills,b.mon.wolf.rib.n,b.mon.wolf.shiny],[0,0,1e7,0,NP],'친구는 발자국이 있어야 인정, 누적 수 10^7 이하, 지금+1일보다 뒤인 시각은 지금으로 자름(받은 칸을 지우지 않음)');
  eq(b.mon.bramble,played.mon.bramble,'멀쩡한 몬스터 칸은 그대로');
  eq([b.medal.one.n,b.medal.one.at,b.medal.king.at[0]>0,b.medal.king.at[2]],[0,[0,0,0],true,0],'훈장: 수에 맞지 않는 받은 시각은 지우고, 문턱을 넘었는데 시각이 없으면 채움');
  eq(b.set,{en:'std',day:30,sfx:0},'설정: 범위 밖 하루 시간은 기본값 30');
@@ -252,6 +252,18 @@ const played=(()=>{const b=mk(5);let t=T;
  eq([c.rv.length,c.seen.length,c.log.length,Object.keys(c.day).length<=35],[200,4000,30,true],'목록 상한(복습 200 · seen 4000 · 놀이 요약 30 · 날짜 35)');
  ok(c.rv.every(e=>e.dp>1)||c.rv.filter(e=>e.dp===1).length<big.rv.filter(e=>e.dp===1).length,'복습 대기열이 넘치면 오래된 것부터 버림');
 }
+
+/* B-3b 리뷰 0.16 R4: 기기 시계가 하루 넘게 뒤로 가도(배터리 방전·날짜 수정) 받은 칸은 남는다. 전에는 지금+1일보다 뒤인 시각을 0으로 지워 발자국·친구 카드·반짝 칸이 사라졌다 */
+{const b=played,cells=B.cells(b),back=b.at-3*DAY,r=B.restore(clone(b),{now:back,knows});
+ ok(cells>0&&B.KINDS.some(k=>b.mon[k].card>0),'고정본에 발자국·친구 카드가 있음');
+ eq(B.cells(r),cells,'시계를 3일 되돌려 열어도 수첩 칸 수 그대로('+cells+')');
+ eq(B.KINDS.map(k=>[r.mon[k].foot>0,r.mon[k].card>0,r.mon[k].shiny>0,r.mon[k].note]),B.KINDS.map(k=>[b.mon[k].foot>0,b.mon[k].card>0,b.mon[k].shiny>0,b.mon[k].note]),'몬스터마다 발자국·친구 카드·반짝·쪽지 단계 그대로');
+ ok(B.KINDS.every(k=>r.mon[k].foot<=back+DAY&&r.mon[k].card<=back+DAY&&r.mon[k].shiny<=back+DAY)&&r.at<=back&&r.made<=back,'미래 시각은 지금+1일 이하');
+ {const one=mk(1);kills(one,'boar',1,T+5*DAY);one.mon.boar.shiny=T+5*DAY;const z=B.restore(clone(one),{now:T});eq([z.mon.boar.foot,z.mon.boar.shiny,z.mon.boar.kills],[T,T,1],'지금+1일보다 뒤인 발자국·반짝 시각은 지금으로 자름')}
+ eq(B.medals(r).map(m=>m.tier),B.medals(b).map(m=>m.tier),'훈장 단계 그대로');
+ const f=B.importFile(B.exportText(b,null,{now:b.at}),{now:back,knows});eq([f.ok,f.preview.cards,B.cells(f.book)],[true,B.KINDS.filter(k=>b.mon[k].card>0).length,cells],'시계가 앞선 기기에서 만든 진행 파일도 칸을 잃지 않음');
+ eq(B.restore({fmt:'kkm-book',v:1,mon:{wolf:{foot:T-400*DAY,card:'x',kills:1}}},{now:T}).mon.wolf.foot,0,'2026-01-01 전 시각은 여전히 없음(0)');
+ eq(B.restore(clone(b),{now:b.at,knows}),b,'시계가 맞으면 한 글자도 바뀌지 않음')}
 
 /* B-4 열기·쓰기: 없음 → 새 기록 / meta 이행(한 번) / 깨짐 / 앱보다 새 버전은 덮어쓰지 않음 / 체험·?book=0은 읽지도 쓰지도 않음 */
 eq(B.keys({}),{book:'hangul-defense-book',bak:'hangul-defense-book-bak',run:null},'열쇠 이름');

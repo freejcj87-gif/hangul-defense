@@ -48,7 +48,9 @@
   const int=(v,lo,hi,d)=>Number.isFinite(v)?Math.min(hi,Math.max(lo,Math.floor(v))):d;
   const cnt=v=>int(v,0,BOOK.CAPS.count,0);
   const nowOf=now=>Number.isFinite(now)&&now>=T0?Math.floor(now):T0;
-  const stamp=(v,now)=>Number.isFinite(v)&&v>=T0&&v<=nowOf(now)+DAYMS?Math.floor(v):0;
+  /* 시각 칸: 숫자가 아니거나 2026-01-01 전이면 0(없음). 지금+1일보다 뒤면 지금으로 자른다(0으로 지우지 않는다).
+     0으로 지우면 기기 시계가 뒤로 간 기기(배터리 방전·날짜 수정)나 시계가 앞선 기기의 진행 파일에서 발자국·친구 카드·반짝 칸이 통째로 사라졌다(리뷰 0.16 R4) */
+  const stamp=(v,now)=>{if(!Number.isFinite(v)||v<T0)return 0;const t=nowOf(now);return Math.floor(v<=t+DAYMS?v:t)};
   const p2=n=>(n<10?'0':'')+n;
   /* 기기 현지 날짜 YYYY-MM-DD */
   const dayOf=now=>{const d=new Date(nowOf(now));return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate())};
