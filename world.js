@@ -397,11 +397,17 @@
     if(K.boss){w.stats.bosses++;w.events.push({type:'boss',kind,wolf:v.id})}
     return v;
   }
+  /* 무리 크기와 묶음별 출현 지점(난수: 묶음 수만큼 spawnPoint). spawnPack과 0.17 예고(herald)가 같은 함수를 써서 난수를 같은 순서로 쓴다. 나올 늑대가 없으면 null(난수를 쓰지 않는다) */
+  function packPlan(w,s){
+    const n=Math.min(packSize(w,s),MAX_WOLVES-w.wolves.length);if(n<=0)return null;
+    const groups=Math.min(3,1+Math.floor(n/5)),points=[];
+    for(let g=0;g<groups;g++)points.push(spawnPoint(w));
+    return {n,groups,points};
+  }
   function spawnPack(w,s){
     const boss=(s.hall|0)>=3&&w.wave.n%BOSS_EVERY===BOSS_EVERY-1;
-    const n=Math.min(packSize(w,s),MAX_WOLVES-w.wolves.length);if(n<=0)return;
-    const R=radius(w)+EDGE,groups=Math.min(3,1+Math.floor(n/5)),points=[];
-    for(let g=0;g<groups;g++)points.push(spawnPoint(w));
+    const plan=packPlan(w,s);if(!plan)return;
+    const {n,groups,points}=plan,R=radius(w)+EDGE;
     const formed=formsOn(w),fm=formed?packForm(w.wave.n):0; /* 0.15.2 대형(난수를 부르지 않는다. 출현 · 종류 · 빠르기는 끔과 같은 순서) */
     for(let i=0;i<n;i++){
       const p=points[i%groups],a=(p+.5)*Math.PI*2/SPAWNS+(rand(w)-.5)*(bridgeAt(w,p)?BRIDGE.spread:.4),back=Math.floor(i/groups)*.75;
@@ -420,6 +426,35 @@
   /* 테스트 모드 "🐺 무리 부르기"(0.15.2): 다음 무리를 지금 숲에 내보낸다(다음 틱에 나와 TRAVEL틱 뒤 마을에 닿는다). 이미 나와 걷는 무리가 있으면
      그 무리는 도착한 것으로 치고 다음 무리를 부른다. 난수를 부르지 않는다. 물러남(peace) 중에는 나오지 않는다(규칙 그대로). → 부를 무리 번호 */
   function callPack(w){if(w.wave.spawned){w.wave.n++;w.stats.waves++;w.wave.spawned=false}w.wave.arrive=w.t+1+TRAVEL;return w.wave.n}
+
+  /* ---------- 0.17 다음 무리 예고(까마귀 · 깃발. 기획 wolf-paths-plan-20261119 안 C를 대형 위에 작게, 프로듀서 결정 '26.11.19 "예고는 2차", 설명 docs/v017-herald.md) ----------
+     herald(w,s): 다음 무리가 숲에 나오기 HERALD.lead틱 전부터, 그 무리가 나올 길(출현 지점 번호)과 대형을 미리 읽어 돌려준다. 세계는 한 글자도 바꾸지 않는다.
+       대형은 무리 번호로 이미 정해져 있다(packForm). 길은 무리가 나오는 틱의 난수(spawnPoint)로 정해지므로, 난수 상태(w.rng)를 복사한 그림자 세계에서
+       그 사이에 나올 낙오 늑대를 진짜 함수(spawnStraggler · trickleGap)로 먼저 내보내 난수를 같은 수만큼 쓴 뒤, 무리와 같은 함수(packPlan)로 길을 뽑는다.
+       물러남 · 완충 풀림도 step과 같은 순서로 센다. 그래서 예고를 켜든 끄든(?herald=0) 늑대 길 · 도착 시각 · 경제가 같다(test-dom H-3 지문).
+       미리 읽은 뒤에 아이가 사거나(늑대를 부르는 정도) 닭을 잃거나(완충) 여우가 나오면(spawnPoint) 길이 바뀔 수 있어, 화면은 틱마다 다시 읽는다. 무리가 나오기 직전 틱의 값은 늘 맞다.
+     → null(예고 없음: 꺼짐 · 무리가 이미 나와 걷는 중 · 아직 lead보다 멂 · 그 틱에 물러남 · 나올 늑대 없음) 또는
+       {n 무리 번호, at 나오는 틱, left 남은 틱, size 늑대 수, groups 묶음별 길, points 서로 다른 길(묶음 순서), forms 길마다 대형(다리 길 · 대형 끔 = 0), form 무리 대형, boss 불씨 왕 무리}
+     HERALD(시점 · 길이를 여기 한곳에): lead = 무리가 숲에 나오기 몇 틱 전부터(60 = 6초. 걸어오는 TRAVEL 7초를 더하면 울타리까지 약 13초 앞).
+       무리 간격이 가장 짧아도(13초) 앞 무리가 마을에 닿은 뒤(간격 − TRAVEL = 6초)에 시작하므로 두 예고가 겹치지 않는다(예고는 무리가 나와 걷는 동안에는 없다).
+       arrive · leave = 3D 까마귀가 날아들고 · 날아가는 초, 깃발이 서고 · 눕는 초(그림 화면은 바로). 움직임 줄이기면 연출 없이 바로 */
+  const HERALD={lead:60,arrive:.8,leave:.9};
+  const heraldOn=()=>{const C=combat();return !!(C&&C.FLAGS&&C.FLAGS.HERALD)};
+  function herald(w,s,lead){
+    if(!heraldOn()||!w||!isObj(w.wave)||w.wave.spawned||!s)return null;
+    const L=Number.isFinite(lead)?lead:HERALD.lead,at=Math.max(w.t+1,w.wave.arrive-TRAVEL);
+    if(!(at-w.t<=L))return null;
+    /* 그림자 세계: 늑대 목록 · 본 종류 · 통계 · 사건은 복사본(새 늑대만 그 안에 들어간다), 난수 · 시각 · 낙오 일정 · 완충은 값 복사. 건물 · 닭은 읽기만 한다(대형 붙이기의 붐빔 셈) */
+    const o=Object.assign({},w,{wolves:w.wolves.slice(),seen:Object.assign({},w.seen),stats:Object.assign({},w.stats),events:[],wave:Object.assign({},w.wave)});
+    let peace=w.peace|0;
+    for(let t=w.t+1;t<at;t++){o.t=t;const quiet=peace!==0;if(peace>0)peace--;
+      if(t>=o.trickle){if(!quiet)spawnStraggler(o,s);o.trickle=t+trickleGap(o,s)}
+      if(o.mercy>0&&--o.mercyT<=0){o.mercy--;o.mercyT=MERCY.decay}}
+    o.t=at;if(peace!==0)return null;
+    const plan=packPlan(o,s);if(!plan)return null;
+    const fm=formsOn(o)?packForm(w.wave.n):0,points=[];for(const p of plan.points)if(!points.includes(p))points.push(p);
+    return {n:w.wave.n,at,left:at-w.t,size:plan.n,groups:plan.points.slice(),points,forms:points.map(p=>fm&&FORM.use.includes(fm)&&!bridgeAt(w,p)?fm:0),form:fm,boss:(s.hall|0)>=3&&w.wave.n%BOSS_EVERY===BOSS_EVERY-1};
+  }
 
   /* ---------- 한 틱 ---------- */
   function step(w,s){
@@ -779,7 +814,7 @@
     if(!(Number.isSafeInteger(w.nextId)&&w.nextId>top))w.nextId=top+1;
   }
 
-  const api={V:2,STAGE,STAGE_MAX,routes,BRIDGE,bridgeAt,FORM,RIVER,formsOn,riverOn,riverGap,packForm,formLoad,formWolf,formPace,callPack,FLOW,flowOn,flowQuestion,flowCorrect,flowAdd,flowYard,flowCap,flowPile,flowIdle,flowLayers,TEMPO,tempoInterval,mulOf,KING,FOX,GUEST,king,kingHit,fox,foxShoo,guest,guestGreet,guestGone,retreat,peaceOff,TICK,RADIUS,EDGE,SPAWNS,WOLF,AGE,THREAT,PACK,TRICKLE,SLOW,slowEase,KINDS,MIX,BOSS_EVERY,TOWER,POWER,POWER_STEP,FLOOR,ROAR,HP,FENCE_HP,MEND,REBUILD,HEN,DASH,RUSH,MERCY,MERCY_CAP,INNER,SIDE_REACH,INTERVAL,MAX_WOLVES,TRAVEL,GUARD,answered,
+  const api={V:2,STAGE,STAGE_MAX,routes,BRIDGE,bridgeAt,FORM,RIVER,formsOn,riverOn,riverGap,packForm,formLoad,formWolf,formPace,callPack,HERALD,heraldOn,herald,packPlan,FLOW,flowOn,flowQuestion,flowCorrect,flowAdd,flowYard,flowCap,flowPile,flowIdle,flowLayers,TEMPO,tempoInterval,mulOf,KING,FOX,GUEST,king,kingHit,fox,foxShoo,guest,guestGreet,guestGone,retreat,peaceOff,TICK,RADIUS,EDGE,SPAWNS,WOLF,AGE,THREAT,PACK,TRICKLE,SLOW,slowEase,KINDS,MIX,BOSS_EVERY,TOWER,POWER,POWER_STEP,FLOOR,ROAR,HP,FENCE_HP,MEND,REBUILD,HEN,DASH,RUSH,MERCY,MERCY_CAP,INNER,SIDE_REACH,INTERVAL,MAX_WOLVES,TRAVEL,GUARD,answered,
     TOWER_SLOTS,RINGS,ALL_SLOTS,SLOT_COUNT,TOWER_UNITS,PLACE,HOMES,HENS_MAX,HOME,towerSlots,fenceLayers,
     intervalFor,create,sync,step,volley,volleyArrows,dashTicks,built,threat,repairAll,brokenCount,brokenKinds,marketDown,wolvesInside,towerUnits,barLeft,secondsLeft,packSize,trickleGap,kindsAt,restore,radius,sectorOf,rand,range,cooldown,damage,towerDamage,towerRange,power,ageOf};
   if(typeof module!=='undefined')module.exports=api;
