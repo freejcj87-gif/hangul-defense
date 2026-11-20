@@ -1762,11 +1762,14 @@ async function start(){
  const inView=(x,y,z,m)=>{ndc.set(x,y,z).project(camera);return Math.abs(ndc.x)<=m&&ndc.y<=m&&ndc.y>=-m};
  const ndcOf=(x,y,z)=>{ndc.set(x,y,z).project(camera);return [+ndc.x.toFixed(3),+ndc.y.toFixed(3)]};
  // where a road's herald stands: the flag on the road outside the fence (the furthest point whose foot and top are on screen, at least radius + 3.2: clear of the
- // bridge and the road markers), the crows over the forest end of the same road (the furthest point on screen, at least 0.8 beyond the flag)
+ // bridge and the road markers; radius + 2.6 only when nothing further out is on screen), the crows over the forest end of the same road (the furthest point on
+ // screen beyond the flag; on a road running to the top of the screen they fly lower before they come closer)
  function heraldPlace(p,sc){
-  const a=spawnAngle(p),c=Math.cos(a),s=Math.sin(a),R=Rd,E=num(W('EDGE'))||7,H=2.3*sc,yC=3.1*sc;let rf=R+3.2,rc=0;
-  for(let r=R+E-1;r>=R+3.2;r-=.5)if(inView(c*r,0,s*r,.86)&&inView(c*r,H,s*r,.86)){rf=r;break}
-  rc=rf+.8;for(let r=R+E+1.5;r>=rf+.8;r-=.5)if(inView(c*r,yC,s*r,.7)){rc=r;break}
+  const a=spawnAngle(p),c=Math.cos(a),s=Math.sin(a),R=Rd,E=num(W('EDGE'))||7,H=2.3*sc,flagOk=r=>inView(c*r,0,s*r,.86)&&inView(c*r,H,s*r,.86);let rf=R+2.6,rc=0,yC=0;
+  for(let r=R+E-1;r>=R+3.2;r-=.5)if(flagOk(r)){rf=r;break}
+  if(rf<R+3.2&&!flagOk(rf))rf=R+3.2;
+  find:for(const yk of [3.1,2.4,1.8]){yC=yk*sc;for(let r=R+E+1.5;r>=rf+.8;r-=.5)if(inView(c*r,yC,s*r,.7)){rc=r;break find}}
+  if(!rc){rc=rf+.8;yC=1.8*sc}
   return {fx:c*rf,fz:s*rf,cx:c*rc,cz:s*rc,yC,H};
  }
  function heraldStep(fdt,less){

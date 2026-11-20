@@ -1792,6 +1792,80 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
    withFlags({},()=>{const b=seed(base,{view:true,query:'?forms=0'});b.go();eq([C.FLAGS.FORMS,b.window.getVillageState().forms],[false,false],'?forms=0: 대형 끔')});
    const c=seed({age:8,gold:300,seed:5},{view:true});c.go();eq(c.window.getVillageState().forms,false,'농가는 대형 없음')}
  }
+ /* ======================= H 0.17 다음 무리 예고(까마귀 · 깃발, 프로듀서 결정 '26.11.19 "예고는 2차", docs/v017-herald.md) ======================= */
+ {const crypto=require('node:crypto'),H=W.HERALD,hash=x=>crypto.createHash('sha256').update(JSON.stringify(x)).digest('hex').slice(0,16);
+  /* 예고가 곧 시작되는 세계: 낙오 늑대 없음(trickle 멀리), 무리 번호 n, 숲에 나오기까지 k틱 */
+  const soon=(w,n,k)=>{w.wolves=[];w.trickle=1e9;w.wave.n=n;w.wave.spawned=false;w.wave.arrive=w.t+W.TRAVEL+k;return w};
+  /* H-1 손잡이 · 상수: 기본 켬, 주소 ?herald=0으로 끔(끄면 W.herald null), 시점 · 길이 상수는 World.HERALD 한곳, 깃발 그림 표는 대형 4가지가 서로 다름 */
+  {eq(C.FLAGS.HERALD,true,'0.17 예고 기본 켬');ok(/\[\?&\]herald=0\\b/.test(src)&&src.includes('Combat.FLAGS.HERALD=false'),'주소 ?herald=0으로 끄는 손잡이');
+   eq([H.lead,H.arrive,H.leave],[60,.8,.9],'예고 시점 · 길이(World.HERALD): 무리가 숲에 나오기 60틱(6초) 전부터, 3D 날아들기 0.8초 · 날아가기 0.9초');
+   ok(W.TRAVEL+H.lead<=W.INTERVAL.min,'가장 짧은 무리 간격(13초)에서도 앞 무리가 마을에 닿은 뒤에 예고가 시작(두 예고가 겹치지 않음)');
+   const L=H.look;eq([L.color.length,L.cloth.length,L.line.length,L.head.length],[4,4,4,4],'깃발 그림 표: 대형 4가지(색 · 천 · 흰 그림 · 화살촉)');
+   ok(new Set(L.color).size===4&&new Set(L.cloth.map(c=>c.length)).size===4&&L.cloth.every(c=>c.length>=8&&c.length%2===0&&c.every(Number.isFinite)),'대형마다 천 색 · 모양이 다름(네모 · 물결 · 제비꼬리 · 동그라미)');
+   ok([...L.cloth.flat(),...L.line.flat(2),...L.head.flat(2)].every(v=>Number.isFinite(v)&&v>=0&&v<=32),'깃발 그림이 24 × 32 칸 안');
+   ok(!/다음 무리/.test(src)&&!/barLeft|secondsLeft/.test(src),'아이 화면에는 예고 글자 · 남은 시간 표시가 없음(그림만)');
+   const s=built(24),w=soon(W.sync(W.create({seed:3,interval:150}),s),1,30);ok(!!W.herald(w,s),'(켬: 예고 있음)');withFlags({HERALD:false},()=>eq(W.herald(w,s),null,'끄면 W.herald는 null'))}
+  /* H-2 예고 상태: 무리가 숲에 나오기 lead틱 전부터 나오기 직전까지(남은 틱이 하나씩 줄어듦), 나오면 없어진다. 예고한 길(묶음별) · 대형 = 실제 무리(pack 사건) */
+  {const s=built(24),w=soon(W.sync(W.create({seed:11,interval:150}),s),1,H.lead+5);
+   eq(W.herald(w,s),null,'아직 lead보다 멀면 예고 없음');for(let i=0;i<5;i++)W.step(w,s);
+   const h0=W.herald(w,s);ok(!!h0&&h0.left===H.lead&&h0.n===1&&h0.form===W.packForm(1)&&h0.points.length>=1&&h0.size>0,'lead틱 전부터 예고: '+JSON.stringify(h0));
+   eq(h0.points,[...new Set(h0.groups)],'points = 서로 다른 길(묶음 순서)');eq(h0.forms,h0.points.map(p=>p===6?0:h0.form),'길마다 대형(다리 길만 곧장)');
+   const lefts=[];let pk=null;for(let i=0;i<H.lead;i++){const h=W.herald(w,s);lefts.push(h&&h.left);W.step(w,s);pk=w.events.find(e=>e.type==='pack')||pk}
+   eq(lefts,Array.from({length:H.lead},(_,i)=>H.lead-i),'남은 틱이 하나씩 줄어듦(60 → 1)');ok(!!pk,'(무리가 나옴)');
+   eq([pk.points,pk.form],[h0.groups,h0.form],'예고한 길(묶음별) · 대형 = 실제 무리');eq(W.herald(w,s),null,'무리가 나와 걷는 동안은 예고 없음');
+   /* 다리 길(6번, 단계 3부터)은 대형 없이 한 줄(0.15 결정)이라 그 길 깃발은 곧장, 다른 길은 무리 대형 */
+   let br=null;for(let sd=1;sd<400&&!br;sd++){const x=soon(W.sync(W.create({seed:sd,interval:150}),s),2,20),h=W.herald(x,s);if(h&&h.points.includes(6)&&h.points.length>1)br=h}
+   ok(!!br&&br.form===2&&br.forms.every((f,i)=>f===(br.points[i]===6?0:2)),'물레방아 마을 갈라지기 무리: 다리 길 깃발은 곧장, 다른 길은 갈라지기 '+JSON.stringify(br&&[br.points,br.forms]));
+   /* 대형을 끄거나 농가(8방향)면 대형 0, 물러남 중이면 예고 없음 */
+   withFlags({FORMS:false},()=>{const h=W.herald(soon(W.sync(W.create({seed:5,interval:150}),s),1,20),s);ok(h&&h.form===0&&h.forms.every(f=>f===0),'대형 끔: 깃발은 곧장')});
+   {const s0=built(3),h=W.herald(soon(W.sync(W.create({seed:5,interval:150}),s0),1,20),s0);ok(h&&h.form===0&&h.points.every(p=>p>=0&&p<8),'농가(8방향): 길 0~7, 대형 곧장 '+JSON.stringify(h&&h.points))}
+   {const x=soon(W.sync(W.create({seed:5,interval:150}),s),1,20);x.peace=-1;eq(W.herald(x,s),null,'물러남(늑대 왕을 물리친 뒤)에는 예고 없음');x.peace=20;eq(W.herald(x,s),null,'물러남이 무리 틱(20틱 뒤)까지 이어지면 예고 없음');x.peace=19;ok(!!W.herald(x,s),'물러남이 한 틱 먼저 끝나면 예고 있음(step과 같은 경계)');
+    {let quiet=0;for(let i=0;i<20;i++){W.step(x,s);if(x.events.some(e=>e.type==='pack'))quiet++}eq([quiet,x.wave.spawned],[1,true],'(물러남 19틱: 무리가 실제로 나옴)')}}
+   {const x=soon(W.sync(W.create({seed:9,interval:150}),s),1,20);x.trickle=x.t+3;const before=JSON.stringify(x),h=W.herald(x,s);
+    ok(!!h&&JSON.stringify(x)===before,'W.herald는 세계를 바꾸지 않음(그 사이 낙오 늑대가 나오는 세계도. 그림자 세계에서만 내보냄)');
+    let pk=null,strays=0;for(let i=0;i<20&&!pk;i++){W.step(x,s);strays+=x.events.filter(e=>e.type==='straggler').length;pk=x.events.find(e=>e.type==='pack')}
+    ok(strays>=1&&!!pk&&JSON.stringify(pk.points)===JSON.stringify(h.groups),'낙오 늑대가 먼저 나와('+strays+'번) 난수를 써도 예고한 길 = 실제 길')}}
+  /* H-3 일치율: 같은 아이(같은 s) · 바깥 호출 없는 판, 단계 0~5 × 씨앗 6 × 3,000틱(300틱마다 일제 사격). 무리 직전 틱의 예고는 100% 맞고(대형도 100%),
+     예고를 시작한 순간의 예고도 거의 맞는다(그 사이 닭을 잃어 완충이 바뀌거나 늑대 상한에 닿으면 낙오 늑대 일정이 바뀌어 길이 바뀔 수 있다) */
+  {let packs=0,first=0,last=0,forms=0;
+   for(const n of [3,8,14,24,36,50])for(let sd=1;sd<=6;sd++){const s=built(n),w=W.sync(W.create({seed:sd*389+n,interval:150,guard:true}),s);let f0=null,f1=null;
+    for(let t=1;t<=3000;t++){const h=W.herald(w,s);if(h){if(!f0||f0.n!==h.n)f0=h;f1=h}W.step(w,s);if(t%300===0)W.volley(w,s,{scale:1});
+     const pk=w.events.find(e=>e.type==='pack');if(pk){packs++;const same=x=>!!x&&JSON.stringify(x.groups)===JSON.stringify(pk.points);if(same(f0))first++;if(same(f1))last++;if(f1&&f1.form===(pk.form|0))forms++;f0=f1=null}}}
+   console.log('  0.17 예고 일치: 무리 '+packs+'개, 예고 시작 순간 '+first+'개('+(100*first/packs).toFixed(1)+'%) · 무리 직전 '+last+'개 · 대형 '+forms+'개');
+   ok(packs>=500,'(무리 '+packs+'개)');eq([last,forms],[packs,packs],'무리 직전 틱의 예고 = 실제 길 · 대형 100%');ok(first>=packs*.97,'예고를 시작한 순간의 예고도 '+first+'/'+packs+'('+(100*first/packs).toFixed(1)+'%) 맞음(97% 이상)')}
+  /* H-4 켬 · 끔 세계 지문이 같다(결정성): 지은 수 5 · 14 · 24 · 36 · 50 × 6,000틱(300틱마다 일제 사격, 1,000틱마다 하나 사기)에서
+     틱마다 W.herald를 불러도(켬) · 끈 채 불러도(?herald=0) · 아예 부르지 않아도 세계 JSON(늑대 경로 · 도착 시각 · 경제 · 난수 상태 · 사건)이 한 글자도 같다 */
+  {const tour=(f,call)=>withFlags(f,()=>{const keys=['level','fence','chickens','farmers','power'],shop={level:'tower',chickens:'chicken',farmers:'farmer',fence:'fence',power:'power'},out=[];let seen=0;
+    for(const [n,sd] of [[5,3],[14,5],[24,7],[36,11],[50,13]]){const s=built(n),w=W.sync(W.create({seed:sd,interval:150}),s),ev=[];
+     for(let i=1;i<=6000;i++){if(call&&W.herald(w,s))seen++;W.step(w,s);for(const e of w.events)if(e.type==='pack'||e.type==='arrive'||e.type==='straggler')ev.push(w.t+':'+e.type+':'+(e.points||e.point||e.n));
+      if(i%300===0)W.volley(w,s,{scale:1});if(i%1000===0){const k=keys[(i/1000)%keys.length];s[k]=Math.min(C.max(shop[k]),s[k]+1);C.grow(s);W.sync(w,s)}}
+     out.push({w,s,ev})}
+    return {print:hash(out),seen,packs:out.reduce((a,o)=>a+o.ev.filter(e=>e.includes(':pack:')).length,0)}});
+   const on=tour({},true),off=tour({HERALD:false},true),none=tour({},false);console.log('  0.17 예고 켬 · 끔 · 부르지 않음 세계 지문 '+[on.print,off.print,none.print].join(' · ')+' (무리 '+none.packs+'개, 예고 틱 '+on.seen+')');
+   ok(on.seen>=1000&&off.seen===0,'(켬: 예고가 뜬 틱 '+on.seen+' · 끔: 0)');eq([on.print,off.print],[none.print,none.print],'켬 · 끔 · 부르지 않음의 세계 지문(늑대 경로 · 도착 시각 · 경제 · 난수)이 같음: '+none.print+'(무리 '+none.packs+'개)')}
+  /* H-4b 화면 판에서도 같다: 같은 저장 세계로 연 판 둘(켬 · ?herald=0)을 그림 화면으로 1,500틱 돌리면 세계 JSON이 같다(예고는 화면만 그린다) */
+  {const s0={...C.fresh(8),level:9,fence:4,chickens:5,farmers:1};C.grow(s0);const wj=JSON.parse(JSON.stringify(W.sync(W.create({seed:777,interval:150,guard:true}),s0)));
+   const base={age:8,level:9,fence:4,chickens:5,farmers:1,gold:300,seed:5,world:wj},run=q=>{const a=seed(base,{view:true,query:q});a.go();a.n.scene.dataset.renderer='fallback';let shown=0,flags=0;
+    for(let i=0;i<1500;i++){a.tick(1);if(a.window.getVillageState().herald)shown++;flags=Math.max(flags,a.n.herald.children.filter(e=>e.className==='hflag').length)}return {w:JSON.stringify(a.api.world),shown,flags}};
+   const A=run(undefined),B=withFlags({},()=>run('?herald=0'));
+   ok(A.shown>=60&&A.flags>=1&&B.shown===0&&B.flags===0,'(켬: 예고 '+A.shown+'틱 · 깃발 최대 '+A.flags+' / 끔: 0)');eq(hash(A.w),hash(B.w),'화면 판 1,500틱: 켬 · ?herald=0 세계가 같음')}
+  /* H-5 화면: getVillageState().herald = World.herald(같은 값), 시작 화면 · 끔이면 null. 그림 화면(3D 실패)은 그 길마다 깃발(대형 표시) · 까마귀(2 + 묶음 수)를
+     늑대와 같은 변환으로 그 길 쪽에 그리고, 무리가 나오면 지운다. 3D 화면에서는 그림 화면 표시를 그리지 않는다 */
+  {const base={age:8,level:9,fence:4,chickens:5,farmers:1,gold:300,seed:5};
+   const a=seed(base,{view:true});eq(a.window.getVillageState().herald,null,'시작 화면: 예고 없음');a.go();calmWorld(a);const w=a.api.world;soon(w,1,30);a.tick(1);
+   const vs=a.window.getVillageState().herald,ref=W.herald(w,a.api.state);ok(!!vs&&JSON.stringify(vs)===JSON.stringify(ref)&&vs.left===29,'getVillageState().herald = World.herald: '+JSON.stringify(vs));
+   eq(a.n.herald.children.length,0,'3D 화면: 그림 화면 표시는 그리지 않음');
+   a.n.scene.dataset.renderer='fallback';a.tick(1);const kids=a.n.herald.children,fl=kids.filter(e=>e.className==='hflag'),cr=kids.filter(e=>e.className==='hcrows');
+   eq([fl.map(e=>e.dataset.point),cr.map(e=>e.dataset.point)],[vs.points.map(String),vs.points.map(String)],'그림 화면: 길마다 깃발 하나 · 까마귀 떼 하나');
+   eq(fl.map(e=>e.dataset.form),vs.forms.map(String),'깃발은 그 길의 대형');ok(fl.every((e,i)=>e.innerHTML.includes(W.HERALD.look.color[vs.forms[i]])&&e.innerHTML.startsWith('<svg')),'깃발 SVG는 대형 색(그림 표 World.HERALD.look)');
+   eq(cr.map(e=>e.children.length),vs.points.map(p=>2+vs.groups.filter(q=>q===p).length),'까마귀 수 = 2 + 그 길로 오는 묶음 수');
+   {const R=W.radius(w),span=R+W.EDGE,W0=a.n.scene.clientWidth,H0=a.n.scene.clientHeight,dirOf=e=>Math.atan2((parseFloat(e.style.top)/H0-.55)/.42,(parseFloat(e.style.left)/W0-.5)/.48);
+    ok([...fl,...cr].every(e=>{const p=Number(e.dataset.point),d=dirOf(e)-(p+.5)*Math.PI/4;return Math.abs(Math.atan2(Math.sin(d),Math.cos(d)))<1e-3}),'깃발 · 까마귀가 그 길 방향(늑대 그림과 같은 % 변환)');
+    ok(fl.every(e=>{const x=(parseFloat(e.style.left)/W0-.5)/.48*span,y=(parseFloat(e.style.top)/H0-.55)/.42*span;return Math.abs(Math.hypot(x,y)-(R+2.6))<1e-2}),'깃발은 울타리 바깥 길 입구(반지름 + 2.6)')}
+   let gone=false;for(let i=0;i<40&&!gone;i++){a.tick(1);gone=w.wave.spawned}ok(gone&&a.n.herald.children.length===0&&a.window.getVillageState().herald===null,'무리가 숲에 나오면 그림 화면 표시가 사라짐');
+   withFlags({},()=>{const b=seed(base,{view:true,query:'?herald=0'});b.go();calmWorld(b);soon(b.api.world,1,30);b.n.scene.dataset.renderer='fallback';b.tick(1);
+    eq([C.FLAGS.HERALD,b.window.getVillageState().herald,b.n.herald.children.length],[false,null,0],'?herald=0: 예고 없음(3D · 그림 화면 모두)')})}
+ }
  /* ---------- 0.14.2 리뷰 수정(work\verification-20261113\review-v014\report.md 1·3·5·7·10번) ---------- */
  const towersOf=w=>w.buildings.filter(b=>b.kind==='tower').map(b=>[b.slot,b.floor]).sort((p,q)=>p[0]-q[0]);
  const ring=(n,f)=>Array.from({length:n},(_,i)=>[i,f?f(i):1]);
@@ -2009,6 +2083,15 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   calmWorld(b);pk.click();eq(M.note,'🐺 무리를 불렀어요 · 대형 끔','끈 뒤 부르면 대형 끔');b.tick(1);ok(w.wolves.length>0&&w.wolves.every(v=>!('fm' in v)),'끈 뒤 부른 무리는 곧장(대형 칸 없음)');eq(M.form,null,'(대형 없는 무리)');
   sel.value='forms';sel.onchange();eq([C.FLAGS.FORMS,last.textContent],[true,'🐺 대형 끄기'],'대형 켜기');
   b.unload();eq(saved[KEY],kid,'대형 손잡이 · 무리 부르기를 써도 아이 저장 그대로');C.FLAGS.FORMS=true;delete b.n.scene.dataset.renderer}
+ /* TM-13 0.17 예고: 📊 줄 맨 끝에 "🐦 다음 무리 <3D 화면 방향>(<길 번호>) · <대형> · <숲에 나오기까지 남은 초>초"(까마귀 · 깃발이 떠 있을 때만). 끄면 붙이지 않음. 아이 저장은 그대로 */
+ {saved={[KEY]:kid};const b=boot({query:TQ}),M=b.window.__testmode,U=UI(b),sel=U.bar.children.find(e=>e.attrs.id==='tmJump');
+  U.next.click();b.n.scene.dataset.renderer='fallback';sel.value='3';sel.onchange();const w=b.api.world;calmWorld(b);w.wave.n=1;w.wave.spawned=false;w.wave.arrive=w.t+W.TRAVEL+45;w.rng=20261120;b.tick(1);
+  const h=b.window.getVillageState().herald,DIR=['오른쪽','오른쪽 아래','아래','왼쪽 아래','왼쪽','왼쪽 위','위','오른쪽 위'];ok(!!h&&h.left===44,'(물레방아 마을, 휘어 오기 무리 예고 중)');
+  const want='🐦 다음 무리 '+h.points.map(p=>DIR[p]+'('+p+')').join('·')+' · '+[...new Set(h.forms.map(f=>W.FORM.names[f]))].join('·')+' · 5초';
+  ok(M.perfNow().endsWith(' · '+want),'📊 줄 끝에 예고(길 · 대형 · 남은 초): '+M.perfNow());eq(M.heraldText(),want,'(heraldText)');
+  b.tick(40);ok(M.perfNow().endsWith(' · 1초'),'남은 초가 줄어듦: '+M.perfNow());b.tick(10);ok(w.wave.spawned&&!/🐦/.test(M.perfNow()),'무리가 나오면 예고 글 없음: '+M.perfNow());
+  withFlags({},()=>{C.FLAGS.HERALD=false;w.wave.spawned=false;w.wave.arrive=w.t+W.TRAVEL+30;b.tick(1);ok(!/🐦/.test(M.perfNow()),'예고를 끄면 📊 줄에 붙이지 않음: '+M.perfNow())});
+  b.unload();eq(saved[KEY],kid,'예고 글을 써도 아이 저장 그대로');delete b.n.scene.dataset.renderer}
 }
 /* ======================= 0.15 아트 들여오기(계획서 §2, S-9 6) =======================
    묶음 원본 outputs\art-v015-v016-20261117을 art-handoff/v015-v016/에 그대로 복사했다. 파일이 바뀌거나 빠지면(복사 실수·줄바꿈 변환) 해시로 잡는다.
