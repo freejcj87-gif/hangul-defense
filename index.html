@@ -354,7 +354,7 @@ function qById(id){
  const q=QMAP.get(id);if(!q)return null;const o={...q,choices:q.choices.slice()};delete o.note;return o;
 }
 const bookKnows=id=>!!qById(id)||!!NOTES.byId(id);
-let bookH=null,book=null,bookDirty=false,bookSavedAt=0,bookFail=false,bookWrites=0;
+let bookH=null,book=null,bookDirty=false,bookSavedAt=0,bookFail=false,bookFailNow=false,bookWrites=0;
 function bookOpen(){
  bookH=BOOK_ON?Book.open(localStorage,BK,{now:Date.now(),seed:state.seed,meta:state.meta,knows:bookKnows}):null;book=bookH?bookH.book:null;
  bookDirty=!!bookH&&(bookH.status==='new'||bookH.status==='migrated');bookSavedAt=0;
@@ -436,7 +436,8 @@ function bookSave(force){
  if(!book||!bookDirty)return;const now=Date.now();
  if(!force&&phase==='ask'&&now-bookSavedAt<30000)return;
  bookSavedAt=now;if(bookH.locked){bookDirty=false;return}
- if(Book.save(localStorage,BK,bookH)){bookDirty=false;bookWrites++}else if(!bookFail){bookFail=true;say('저장 공간을 사용할 수 없어요. 이번 판은 계속할 수 있어요.')}
+ /* bookFailNow: 마지막 쓰기가 실패했는가(보호자 기록 탭 경고, 명세 §2.5. 리뷰 0.16 W) */
+ if(Book.save(localStorage,BK,bookH)){bookDirty=false;bookWrites++;bookFailNow=false}else{bookFailNow=true;if(!bookFail){bookFail=true;say('저장 공간을 사용할 수 없어요. 이번 판은 계속할 수 있어요.')}}
 }
 
 /* ---------- 그림 마을(3D를 못 쓰는 기기) ---------- */

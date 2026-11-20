@@ -102,6 +102,8 @@
     const r=Book.report(book,Date.now()),w=r.week,a=r.all;
     if(bookH.status==='newer')para(box,'새 버전에서 만든 기록이에요. 앱을 업데이트하면 이어져요. 지금 놀이는 저장되지 않아요.','g-warn');
     if(bookH.locked&&bookH.status==='memory'&&!DEMO)para(box,'저장 공간을 쓸 수 없어 지금 놀이는 저장되지 않아요.','g-warn');
+    /* 쓰기 실패(용량 등)도 보호자 화면에 알린다(명세 §2.5 "보호자 화면에 경고". 전에는 판 중 한 줄 안내뿐이었다, 리뷰 0.16 W) */
+    else if(bookFailNow)para(box,'저장 공간이 모자라 수첩 기록을 저장하지 못했어요. 기기의 저장 공간을 확인해 주세요. 지금 놀이는 계속할 수 있어요.','g-warn');
     para(box,'이번 주(최근 7일): 푼 문제 '+w.q+' · 한 번에 맞힌 문제 '+w.f+' · 처음 맞힌 새 글 '+w.nw+' · 논 시간 '+min(w.s)+'분 · 논 날 '+w.days+'일');
     para(box,'전체: 놀이 '+a.plays+'번 · 푼 문제 '+a.q+' · 한 번에 맞힌 문제 '+a.f+' · 논 날 '+a.days+'일 · 지킨 마을 '+a.villages+'곳');
     para(box,'분류별 한 번에 맞힌 문제(최근 놀이 30번): '+(r.rate.rd[0]+r.rate.qz[0]+r.rate.en[0]?'한글 읽기 '+r.rate.rd[1]+' / '+r.rate.rd[0]+' · 상식·수학 '+r.rate.qz[1]+' / '+r.rate.qz[0]+' · 영어 '+r.rate.en[1]+' / '+r.rate.en[0]:'아직 기록이 없어요.'));

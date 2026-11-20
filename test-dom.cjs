@@ -2296,6 +2296,13 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   eq([bookOf(c).set.sfx,stored().set.sfx],[0,0],'풀이 중에 꺼도 기록에 바로 저장');const d=boot({book:true});eq(d.n.sfx.checked,false,'다시 열어도 꺼져 있음');
   d.n.sfx.checked=true;d.n.sfx.onchange();eq(stored().set.sfx,1,'다시 켜면 저장');
   saved={};const off=boot({book:true,query:'?book=0'});off.n.sfx.checked=false;off.n.sfx.onchange();ok(!(BOOK_KEY in saved),'?book=0이면 기록 열쇠를 쓰지 않음(0.15와 같음)')}
+ /* M-9e 리뷰 0.16 W: 기록 쓰기가 실패하면(용량 등) 보호자 기록 탭에 경고(명세 §2.5), 다시 써지면 경고가 사라짐 */
+ {let full=true;const store={[KEY]:JSON.stringify({version:3,...C.fresh(8),seed:4242}),[BOOK_KEY]:JSON.stringify(Bk.fresh(Date.now(),4242))};
+  saved=new Proxy(store,{set(t,k,v){if(k===BOOK_KEY&&full)throw new Error('가득');t[k]=v;return true}});
+  const a=boot({book:true});a.go();a.unlock();a.right();ok(a.game().book.dirty,'쓰기 실패: 기록은 메모리에 남음');
+  press(a,'drawerGuard',2100);gatePass(a);ok(/수첩 기록을 저장하지 못했어요/.test(a.n.gBody.textContent),'보호자 기록 탭에 쓰기 실패 경고');
+  full=false;a.n.guardClose.click();a.n.pause.click();a.n.pause.click();press(a,'drawerGuard',2100);gatePass(a);ok(!/저장하지 못했어요/.test(a.n.gBody.textContent)&&JSON.parse(store[BOOK_KEY]).medal.one.n===1,'다시 써지면 경고가 사라짐');
+  const ok2=bboot(null,{index:1});press(ok2,'openGuard',2100);gatePass(ok2);ok(!/저장하지 못했어요|저장되지 않아요/.test(ok2.n.gBody.textContent),'평소에는 경고 없음')}
  /* M-9b 리뷰 0.16 R1: 기록을 다시 읽은 뒤(진행 파일 바꾸기 · 되돌리기 · 모든 기록 지우기) 그 기록의 영어 설정이 문제은행에 바로 반영된다. 전에는 앞 기록의 비중이 다시 열 때까지 남았다 */
  {const src=Bk.fresh(Date.now(),77);src.set.en='off';const file=Bk.exportText(src,{...C.fresh(8),seed:77,bank:Q.BANK_VERSION,version:3},{now:Date.now()});
   const a=bboot(null,{index:1});eq(Q.QUIZ_MIX[8].english,2,'이 기기 기록: 영어 보통');
