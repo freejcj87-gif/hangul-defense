@@ -2167,6 +2167,13 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   const c=bboot(x=>{x.shiny.guest='wolf';x.shiny.run=1},{index:30,run:{...C.freshRun(),asked:30,t0:1,bell:1}},{view:true});c.go();ok(c.api.world.guest&&c.api.world.guest.kind==='wolf','기록에 손님이 있으면 세계에도 세움');
   c.buy('bell');eq([bookOf(c).shiny.guest,bookOf(c).shiny.miss,c.api.world.guest&&c.api.world.guest.state],[null,2,'leave'],'결전이 시작되면 손님은 숲으로(다음 기회 확정)');
  }
+ /* M-6b 리뷰 0.16 R6: 신바람 2단(6연속 이상)인 채로 새로고침해도 신바람 훈장을 한 번 더 세지 않는다. 연속이 끊겼다가 다시 오르면 센다 */
+ {const a=bboot(null,{index:12,streak:C.FLOW.boost2-1});a.go();quiet(a);a.unlock();a.right();const r1=bookOf(a).medal.rush.n;
+  nextAsk(a);a.n.pause.click();a.unload();const b=boot({book:true});b.go();quiet(b);b.unlock();b.right();
+  eq([r1,bookOf(b).medal.rush.n,b.game().state.streak],[1,1,C.FLOW.boost2+1],'6연속에서 새로고침 뒤 이어 맞혀도 신바람 훈장 수 그대로');
+  nextAsk(b);b.unlock();b.wrong(0);b.tick(C.DASH_TICKS+2);b.unlock();b.btn(b.api.round.q.answer).click();for(let i=0;i<120&&!b.api.round.ready;i++)b.tick();b.btn(b.api.round.q.answer).click();b.untilAsk();
+  eq(b.game().state.streak,0,'틀리면 연속이 끊김');for(let i=0;i<C.FLOW.boost2;i++){b.unlock();b.right();nextAsk(b)}
+  eq(bookOf(b).medal.rush.n,2,'끊겼다가 다시 신바람 2단에 오르면 한 번 더 셈')}
  /* M-7 '마을을 처음부터'는 판 저장만 새로 만들고 기록은 그대로 */
  {const a=bboot(b=>{Object.assign(b.mon.wolf,{foot:Date.now(),card:Date.now(),note:3,plays:3,kills:50});b.medal.king.n=2;b.medal.king.at=[Date.now(),0,0];b.rv=[{id:'a8-story-03',box:2,due:0,dp:1,miss:2,seen:1}];b.play=5},{index:40,gold:900,level:3});
   a.go();a.unlock();a.right();const before=bookOf(a);a.n.reset.click();const g=a.game();
