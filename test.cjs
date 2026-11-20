@@ -2,7 +2,7 @@ const {chromium,webkit}=require('playwright');
 const assert=require('node:assert/strict'),http=require('node:http'),fs=require('node:fs'),path=require('node:path');
 const Questions=require('./questions.js'),Combat=require('./combat.js'),World=require('./world.js');
 const INTERIM=process.env.INTERIM_NO_3D_BUILD==='1',FULL_SHOTS=process.env.FULL_SHOTS==='1';
-const ONLY=process.env.ONLY||'',run=part=>!ONLY||ONLY.split(',').includes(part);/* ONLY=matrix,clock,feel,fallback,demo,flow,farm,stage,art,testmode,book 중 일부만 돌릴 때(개발용). CI는 전부 돌린다. */
+const ONLY=process.env.ONLY||'',run=part=>!ONLY||ONLY.split(',').includes(part);/* ONLY=matrix,clock,feel,fallback,demo,flow,farm,stage,art,testmode,book,book3d 중 일부만 돌릴 때(개발용). CI는 전부 돌린다. */
 /* 0.13: 아래 matrix·clock·feel·fallback·demo·flow 구간은 0.12 경제 회귀 검사라 주소에 flow=0을 붙여 연다(OLD). 흐르는 농장(기본 켬)은 맨 끝 farm 구간이 본다 */
 /* 0.14: 같은 까닭으로 그 구간들은 stages=0도 붙인다(단계를 끄면 0.13.2 화면·규칙 그대로라는 회귀 검사). 단계(기본 켬)는 맨 끝 stage 구간이 본다. farm 구간은 단계를 켠 채 돈다 */
 const OLD='/?flow=0&stages=0';Combat.FLAGS.FLOW=false;Combat.FLAGS.STAGES=false;Combat.FLAGS.ROUTES=false;/* 이 파일의 기대값 계산(Node 쪽 Combat)도 0.12 경제·단계 끔으로. farm·stage 구간은 상수만 읽는다 */
@@ -903,6 +903,74 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
    {const ctx=await bookBrowser.newContext({viewport:{width:1366,height:640}});await ctx.addInitScript(HOLD);const page=await ctx.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.route('**/environment-pack.glb',r=>r.abort());await page.goto(url+'/?book=0');await ready(page);
     ok(!(await page.locator('#bookRow').isVisible())&&!(await page.locator('#openInfo').isVisible())&&(await page.locator('#reset').textContent())==='처음부터 시작','book=0: no notebook buttons, the 0.15 reset label');eq((await game(page)).book.on,false,'book=0: no record');eq(errors,[],'book=0 page errors');await ctx.close()}
   }finally{await bookBrowser.close()}}
+ /* ---------- 0.17 수첩 3D(book3d 구간, 3D 렌더러): 쪽지 종이 · 기억 늑대 팻말 · 친구 방문(src/book3d.js). 시계를 세우고(__HOLD_CLOCK) 틱과 화면 시간(debug hold/advance)을 직접 돌린다 ---------- */
+ if(run('book3d')){const b3Browser=await chromium.launch({headless:true,args:SWIFT});
+  try{
+   const BOOK_KEY='hangul-defense-book',Bk=require('./book.js'),Sc=Bk.BOOK.SCENE;
+   const open=async(b,s,q)=>{const ctx=await b3Browser.newContext({viewport:{width:1180,height:820},hasTouch:true});await ctx.addInitScript(HOLD);await ctx.addInitScript(FAKE_TTS);
+    await ctx.addInitScript(x=>{if(!localStorage.getItem(x.key)){localStorage.setItem(x.key,x.book);localStorage.setItem('hangul-defense-v1',x.run)}},{key:BOOK_KEY,book:JSON.stringify(b),run:JSON.stringify({version:3,...Combat.fresh(8),seed:4242,...s})});
+    const page=await ctx.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(url+(q||'/?book=1'));await ready(page);
+    await page.waitForFunction(()=>window.VillageView&&window.VillageView.inspect().ready,{},{timeout:45000});return {ctx,page,errors}};
+   const insp=page=>page.evaluate(()=>window.VillageView.inspect().book3d);
+   const st=page=>page.evaluate(()=>window.getBook3dState());
+   const view=async(page,sec)=>{await page.evaluate(s=>window.VillageView.debug({advance:s}),sec);await frames(page,2)};
+   const roll=async(page,n,sec)=>{await page.evaluate(([n,s])=>{window.__tick(n);window.VillageView.debug({advance:s})},[n,sec]);await frames(page,1)};
+   const start=async page=>{await page.locator('#go').click();await phaseIs(page,'ask');
+    await page.evaluate(()=>{window.VillageView.debug({hold:true});world.wolves=[];world.trickle=world.t+1e6;world.wave.arrive=world.t+1e6;world.calm=0})};
+   /* 쪽지 종이: 정답 화살에 쓰러진 자리에 팔랑 내려앉고, 누르면 깡충, 그 쪽지 문제가 나오면 주워 읽어 사라짐 */
+   {const b=Bk.fresh(Date.now(),4242);Object.assign(b.mon.wolf,{foot:Date.now(),plays:2,last:1,kills:40,note:1});b.pq=6;
+    const {ctx,page,errors}=await open(b,{index:3});await start(page);
+    eq((await insp(page)).paper,null,'book3d: no paper before a note drops');
+    await page.evaluate(()=>{const v={id:world.nextId++,kind:'wolf',x:3,z:1.5,sx:20,sz:1.5,hp:1,max:1,speed:.01,state:'walk',target:0,timer:0,inside:0,hen:0,vh:1};world.wolves.push(v);window.__pw=v});
+    let s=null;for(let i=0;i<30&&!(s=await st(page)).note;i++)await page.evaluate(()=>window.__tick(2));
+    const pw=await page.evaluate(()=>[window.__pw.x,window.__pw.z,window.__pw.state]);
+    ok(s.note&&pw[2]==='dead'&&Math.abs(s.note.x-pw[0])<=.01&&Math.abs(s.note.z-pw[1])<=.01,'book3d: the shot wolf dropped a name note where it fell '+JSON.stringify(s.note));
+    await view(page,.3);let v=await insp(page);
+    ok(v.on&&v.paper&&v.paper.id===s.note.id&&v.paper.mode==='fall'&&v.paper.shown&&v.paper.y>.2,'book3d: a 3D paper flutters down at that spot '+JSON.stringify(v.paper));
+    await view(page,1.6);v=await insp(page);
+    ok(v.paper&&v.paper.mode==='rest'&&v.paper.y<.2&&Math.abs(v.paper.x-s.note.x)<.01&&Math.abs(v.paper.z-s.note.z)<.01&&Math.abs(v.paper.ndc[0])<1&&Math.abs(v.paper.ndc[1])<1,'book3d: the paper lies on the ground, on screen '+JSON.stringify(v.paper));
+    eq([v.papers,v.papersShown],[1,1],'book3d: one paper object');await shot(page,'book3d-paper');
+    await page.evaluate(n=>{const c=document.getElementById('villageCanvas'),r=c.getBoundingClientRect();c.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,clientX:r.left+(n[0]+1)/2*r.width,clientY:r.top+(1-n[1])/2*r.height}))},v.paper.ndc);
+    await view(page,.1);ok((await insp(page)).taps===1&&/이름 쪽지예요/.test(await page.locator('#villageStatus').textContent()),'book3d: tapping the paper hops it and the status line says what it is');
+    await answer(page,true);for(let i=0;i<40&&(await game(page)).phase!=='ask';i++)await roll(page,1,.1);await roll(page,1,.1);
+    eq(((await game(page)).book.special||{}).kind,'note','book3d: the next question is that name note');
+    v=await insp(page);ok(v.reads===1&&v.paper===null,'book3d: reading the note picks the paper up '+JSON.stringify({reads:v.reads,paper:v.paper}));
+    await view(page,1);eq((await insp(page)).papersShown,0,'book3d: the paper is gone after reading');
+    eq(errors,[],'book3d paper page errors');await ctx.close()}
+   /* 기억 늑대 팻말: 기억 늑대 문제 동안 그 늑대 머리 위에 떠 있고, 한 번에 맞히면 내려놓고 곧 사라짐 */
+   {const X=Questions.get(8,'story',150),b=Bk.fresh(Date.now(),4242);b.pq=6;b.rv=[{id:X.id,box:1,due:0,dp:1,miss:1,seen:0}];
+    const {ctx,page,errors}=await open(b,{index:9});await start(page);
+    eq(((await game(page)).book.special||{}).kind,'review','book3d: memory wolf question');await roll(page,2,.2);eq((await insp(page)).sign,null,'book3d: no wolf, no sign');
+    const sw=await page.evaluate(()=>{const R=World.radius(world),v={id:world.nextId++,kind:'wolf',x:R+2.5,z:-1,sx:R+10,sz:-1,hp:1e6,max:1e6,speed:.05,state:'walk',target:0,timer:0,inside:0,hen:0};world.wolves.push(v);return v.id});
+    for(let i=0;i<3;i++)await roll(page,2,.2);await view(page,.3);
+    let v=await insp(page);
+    ok(v.sign&&v.sign.wolf===sw&&v.sign.mode==='carry'&&v.sign.shown&&v.sign.wolfTop,'book3d: a sign floats over the memory wolf '+JSON.stringify(v.sign));
+    ok(v.sign&&v.sign.wolfTop&&Math.hypot(v.sign.x-v.sign.wolfTop[0],v.sign.z-v.sign.wolfTop[2])<.05&&v.sign.y>v.sign.wolfTop[1]+.1,'book3d: the sign is right above that wolf\'s head');
+    await shot(page,'book3d-sign');
+    await answer(page,true);await roll(page,1,.1);v=await insp(page);ok(v.downs===1&&v.sign&&v.sign.mode==='drop','book3d: a first-try answer puts the sign down '+JSON.stringify(v.sign));
+    await view(page,2.5);eq((await insp(page)).sign,null,'book3d: the sign is gone a moment later');
+    eq(errors,[],'book3d sign page errors');await ctx.close()}
+   /* 친구 방문: 늑대 없는 틈에 모은 친구가 제 모형으로 길을 걸어와 울타리 밖에서 인사하고 돌아감(세계에는 아무것도 넣지 않음) */
+   {const b=Bk.fresh(Date.now(),4242);['boar','fox','frost'].forEach((k,i)=>Object.assign(b.mon[k],{foot:Date.now(),card:Date.now()+i,note:3,rib:{n:k==='boar'?3:0,last:1}}));
+    const {ctx,page,errors}=await open(b,{index:5});await start(page);
+    await page.evaluate(n=>window.__tick(n),Sc.first-5);await view(page,.2);eq((await insp(page)).friend,null,'book3d: no friend before the gap');
+    let s=null;for(let i=0;i<20&&!(s=await st(page)).visit;i++)await page.evaluate(()=>window.__tick(1));
+    ok(s.visit&&['boar','fox','frost'].includes(s.visit.kind),'book3d: a collected friend comes to visit: '+(s.visit&&s.visit.kind));
+    await roll(page,4,.4);let v=await insp(page);
+    ok(v.friend&&v.friend.kind===s.visit.kind&&v.friend.shown&&v.friend.act==='come','book3d: the friend is drawn with its own monster model '+JSON.stringify(v.friend));
+    eq(v.friend&&v.friend.ribbon,s.visit.kind==='boar','book3d: only a ribbon friend wears the ribbon');
+    for(let i=0;i<20&&(await st(page)).visit.act==='come';i++)await roll(page,4,.4);await view(page,.6);
+    v=await insp(page);const R=await page.evaluate(()=>World.radius(world));
+    ok(v.friend&&v.friend.act==='hello'&&v.hellos===1&&Math.abs(Math.hypot(v.friend.x,v.friend.z)-(R+Sc.r1))<.25&&Math.abs(v.friend.ndc[0])<1&&Math.abs(v.friend.ndc[1])<1,'book3d: the friend stops by the fence, says hello, on screen '+JSON.stringify(v.friend));
+    await shot(page,'book3d-friend');
+    for(let i=0;i<30&&(await st(page)).visit;i++)await roll(page,4,.4);await view(page,1);
+    v=await insp(page);ok(v.friend===null&&v.friends===1,'book3d: the friend walks back into the forest and is gone '+JSON.stringify({friend:v.friend,friends:v.friends}));
+    eq(await page.evaluate(()=>world.wolves.length),0,'book3d: the visit puts nothing into the world');
+    eq(errors,[],'book3d friend page errors');await ctx.close()}
+   /* ?book=0이면 셋 다 없음 */
+   {const {ctx,page,errors}=await open(Bk.fresh(Date.now(),1),{index:5},'/?book=0');await page.locator('#go').click();await phaseIs(page,'ask');await tick(page,5);await frames(page,2);
+    const v=await insp(page);eq([v.on,v.paper,v.sign,v.friend,await st(page)],[false,null,null,null,null],'book=0: no paper, no sign, no friend');eq(errors,[],'book3d off page errors');await ctx.close()}
+  }finally{await b3Browser.close()}}
  console.log((ONLY?'PARTIAL('+ONLY+') ':'')+'PASS '+checks+' browser assertions (Chromium/WebKit, desktop + mobile emulation, held clock + one real-clock run). Physical audio/device validation remains manual.');
  }finally{server.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});
