@@ -51,6 +51,26 @@
   const FORM={names:['곧장','휘어 오기','갈라지기','따라 돌기'],L:5,arc:10,full:22,ring:2,turn:Math.PI/3,margin:5*Math.PI/180,min:4*Math.PI/180,run:2.5,river:.4,pick:'load',use:[1,2,3],pace:1,from:1};
   /* 강 띠(src/layout.js RIVER와 같은 수, test-dom이 대조): 마을 중심에서 가장 가까운 점의 방향 280° · 거리 반지름 + 1.3(물 가운데 줄), 물 1.8 · 둑 0.35. 단계 3부터 */
   const RIVER={dir:280,dist:1.3,water:1.8,bank:.35,stage:3};
+  /* ---------- 0.17 돌 성벽(계획서 work\verification-20261113\design\v016-plan.md §3.2 안 B, 프로듀서 결정 '26.11.20 ①: 성곽 마을부터 6면 모두 막음) ----------
+     성곽 마을(단계 from = 4)부터 울타리 6면의 최대 체력에 add(70)를 더한다. 울타리를 안 산 면도 체력 70짜리 성벽 건물(layer 0)이 선다. 산 울타리는 그 위에 더한다.
+     같은 건물(kind 'fence')이라 걷기 · 부수기 · 15초 다시 세우기 · 고치기는 그대로다. 최대 체력이 오르면 늘어난 만큼 체력도 늘고, 성벽이 처음 서는 순간 부서져 있던 면은 바로 선다.
+     성문 · 성탑은 그림만(규칙 없음). 늑대는 지금처럼 넓게 온다(프로듀서 결정 ②, 성문 줄 규칙은 만들지 않음).
+     Combat.FLAGS.WALLS(주소 ?walls=0)와 단계 · 길이 모두 켜져 있을 때만. 끄면 다음 맞추기에서 layer 0 건물을 지우고 0.16 최대 체력으로 돌아간다(한 글자도 다르지 않다) */
+  const WALL={from:4,add:70};
+  const walled=w=>{const C=combat();return hasStage(w)&&w.stage>=WALL.from&&!!(C&&C.FLAGS&&C.FLAGS.STAGES&&C.FLAGS.ROUTES&&C.FLAGS.WALLS)};
+  /* 울타리 면 최대 체력 = 산 겹(0~3)의 체력 + 성벽 바닥(성벽 단계면 70) */
+  const fenceMax=(w,L)=>(L>0?FENCE_HP[L-1]:0)+(walled(w)?WALL.add:0);
+  /* ---------- 0.17 바깥 타워 고리(계획서 §4.2): 자리 번호(0~19)는 그대로, 고리 자리의 좌표만 단계의 함수 ----------
+     SLOT_R[단계] = 고리 1 · 2 · 3(자리 6~9 · 10~13 · 14~19)의 반지름. 각도는 ALL_SLOTS 그대로. 표에 없는 단계 · 고리와 가운데 자리 0~5는 ALL_SLOTS 그대로.
+     성곽 마을(반지름 18)에서 고리 1 · 2를 8.5 · 11.5 → 10.5 · 14.5로, 성(22)에서 고리 3을 14.5 → 17.5로 성벽 가까이 민다(17.8이면 반지름 19.6 집과 1.2 아래).
+     sync가 타워 좌표를 울타리 면처럼 다시 쓴다(저장 형식 그대로). Combat.FLAGS.TOWER_RING(주소 ?ring=0)과 단계 · 길이 켜져 있을 때만 */
+  const SLOT_R={4:[10.5,14.5],5:[10.5,14.5,17.5]};
+  const ringOn=w=>{const C=combat();return hasStage(w)&&!!(C&&C.FLAGS&&C.FLAGS.STAGES&&C.FLAGS.ROUTES&&C.FLAGS.TOWER_RING)};
+  const ringOf=i=>i<6?-1:i<10?0:i<14?1:i<20?2:-1;
+  /* 단계 st에서 자리 i의 좌표(고리를 켠 것으로 셈). 표에 없으면 ALL_SLOTS */
+  function slotAtStage(i,st){const p=ALL_SLOTS[i],g=ringOf(i),T=SLOT_R[st],r=T&&g>=0?T[g]:undefined;if(!p||!Number.isFinite(r))return p;const a=Math.atan2(p[1],p[0]);return [Math.round(Math.cos(a)*r*100)/100,Math.round(Math.sin(a)*r*100)/100]}
+  /* 세계 w에서 자리 i의 좌표(고리를 끄면 ALL_SLOTS) */
+  const slotAt=(i,w)=>ringOn(w)?slotAtStage(i,w.stage):ALL_SLOTS[i];
   const formsOn=w=>{const C=combat();return !!(C&&C.FLAGS&&C.FLAGS.FORMS&&C.FLAGS.STAGES)&&!!routes(w)&&w.stage>=FORM.from};
   const riverOn=w=>{const C=combat();return hasStage(w)&&w.stage>=RIVER.stage&&!!(C&&C.FLAGS&&C.FLAGS.STAGES&&C.FLAGS.ROUTES&&C.FLAGS.RIVER)};
   const riverGap=(R,x,z)=>{const a=RIVER.dir*Math.PI/180;return Math.abs(x*Math.cos(a)+z*Math.sin(a)-R-RIVER.dist)-RIVER.water/2-RIVER.bank};
@@ -196,7 +216,9 @@
   /* 늑대 왕(0.12): 늑대 목록(상한 90)과 별개 자리(w.king). 화살에 맞지 않고 포효하지 않으며 공격하지 않는다(지는 경우 없음).
      마을 정면 쪽 출현 지점(point)의 숲 가장자리에서 기다리다(wait), 종이 울리면 울타리 밖 멈춤 지점(반지름 + stop)까지 걸어오고(come → stand),
      8세부터 두 번 틀릴 때마다 step만큼 다가선다(최대 3걸음, 그래도 울타리 밖). 방패가 다 깨지면 숲으로 달아난다(flee) */
-  const KING={point:2,far:3,wait:-3,stop:2.4,step:.6,speed:1.2,flee:4,size:3.6};
+  /* wall(0.17, 프로듀서 결정 '26.11.20 ③: 왕은 정문을 민다): 성벽 단계에는 정문(2번 길 성문) 밖에서 기다리고(반지름 + EDGE + wait = + 5) 결전 멈춤 지점은 반지름 + stop(4.0).
+     앞발(GLB 머리 쪽 0.997 × 화면 배수 3.6)이 정문 바깥면(반지름 + 0.12)에서 약 0.3 떨어진다. 두 번 틀려도 다가서지 않고 걸음 수(steps)만 센다(화면이 정문을 민다) */
+  const KING={point:2,far:3,wait:-3,stop:2.4,step:.6,speed:1.2,flee:4,size:3.6,wall:{wait:-2,stop:4.0}};
   /* 도둑 여우(0.12): 한 번에 한 마리, 늑대 목록과 별개(w.fox)라 타워가 저절로 쏘지 않는다. 정해진 틱(total)에 맞춰 닭까지 온다 */
   const FOX={flee:3.2,arrow:1.6,size:.7};
   /* 수첩 MVP 반짝 손님: 늑대 목록과 별개(w.guest)라 타워가 저절로 쏘지 않고, 닭·건물을 노리지 않는다. 마을 둘레를 천천히 돈다. 머무는 시간 제한 없음(판이 끝날 때 화면이 치움) */
@@ -335,14 +357,15 @@
     const want={coop:1,market:1,nursery:w.hall>=1?1:0,barn:w.hall>=3?1:0};
     for(const kind of Object.keys(want))if(want[kind]&&!w.buildings.some(b=>b.kind===kind)){const [x,z]=PLACE[kind];w.buildings.push({id:id(w),kind,x,z,hp:HP[kind],max:HP[kind],broken:false})}
     syncTowers(w,Math.max(1,Math.min(TOWER_UNITS,1+(s.level|0))),wait);
-    const layers=fenceLayers(s.fence);
+    const layers=fenceLayers(s.fence),wall=walled(w);
     for(let k=0;k<6;k++){
-      let f=w.buildings.find(b=>b.kind==='fence'&&b.side===k);const L=layers[k];
-      if(L>0&&!f){f={id:id(w),kind:'fence',side:k,layer:L,x:0,z:0,hp:FENCE_HP[L-1],max:FENCE_HP[L-1],broken:false};w.buildings.push(f)}
-      else if(f&&L>0&&L!==f.layer){
-        /* 덧대면 그 겹 최대 체력이 되고 늘어난 만큼 체력도 는다. 부서져 있던 면은 새로 쌓아 바로 선다(산 순간 보이게). 줄어드는 것은 망가진 저장뿐 */
-        const mx=FENCE_HP[L-1];
-        if(L>f.layer){if(f.broken){f.broken=false;f.hp=mx;f.rebuild=REBUILD}else f.hp=Math.min(mx,f.hp+mx-f.max)}else f.hp=Math.min(mx,f.hp);
+      let f=w.buildings.find(b=>b.kind==='fence'&&b.side===k);const L=layers[k],mx=fenceMax(w,L);
+      /* 0.17: 성벽 단계면 산 겹이 0이어도 성벽(layer 0, 체력 70)이 선다. 성벽을 끄면 layer 0 건물은 지운다 */
+      if(mx>0&&!f){f={id:id(w),kind:'fence',side:k,layer:L,x:0,z:0,hp:mx,max:mx,broken:false};w.buildings.push(f)}
+      else if(f&&!wall&&f.layer===0){w.buildings.splice(w.buildings.indexOf(f),1);f=null}
+      else if(f&&mx>0&&(L!==f.layer||(wall?f.max!==mx:f.max>mx))){
+        /* 덧대면(또는 성벽이 서면) 늘어난 최대 체력만큼 체력도 는다. 부서져 있던 면은 새로 쌓아 바로 선다(산 순간 보이게). 줄어드는 것은 성벽을 끄거나 망가진 저장뿐 */
+        if(mx>f.max){if(f.broken){f.broken=false;f.hp=mx;f.rebuild=REBUILD}else f.hp=Math.min(mx,f.hp+mx-f.max)}else f.hp=Math.min(mx,f.hp);
         f.layer=L;f.max=mx;
       }
       if(f){const a=(k+.5)*Math.PI/3;f.x=Math.cos(a)*R;f.z=Math.sin(a)*R}
@@ -368,6 +391,12 @@
     while(!wait&&sum<units){let low=null;for(const b of w.buildings)if(b.kind==='tower'&&(!low||b.floor<low.floor||b.floor===low.floor&&(b.broken!==low.broken?low.broken:b.slot<low.slot)))low=b;if(!low)break;low.floor++;sum++}
     /* 경제보다 많으면(망가진 저장·상한 보정) 가장 높은 타워(같으면 뒤 자리)부터 낮추고, 1층이면 없앤다 */
     while(sum>units){let hi=null;for(const b of w.buildings)if(b.kind==='tower'&&(!hi||b.floor>hi.floor||b.floor===hi.floor&&b.slot>hi.slot))hi=b;if(!hi)break;if(hi.floor>1)hi.floor--;else w.buildings.splice(w.buildings.indexOf(hi),1);sum--}
+    /* 0.17 바깥 고리: 고리 자리(6~19) 타워의 좌표를 지금 단계의 자리로 다시 쓴다(울타리 면처럼). 고리를 끄면 고리가 옮겨 둔 좌표(단계 4 · 5 표)만 ALL_SLOTS로 되돌린다
+       (0.16까지의 저장은 좌표가 원래 ALL_SLOTS라 한 글자도 바뀌지 않는다) */
+    const ring=ringOn(w);
+    for(const b of w.buildings){if(b.kind!=='tower'||ringOf(b.slot)<0)continue;
+      let p=null;if(ring)p=slotAt(b.slot,w);else for(const st in SLOT_R){const q=slotAtStage(b.slot,+st);if(b.x===q[0]&&b.z===q[1]){p=ALL_SLOTS[b.slot];break}}
+      if(p&&(b.x!==p[0]||b.z!==p[1])){b.x=p[0];b.z=p[1]}}
   }
   function freeHome(w){for(let i=0;i<HENS_MAX;i++)if(!w.hens.some(h=>h.state!=='gone'&&h.slot===i))return i;return 0}
 
@@ -626,7 +655,8 @@
     return n;
   }
   /* ---------- 늑대 왕 · 도둑 여우 · 물러남 (0.12. 화면·시뮬이 부른다) ---------- */
-  const kingGoal=(w,k)=>{const R=radius(w);return k.state==='wait'?R+EDGE+KING.wait:k.state==='flee'?R+EDGE+KING.far:R+KING.stop-KING.step*Math.max(0,Math.min(3,k.steps|0))};
+  /* 0.17: 성벽 단계면 정문 밖(KING.wall)에서 기다리고 멈춘다. 걸음 수는 세지만 다가서지 않는다(화면이 정문을 민다) */
+  const kingGoal=(w,k)=>{const R=radius(w),G=walled(w)?KING.wall:null;return k.state==='wait'?R+EDGE+(G?G.wait:KING.wait):k.state==='flee'?R+EDGE+KING.far:G?R+G.stop:R+KING.stop-KING.step*Math.max(0,Math.min(3,k.steps|0))};
   const kingPut=k=>{k.x=Math.round(Math.cos(k.a)*k.r*1000)/1000;k.z=Math.round(Math.sin(k.a)*k.r*1000)/1000};
   /* king(w, mode, steps, snap): mode 'wait'(숲 가장자리에서 기다림) · 'fight'(결전: 멈춤 지점으로, steps = 다가온 걸음) · 'flee'(달아남) · 'none'(없앰).
      snap이면 걷지 않고 바로 그 자리에 둔다(이어하기: 결전 중이던 왕은 멈춤 지점 처음 자리). 없던 왕은 숲 속(far)에서 걸어 나온다. → 왕 또는 null */
@@ -765,8 +795,10 @@
       if(b.kind==='tower'&&!int(b.slot,0,ALL_SLOTS.length-1)||b.kind==='fence'&&!int(b.side,0,5))return false;
       const key=b.kind+(b.kind==='tower'?b.slot:b.kind==='fence'?b.side:'');if(one.has(key))return false;one.add(key);return true}); /* 같은 자리 겹침은 처음 것만 */
     for(const b of w.buildings){
-      if(b.kind==='fence'&&!int(b.layer,1,3))b.layer=1;
-      if(!(fin(b.max)&&b.max>0))b.max=b.kind==='fence'?FENCE_HP[b.layer-1]:HP[b.kind];
+      /* 0.17: 성벽 단계의 layer 0(울타리를 안 산 면의 성벽)도 받는다. 최대 체력이 없으면 같은 식(산 겹 + 성벽 바닥)으로 채운다 */
+      /* (성벽을 끈 채 불러오면 다음 sync가 layer 0 건물을 지운다) */
+      if(b.kind==='fence'&&!int(b.layer,0,3))b.layer=1;
+      if(!(fin(b.max)&&b.max>0))b.max=b.kind==='fence'?(fenceMax(w,b.layer)||WALL.add):HP[b.kind];
       if(!fin(b.hp))b.hp=b.max;else if(b.hp<0||b.hp>b.max)b.hp=Math.max(0,Math.min(b.max,b.hp));
       if(typeof b.broken!=='boolean')b.broken=b.hp<=0;
       if(b.kind==='tower'){if(!int(b.floor,1,TOWER_UNITS))b.floor=1;if(!int(b.cd,0,1e6))b.cd=0;if(!int(b.stun,0,ROAR.stun))b.stun=0}
@@ -779,7 +811,7 @@
     if(!(Number.isSafeInteger(w.nextId)&&w.nextId>top))w.nextId=top+1;
   }
 
-  const api={V:2,STAGE,STAGE_MAX,routes,BRIDGE,bridgeAt,FORM,RIVER,formsOn,riverOn,riverGap,packForm,formLoad,formWolf,formPace,callPack,FLOW,flowOn,flowQuestion,flowCorrect,flowAdd,flowYard,flowCap,flowPile,flowIdle,flowLayers,TEMPO,tempoInterval,mulOf,KING,FOX,GUEST,king,kingHit,fox,foxShoo,guest,guestGreet,guestGone,retreat,peaceOff,TICK,RADIUS,EDGE,SPAWNS,WOLF,AGE,THREAT,PACK,TRICKLE,SLOW,slowEase,KINDS,MIX,BOSS_EVERY,TOWER,POWER,POWER_STEP,FLOOR,ROAR,HP,FENCE_HP,MEND,REBUILD,HEN,DASH,RUSH,MERCY,MERCY_CAP,INNER,SIDE_REACH,INTERVAL,MAX_WOLVES,TRAVEL,GUARD,answered,
+  const api={V:2,STAGE,STAGE_MAX,routes,WALL,walled,fenceMax,SLOT_R,ringOn,slotAt,slotAtStage,BRIDGE,bridgeAt,FORM,RIVER,formsOn,riverOn,riverGap,packForm,formLoad,formWolf,formPace,callPack,FLOW,flowOn,flowQuestion,flowCorrect,flowAdd,flowYard,flowCap,flowPile,flowIdle,flowLayers,TEMPO,tempoInterval,mulOf,KING,FOX,GUEST,king,kingHit,fox,foxShoo,guest,guestGreet,guestGone,retreat,peaceOff,TICK,RADIUS,EDGE,SPAWNS,WOLF,AGE,THREAT,PACK,TRICKLE,SLOW,slowEase,KINDS,MIX,BOSS_EVERY,TOWER,POWER,POWER_STEP,FLOOR,ROAR,HP,FENCE_HP,MEND,REBUILD,HEN,DASH,RUSH,MERCY,MERCY_CAP,INNER,SIDE_REACH,INTERVAL,MAX_WOLVES,TRAVEL,GUARD,answered,
     TOWER_SLOTS,RINGS,ALL_SLOTS,SLOT_COUNT,TOWER_UNITS,PLACE,HOMES,HENS_MAX,HOME,towerSlots,fenceLayers,
     intervalFor,create,sync,step,volley,volleyArrows,dashTicks,built,threat,repairAll,brokenCount,brokenKinds,marketDown,wolvesInside,towerUnits,barLeft,secondsLeft,packSize,trickleGap,kindsAt,restore,radius,sectorOf,rand,range,cooldown,damage,towerDamage,towerRange,power,ageOf};
   if(typeof module!=='undefined')module.exports=api;

@@ -1640,7 +1640,7 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
    {const m=/const FALLBACK_RIVER=(\{[^}]*\});/.exec(src),F=m&&new Function('return '+m[1])();
     eq(F&&[F.dir,F.dist,F.water,F.bank,F.road,F.mill,F.bridge],[RV.dir,RV.dist,RV.water,RV.bank,RV.road,L.MILL.at,L.BRIDGE.len],'그림 화면 FALLBACK_RIVER = layout.js RIVER · MILL · BRIDGE');
     const B=require('./scripts/build-pages.cjs'),png=[...src.matchAll(/'(art-handoff\/v015-v016\/png\/[a-z-]+\.png)'/g)].map(x=>x[1]).sort();
-    eq(png,['bridge','thief-fox','watermill','wolf-king'].map(n=>'art-handoff/v015-v016/png/'+n+'.png'),'그림 화면이 쓰는 0.15 그림 4개');ok(png.every(p=>B.files.includes(p)),'그림 화면의 0.15 그림은 배포 묶음에 있음');
+    eq(png,['bridge','castle-gate','castle-hall','thief-fox','wall-segment','watchtower','watermill','wolf-king'].map(n=>'art-handoff/v015-v016/png/'+n+'.png'),'그림 화면이 쓰는 0.15 그림 4개 + 0.17 성·성벽·성문·성탑 그림 4개');ok(png.every(p=>B.files.includes(p)),'그림 화면의 0.15 그림은 배포 묶음에 있음');
     ok(/\[\?&\]art15=0\\b/.test(src),'그림 화면도 ?art15=0이면 새 그림을 쓰지 않음');
     const c=/const FALLBACK_COTTAGES=(\[[^;]*\]);/.exec(src);eq(c&&JSON.parse(c[1]),L.COTTAGES.map(k=>[...k.at,k.stage].map(v=>v+0)),'그림 화면 집 자리 FALLBACK_COTTAGES = layout.js COTTAGES(단계별 2 · 4 · 6 · 10 · 22채)')}
    /* 다리 발판 높이: 가운데 0.469, 양 끝으로 낮아지고 1.97 밖은 땅 */
@@ -1682,6 +1682,88 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   vs=up({RIVER:false,BRIDGE:false},'강 끔','💧물레방아 마을이 되었어요!땅이 넓어졌어요 · 늑대는 길 4곳으로 와요');eq([vs.river,vs.bridge],[false,false],'강을 끄면 0.14 띠 알림 · 강 없음');
   withFlags({ROUTES:false},()=>{const a=seed(base,{view:true});a.go();const s=a.window.getVillageState();eq([s.river,s.bridge],[false,false],'길을 끄면(?routes=0) 강 · 다리 없음')});
   withFlags(OFF,()=>{const a=seed(base,{view:true});a.go();const s=a.window.getVillageState();eq([s.river,s.bridge],[false,false],'단계를 끄면(?stages=0) 강 · 다리 없음')})}
+ /* ======================= S-10 0.17 성벽 · 성문 · 성탑 · 성(계획서 v016-plan §6.3, 프로듀서 결정 '26.11.20: 6면 모두 막음 · 늑대는 지금처럼 넓게 · 왕은 정문을 밂) ======================= */
+ {const WL=W.WALL,FH=W.FENCE_HP,fences=w=>[0,1,2,3,4,5].map(k=>{const f=w.buildings.find(b=>b.kind==='fence'&&b.side===k);return f?[f.layer,f.max,f.hp,f.broken]:null});
+  /* 마을 하나를 손으로: 타워 · 울타리 · 닭 · 농부 수(지은 수 = 1 + 합) */
+  const mk=o=>{const s=Object.assign(C.fresh(8),o);C.grow(s);return s};
+  /* S-10-1 손잡이: 기본 켬, 주소로 끔, 단계 · 길을 끄면 둘 다 쓰지 않음 */
+  {eq([C.FLAGS.WALLS,C.FLAGS.TOWER_RING],[true,true],'0.17 성벽 · 바깥 고리 기본 켬');eq([WL,W.SLOT_R],[{from:4,add:70},{4:[10.5,14.5],5:[10.5,14.5,17.5]}],'성벽: 성곽 마을(단계 4)부터 6면 +70, 고리 반지름표(단계 4 · 5)');
+   ok(/\[\?&\]walls=0\\b/.test(src)&&/\[\?&\]ring=0\\b/.test(src)&&/\[\?&\]art16=0\\b/.test(src)&&src.includes('Combat.FLAGS.WALLS=false')&&src.includes('Combat.FLAGS.TOWER_RING=false'),'주소 ?walls=0 · ?ring=0 · ?art16=0 손잡이');
+   const w4=W.sync(W.create({seed:1}),built(36)),w3=W.sync(W.create({seed:1}),built(35));eq([w4.stage,w3.stage,W.walled(w4),W.walled(w3),W.ringOn(w4)],[4,3,true,false,true],'성벽은 성곽 마을부터');
+   for(const f of [{WALLS:false},{ROUTES:false},{STAGES:false}])withFlags(f,()=>ok(!W.walled(w4),'끄면 성벽 없음: '+JSON.stringify(f)));
+   for(const f of [{TOWER_RING:false},{ROUTES:false},{STAGES:false}])withFlags(f,()=>ok(!W.ringOn(w4),'끄면 고리 이동 없음: '+JSON.stringify(f)))}
+  /* S-10-2 세계 성벽 */
+  {/* 단계 3까지는 켬 · 끔 세계가 같다(1,500틱, 일제 사격 포함) */
+   const run=(s,f,T)=>withFlags(f,()=>{const w=W.sync(W.create({seed:9,interval:150}),s);for(let i=1;i<=T;i++){W.step(w,s);if(i%300===0)W.volley(w,s,{scale:1})}return JSON.stringify(w)});
+   for(const n of [5,14,24,35])eq(run(built(n),{},1500),run(built(n),{WALLS:false,TOWER_RING:false},1500),'지은 수 '+n+'(단계 '+C.stage(built(n))+'): 성벽 · 고리 켬 = 끔(같은 세계)');
+   /* 단계 4, 울타리 2면만 산 마을: 6면 모두 건물, 산 면 70 + 70 = 140, 안 산 면 70짜리 성벽(layer 0) */
+   const s=mk({level:19,fence:2,chickens:16}),w=W.sync(W.create({seed:3}),s);eq(w.stage,4,'(울타리 2면 · 지은 수 36 = 성곽 마을)');
+   eq(fences(w),[[1,140,140,false],[1,140,140,false],[0,70,70,false],[0,70,70,false],[0,70,70,false],[0,70,70,false]],'성곽 마을: 6면 모두 성벽, 최대 체력 = 산 겹 체력 + 70(안 산 면은 70)');
+   /* 울타리를 하나 더 사면 그 면이 겹 1이 되어 최대 체력 70 → 140, 늘어난 만큼 체력도 는다 */
+   w.buildings.find(b=>b.kind==='fence'&&b.side===2).hp=30;s.fence=3;C.grow(s);W.sync(w,s);eq(fences(w)[2],[1,140,100,false],'성벽 단계에서 울타리를 사면 최대 체력 +70, 체력도 +70');
+   /* 겹 3까지: 220 + 70 */
+   {const t=mk({level:18,fence:18,chickens:1}),x=W.sync(W.create({seed:3}),t);eq([x.stage,fences(x).map(f=>f[1])],[4,[290,290,290,290,290,290]],'겹 3(돌담) 면도 +70 = 290')}
+   /* 성벽이 처음 서는 순간: 부서져 있던 면은 바로 선다(덧댄 울타리와 같은 규칙) */
+   {const t=mk({level:19,fence:2,chickens:15}),x=W.sync(W.create({seed:3}),t);eq(x.stage,3,'(지은 수 35 = 물레방아 마을)');const f0=x.buildings.find(b=>b.kind==='fence'&&b.side===0);f0.hp=0;f0.broken=true;f0.rebuild=90;
+    t.chickens++;C.grow(t);W.sync(x,t);eq([x.stage,fences(x)[0],f0.rebuild],[4,[1,140,140,false],W.REBUILD],'성벽이 서는 순간 부서진 면이 바로 섬(체력 가득)')}
+   /* 걷기 · 부수기 · 다시 세우기는 그대로: 성벽 면도 부서지고 15초 뒤 절반 체력(layer 0 = 35)으로 선다 */
+   {const t=mk({level:19,fence:0,chickens:18}),x=W.sync(W.create({seed:3}),t),f=x.buildings.find(b=>b.kind==='fence'&&b.side===1);eq([x.stage,f.layer,f.max],[4,0,70],'(울타리 0면 성곽 마을: 성벽만)');
+    x.wave.arrive=1e9;x.wave.spawned=true;x.trickle=1e9;f.hp=.2;const v={id:999,kind:'wolf',x:f.x,z:f.z,sx:f.x*2,sz:f.z*2,hp:9,max:9,speed:1,state:'smash',target:f.id,timer:0,inside:0,hen:0};x.wolves.push(v);
+    let broke=0;for(let i=0;i<5;i++)for(const e of W.step(x,t))if(e.type==='broken'&&e.building===f.id)broke++;x.wolves=[];let up=0;for(let i=0;i<W.REBUILD+5;i++)for(const e of W.step(x,t))if(e.type==='rebuilt'&&e.building===f.id)up++;
+    eq([broke,up,f.broken,Math.floor(f.hp)],[1,1,false,35],'성벽 면도 부서지고, 늑대가 없으면 15초 뒤 절반 체력(35)으로 다시 섬')}
+   /* 끄면(?walls=0) layer 0 건물이 사라지고 0.16 최대 체력 */
+   withFlags({WALLS:false},()=>{W.sync(w,s);eq(fences(w),[[1,70,70,false],[1,70,70,false],[1,70,70,false],null,null,null],'성벽을 끄면 layer 0 건물이 사라지고 0.16 최대 체력(70)으로')});
+   W.sync(w,s);eq(fences(w).map(f=>f&&f.slice(0,2)),[[1,140],[1,140],[1,140],[0,70],[0,70],[0,70]],'다시 켜면 다음 맞추기에서 성벽')}
+  /* S-10-3 저장: 성벽 세계 저장 → 복원 → 저장이 같음, 0.16 성 단계 세계(성벽 · 고리 끔으로 만든 것)를 켜고 불러오면 +70 · 고리 3 좌표 17.5 */
+  {const s=mk({level:19,fence:2,chickens:20,farmers:9,power:5}),w=W.sync(W.create({seed:5,interval:150}),s);for(let i=1;i<=900;i++){W.step(w,s);if(i%300===0)W.volley(w,s,{scale:1})}
+   const raw=JSON.stringify({...w,events:[]}),back=W.restore(JSON.parse(raw));eq(JSON.stringify({...back,events:[]}),raw,'성벽 · 고리 세계: 저장 → 복원 → 저장이 같음(다듬기가 layer 0 · 옮긴 좌표를 받음)');
+   const old=withFlags({WALLS:false,TOWER_RING:false},()=>W.sync(W.create({seed:5}),s)),econ=JSON.stringify(s),t3=old.buildings.filter(b=>b.kind==='tower'&&b.slot>=14);
+   eq([old.stage,t3.length,t3.every(b=>Math.abs(Math.hypot(b.x,b.z)-14.5)<.01),fences(old).filter(Boolean).every(f=>f[1]===FH[f[0]-1])&&fences(old).filter(Boolean).length===2],[5,6,true,true],'(0.16 성 단계 세계: 고리 3 반지름 14.5, 울타리 최대 체력 = 겹 체력)');
+   const now=W.sync(W.restore(JSON.parse(JSON.stringify(old))),s),u3=now.buildings.filter(b=>b.kind==='tower'&&b.slot>=14);
+   eq([u3.map(b=>b.slot),u3.every(b=>Math.abs(Math.hypot(b.x,b.z)-17.5)<.011),fences(now).every(f=>f&&f[1]===(f[0]>0?FH[f[0]-1]:0)+70)],[t3.map(b=>b.slot),true,true],'0.16 저장을 켜고 불러오면: 자리 · 층 그대로, 고리 3이 17.5로, 울타리 6면 +70(안 산 4면은 70짜리 성벽이 새로 섬)');
+   eq(JSON.stringify(s),econ,'경제 저장(state)은 한 글자도 바뀌지 않음');
+   eq(old.buildings.filter(b=>b.kind==='tower').map(b=>[b.slot,b.floor]),now.buildings.filter(b=>b.kind==='tower').map(b=>[b.slot,b.floor]),'타워 자리 번호 · 층 그대로');
+   const bad=JSON.parse(raw);bad.buildings.find(b=>b.kind==='fence'&&b.layer>0).layer=0;delete bad.buildings.find(b=>b.kind==='fence').max;const fixed=W.restore(bad);ok(fixed.buildings.filter(b=>b.kind==='fence').every(b=>b.layer>=0&&b.layer<=3&&b.max>0),'다듬기: layer 0 · 빠진 최대 체력을 받아 채움');
+   /* 0.16 코드가 0.17 저장을 읽으면 layer 0은 겹 1로 고쳐져 남는다(계획서 §4.3, 배포는 한 버전이라 위험 낮음): 여기서는 기록만 */}
+  /* S-10-4 고리: 단계 0~3은 ALL_SLOTS, 단계 4 · 5 표, 단계가 올라도 타워 수 · 층 합 = 1 + level */
+  {for(let st=0;st<=3;st++)eq(W.ALL_SLOTS.map((p,i)=>W.slotAtStage(i,st)),W.ALL_SLOTS.map(p=>p),'단계 '+st+': 자리 좌표 = ALL_SLOTS');
+   const R=(st,i)=>+Math.hypot(...W.slotAtStage(i,st)).toFixed(2),ang=(st,i)=>Math.atan2(W.slotAtStage(i,st)[1],W.slotAtStage(i,st)[0]);
+   eq([4,5].map(st=>[0,6,9,10,13,14,19].map(i=>R(st,i))),[[1.84,10.5,10.5,14.5,14.5,14.5,14.5],[1.84,10.5,10.5,14.5,14.5,17.5,17.5]],'단계 4: 고리 1 · 2 = 10.5 · 14.5(고리 3은 회관 3에서 열림), 단계 5: 고리 3 = 17.5, 가운데 자리는 그대로');
+   ok(W.ALL_SLOTS.every((p,i)=>i<6||Math.abs(ang(5,i)-Math.atan2(p[1],p[0]))<.005),'고리 자리의 각도는 ALL_SLOTS 그대로');
+   for(const n of [35,36,49,50,62]){const s=built(n),w=W.sync(W.create({seed:2}),s),tw=w.buildings.filter(b=>b.kind==='tower');
+    ok(W.towerUnits(w)===1+s.level&&tw.every(b=>{const p=W.slotAt(b.slot,w);return b.x===p[0]&&b.z===p[1]}),'지은 수 '+n+'(단계 '+w.stage+'): 타워 '+tw.length+'채 · 층 합 = 1 + level, 좌표 = 그 단계 자리')}
+   /* 읽는 중(보류)에 단계가 오를 참이면 좌표도 그대로, 풀면 새 자리 */
+   {const s=built(35),w=W.sync(W.create({seed:2}),s),x0=JSON.stringify(w.buildings.filter(b=>b.kind==='tower').map(b=>[b.x,b.z]));s.chickens++;C.grow(s);W.sync(w,s,{hold:true});
+    eq([w.stage,JSON.stringify(w.buildings.filter(b=>b.kind==='tower').map(b=>[b.x,b.z]))],[3,x0],'보류 중: 단계 · 타워 좌표 그대로');W.sync(w,s);ok(w.stage===4&&w.buildings.some(b=>b.kind==='tower'&&b.slot>=6&&Math.abs(Math.hypot(b.x,b.z)-10.5)<.01),'보류를 풀면 고리 1이 10.5로')}
+   withFlags({TOWER_RING:false},()=>{const s=built(55),w=W.sync(W.create({seed:2}),s);ok(w.buildings.filter(b=>b.kind==='tower').every(b=>{const p=W.ALL_SLOTS[b.slot];return b.x===p[0]&&b.z===p[1]}),'고리를 끄면(?ring=0) ALL_SLOTS 좌표')});
+   {const s=built(55),w=W.sync(W.create({seed:2}),s);withFlags({TOWER_RING:false},()=>W.sync(w,s));ok(w.buildings.filter(b=>b.kind==='tower').every(b=>{const p=W.ALL_SLOTS[b.slot];return b.x===p[0]&&b.z===p[1]}),'켠 채 옮긴 좌표도 끄고 맞추면 ALL_SLOTS로 돌아감')}}
+  /* S-10-6 늑대 왕: 성벽 단계에는 정문(2번 길) 밖 반지름 + 5에서 기다리고 반지름 + 4.0에 선다. 두 번 틀려도 다가서지 않고 걸음 수만 센다 */
+  {const s=built(55),w=W.sync(W.create({seed:4}),s),R=W.radius(w);
+   let k=W.king(w,'wait',0,true);eq([k.state,+k.r.toFixed(3)],['wait',R+W.EDGE+W.KING.wall.wait],'성: 왕은 정문 밖 반지름 + 5에서 기다림');
+   k=W.king(w,'fight',0,true);eq([k.state,+k.r.toFixed(3)],['stand',R+W.KING.wall.stop],'성: 결전 멈춤 지점 반지름 + 4.0');
+   for(const n of [1,2,3]){W.king(w,'fight',n);for(let i=0;i<40;i++)W.step(w,s);eq([w.king.steps,+w.king.r.toFixed(3)],[n,R+W.KING.wall.stop],'두 번 틀린 걸음 '+n+': 걸음 수는 세고 자리는 그대로(정문을 밂)')}
+   const a=(W.KING.point+.5)*Math.PI/4;ok(Math.abs(Math.atan2(w.king.z,w.king.x)-(a-Math.PI*2*(a>Math.PI?1:0)))<1e-3,'왕은 정문(2번 길) 축 위');
+   /* 앞발(GLB 머리 쪽 0.997 × 화면 배수 3.6)이 정문 바깥면(반지름 − 0.5 + 0.537 × 정문 축척 1.15) + 0.25 밖 */
+   const man=JSON.parse(fs.readFileSync(__dirname+'/art-handoff/v015-v016/manifest.json','utf8')),king=man.find(m=>m.asset==='wolf-king'),gate=man.find(m=>m.asset==='castle-gate');
+   const front=R+W.KING.wall.stop-king.world_bounds_max[2]*W.KING.size,face=R-.5+gate.world_bounds_max[2]*1.15;ok(front>=face+.25,'왕 앞발 반지름 + '+(front-R).toFixed(2)+' ≥ 정문 바깥면 + '+(face-R).toFixed(2)+' + 0.25');
+   withFlags({WALLS:false},()=>{const x=W.sync(W.create({seed:4}),s);W.king(x,'fight',2,true);eq(+x.king.r.toFixed(3),R+W.KING.stop-2*W.KING.step,'성벽을 끄면 0.16처럼 다가섬')});
+   const m=W.sync(W.create({seed:4}),built(30));W.king(m,'fight',0,true);eq(+m.king.r.toFixed(3),W.radius(m)+W.KING.stop,'성벽 전(물레방아 마을)은 0.16 멈춤 지점')}
+  /* S-10-7 추천 말풍선 · 띠 알림 · 화면 상태 */
+  {const s=mk({level:18,fence:2,chickens:16,gold:5000}),r=C.recommend(s,{lostHenRecently:true,walled:true});
+   eq(r&&[r.key,r.line],['tower','꼬꼬를 지키려면 타워가 더 필요해요!'],'(타워를 살 수 있으면 타워)');
+   const t=mk({level:19,fence:2,chickens:16,gold:5000}),r2=C.recommend(t,{lostHenRecently:true,walled:true}),r3=C.recommend(t,{lostHenRecently:true});
+   eq([r2&&r2.key,r2&&r2.line,r3&&r3.line],['fence','성벽을 더 튼튼하게 쌓아요!','이쪽이 뻥 뚫렸어요. 울타리를 쳐요!'],'성벽 단계에는 "뻥 뚫렸어요" 대신 "성벽을 더 튼튼하게"(key는 그대로 fence)');
+   const v35=built(35),base={age:8,level:v35.level,fence:v35.fence,chickens:v35.chickens,farmers:v35.farmers,gold:3000,seed:5};
+   const up=(flags,want)=>withFlags(flags,()=>{const a=seed(base,{view:true});a.go();calmWorld(a);eq(a.game().stage.now,3,'(지은 수 35 = 물레방아 마을)');a.unlock();a.right();a.tick(5);a.buy('chicken');
+    eq([a.game().stage.now,a.fx('banner')[0]&&a.fx('banner')[0].textContent],[4,want],'성곽 마을 띠 알림 '+JSON.stringify(flags));return a});
+   const a=up({},'🧱성곽 마을이 되었어요!돌 성벽이 저절로 섰어요 · 늑대는 길 5곳으로 와요 · 알값 +1');
+   const vs=a.window.getVillageState();eq([vs.walls,vs.walled,vs.ring],[true,true,true],'3D에 성벽 · 고리 켬을 넘김');
+   ok(src.includes('walled:walled()}}'),'추천 맥락에 성벽 단계(walled)를 넘김');
+   up({WALLS:false},'🧱성곽 마을이 되었어요!늑대는 길 5곳으로 와요 · 알값 +1 · '+(()=>{const o=C.SHOP.filter(k=>C.ITEMS[k]&&C.ITEMS[k].need===2);return o.length?'새 상품: '+o.map(k=>({repair:'고치기',tower:'타워',power:'강화',fence:'울타리',chicken:'닭',farmer:'농부',pond:'연못',hall:'회관',feast:'잔치'})[k]).join('·'):'타워 자리 14곳'})());
+   const v49=built(49),b5={age:8,level:v49.level,fence:v49.fence,chickens:v49.chickens,farmers:v49.farmers,gold:3000,seed:5};
+   withFlags({},()=>{const b=seed(b5,{view:true});b.go();calmWorld(b);b.unlock();b.right();b.tick(5);b.buy('chicken');eq([b.game().stage.now,b.fx('banner')[0]&&b.fx('banner')[0].textContent.startsWith('🏰성이 되었어요!회관이 성이 되었어요 · 늑대는 길 6곳으로 와요')],[5,true],'성 띠 알림: 회관이 성이 되었어요')});
+   withFlags({ROUTES:false},()=>{const c=seed(base,{view:true});c.go();const v=c.window.getVillageState();eq([v.walls,v.walled,v.ring],[false,false,false],'길을 끄면 성벽 · 고리 없음')})}
+ }
  /* ======================= F 0.15.2 늑대 무리 대형(기획 wolf-paths-plan-20261119 §3.6, 프로듀서 결정 '26.11.19: 무리 대형부터, 따라 도는 늑대는 옆 길 울타리 면까지) ======================= */
  {const crypto=require('node:crypto'),FM=W.FORM,TAU=Math.PI*2,dAng=(a,b)=>{let d=(a-b)%TAU;if(d>Math.PI)d-=TAU;if(d<=-Math.PI)d+=TAU;return d},axisOf=p=>(p+.5)*Math.PI/4;
   const roadOf=v=>{const a=Math.atan2(v.sz,v.sx);let p=0;for(let q=1;q<8;q++)if(Math.abs(dAng(a,axisOf(q)))<Math.abs(dAng(a,axisOf(p))))p=q;return p};
@@ -1700,14 +1782,14 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
      for(let i=1;i<=6000;i++){W.step(w,s);if(i%300===0)W.volley(w,s,{scale:1});if(i%1000===0){const k=keys[(i/1000)%keys.length];s[k]=Math.min(C.max(shop[k]),s[k]+1);C.grow(s);W.sync(w,s)}}
      out.push(w)}
     return out}),print=ws=>crypto.createHash('sha256').update(JSON.stringify(ws,BOOK_ONLY)).digest('hex').slice(0,16);
-   const off=tour({FORMS:false}),on=tour({});eq(print(off),'5c6f00898a3c7d3d','대형 끔: 세계 지문이 0.15.1과 같음(5단계 × 6,000틱)');ok(print(on)!==print(off),'대형 켬: 세계가 달라짐');
+   /* 0.17: 0.15.1 지문은 성벽 · 바깥 고리도 끄고 잰다(둘 다 0.15.1에 없던 규칙. 켜면 단계 4 · 5 세계가 달라진다) */const off=tour({FORMS:false,WALLS:false,TOWER_RING:false}),on=tour({});eq(print(off),'5c6f00898a3c7d3d','대형 끔(성벽 · 고리 끔): 세계 지문이 0.15.1과 같음(5단계 × 6,000틱)');ok(print(on)!==print(off),'대형 켬: 세계가 달라짐');
    ok(off.every(w=>w.wolves.every(v=>!('fm' in v)&&!('fa' in v)&&!('fp' in v))),'끄면 늑대에 대형 칸이 생기지 않음');ok(on.some(w=>w.wolves.some(v=>v.fm>0)),'(켜면 대형 칸이 있는 늑대가 있음)')}
   /* F-3 난수 호출 수 그대로: 켬 · 끔 같은 씨앗이면 나오는 늑대(종류 · 체력 · 최대 체력 · 빠르기 · 출현 좌표)와 w.rng가 같다.
      새 판 보호로 잃는 것이 없어 완충이 그대로인 세계, 늑대 상한(90 · 낙오 72)에 닿기 전 구간(상한 판정은 0.15.1 규칙 그대로라 살아 있는 늑대 수가 다르면 그 뒤로 갈린다) */
   {let rows=0;for(const [n,T,seeds] of [[5,3000,[3,11,29]],[14,3000,[3,11,29]],[24,3000,[3,11,29]],[36,900,[3,11,29]],[50,900,[11]]])for(const sd of seeds){
     const mk=f=>withFlags(f,()=>{const s=built(n),w=W.sync(W.create({seed:sd,interval:150,guard:true}),s),list=[],seen=new Set();let formed=0;
      for(let t=0;t<T;t++){W.step(w,s);for(const v of w.wolves)if(!seen.has(v.id)){seen.add(v.id);list.push([v.kind,v.hp,v.max,v.speed,v.sx,v.sz].join(','));if(v.fm)formed++}}return {rng:w.rng,list:list.join(';'),n:list.length,formed}});
-    const a=mk({}),b=mk({FORMS:false});ok(a.rng===b.rng&&a.list===b.list&&a.formed>0,'지은 수 '+n+' 씨앗 '+sd+': 켬 · 끔 같은 늑대 '+a.n+'마리(그중 대형 '+a.formed+') · 같은 난수 상태');rows++}
+    /* 0.17: 성벽 · 고리는 끄고 견준다(켜면 지은 수 50에서 타워 · 성벽이 다른 늑대를 쓰러뜨려 늑대 상한 90에 닿는 때가 갈린다. 위 주석의 상한 판정과 같은 까닭) */const a=mk({WALLS:false,TOWER_RING:false}),b=mk({FORMS:false,WALLS:false,TOWER_RING:false});ok(a.rng===b.rng&&a.list===b.list&&a.formed>0,'지은 수 '+n+' 씨앗 '+sd+': 켬 · 끔 같은 늑대 '+a.n+'마리(그중 대형 '+a.formed+') · 같은 난수 상태');rows++}
    eq(rows,13,'(난수 비교 13판)')}
   /* F-4 단계 1~5 × 씨앗 12개 × 3,000틱(150틱마다 일제 사격)에서 늑대를 따라가며: 닿는 면 · 옆 면 · 강 · 다리 길 · 도는 각도 · 방향 바뀐 합 · 닿는 때 */
   {const walk={};let rows=0,wetFormed=0,road6=0,road6Formed=0,badSide=0,badNear=0,river74=0,arcOver=0,bossFormed=0,bosses=0,strayBad=0,strays=0,splitPacks=0,splitBoth=0;
@@ -2018,15 +2100,17 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
  for(const a of man)for(const ext of ['glb','png']){const f=dir+a[ext],has=fs.existsSync(f);ok(has,'0.15 아트 파일 있음: '+a[ext]);
   if(has){const buf=fs.readFileSync(f);eq([buf.length,crypto.createHash('sha256').update(buf).digest('hex')],[a.bytes[ext],a.sha256[ext]],'0.15 아트 '+a[ext]+': 크기·SHA-256 = manifest');
    ok(ext==='glb'?buf.subarray(0,4).toString('latin1')==='glTF':buf.subarray(0,8).equals(Buffer.from('89504e470d0a1a0a','hex')),'0.15 아트 '+a[ext]+': '+(ext==='glb'?'glTF':'PNG')+' 머리')}}
- const B=require('./scripts/build-pages.cjs'),want=['watermill','bridge','wolf-king','thief-fox'].flatMap(n=>['art-handoff/v015-v016/glb/'+n+'.glb','art-handoff/v015-v016/png/'+n+'.png']);
+ const B=require('./scripts/build-pages.cjs'),want=['watermill','bridge','wolf-king','thief-fox','castle-hall','wall-segment','castle-gate','watchtower'].flatMap(n=>['art-handoff/v015-v016/glb/'+n+'.glb','art-handoff/v015-v016/png/'+n+'.png']);
  eq(B.art15,['watermill','bridge','wolf-king','thief-fox'],'배포할 0.15 아트: 물레방아·다리·늑대 왕·도둑 여우');
- eq(B.files.filter(f=>f.startsWith('art-handoff/v015-v016/')),want,'배포 묶음의 0.15 아트 = GLB·PNG 4쌍(0.16 성·성벽·성문·성탑과 따로 된 바퀴는 아직 묶지 않음)');
+ eq(B.art16,['castle-hall','wall-segment','castle-gate','watchtower'],'0.17: 배포할 0.16 아트(S-10-8): 성 회관·성벽 조각·성문·성탑');
+ eq(B.files.filter(f=>f.startsWith('art-handoff/v015-v016/')),want,'배포 묶음의 아트 = 0.15 4쌍 + 0.16 성·성벽·성문·성탑 4쌍(따로 된 바퀴는 묶지 않음)');
  eq(new Set(B.files).size,B.files.length,'배포 묶음에 같은 파일이 두 번 없음');
  const refs=B.references();eq([...refs].filter(([f])=>!B.files.includes(f)),[],'index.html·src/*.js가 글자 그대로 부르는 아트는 모두 배포 묶음에 있음');
  ok(refs.has('art-handoff/coopnight/source-3d/models/environment-pack.glb')&&refs.has('art-handoff/coopnight/browser/characters/chicken.png'),'참조 검사가 3D 스크립트의 GLB와 페이지의 PNG를 모두 읽음');
  for(const wf of ['pages.yml','package-test.yml'])ok(/^\s*- art-handoff\/v015-v016\/\*\*\s*$/m.test(fs.readFileSync(__dirname+'/.github/workflows/'+wf,'utf8')),wf+': art-handoff/v015-v016을 바꾸면 워크플로가 돈다(paths)');
  {const pg=fs.readFileSync(__dirname+'/.github/workflows/pages.yml','utf8'),m=/art15 = \[([^\]]*)\]/.exec(pg);
   eq(m&&m[1].split(',').map(s=>s.trim().replace(/'/g,'')),B.art15,'pages.yml 실제 주소 검사: 배포한 0.15 아트 4쌍을 모두 받아 봄');
+  {const m16=/art16 = \[([^\]]*)\]/.exec(pg);eq(m16&&m16[1].split(',').map(s=>s.trim().replace(/'/g,'')),B.art16,'pages.yml 실제 주소 검사: 0.16 아트 4쌍도 받아 봄');ok(pg.includes('for name in art15 + art16:'),'pages.yml: 두 목록을 함께 돎')}
   ok(pg.includes("'art-handoff/v015-v016/glb/' + name + '.glb').startswith(b'glTF')")&&pg.includes("'art-handoff/v015-v016/png/' + name + '.png').startswith(bytes.fromhex('89504e470d0a1a0a'))"),'pages.yml: GLB는 glTF 머리, PNG는 PNG 머리로 확인')}
 }
 

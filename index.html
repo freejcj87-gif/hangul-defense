@@ -315,6 +315,9 @@ try{if(STAGES_OFF){Combat.FLAGS.STAGES=false;Combat.FLAGS.ROUTES=false}if(/[?&]r
 try{if(/[?&]river=0\b/.test(location.search)){Combat.FLAGS.RIVER=false;Combat.FLAGS.BRIDGE=false}if(/[?&]bridge=0\b/.test(location.search))Combat.FLAGS.BRIDGE=false}catch{}
 /* 0.15.2: ?forms=0이면 늑대 무리 대형을 끈다(0.15.1처럼 곧게, World.formsOn). 단계나 길을 끄면 대형도 없다 */
 try{if(/[?&]forms=0\b/.test(location.search))Combat.FLAGS.FORMS=false}catch{}
+/* 0.17: ?walls=0이면 성벽 규칙(성곽 마을부터 6면 +70)과 성벽 · 성문 · 성탑 그림, 정문 앞 늑대 왕을 끄고(0.16 울타리), ?ring=0이면 바깥 타워 고리 자리를 0.16 자리로.
+   ?art16=0은 0.16 아트(성벽 조각 · 성문 · 성탑 · 성 회관 GLB와 그림)를 받지 않고 코드 도형으로 그린다. 단계나 길을 끄면 성벽 · 고리 모두 쓰지 않는다(World.walled · ringOn이 함께 본다) */
+try{if(/[?&]walls=0\b/.test(location.search))Combat.FLAGS.WALLS=false;if(/[?&]ring=0\b/.test(location.search))Combat.FLAGS.TOWER_RING=false}catch{}
 const DEMO_VILLAGE={1:{hall:1,level:2,fence:2,chickens:4,gold:250},2:{hall:2,level:3,fence:4,chickens:6,farmers:1,power:1,gold:450},3:{hall:3,level:5,fence:6,chickens:8,farmers:2,pond:2,power:2,gold:700}};
 /* 규칙은 combat.js(Combat)·world.js(World)가 정한다. 이 스크립트는 단계(phase) 진행, 화면, 효과음만 맡는다. 계약: docs/v09-contract.md
    0.11: 아이는 글을 읽기만 한다. 소리 모드도, 읽어 주는 음성(음성 합성)도 없다. state.mode는 저장 호환용으로 늘 'story'.
@@ -407,6 +410,8 @@ syncKing(true);
    읽는 동안에는 화면(카메라)이 스스로 움직이지 않는다. 그동안 8번째 칸은 '곧!'을 보여 준다 */
 const staged=()=>!!Combat.FLAGS.STAGES;
 const rivered=()=>staged()&&!!Combat.FLAGS.ROUTES&&!!Combat.FLAGS.RIVER;   /* 0.15: 단계 3부터 강 · 다리 · 물레방아(화면). 다리 길 규칙은 World.bridgeAt */
+const wallsOn=()=>staged()&&!!Combat.FLAGS.ROUTES&&!!Combat.FLAGS.WALLS;    /* 0.17: 성벽 손잡이(단계와 무관하게 켜져 있는지) */
+const walled=()=>!!(World.walled&&World.walled(world));                      /* 0.17: 지금 보이는 단계에 돌 성벽이 서 있나(성곽 마을부터, 규칙 World.walled) */
 const stageNow=()=>staged()?(Number.isSafeInteger(world.stage)?world.stage:0):-1;
 const stageDue=()=>staged()&&(Combat.stage(state)>stageNow()||(state.hall|0)>(world.hall|0));
 const STAGE_ICON=['🏡','🏘️','🏪','💧','🧱','🏰'],STAGE_SHORT=['농가','마을','장터','물레방아','성곽','성'];
@@ -453,6 +458,11 @@ let artStamp='';
 const FALLBACK_RIVER={dir:280,dist:1.3,water:1.8,bank:.35,road:6,mill:[-4.52,-10.9],bridge:3.34};
 const ART15_PNG={king:'art-handoff/v015-v016/png/wolf-king.png',fox:'art-handoff/v015-v016/png/thief-fox.png',bridge:'art-handoff/v015-v016/png/bridge.png',mill:'art-handoff/v015-v016/png/watermill.png'};
 const ART15_OFF=(()=>{try{return /[?&]art15=0\b/.test(location.search)}catch{return false}})();
+/* 0.17 그림 화면 · 가게 칸 그림(0.16 아트 묶음): 성 회관 · 성벽 조각 · 성문 · 성탑. ?art16=0이면 쓰지 않는다(그림 화면은 코드로 그린 돌 띠만) */
+const ART16_PNG={castle:'art-handoff/v015-v016/png/castle-hall.png',wall:'art-handoff/v015-v016/png/wall-segment.png',gate:'art-handoff/v015-v016/png/castle-gate.png',watch:'art-handoff/v015-v016/png/watchtower.png'};
+const ART16_OFF=(()=>{try{return /[?&]art16=0\b/.test(location.search)}catch{return false}})();
+/* 그림 화면 성벽 자리(src/layout.js WALLS와 같은 수, test-dom이 대조): 성곽 마을(단계 from)부터 성벽 줄 = 반지름 − in, 성문 = 반지름 − gateIn */
+const FALLBACK_WALL={from:4,gateIn:.5,in:.4};
 /* 단계별 집 자리 [x, z, 나타나는 단계] = src/layout.js COTTAGES(test-dom이 같은지 확인) */
 const FALLBACK_COTTAGES=[[2.79,6.74,1],[-3.03,-6.97,1],[4.37,8.21,2],[-3.09,-8.98,2],[3.58,11.03,3],[5.7,9.87,3],[5.96,12.22,4],[-6.95,-12.04,4],[-8.14,11.63,4],[11.63,-8.14,4],[5.68,15.6,5],[-5.07,-15.6,5],[-13.76,9.64,5],[9.64,-13.76,5],[16.64,2.93,5],[-16.64,-2.93,5],[13.86,13.86,5],[0,19.6,5],[-13.86,13.86,5],[-19.6,0,5],[0,-19.6,5],[13.86,-13.86,5]];
 const fallbackOn=()=>$('scene').dataset.renderer==='fallback';
@@ -836,7 +846,8 @@ const SHOP_LOOK={repair:['고치기','🔨'],tower:['타워'],power:['강화','�
 const HALL_AUTO=()=>Combat.FLAGS.HALL_MODE==='auto';
 function itemIcon(key){
  if(key==='tower')return artImage('buildings/tower-'+TOWER_ART[Math.min(5,state.level+1)]+'.png');
- if(key==='fence')return artImage('buildings/fence.png');if(key==='chicken')return artImage('characters/chicken.png');
+ /* 0.17: 성벽 단계의 울타리 칸은 '성벽을 튼튼하게'(돌 성벽 조각 그림, ?art16=0이면 0.16 울타리 그림). 칸 이름 '울타리'는 그대로 */
+ if(key==='fence')return walled()&&!ART16_OFF?Object.assign(document.createElement('img'),{src:ART16_PNG.wall,alt:'',draggable:false}):artImage('buildings/fence.png');if(key==='chicken')return artImage('characters/chicken.png');
  /* 회관 칸: 사는 방식이면 다음 단계 그림, 자동 승급(0.12 기본)이면 지금 회관 그림(살 수 없는 그림 칸) */
  if(key==='hall')return artImage('buildings/home-'+String(Math.min(5,state.hall+(HALL_AUTO()?1:2))).padStart(2,'0')+'.png');
  return emoji((SHOP_LOOK[key]||[])[1]||'⭐');
@@ -871,7 +882,7 @@ function renderShop(){
  const rows=shopRows();let lit=false;
  rows.forEach((r,i)=>{const b=box.children[i];if(!b)return;
   const cell=r.key==='hall'&&r.state==='auto'?stageCell():null;
-  const art=r.key+':'+(r.key==='tower'?Math.min(5,state.level+1):r.key==='hall'?(cell?'s'+cell.stage:state.hall):'');
+  const art=r.key+':'+(r.key==='tower'?Math.min(5,state.level+1):r.key==='hall'?(cell?'s'+cell.stage:state.hall):r.key==='fence'&&walled()?'wall':'');
   if(b._art!==art){b._art=art;b.dataset.key=r.key;b._ico.innerHTML='';b._ico.append(cell?artImage('buildings/home-'+String(Math.min(5,1+cell.stage)).padStart(2,'0')+'.png'):itemIcon(r.key));put(b._nm,cell?STAGE_SHORT[cell.stage]:(SHOP_LOOK[r.key]||[r.key])[0])}
   if(cell){if(b.dataset.stage!==String(cell.stage))b.dataset.stage=String(cell.stage);const p=cell.prog+'%';if(b._prog!==p){b._prog=p;b.style.setProperty('--prog',p)}}else if(b.dataset.stage!==undefined){delete b.dataset.stage;b._prog='';b.style.setProperty('--prog','')}
   if(shopPrev[i]===r.key+':poor'&&r.state==='buy'){pop(b,'lit');lit=true}
@@ -932,6 +943,8 @@ function stageUp(st0,h0){
 /* 단계 st가 되어 좋아진 것 한 줄(규칙에서 읽는다, 최대 3가지): 늑대 길 수 · 알값 · 새 상품(없으면 타워 자리) · 넓어진 땅 */
 function stagePerks(st,st0,hallRose){
  const out=[],R=World.STAGE&&World.STAGE.open,n1=R&&Combat.FLAGS.ROUTES&&R[st]?R[st].length:0,n0=R&&Combat.FLAGS.ROUTES&&st0>0&&R[st0]?R[st0].length:0;
+ /* 0.17: 성곽 마을이 되면 돌 성벽이 6면 모두 저절로 서고, 성이 되면 회관이 성이 된다(맨 앞 줄: 화면에서 가장 크게 바뀌는 것) */
+ const W4=World.WALL?World.WALL.from:4;if(wallsOn()&&st>=W4&&st0<W4)out.push('돌 성벽이 저절로 섰어요');if(wallsOn()&&st>=5&&st0<5)out.push('회관이 성이 되었어요');
  if(n1&&n1!==n0)out.push('늑대는 길 '+n1+'곳으로 와요');
  if(rivered()&&st>=3&&st0<3)out.push('강 건너 다리 길이 열렸어요');
  if(hallRose){out.push('알값 +'+Combat.PAY.hall);const opened=Combat.SHOP.filter(k=>Combat.ITEMS[k]&&Combat.ITEMS[k].need===(world.hall|0)).map(k=>(SHOP_LOOK[k]||[k])[0]);out.push(opened.length?'새 상품: '+opened.join('·'):'타워 자리 '+towerSpots()+'곳')}
@@ -1013,7 +1026,7 @@ const rec={glow:null,bubble:null,left:0,last:-1e9,times:[],prev:null,ign:{},mute
 function recReset(){Object.assign(rec,{glow:null,bubble:null,left:0,last:-1e9,times:[],prev:null,ign:{},mute:{},want:null,opened:[],lostAt:-1e9,said:{},bellAt:-1e9});hideBubble()}
 const saidKey=r=>(state.hall|0)+':'+r.line;
 function recCtx(keep){const kinds=[];for(const b of world.buildings)if(b.broken&&b.kind!=='fence'&&!kinds.includes(b.kind))kinds.push(b.kind);
- return {wolvesInside:wolvesInside(),towers:world.buildings.filter(b=>b.kind==='tower'&&!b.broken).length,lostHenRecently:world.t-rec.lostAt<=300,brokenKinds:kinds,opened:rec.opened.filter(k=>k!==keep),bellQuiet:world.t-rec.bellAt<REC.bellGap,pile:World.flowPile(world)}}
+ return {wolvesInside:wolvesInside(),towers:world.buildings.filter(b=>b.kind==='tower'&&!b.broken).length,lostHenRecently:world.t-rec.lostAt<=300,brokenKinds:kinds,opened:rec.opened.filter(k=>k!==keep),bellQuiet:world.t-rec.bellAt<REC.bellGap,pile:World.flowPile(world),walled:walled()}}
 function recommendNow(keep){const s={...state,gold:shownGold()};try{return Combat.recommend(s,recCtx(keep))||null}catch{return null}}
 /* 새 몬스터 알림 띠가 떠 있는 동안에도 기다린다(작은 화면에서 띠와 말풍선이 겹쳐 마을이 가려지지 않게). */
 /* 0.13 흐르는 농장: 문제를 읽는 동안(ask)에는 새 말풍선을 띄우지 않는다. 문제 사이(정답 연출·정답 배우기)에만 새로 뜨고, 떠 있던 것은 조용히 남았다가 사라진다 */
@@ -1090,10 +1103,10 @@ function sale(g,sold,left){const e=document.createElement('div');e.className='sa
  $('effects').append(e);setTimeout(()=>e.remove(),2300)}
 const towerSpots=()=>{try{return World.towerSlots?World.towerSlots(state.hall).length:World.TOWER_SLOTS.length}catch{return 6}};
 const POWER_NAME=['','💥 펑 화살','💥 큰 펑 화살','🏹 세 갈래 화살'];
-const LABEL={repair:()=>'🔨 다 고쳤어요!',power:n=>(POWER_NAME[n]||'🏹 더 센 화살')+'!',tower:n=>1+n>towerSpots()?'🏹 타워 한 층 더!':'🏹 화살 타워 '+(n+1)+'개!',fence:n=>n<=6?'🪵 울타리 '+n+'면!':'🪵 울타리 튼튼!',chicken:n=>'🐔 꼬꼬 '+n+'마리!',farmer:n=>'🧑‍🌾 농부 '+(n+1)+'명!',pond:n=>'🐟 연못 '+n+'단계!',hall:n=>'🏠 회관 '+n+'단계!',feast:()=>'🎉 마을 잔치!',stage:()=>STAGE_ICON[Math.max(0,stageNow())]+' '+Combat.STAGE_NAME[Math.max(0,stageNow())]+'!'};
+const LABEL={repair:()=>'🔨 다 고쳤어요!',power:n=>(POWER_NAME[n]||'🏹 더 센 화살')+'!',tower:n=>1+n>towerSpots()?'🏹 타워 한 층 더!':'🏹 화살 타워 '+(n+1)+'개!',fence:n=>walled()?'🧱 성벽 튼튼!':n<=6?'🪵 울타리 '+n+'면!':'🪵 울타리 튼튼!',chicken:n=>'🐔 꼬꼬 '+n+'마리!',farmer:n=>'🧑‍🌾 농부 '+(n+1)+'명!',pond:n=>'🐟 연못 '+n+'단계!',hall:n=>'🏠 회관 '+n+'단계!',feast:()=>'🎉 마을 잔치!',stage:()=>STAGE_ICON[Math.max(0,stageNow())]+' '+Combat.STAGE_NAME[Math.max(0,stageNow())]+'!'};
 /* 지은 뒤 가게 칸 위에 뜨는 한 줄(7세가 읽을 만큼 짧게). 문제 안내 줄은 건드리지 않는다. */
 const DONE={repair:()=>'🔨 부서진 건물을 다 고쳤어요!',tower:n=>1+n>towerSpots()?'🏹 타워가 한 층 높아졌어요!':'🏹 타워가 늑대를 쏴요!',
- power:n=>n===1?'💥 펑! 터지는 화살이에요.':n===2?'💥 더 크게 펑!':n===3?'🏹 한 번에 세 마리!':'🏹 화살이 더 세졌어요!',fence:()=>'🪵 울타리가 늑대를 막아요!',chicken:()=>'🐔 꼬꼬가 왔어요! 알을 더 낳아요.',
+ power:n=>n===1?'💥 펑! 터지는 화살이에요.':n===2?'💥 더 크게 펑!':n===3?'🏹 한 번에 세 마리!':'🏹 화살이 더 세졌어요!',fence:()=>walled()?'🧱 성벽이 더 튼튼해졌어요!':'🪵 울타리가 늑대를 막아요!',chicken:()=>'🐔 꼬꼬가 왔어요! 알을 더 낳아요.',
  farmer:()=>flowing()?'🧑‍🌾 농부가 알을 하나씩 날라요!':'🧑‍🌾 농부가 알을 더 많이 날라요!',pond:()=>'🐟 정답마다 물고기 금화 +'+Combat.PAY.fish+'!',hall:()=>'🏠 마을이 넓어졌어요! 새 몬스터도 와요.',feast:()=>'🎉 잔치! 금화가 더 생겨요.',stage:()=>'🗺️ 마을이 더 넓어졌어요!'};
 function celebrate(kind,at,slot){
  const n=state[COUNT[kind]]|0,three=$('scene').dataset.renderer==='three';
@@ -1154,7 +1167,7 @@ function worldStep(){
   else if(e.type==='kingStand'){jingle('roar');if(!worldNote||worldNote.low)worldNote={text:'👑 늑대 왕이 울타리 앞에 섰어요!',until:world.t+40}}
   else if(e.type==='henSaved'){worldNote={text:'🏹 꼬꼬를 구했어요!',until:world.t+25}}
   else if(e.type==='broken'){
-   if(e.kind==='fence'){if(world.t-lastCrash>=20){lastCrash=world.t;jingle('crash')}if(!worldNote||worldNote.low)worldNote={text:'🪵 울타리가 부서졌어요! 늑대가 떠나면 농부가 다시 세워요',until:world.t+25,low:true}}
+   if(e.kind==='fence'){if(world.t-lastCrash>=20){lastCrash=world.t;jingle('crash')}if(!worldNote||worldNote.low)worldNote={text:walled()?'🧱 성벽이 무너졌어요! 늑대가 떠나면 농부가 다시 쌓아요':'🪵 울타리가 부서졌어요! 늑대가 떠나면 농부가 다시 세워요',until:world.t+25,low:true}}
    else{state.broken=World.brokenCount(world);syncMarket();lastCrash=world.t;jingle('crash');worldNote={text:'💥 늑대가 '+(BUILDING_NAME[e.kind]||'건물을')+' 부쉈어요! 🔨 고치기로 고쳐요',until:world.t+40};askBubble(true)}}
   else if(e.type==='newKind'&&e.kind!=='wolf'){const K=World.KINDS[e.kind];jingle('alarm');banner(KIND_ICON[e.kind],'새 몬스터: '+K.name+'!',K.tip,K.boss);worldNote={text:KIND_ICON[e.kind]+' 새 몬스터 '+K.name+': '+K.tip,until:world.t+50}}
   else if(e.type==='boss'&&world.seen&&world.stats.bosses>1){jingle('roar');banner('🔥','불씨 왕이 또 왔어요!','타워 사거리 안에서 쓰러뜨려요',true);worldNote={text:'🔥 우두머리 불씨 왕이 나타났어요!',until:world.t+40}}
@@ -1327,6 +1340,6 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden&&!paused&&p
 drawStart();
 /* 3D 마을(village.js)은 이 상태(늑대 세계 world 포함)를 매 프레임 읽어 간다. 일회성 연출(세계 사건·volley·produce·dash·build)만 따로 알린다.
    running: 늑대 세계 시계가 흐르는지(시작 화면·쉬기만 멈춤). 0.9에서 reward 단계가 생겨, 3D는 phase 목록 대신 이 값을 보면 된다. */
-window.getVillageState=()=>({phase,paused,running:phase!=='start'&&phase!=='ending'&&!paused,village:state.run.village,bell:state.run.bell,shields:state.run.shields,level:state.level,power:state.power|0,streak:state.streak|0,chickens:state.chickens,fence:state.fence,farmers:state.farmers,farmersTotal:1+(state.farmers|0),nest:state.nest|0,friends:book&&state.run.bell===4?Book.friends(book):[],special:round&&round.special?round.special.kind:null,flow:!!world.flow&&flowing(),repairAct:!!Combat.FLAGS.REPAIR_ACT,marketDown:state.marketDown|0,recommend:rec.glow||null,pond:state.pond,hall:staged()?world.hall|0:state.hall,feast:state.feast,wins:state.wins,world,radius:World.radius(world),stage:stageNow(),routes:World.routes(world),river:rivered(),bridge:rivered()&&!!Combat.FLAGS.BRIDGE,forms:World.formsOn(world),tries:round?round.tries:0,dash:!!(round&&round.dash>0),result:round?round.result:null});
+window.getVillageState=()=>({phase,paused,running:phase!=='start'&&phase!=='ending'&&!paused,village:state.run.village,bell:state.run.bell,shields:state.run.shields,level:state.level,power:state.power|0,streak:state.streak|0,chickens:state.chickens,fence:state.fence,farmers:state.farmers,farmersTotal:1+(state.farmers|0),nest:state.nest|0,friends:book&&state.run.bell===4?Book.friends(book):[],special:round&&round.special?round.special.kind:null,flow:!!world.flow&&flowing(),repairAct:!!Combat.FLAGS.REPAIR_ACT,marketDown:state.marketDown|0,recommend:rec.glow||null,pond:state.pond,hall:staged()?world.hall|0:state.hall,feast:state.feast,wins:state.wins,world,radius:World.radius(world),stage:stageNow(),routes:World.routes(world),river:rivered(),bridge:rivered()&&!!Combat.FLAGS.BRIDGE,forms:World.formsOn(world),walls:wallsOn(),walled:walled(),ring:!!(World.ringOn&&World.ringOn(world)),tries:round?round.tries:0,dash:!!(round&&round.dash>0),result:round?round.result:null});
 if(TEST){const s=document.createElement('script');s.src='testmode.js?v=0.16';document.body.append(s)}/* 0.14.1: ?test=1일 때만 테스트 모드 막대를 불러온다 */
 </script><script src="bookui.js?v=0.16"></script><script src="village.js?v=0.16" defer></script></body></html>

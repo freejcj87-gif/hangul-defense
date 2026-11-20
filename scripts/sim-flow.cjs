@@ -24,7 +24,9 @@ const NAME={typ:'보통',slow:'느린',fast:'빠른',guess:'찍기',idle:'방치
 const ALL=Object.keys(NAME);
 const meanCache={};
 function meanBase(age,seed){const k=age+':'+seed;if(!meanCache[k]){let sum=0;for(let i=0;i<120;i++)sum+=C.baseSeconds(Q.at(age,'story',i,seed));meanCache[k]=sum/120}return meanCache[k]}
-function apply(over){const o=over||{};if('FLOW' in o)C.FLAGS.FLOW=!!o.FLOW;if(o.C)Object.assign(C.FLOW,o.C);if(o.W)Object.assign(W.FLOW,o.W);if(o.FLAGS)Object.assign(C.FLAGS,o.FLAGS);if(o.PAY)Object.assign(C.PAY,o.PAY);if(o.STAGE)Object.assign(W.STAGE,o.STAGE);if(o.FORM)Object.assign(W.FORM,o.FORM)}
+/* 0.17 성벽: '{"WALL":{"add":35}}'(World.WALL) · '{"SLOT_R":{"5":[10.5,14.5,17]}}'(World.SLOT_R) · 0.16 기준선 '{"FLAGS":{"WALLS":false,"TOWER_RING":false}}' */
+function apply(over){const o=over||{};if('FLOW' in o)C.FLAGS.FLOW=!!o.FLOW;if(o.C)Object.assign(C.FLOW,o.C);if(o.W)Object.assign(W.FLOW,o.W);if(o.FLAGS)Object.assign(C.FLAGS,o.FLAGS);if(o.PAY)Object.assign(C.PAY,o.PAY);if(o.STAGE)Object.assign(W.STAGE,o.STAGE);if(o.FORM)Object.assign(W.FORM,o.FORM);
+  if(o.WALL&&W.WALL)Object.assign(W.WALL,o.WALL);if(o.SLOT_R&&W.SLOT_R)Object.assign(W.SLOT_R,o.SLOT_R)}
 
 /* 엔딩까지 한 판. opt.buys = 한 번에 맞힐 때마다 사는 횟수(기본 1) */
 function playEnd(age,kind,seed,opt){
@@ -39,6 +41,17 @@ function playEnd(age,kind,seed,opt){
   const sideHits=Array(6).fill(0);   /* 0.15: 울타리 면(0~5)별 부서진 횟수(다리 길 한 줄이 한 면에 몰리는지) */
   /* 0.15.2 무리 대형: 단계 1부터 나온 늑대의 대형별 수, 울타리 줄에 닿은 늑대의 (닿은 틱 ÷ 곧은 길 틱), 따라 돌기 중 다른 면으로 간 수, 면별 다시 세움 */
   const sideRebuilt=Array(6).fill(0),forms={n:[0,0,0,0],ratio:[[],[],[],[]],circle:0,away:0},walkers=[];let lastId=0;
+  /* 0.17 성벽 표: 단계 4(성곽 마을)에 들어선 틱, 그 뒤 울타리(성벽) · 건물 부서짐, 성벽을 처음 두드린 자리(성문 폭 안 · 성탑 옆 · 그 밖 성벽, 모두 · 따라 돌기 늑대).
+     규칙에는 손대지 않는다(세는 것만). 성문 = 그 단계 열린 길 축, 성곽 마을 · 성 모두 GATE_W(성문 GLB 폭 3.18, 정문 2번 길 × 1.15)의 절반 안. 성탑 = 면 경계(0° · 60° …) ± TOWER_NEAR */
+  const GATE_W=3.18,TOWER_NEAR=1.3,wall={t4:-1,end:-1,fence:0,bld:0,hit:{all:[0,0,0],ring:[0,0,0]},seen:new Set()};
+  function trackWalls(){
+    if(!Number.isSafeInteger(w.stage)||w.stage<4)return;if(wall.t4<0)wall.t4=w.t;
+    const R=W.radius(w),open=W.routes(w)||[];
+    for(const v of w.wolves){if(v.state!=='smash'||wall.seen.has(v.id))continue;const b=w.buildings.find(x=>x.id===v.target);if(!b||b.kind!=='fence')continue;wall.seen.add(v.id);
+      const a=Math.atan2(v.z,v.x),dA=(x,y)=>{let d=(x-y)%(Math.PI*2);if(d>Math.PI)d-=Math.PI*2;if(d<-Math.PI)d+=Math.PI*2;return Math.abs(d)};
+      const gate=open.some(p=>dA(a,(p+.5)*Math.PI/4)*(R-.5)<=GATE_W/2*(p===2?1.15:1)),tower=[0,1,2,3,4,5].some(k=>dA(a,k*Math.PI/3)*(R-.4)<=TOWER_NEAR),i=gate?0:tower?1:2;
+      wall.hit.all[i]++;if(v.fm===3)wall.hit.ring[i]++}
+  }
   function trackForms(){
     const R=W.radius(w);
     for(let i=w.wolves.length-1;i>=0;i--){const v=w.wolves[i];if(v.id<=lastId)break;if(w.stage>0&&v.state==='walk'){const fm=v.fm|0;forms.n[fm]++;walkers.push({v,t0:w.t,fm,side0:W.sectorOf(v.sx,v.sz),line:Math.max(.5,Math.hypot(v.sx,v.sz)-R-.3)/(v.speed*W.TICK)})}}
@@ -75,9 +88,9 @@ function playEnd(age,kind,seed,opt){
       else if(e.type==='laid')st.laid++;
       else if(e.type==='pack'&&w.stage>0){for(let i=0;i<e.n;i++)inflow[e.points[i%e.points.length]]++;inflowN+=e.n}
       else if(e.type==='straggler'&&w.stage>0){inflow[e.point]+=e.n;inflowN+=e.n}
-      else if(e.type==='broken'){if(e.kind==='fence'){fenceHits++;const b=w.buildings.find(x=>x.id===e.building);if(b&&b.side>=0&&b.side<6)sideHits[b.side]++}else{s.broken=W.brokenCount(w);s.marketDown=W.marketDown(w);ask(true)}}
+      else if(e.type==='broken'){if(w.stage>=4){if(e.kind==='fence')wall.fence++;else wall.bld++}if(e.kind==='fence'){fenceHits++;const b=w.buildings.find(x=>x.id===e.building);if(b&&b.side>=0&&b.side<6)sideHits[b.side]++}else{s.broken=W.brokenCount(w);s.marketDown=W.marketDown(w);ask(true)}}
       else if(e.type==='rebuilt'){const b=w.buildings.find(x=>x.id===e.building);if(b&&b.side>=0&&b.side<6)sideRebuilt[b.side]++}}
-    trackForms();
+    trackForms();trackWalls();
     earned+=s.gold-g0;st.ticks++;if(bk&&st.ticks%10===0)B.tick(bk.book,now(),1);
     if(w.flow){const f=w.flow,yard=W.flowYard(w),hens=W.flowLayers(w);if(yard>=Math.max(2,hens))st.pile++;if(yard>=W.flowCap(w))st.full++;if(f.boost.left>0)st.boost++;if((s.farmers|0)>=9){st.late++;if(yard>=Math.max(2,hens))st.latePile++;if(yard>=W.flowCap(w))st.lateFull++}
       if(reading){st.read++;if(f.rate*f.beat<.25||f.credit<=0)st.readLow++}}
@@ -94,7 +107,7 @@ function playEnd(age,kind,seed,opt){
     /* 읽는 중(그리고 방치 아이가 띄워 둔 문제)에만 보류, 문제 사이에 산 것은 바로(화면과 같음) */
     const held=reading||idling;if(key==='repair')W.repairAll(w);W.sync(w,s,{hold:held});if(!held)markStages();s.broken=W.brokenCount(w);s.marketDown=W.marketDown(w);shopLock=4;run(.5);marks();return 1}
   const kidTime=(q,firstTry)=>{const lock=Math.max(3,C.reveal(q))/10;if(kind==='guess'||kind==='wrong')return firstTry?lock+.4:.4;const need=C.needSeconds(q)*SPEEDK[kind]*(.75+rnd()*.5);return firstTry?Math.max(lock+.4,need):Math.max(.4,need*.35)};
-  const done=()=>({forms,lost:s.run.lost,stage:w.stage,topRoute:inflowN?100*Math.max(...inflow)/inflowN:NaN,bridgeRoute:inflowN?100*inflow[6]/inflowN:NaN,state:s,ended,qn,min:clock()/60,ms,collapse:minHen10===0,snaps,earned,first,built:C.built(s),hens:s.chickens,farmers:1+s.farmers,gold:s.gold,st,fenceHits,yard:W.flowYard(w),credit:w.flow?w.flow.credit:0});
+  const done=()=>({wall:{t4:wall.t4,end:wall.end>=0?wall.end:w.t,fence:wall.fence,bld:wall.bld,hit:wall.hit},forms,lost:s.run.lost,stage:w.stage,topRoute:inflowN?100*Math.max(...inflow)/inflowN:NaN,bridgeRoute:inflowN?100*inflow[6]/inflowN:NaN,state:s,ended,qn,min:clock()/60,ms,collapse:minHen10===0,snaps,earned,first,built:C.built(s),hens:s.chickens,farmers:1+s.farmers,gold:s.gold,st,fenceHits,yard:W.flowYard(w),credit:w.flow?w.flow.credit:0});
   if(kind==='idle'||kind==='idleBuy'){
     idling=true;   /* 방치 아이는 첫 문제를 띄운 채 답하지 않는다: 산 것은 화면처럼 보류된 채 */
     if(flowing)W.flowQuestion(w,C.beatTicks(s,QA(0)));
@@ -124,7 +137,7 @@ function playEnd(age,kind,seed,opt){
         if(w.guest)W.guestGreet(w);else{const kinds=W.kindsAt(w.hall|0).slice();if(C.FOX.on&&(s.run.fox|0)<C.FOX.at.length)kinds.push('fox');
           const c=B.shinyChance(bk.book,{run:s.run.no|0,asked:s.run.asked|0,boost2:lv>=2,kinds,finale:!!fin||s.run.bell>=2,free:false});if(c&&c.win&&W.guest(w,c.kind))B.shinySpawned(bk.book)}
         if(br.friend)run(1.3);/* 친구 카드 연출만큼 정답 연출이 길어짐 */}
-      if(fz){W.kingHit(w);if(fz.won){if(bk)B.kingWon(bk.book,{now:now(),stars:C.stars(s),village:s.run.village,perfect:(s.run.fq|0)===C.FINALE.shields});W.king(w,'flee');W.retreat(w,-1);ended={q:qn,min:clock()/60,finaleQ:qn-finale.q0}}}
+      if(fz){W.kingHit(w);if(fz.won){if(bk)B.kingWon(bk.book,{now:now(),stars:C.stars(s),village:s.run.village,perfect:(s.run.fq|0)===C.FINALE.shields});W.king(w,'flee');W.retreat(w,-1);ended={q:qn,min:clock()/60,finaleQ:qn-finale.q0};wall.end=w.t}}
       ask(false);run(.6);if(!fin)for(let b=0;b<(o.buys||1);b++){if(b)run(.4);buyOne()}run(.6);
     }else{
       C.trackPace(s,q,ticks);W.answered(w);run(W.dashTicks(w)*W.TICK+.2);run(kidTime(q,false));
@@ -166,6 +179,13 @@ function endReport(runs,ages,kinds,opt){
     const circ=rs.reduce((a,r)=>a+r.forms.circle,0),away=rs.reduce((a,r)=>a+r.forms.away,0),sn=k=>rs.map(r=>r.snaps[20]?r.snaps[20][k]:null).filter(Boolean);
     const per=k=>[0,1,2,3,4,5].map(i=>f(avg(sn(k).map(a=>a[i])),1)).join('·'),top=avg(sn('sideHits').map(a=>{const t=a.reduce((p,q)=>p+q,0);return t?100*Math.max(...a)/t:NaN}));
     console.log(`| ${age}세 | ${NAME[kind]} | ${tot?n.map(x=>f(100*x/tot)).join('·')+'%':'-'} | ${ratio.join('·')} | ${circ?f(100*away/circ)+'% ('+away+'/'+circ+')':'-'} | ${per('sideHits')} | ${per('sideRebuilt')} | ${f(top)}% |`)}
+  /* 0.17 성벽 표(계획서 v016-plan §3.4): 성곽 마을(단계 4)에 들어선 판만. 단계 4 이후 울타리(성벽) · 건물 부서짐(판당), 단계 4 이후 머문 분(엔딩 또는 시뮬 끝까지),
+     성벽을 처음 두드린 자리(늑대마다 한 번: 성문 폭 안 · 성탑 옆 · 그 밖 성벽), 따라 돌기 늑대만 같은 셈 */
+  console.log('\n| 나이 | 아이 | 단계 4 간 판 | 단계 4 이후 울타리 부서짐(판당) | 단계 4 이후 머문 분 | 단계 4 이후 건물 부서짐(판당) | 두드린 자리 모두(성문·성탑 옆·성벽) | 따라 돌기(성문·성탑 옆·성벽) |');
+  console.log('|---|---|---|---|---|---|---|---|');
+  for(const age of ages)for(const kind of kinds){const rs=runsOf[age+kind];if(!rs)continue;const r4=rs.filter(r=>r.wall&&r.wall.t4>=0);
+    const pct=k=>{const a=[0,1,2].map(i=>r4.reduce((s,r)=>s+r.wall.hit[k][i],0)),t=a[0]+a[1]+a[2];return t?a.map(x=>f(100*x/t)).join('·')+'% ('+t+')':'-'};
+    console.log(`| ${age}세 | ${NAME[kind]} | ${r4.length}/${rs.length} | ${f(avg(r4.map(r=>r.wall.fence)),1)} | ${f(avg(r4.map(r=>(r.wall.end-r.wall.t4)*W.TICK/60)),1)} | ${f(avg(r4.map(r=>r.wall.bld)),2)} | ${pct('all')} | ${pct('ring')} |`)}
   console.log('\n| 나이 | 느린 ÷ 보통(문제) | 빠른 ÷ 보통(문제) | 빠른 ÷ 보통(금화/문제) | 찍기 엔딩 ÷ 보통 | 찍기 10분 지음 ÷ 보통 | 방치·상점만·틀리기만 30분 금화 |');console.log('|---|---|---|---|---|---|---|');
   for(const age of ages){const g=k=>out[age+k]||{},t=g('typ');if(!t.q)continue;const pc=(x,y)=>Number.isFinite(x)&&y?f(100*x/y)+'%':'-';
     console.log(`| ${age}세 | ${pc(g('slow').q,t.q)} | ${pc(g('fast').q,t.q)} | ${pc(g('fast').gpq,t.gpq)} | ${g('guess').undone?'못 감 '+g('guess').undone+'판':f(g('guess').q/t.q,1)+'배'} | ${pc(g('guess').b10,t.b10)} | ${f(g('idle').earned)} · ${f(g('idleBuy').earned)} · ${f(g('wrong').earned)} |`)}
@@ -265,6 +285,7 @@ if(require.main===module){
   const over=json?JSON.parse(json):{};apply(over);
   console.log(`== ${cmd} · STAGES ${C.FLAGS.STAGES} · ROUTES ${C.FLAGS.ROUTES} · 단계 문턱 ${JSON.stringify(C.FLAGS.STAGE_AT)} · 종 ${C.FLAGS.BELL_BUILT} ${JSON.stringify(C.FLAGS.STAGE_BELL_BY_AGE)} · 반지름 ${JSON.stringify(W.STAGE.radius)}`);
   console.log(`== ${cmd} · FLOW ${C.FLAGS.FLOW} · Combat.FLOW ${JSON.stringify(C.FLOW)} · World.FLOW ${JSON.stringify(W.FLOW)}`);
+  if(W.WALL)console.log(`== ${cmd} · 0.17 성벽 WALLS ${C.FLAGS.WALLS} · 고리 TOWER_RING ${C.FLAGS.TOWER_RING} · World.WALL ${JSON.stringify(W.WALL)} · World.SLOT_R ${JSON.stringify(W.SLOT_R)}`);
   if(cmd==='book'){applyBook(over);if(over.en)EN=String(over.en);if(over.buys)BUYS=Number(over.buys)||1;console.log('== book · Book.BOOK '+JSON.stringify({NOTE:{cap:B.BOOK.NOTE.cap,gap:B.BOOK.NOTE.gap,after:B.BOOK.NOTE.after},REVIEW:B.BOOK.REVIEW,SHINY:B.BOOK.SHINY,SPECIAL:B.BOOK.SPECIAL}));
     bookReport(Number(rest[0])||30,rest[1]?rest[1].split(',').map(Number):Q.AGES,rest[2]?rest[2].split(','):['typ','slow','fast','guess','idle','idleBuy','wrong'],Number(over.runs)||3);shinyCheck()}
   else if(cmd==='farm')farmReport(rest[0]?rest[0].split(',').map(Number):[8]);

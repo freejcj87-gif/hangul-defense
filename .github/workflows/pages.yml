@@ -100,9 +100,10 @@ jobs:
           assert len(fetch('village.js')) > 10000
           assert fetch('art-handoff/coopnight/source-3d/models/environment-pack.glb').startswith(b'glTF')
           art15 = ['watermill', 'bridge', 'wolf-king', 'thief-fox']
-          for name in art15:
+          art16 = ['castle-hall', 'wall-segment', 'castle-gate', 'watchtower']
+          for name in art15 + art16:
               assert fetch('art-handoff/v015-v016/glb/' + name + '.glb').startswith(b'glTF'), name
               assert fetch('art-handoff/v015-v016/png/' + name + '.png').startswith(bytes.fromhex('89504e470d0a1a0a')), name
-          print('PASS: live HTML, combat + questions + village scripts, deployed commit, ' + str(1 + len(art15)) + ' GLB and ' + str(len(images) + len(art15)) + ' PNG assets.')
+          print('PASS: live HTML, combat + questions + village scripts, deployed commit, ' + str(1 + len(art15) + len(art16)) + ' GLB and ' + str(len(images) + len(art15) + len(art16)) + ' PNG assets.')
           print('Playable URL: ' + base)
           PY
