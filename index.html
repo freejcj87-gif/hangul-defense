@@ -379,7 +379,7 @@ const Shop={list:s=>Combat.shop(s),buy:(s,k)=>Combat.buy(s,k)|0};
    긴 글을 읽는 나이는 그만큼 늑대도 느긋하게 온다. 무리 사이에도 낙오 늑대가 계속 온다. */
 const TEMPO_SPAN=120;
 /* 수첩 MVP 이어 순서: 판이 바뀌어도 같은 씨앗(book.order.seed)을 쓰고 묶음 순번을 지난 판들이 쓴 만큼(off) 밀어, 문제은행을 한 바퀴 다 돌 때까지 같은 글이 다시 나오지 않게 한다.
-   한 판 안에서 off는 바뀌지 않는다(판이 끝날 때 Book.newVillage · resetVillage가 더한다). 씨앗이 기록과 다른 판(이어 순서를 켜기 전에 시작한 판 등)·?order=0은 밀지 않는다 */
+   한 판 안에서 off는 바뀌지 않는다(판이 끝날 때 Book.newVillage · resetVillage가 더한다. 판 중간에 나이를 바꾸면 떠난 나이만 그 자리에서 민다: ageLeft). 씨앗이 기록과 다른 판(이어 순서를 켜기 전에 시작한 판 등)·?order=0은 밀지 않는다 */
 const ordOff=()=>book&&Book.BOOK.FLAGS.order&&state.seed===book.order.seed?Book.orderFor(book,state.age).off:undefined;
 function waveInterval(){let sum=0;const off=ordOff();for(let i=0;i<TEMPO_SPAN;i++)sum+=Combat.baseSeconds(Questions.at(state.age,state.mode,state.index+i,state.seed,state.bank,off));return World.tempoInterval(sum/TEMPO_SPAN)}
 /* guard(0.10): 새 판은 처음 한 번에 맞힐 때까지(3번) 늑대가 쫓기만 하고, 마지막 닭 한 마리는 늘 지켜진다 */
@@ -1285,7 +1285,16 @@ function changeSetting(){
  if(phase==='ask'){const tries=round.tries;newRound();round.tries=tries;say(state.age+'세 문제로 바꿨어요. 늑대는 그대로 와요.');render()}
  else{say('다음 문제부터 '+state.age+'세 문제가 나와요.');save();render()}
 }
-$('age').value=String(state.age);$('age').onchange=()=>{const age=Number($('age').value);if(!AGES.includes(age)||paused){$('age').value=String(state.age);return}state.age=age;changeSetting()};
+/* 판 중간에 나이를 바꾸면 떠나는 나이의 이어 순서를 이 판에서 쓴 만큼 민다(판 끝의 ordDone()은 마지막 나이만 센다). 전에는 떠난 나이의 글이
+   다음에 그 나이로 놀 때 처음부터 다시 나왔다(한 바퀴 안 같은 글, 리뷰 0.16 G). 그 나이로 마지막에 답했을 때만(답하지 않고 나이를 오가면 밀지 않음), 같은 자리에서는 한 번만.
+   이 판에서 그 나이로 돌아오면 민 자리부터 낸다(건너뛴 글은 다음 바퀴에 나오고, 같은 글이 되풀이되지는 않음) */
+let ageMark='';
+function ageLeft(old){
+ if(!book||old===state.age||!AGES.includes(old)||!Book.BOOK.FLAGS.order||state.seed!==book.order.seed||!(state.index>0)||book.cur.age!==old)return;
+ const mark=state.run.no+':'+state.index+':'+old;if(mark===ageMark)return;ageMark=mark;
+ Book.advanceOrder(book,old,Questions.used(old,state.index,state.seed,state.bank),{bank:state.bank,latest:Questions.BANK_VERSION,size:Questions.bankCount(old,state.bank)});bookDirty=true;
+}
+$('age').value=String(state.age);$('age').onchange=()=>{const age=Number($('age').value);if(!AGES.includes(age)||paused){$('age').value=String(state.age);return}const was=state.age;state.age=age;ageLeft(was);changeSetting()};
 /* 처음부터 시작: 마을·금화·도장(지도)을 새로 만든다. 수첩 MVP: 수첩·훈장·기억 늑대 기록은 지우지 않는다(판 저장만 새로, Book.resetVillage). 모든 기록 지우기는 보호자 화면에서만 */
 $('reset').onclick=()=>{if(!confirm(book?'마을을 처음부터 다시 시작할까요? 수첩과 훈장은 그대로 남아요.':'저장된 금화와 마을을 초기화할까요?'))return;let ord=null;if(book){ord=Book.resetVillage(book,Date.now(),ordDone());bookDirty=true;gainReset()}
  state=Object.assign(Combat.fresh(state.age),{seed:ord&&ord.seed&&Book.BOOK.FLAGS.order?ord.seed:newSeed(),bank:ord&&ord.bank||Questions.BANK_VERSION},DEMO?DEMO_VILLAGE[DEMO]:{});state.run.t0=Date.now();world=freshWorld();resetView();$('ending').hidden=true;$('sleepy').hidden=true;sleepyOn=false;nextQuestion()};
@@ -1307,7 +1316,7 @@ $('motion').onchange=()=>document.body.classList.toggle('reduced',$('motion').ch
 if(DEMO){const t=document.querySelector('header small');if(t){const d=document.createElement('span');d.className='demo-tag';d.textContent='체험: 마을회관 '+DEMO+'단계';t.append(' · ',d)}}
 /* 시작 화면: 나이만 고른다. */
 function drawStart(){
- if(!$('ageRow').children.length)for(const a of AGES){const b=document.createElement('button');b.textContent=a+'살';b.dataset.age=String(a);b.onclick=()=>{state.age=a;regrow();drawStart()};$('ageRow').append(b)}
+ if(!$('ageRow').children.length)for(const a of AGES){const b=document.createElement('button');b.textContent=a+'살';b.dataset.age=String(a);b.onclick=()=>{const was=state.age;state.age=a;ageLeft(was);regrow();drawStart()};$('ageRow').append(b)}
  for(const b of $('ageRow').children)b.classList.toggle('on',Number(b.dataset.age)===state.age);
  put($('go'),state.run.bell===3||state.round&&state.round.token===token()?'이어서 하기 ▶':'시작하기 ▶');drawMap($('mapRow'),false);if(window.bookStart)window.bookStart();render();
 }

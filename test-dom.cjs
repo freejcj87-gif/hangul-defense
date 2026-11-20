@@ -2299,6 +2299,20 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   ok((BOOK_KEY+'-test') in saved&&!(BOOK_KEY in saved)&&!(KEY in saved),'시험 열쇠만 씀(아이 기록은 건드리지 않음)');
   T.bookTest('wipe');eq([(BOOK_KEY+'-test') in saved,a.api.phase,bookOf(a).mon.wolf.card,bookOf(a).play],[false,'start',0,1],'기록 비우기: 시험 기록을 비우고 시작 화면으로');
   const off=boot({query:'?test=1'});eq(off.window.__testmode.bookTest('note'),false,'수첩이 꺼져 있으면 아무 일도 없음')}
+ /* M-13 리뷰 0.16 G: 판 중간에 나이를 바꿔도, 떠난 나이의 글이 다음에 그 나이로 놀 때 처음부터 다시 나오지 않는다(이어 순서: 한 바퀴 안 같은 글 0) */
+ {const a=bboot(null,{index:0});a.go();quiet(a);const ids=n=>{const out=[];for(let i=0;i<n;i++){const r=a.game().round;if(r.mode==='story'&&!a.n.answers.dataset.special)out.push(r.id);a.unlock();a.right();nextAsk(a)}return out};
+  const seen8=ids(14),i8=a.game().state.index,bank=a.game().state.bank;ok(seen8.length>=8&&i8===14,'8세로 14문제('+seen8.length+'개 읽기 글)');
+  a.n.age.value='7';a.n.age.onchange();eq(bookOf(a).order.off[8],Q.used(8,i8,4242,bank),'판 중간 8세 → 7세: 떠난 8세의 이어 순서를 이 판에서 쓴 만큼 밂');
+  const seen7=ids(6);a.n.age.value='8';a.n.age.onchange();a.n.age.value='7';a.n.age.onchange();a.n.age.value='8';a.n.age.onchange();a.n.age.value='7';a.n.age.onchange();
+  eq(bookOf(a).order.off[8],Q.used(8,i8,4242,bank),'답하지 않고 나이를 오가면 8세를 더 밀지 않음');
+  ok(bookOf(a).order.off[7]&&bookOf(a).order.off[7].story>0,'7세로 풀다 떠나면 7세도 밂');
+  const b0=a.game().state.index;a.n.reset.click();a.n.age.value='8';a.n.age.onchange();eq(bookOf(a).order.off[8],Q.used(8,i8,4242,bank),'새 판 첫 칸(번호 0)에서 나이를 바꾸면 밀 것이 없음');
+  const again=ids(14);eq(again.filter(id=>seen8.includes(id)),[],'다음 판에 8세로 돌아와도 앞 판에서 본 8세 글이 다시 나오지 않음');
+  const s=boot({book:true});eq(s.game().book.data.order.off[8],bookOf(a).order.off[8],'민 자리는 기록에 저장됨');ok(seen7.length>0&&b0>i8,'7세로도 풀었음');
+  /* 시작 화면에서 나이를 바꿔도 같음(하던 판을 다른 나이로 이어 감) */
+  const c=bboot(null,{index:0});c.go();quiet(c);for(let i=0;i<10;i++){c.unlock();c.right();c.tick(REWARD+2);c.untilAsk()}c.n.pause.click();c.unload();
+  const d=boot({book:true}),i2=d.game().state.index;d.n.ageRow.children.find(b=>b.dataset.age==='9').click();d.n.ageRow.children.find(b=>b.dataset.age==='8').click();d.n.ageRow.children.find(b=>b.dataset.age==='9').click();
+  eq(d.game().book.data.order.off[8],Q.used(8,i2,4242,d.game().state.bank),'시작 화면에서 나이를 바꿔도 떠난 나이를 한 번만 밂');}
  /* M-11 바깥 링크·외부 요청 없음(문자열 검사): 수첩 화면·규칙·콘텐츠 파일과 페이지 */
  {const files={'index.html':html,'bookui.js':BOOKUI_SRC,'book.js':fs.readFileSync(__dirname+'/book.js','utf8'),'notes.js':fs.readFileSync(__dirname+'/notes.js','utf8')};
   for(const [name,text] of Object.entries(files)){
