@@ -19,9 +19,14 @@ on:
       - world.js
       - questions.js
       - questions-gen.js
+      - book.js
+      - notes.js
+      - bookui.js
+      - testmode.js
       - src/**
       - art-handoff/coopnight/source-3d/models/environment-pack.glb
       - art-handoff/coopnight/browser/**
+      - art-handoff/v015-v016/**
       - scripts/build-pages.cjs
       - android-app/**
       - .github/workflows/android.yml
@@ -99,6 +104,7 @@ jobs:
           if grep -q 'appStartPath' "$config"; then echo 'release config must not have appStartPath'; exit 1; fi
           if grep -q 'webContentsDebuggingEnabled' "$config"; then echo 'leave webContentsDebuggingEnabled unset (debug-only default)'; exit 1; fi
           test -f "$public/village.js"
+          test -f "$public/bookui.js"
           test -f "$public/webview-old.html"
           test -f "$public/oss-licenses.html"
           test -f "$public/art-handoff/coopnight/source-3d/models/environment-pack.glb"
@@ -134,7 +140,10 @@ jobs:
           merged=$(find app/build/intermediates -path '*release*' -name AndroidManifest.xml | head -n 1)
           echo "Merged manifest: $merged"
           grep -o 'uses-permission[^>]*' "$merged" | sort -u | tee "$RUNNER_TEMP/release-permissions.txt"
-          if grep -Ei 'AD_ID|LOCATION|READ_PHONE|CONTACTS|CAMERA|RECORD_AUDIO' "$RUNNER_TEMP/release-permissions.txt"; then echo 'Blocked permission found'; exit 1; fi
+          if grep -Ei 'AD_ID|LOCATION|READ_PHONE|CONTACTS|CAMERA|RECORD_AUDIO|EXTERNAL_STORAGE|READ_MEDIA' "$RUNNER_TEMP/release-permissions.txt"; then echo 'Blocked permission found'; exit 1; fi
+          # Allowlist: anything new must be a deliberate decision (progress-file transfer uses the system document screen and share sheet, no permission).
+          unexpected=$(grep -o 'android:name="[^"]*"' "$RUNNER_TEMP/release-permissions.txt" | sed 's/^android:name="//; s/"$//' | grep -Ev '^android\.permission\.(INTERNET|VIBRATE)$|\.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION$' || true)
+          if [ -n "$unexpected" ]; then echo "Permission not on the allowlist: $unexpected"; exit 1; fi
           echo 'Native libraries in AAB (16KB page size matters only if any are listed):'
           unzip -l app/build/outputs/bundle/release/*.aab | grep '\.so$' || echo 'none'
           cp "$RUNNER_TEMP/release-dependencies.txt" "$RUNNER_TEMP/release-permissions.txt" app/build/outputs/
