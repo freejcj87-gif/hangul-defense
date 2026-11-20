@@ -725,7 +725,10 @@ withBook({ON:false},()=>{const b=mk(),x=clone(b);
   eq([o2.off,o2.bank,o2.seed],[u,1,4242],'예전 판(1)으로 시작한 아이: 읽기 묶음 한 바퀴가 끝나기 전에는 그 판 그대로 이어 감');
   const big={story:Q.bankCount(a,1).story,common:0,math:0,english:0},o3=B.advanceOrder(b,a,big,{bank:1,latest:V,size:Q.bankCount(a,1)});
   eq([o3.off,o3.bank],[zero,V],'한 바퀴가 끝난 곳에서 최신 판('+V+')으로 올리고 새 바퀴 처음부터');
-  ok(Q.at(a,'story',0,4242,o3.bank,o3.off).id===Q.at(a,'story',0,4242,V).id,'올린 뒤 첫 문제 = 최신 판의 첫 문제');}
+  ok(Q.at(a,'story',0,4242,o3.bank,o3.off).id===Q.at(a,'story',0,4242,V).id,'올린 뒤 첫 문제 = 최신 판의 첫 문제');
+  /* 리뷰 0.16 R2: 판의 bank 0(아직 안 정함)은 문제은행이 최신 판으로 낸 판이다. 마친 뒤에도 최신 판(예전 판 1로 내려가지 않음) */
+  const b4=B.fresh(T,4242),o4=B.advanceOrder(b4,a,Q.used(a,40,4242,0),{bank:0,latest:V,size:Q.bankCount(a,0)});
+  eq([o4.bank,b4.order.bank[a],o4.off],[V,V,Q.used(a,40,4242,V)],'bank 0으로 푼 판을 마치면 다음 판도 최신 판('+V+'), 쓴 수 그대로');}
  /* byId: 은행 문항 복사본 */
  {const q=Q.get(8,'story',5),z=Q.byId(q.id);eq(z,q,'byId = 은행 문항');z.choices.push('x');eq(Q.byId(q.id).choices.length,q.choices.length,'byId는 복사본');
   const e=bankQuiz(9).find(x=>x.cat==='english');eq(Q.byId(e.id),e,'퀴즈 문항도');eq([Q.byId('nope'),Q.byId(undefined)],[null,null],'모르는 id는 null');

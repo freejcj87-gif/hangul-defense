@@ -1257,7 +1257,12 @@ function wakeUp(){
 /* 저장소에서 판 저장과 기록을 다시 읽어 시작 화면으로(진행 파일 바꾸기·되돌리기·모든 기록 지우기 뒤) */
 function reloadFromStore(){
  let saved=null;try{saved=JSON.parse(localStorage.getItem(KEY))}catch{}
- state=saved&&typeof saved==='object'?Combat.restore(saved,AGES):Combat.fresh(8);if(!(state.seed>0))state.seed=newSeed();if(!state.run.t0)state.run.t0=Date.now();
+ const kept=!!saved&&typeof saved==='object'&&(saved.version===1||saved.version===Combat.SAVE_VERSION);
+ state=saved&&typeof saved==='object'?Combat.restore(saved,AGES):Combat.fresh(8);
+ /* 처음 불러올 때(맨 위)와 같은 정리: 체험 마을 · 씨앗 · 문제은행 판. 전에는 판 저장이 없을 때(모든 기록 지우기 · 판 없는 진행 파일) bank 0으로 시작해,
+    다시 열면 예전 판(1)으로 바뀌어 하던 판의 문제가 달라지고 새 마을도 예전 판으로 갔다(리뷰 0.16 R2) */
+ if(DEMO&&!state.wins&&!state.index)Object.assign(state,DEMO_VILLAGE[DEMO]);
+ if(!(state.seed>0))state.seed=newSeed();if(!(state.bank>=1&&state.bank<=Questions.BANK_VERSION))state.bank=kept?1:Questions.BANK_VERSION;if(!state.run.t0)state.run.t0=Date.now();
  bookOpen();gainReset();world=freshWorld();flowSync();state.broken=World.brokenCount(world);syncKing(true);resetView();round=null;phase='start';sleepyOn=false;
  for(const id of ['ending','sleepy','bookScreen','guardian','gate'])$(id).hidden=true;$('start').hidden=false;$('age').value=String(state.age);drawStart();
 }

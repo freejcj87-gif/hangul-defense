@@ -2256,6 +2256,9 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   eq([KEY in saved,BOOK_KEY in saved,h.game().book.status,h.game().state.gold,h.game().book.data.medal.one.n,h.api.phase],[false,false,'new',20,0,'start'],'두 열쇠를 비우고 새로 시작');
   /* 보호자 안내(시작 화면): 문턱 없이 개인정보처리방침 본문만 */
   h.n.openInfo.click();ok(h.n.guardian.hidden===false&&h.n.gTabs.children.length===1&&/개인정보처리방침/.test(h.n.gBody.textContent)&&!h.n.gBody.children.some(c=>c.tagName==='button'),'보호자 안내: 방침 본문만(문턱·단추 없음)');h.n.guardClose.click();
+  /* 리뷰 0.16 R2: 지운 뒤(판 저장 없음) 새 판도 처음 불러올 때처럼 최신 문제은행 판. 전에는 bank 0으로 저장돼 다시 열면 예전 판(1)으로 바뀌었다 */
+  eq(h.game().state.bank,Q.BANK_VERSION,'모든 기록 지우기 뒤 판의 문제은행 판 = 최신('+Q.BANK_VERSION+')');
+  h.go();const qid=h.n.answers.dataset.qid;const h2=boot({book:true});h2.go();eq([h2.game().state.bank,h2.n.answers.dataset.qid],[Q.BANK_VERSION,qid],'지운 뒤 놀다가 다시 열어도 같은 판·같은 문제(예전 판 1로 바뀌지 않음)');
   saved={[KEY]:mine[0],[BOOK_KEY]:mine[1]};
  }
  /* M-10 엔딩 카드: 쉬기 권유가 단추 위에, 이번 판 요약, "오늘은 그만하기" */

@@ -278,7 +278,8 @@
     if(!AGES.includes(age))return orderFor(b,8);
     const o=opt||{},off=offOf(b,age),u=isObj(used)?used:{};
     for(const p of POOLS)off[p]=cnt(off[p]+cnt(u[p]));
-    const bank=int(o.bank,1,9999,b.order.bank[age]||1),latest=int(o.latest,1,9999,bank),size=isObj(o.size)?o.size:null;
+    /* bank 0 = 아직 안 정함 = 문제은행이 최신 판으로 냄(Questions.at). 1로 자르면 최신 판으로 푼 판을 마친 뒤 예전 판으로 내려갔다(리뷰 0.16 R2) */
+    const bank=Number.isFinite(o.bank)&&o.bank<1&&o.latest>=1?int(o.latest,1,9999,1):int(o.bank,1,9999,b.order.bank[age]||1),latest=int(o.latest,1,9999,bank),size=isObj(o.size)?o.size:null;
     let next=bank;
     if(latest>bank&&size&&size.story>0&&off.story>=size.story){next=latest;for(const p of POOLS)off[p]=0}
     b.order.off[age]=off;b.order.bank[age]=next;
