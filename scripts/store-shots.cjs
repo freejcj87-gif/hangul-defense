@@ -107,6 +107,8 @@ function richBook() {
   const n = { one: 412, fresh: 130, again: 7, rush: 18, en: 9, quiz: 61, king: 5, fox: 4, arrow: 1240, keeper: 3, star: 2, map: 1 };
   for (const k of Object.keys(n)) { b.medal[k].n = n[k]; Book.BOOK.MEDAL[k].forEach((need, i) => { if (n[k] >= need) b.medal[k].at[i] = t; }); }
   b.play = 6; b.pq = 6; b.tot = { q: 540, f: 455, s: 9800, days: 6 }; b.day[DAY] = [42, 36, 900, 11];
+  /* 최근 놀이 6번 요약(보호자 기록 탭의 분류별 줄): 합계가 위 tot와 맞게 */
+  b.log = [0, 1, 2, 3, 4, 5].map(i => ({ p: i + 1, d: Book.dayOf(NOW - (10 - 2 * i) * 86400000), age: 8, q: 90, f: i < 5 ? 76 : 75, nw: 20, en: [6, 4], qz: [14, 11], rd: [70, i < 5 ? 61 : 60], rv: [2, 1], s: 1630 }));
   b.rv = [['a8-story-03', 4], ['a8-story-12', 3], ['a8-quiz-07', 2], ['a8-story-g041', 2], ['a8-story-g102', 1]].map(([id, miss]) => ({ id, box: 1, due: 99, dp: 6, miss, seen: 1 }));
   return b;
 }
@@ -123,13 +125,15 @@ const SCENES = [
     async make(t) { await t.begin(); await t.story(); await t.pack(); await t.run(30); await t.unlock(); await t.run(6); } },
   { id: 'T3', file: '03-castle', title: '농가에서 성까지', alt: '많이 지을수록 농가가 마을, 장터 마을을 지나 성으로 자라요', state: '성 · 8세 · 늑대 몇 마리 접근',
     run: J => runJson(J['8:5']), query: QUIET,
-    async make(t) { await t.begin(); await t.story(); await t.pack(); await t.run(70); await t.unlock(); } },
-  { id: 'T4', file: '04-eggs-farmers', title: '알 → 농부 → 장터', alt: '닭이 알을 낳으면 농부가 장터에 팔아 금화가 생겨요', state: '장터 마을 · 8세 · 닭 6마리 · 농부 3명',
-    run: J => { const s = { ...J['8:2'] }; s.farmers = Math.max(2, s.farmers | 0); s.chickens = Math.max(6, (s.chickens | 0) - (s.farmers - (J['8:2'].farmers | 0))); return runJson(s); }, query: QUIET,
-    async make(t) { await t.begin(); await t.story(); await t.run(120); await t.unlock(); } },
+    async make(t) { await t.begin(); await t.story(); await t.pack(); await t.run(70); await t.unlock(); await t.clearBanners(); } },
+  /* 알·농부는 화면이 가장 가까운 '마을' 단계에서(장터 마을은 마을이 넓어져 알이 작다). 정답 뒤 판매 연출 중: 알을 든 농부가 매대로, 동전이 금화 칸으로 */
+  { id: 'T4', file: '04-eggs-farmers', title: '알 → 농부 → 장터', alt: '닭이 알을 낳으면 농부가 장터에 팔아 금화가 생겨요', state: '마을 · 8세 · 닭 6마리 · 농부 3명 · 정답 뒤 판매 연출',
+    run: J => runJson(J['8:1'], { chickens: Math.max(6, J['8:1'].chickens | 0), farmers: Math.max(2, J['8:1'].farmers | 0) }), query: QUIET,
+    css: 250, async make(t) { await t.begin(); await t.run(20); await t.answer(); await t.run(7); } },
+  /* 말풍선은 문제 사이에만, 20초에 한 번만 뜬다(REC.gap). 앞 문제를 넘기지 않고 첫 정답에서 뜬 말풍선을 찍는다 */
   { id: 'T5', file: '05-shop-bubble', title: '가게와 추천 말풍선', alt: '모은 금화로 언제든 타워, 닭, 농부, 울타리를 사요', state: '마을 · 8세 · 금화 넉넉 · 정답 뒤 추천 말풍선',
     run: J => runJson(J['8:1'], { gold: 420 }), query: QUIET,
-    async make(t) { await t.begin(); await t.story(); await t.answer(); for (let i = 0; i < 40 && !(await t.st()).bubble; i++) await t.run(2); await t.run(2); } },
+    async make(t) { await t.begin(); await t.run(10); await t.answer(); for (let i = 0; i < 40 && !(await t.st()).bubble; i++) await t.run(2); if (!(await t.st()).bubble) throw new Error('추천 말풍선이 뜨지 않음'); await t.run(2); } },
   { id: 'T6', file: '06-stage-up', title: '단계가 오르는 순간', alt: '마을이 커질 때마다 땅이 넓어지고 새 길과 새 몬스터가 나와요', state: '농가 → 마을 · 8세 · 단계 전환 띠',
     run: () => runJson(Combat.fresh(8), { age: 8, index: 0, level: 2, fence: 1, chickens: 2, gold: 300 }), query: QUIET,
     async make(t) { await t.begin(); await t.story(); await t.run(4); await t.buy('chicken'); await t.run(8); await t.answer(); await t.run(5); } },
@@ -216,6 +220,8 @@ async function main() {
       async settle() { for (let i = 0; i < 80; i++) { const s = await t.st(); if (s.phase === 'ask') return; if (s.phase === 'learn') { await t.run(30); await page.locator('#answers button[data-i="' + s.answer + '"]').click().catch(() => {}); } await t.run(4); } throw new Error('다음 문제가 나오지 않음'); },
       /* 지금 문제가 읽기 문제(상식·수학·영어 퀴즈·쪽지 아님)가 될 때까지 맞히며 넘긴다 */
       async story(max = 10) { for (let i = 0; i < max; i++) { const s = await t.st(); if (s.mode !== 'quiz' && !s.special) return; await t.answer(); await t.settle(); } throw new Error('읽기 문제를 찾지 못함'); },
+      /* 알림 띠(새 몬스터 등)가 사라질 때까지 세계를 조금씩 흘린다(띠가 단계 이름표를 가리는 장면용) */
+      async clearBanners(max = 150) { for (let i = 0; i < max; i += 6) { if (!(await page.evaluate(() => !!document.querySelector('#effects .banner:not(.later)')))) return; await t.run(6); } },
       async longPress(id) { await page.evaluate(id => { const b = document.getElementById(id), n = Date.now; b.onpointerdown(); Date.now = () => n() + 2500; b.onpointerup(); Date.now = n; }, id); },
       async passGate() { await page.evaluate(() => { const N = { 이: 2, 삼: 3, 사: 4, 오: 5, 육: 6, 칠: 7, 팔: 8, 구: 9 }, m = /^(.)백(.)십(.)$/.exec(document.getElementById('gateCode').textContent); for (const c of [m[1], m[2], m[3]]) [...document.getElementById('gatePad').children].find(b => b.dataset.d === String(N[c])).click(); }); },
       /* CSS 애니메이션(동전 비행·튀는 칸)을 ms만큼 실제로 흘린 뒤 멈춘다: 찍는 동안 바뀌지 않게 */
