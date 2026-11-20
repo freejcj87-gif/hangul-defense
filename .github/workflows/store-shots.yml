@@ -1,0 +1,44 @@
+name: Store screenshots
+# 출시 준비: Play 스토어 스크린샷(태블릿 1920×1080)과 그래픽 이미지(1024×500)를 출시 후보 빌드에서 찍어 묶음으로 올린다.
+# 구성안 launch/store/04 §2·§4, 도구 scripts/store-shots.cjs. 수동 실행(workflow_dispatch) 때 sizes에 portrait·phone을 더할 수 있다.
+on:
+  workflow_dispatch:
+    inputs:
+      sizes:
+        description: 'tablet, portrait, phone 중 쉼표로(기본 tablet)'
+        required: false
+        default: 'tablet'
+  push:
+    branches: [claude/release-kit]
+concurrency:
+  group: store-shots-${{ github.ref_name }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  shots:
+    runs-on: ubuntu-24.04
+    container:
+      image: mcr.microsoft.com/playwright:v1.56.1-noble
+      options: --ipc=host
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Release placeholders (warning only)
+        run: node scripts/check-release.cjs
+      - run: npm install --no-save --package-lock=false playwright@1.56.1 three@0.180.0 esbuild@0.25.10
+      - run: node scripts/build-pages.cjs
+      - name: Take store screenshots
+        env:
+          SIZES: ${{ github.event.inputs.sizes || 'tablet' }}
+        run: node scripts/store-shots.cjs store-shots "--sizes=$SIZES"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: store-shots
+          path: store-shots/
+          if-no-files-found: error
+          retention-days: 14
