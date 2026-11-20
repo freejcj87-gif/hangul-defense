@@ -4,6 +4,7 @@ import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { SimplifyModifier } from 'three/addons/modifiers/SimplifyModifier.js';
 import { KIND_ORDER, RIG, GAIT, RIG_TIME, monsterGeometry, shadowGeometry, rigMaterial, rigDepthMaterial, rigMaterialAt, gaitPose, setRig } from './monsters.js';
 import { prep, fuse, solid, flat, merge } from './geo.js';
+import CARDS from '../cards.js';   // 0.17: 종별 반짝 색 표(CARDS.SHINY). 친구 카드 렌더(tools/card-render.js)와 같은 표
 import { POND, POND_R, HAY, GARDEN, ZONE, FARM_ZONE, FARM_HOME, PICK, DROP, MARKET_FRONT, MARKET_GATE, TENTS, MILL, RIVER, riverFrame, riverOffset, millRace, bridgeSpot, deckY, BRIDGE as BRIDGE_ART } from './layout.js';
 import { STOREY_H, storeyGeometry, basketGeometry, basketEggs, railGeometry, wallGeometry, marketExtras, STALL_OMIT, NESTS, NEST_MAX, nestSpots, villageProps, lanterns, LANTERN_TOP, drawHammer, trailGeometry, stageProps, riverGeometry, codeWheelGeometry } from './props.js';
 
@@ -550,6 +551,17 @@ async function start(){
  for(const k of ['king','fox'])if(art15[k]){try{beast[k]=beastRig(art15[k],BEAST[k].h)}catch(error){art15[k]=null;console.warn('0.15 '+k+' model unavailable:',error.message)}}
  const herd={};for(const k of KIND_ORDER){const b=beast[k];if(b)setRig(k,b.rig,BEAST[k].gait);
   const r=rigMesh(b?b.geometry:monsterGeometry(k),b?rigMaterialAt(b.rig.H,.86):rigMaterial(k),WCAP,true);r.mesh.castShadow=false;r.mesh.receiveShadow=true;herd[k]=r}
+ /* 0.17 반짝 손님(명세 C11): 그 종의 반짝 카드와 같은 색. 같은 모형의 꼭짓점 색을 cards.js 표(CARDS.SHINY)로 바꾼 메시를 손님이 처음 올 때 하나 만든다
+    (재질은 그 종과 같이 씀, 손님은 한 마리라 칸 2개). 만들지 못하면(표·모형 문제) 예전처럼 그 종 메시에 금빛 색조(SHINY_TINT) */
+ const shinyHerd={},shinyFail={};
+ function shinyMesh(k){
+  if(shinyHerd[k]||shinyFail[k])return shinyHerd[k]||null;
+  try{const g=beast[k]?beast[k].geometry.clone():monsterGeometry(k),col=g.attributes.color,map=CARDS.SHINY[k],c=new THREE.Color();if(!col||!map)throw new Error('no colour table');let mapped=0;
+   for(let i=0;i<col.count;i++){c.setRGB(col.getX(i),col.getY(i),col.getZ(i),THREE.LinearSRGBColorSpace);const to=map[c.getHex(THREE.SRGBColorSpace)];if(to===undefined)continue;c.setHex(to,THREE.SRGBColorSpace);col.setXYZ(i,c.r,c.g,c.b);mapped++}
+   if(!mapped)throw new Error('no colour matched');col.needsUpdate=true;
+   const r=rigMesh(g,herd[k].mesh.material,2,true);r.mesh.castShadow=false;r.mesh.receiveShadow=true;r.mesh.name='monster-'+k+'-shiny';r.mapped=mapped;return shinyHerd[k]=r}
+  catch(error){shinyFail[k]=true;console.warn('0.17 shiny '+k+' colours unavailable:',error.message);return null}
+ }
  const shade=rigMesh(shadowGeometry(),herd.wolf.mesh.material,WCAP,false);shade.mesh.castShadow=true;shade.mesh.receiveShadow=false;shade.mesh.customDepthMaterial=rigDepthMaterial('wolf');
  // The stand-in only draws into the shadow map: in the main pass it has zero instances (no draw call).
  shade.mesh.onBeforeRender=function(){this.userData.n=this.count;this.count=0};shade.mesh.onAfterRender=function(){this.count=this.userData.n};
@@ -1221,6 +1233,8 @@ async function start(){
     decor:{forest:forest.count,grove:grove.count,bushes:shrubs.count,rocks:stones.count},
     art15:Object.fromEntries(Object.keys(ART15).map(k=>[k,!!art15[k]])),   // 0.15 model loaded (and baked where it is used); false = that model keeps its 0.14 look
     monsterArt:{king:!!beast.king,fox:!!beast.fox},   // true = drawn from the 0.15 GLB, false = the 0.14 code model
+    // 0.17 반짝 손님: look 'card' = 카드와 같은 반짝 색 메시(mapped = 표로 바꾼 꼭짓점 수), 'tint' = 금빛 색조(메시를 못 만듦), drawn = 이번 그림의 손님 메시 수
+    shinyGuest:(()=>{const g=curS&&curS.world&&curS.world.guest;if(!g)return null;const k=g.kind,h=shinyHerd[k];return {kind:k,look:h?'card':shinyFail[k]?'tint':null,mapped:h?h.mapped:0,drawn:h?h.mesh.count:0}})(),
     river:(()=>{const o={on:riverR>0,radius:riverR,bridge:bridgeArt?'glb':'code',bridged:crossed.bridged.size,waded:crossed.waded.size,wadedIn:crossed.wadedIn.size,splashes:crossed.splashes,flow:+riverMesh.scale.x.toFixed(3)};if(!riverR)return o;const b=bridgeSpot(riverR),at=(f,y)=>{ndc.set(b.at[0]+b.u[0]*f,y,b.at[1]+b.u[1]*f).project(camera);return [+ndc.x.toFixed(3),+ndc.y.toFixed(3)]};
      o.bridgeNdc=at(0,.5);o.bridgeFarNdc=at(BRIDGE_ART.len/2,.3);return o})(),   // where the bridge's middle and its far (forest) end are on screen (−1…1)
     mill:{art:millArt?'glb':'code',shown:wheel.obj.visible,turns:Math.round(millSpin.angle/(Math.PI*2)*100)/100,spinning:millSpin.vel>0,kicks:millSpin.kicks},
@@ -1349,7 +1363,7 @@ async function start(){
   c[k]=o.legs[3];c[k+1]=P.hr;c[k+2]=o.seed*20;c[k+3]=0;d[k]=o.lift[0];d[k+1]=o.lift[1];d[k+2]=o.lift[2];d[k+3]=o.lift[3]}
  function animateWolves(dt,wdt,less){
   const e=tickBlend(less);
-  for(const k of KIND_ORDER){herd[k].n=0;wolfKinds[k]=0}shade.n=0;fxBudget=less?0:5;splashBudget=less?0:2;
+  for(const k of KIND_ORDER){herd[k].n=0;wolfKinds[k]=0}for(const k in shinyHerd)shinyHerd[k].n=0;shade.n=0;fxBudget=less?0:5;splashBudget=less?0:2;
   henSpots.length=0;for(const c of henSlots)if(c.on&&c.h&&(c.h.state==='yard'||c.h.state==='home'||c.h.state==='flee'))henSpots.push(c.a);
   for(const o of wolfVis.values()){
    const px=o.x,pz=o.z;if(!o.ghost){o.x=o.fx+(o.tx-o.fx)*e;o.z=o.fz+(o.tz-o.fz)*e}
@@ -1453,13 +1467,15 @@ async function start(){
    rv.set(0,pivY*S,pivZ*S);rv2.copy(rv).applyAxisAngle(YAX,o.ry);rv.applyQuaternion(rq);
    rp.set(o.x+o.kx+Math.sin(o.ry)*fwd*S,P.y*S+o.ky+ay,o.z+o.kz+Math.cos(o.ry)*fwd*S).add(rv2).sub(rv);
    o.mat.compose(rp,rq,rs.set(S*P.sx,S*P.sy,S*P.sz));o.phy=P.hy;o.php=P.hp;o.phr=P.hr;
-   const Hd=herd[o.kind],i=Hd.n++;o.mat.toArray(Hd.mesh.instanceMatrix.array,i*16);if(R.tp0){P.tp+=R.tp0;writePose(Hd.pose,i,P,o);P.tp-=R.tp0}else writePose(Hd.pose,i,P,o);
-   Hd.mesh.setColorAt(i,o.hit>0?FLASH:st==='dead'?DEAD:lit&&!less&&Math.sin(time*9)>0?HL:curS&&curS.world&&curS.world.guest&&o.id===curS.world.guest.id?SHINY_TINT:PLAIN);   // 수첩 MVP: 반짝 손님은 밝은 금빛
+   // 수첩: 반짝 손님은 종별 반짝 색 메시(0.17, 카드와 같은 색)로, 그 메시를 못 만들면 그 종 메시에 금빛 색조
+   const guest=!!(curS&&curS.world&&curS.world.guest&&o.id===curS.world.guest.id),own=guest?shinyMesh(o.kind):null,Hd=own&&own.n<2?own:herd[o.kind],i=Hd.n++;
+   o.mat.toArray(Hd.mesh.instanceMatrix.array,i*16);if(R.tp0){P.tp+=R.tp0;writePose(Hd.pose,i,P,o);P.tp-=R.tp0}else writePose(Hd.pose,i,P,o);
+   Hd.mesh.setColorAt(i,o.hit>0?FLASH:st==='dead'?DEAD:lit&&!less&&Math.sin(time*9)>0?HL:guest&&Hd!==own?SHINY_TINT:PLAIN);
    if(!o.ghost)wolfKinds[o.kind]++;
    if(st!=='dead'||o.deadAge<.9){const j=shade.n++,fit=SHADE_FIT[o.kind];if(fit){rm.copy(o.mat).scale(fit);rm.toArray(shade.mesh.instanceMatrix.array,j*16)}else o.mat.toArray(shade.mesh.instanceMatrix.array,j*16);writePose(shade.pose,j,P,o)}
   }
   let drawn=0;
-  for(const k of KIND_ORDER){const Hd=herd[k];Hd.mesh.count=Hd.n;Hd.mesh.visible=Hd.n>0;drawn+=Hd.n;Hd.mesh.instanceMatrix.needsUpdate=true;for(const p of Hd.pose)p.needsUpdate=true;if(Hd.mesh.instanceColor)Hd.mesh.instanceColor.needsUpdate=true}
+  for(const Hd of [...KIND_ORDER.map(k=>herd[k]),...Object.values(shinyHerd)]){Hd.mesh.count=Hd.n;Hd.mesh.visible=Hd.n>0;drawn+=Hd.n;Hd.mesh.instanceMatrix.needsUpdate=true;for(const p of Hd.pose)p.needsUpdate=true;if(Hd.mesh.instanceColor)Hd.mesh.instanceColor.needsUpdate=true}
   shade.mesh.count=shade.n;shade.mesh.visible=shade.n>0;shade.mesh.instanceMatrix.needsUpdate=true;for(const p of shade.pose)p.needsUpdate=true;
   wolvesDrawn=drawn;maxWolvesDrawn=Math.max(maxWolvesDrawn,drawn);
  }

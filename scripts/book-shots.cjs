@@ -5,7 +5,7 @@ const {chromium}=require('playwright');
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path');
 const ROOT=path.join(__dirname,'..'),OUT=path.join(ROOT,'.pages-build'),DIR=path.resolve(process.argv[2]||path.join(ROOT,'test-results','book-shots')),HEADED=process.argv.includes('headed');
 const Combat=require(path.join(ROOT,'combat.js')),Book=require(path.join(ROOT,'book.js'));
-const TYPES={'.js':'text/javascript; charset=utf-8','.html':'text/html; charset=utf-8','.png':'image/png','.glb':'model/gltf-binary','.json':'application/json'};
+const TYPES={'.js':'text/javascript; charset=utf-8','.html':'text/html; charset=utf-8','.png':'image/png','.webp':'image/webp','.glb':'model/gltf-binary','.json':'application/json'};
 (async()=>{
   const server=http.createServer((req,res)=>{const p=new URL(req.url,'http://x').pathname,f=path.join(OUT,p==='/'?'index.html':decodeURIComponent(p.slice(1)));
     if(!f.startsWith(OUT)||!fs.existsSync(f)||!fs.statSync(f).isFile()){res.writeHead(404);return res.end()}

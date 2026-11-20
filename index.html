@@ -115,6 +115,8 @@ body.paused.covered #quiz{filter:blur(9px);pointer-events:none}
 #feedback.warn{color:#a2533f}
 .growth-panel{margin-top:18px;padding:16px 20px}.growth-title{display:flex;align-items:center;justify-content:space-between;font-size:14px}.growth-title small{font-weight:400;color:#79856c}
 #garden{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:8px 0}#garden img{width:43px;height:43px;object-fit:contain}#garden span{font-size:13px;color:#70825e}#garden i{font-style:normal;font-size:30px}
+#garden .garden-friends{display:flex;align-items:center;gap:6px;flex-wrap:wrap}#garden .garden-friends .fr{position:relative;display:block;width:36px}#garden .garden-friends .card-art{width:36px;border-radius:7px}
+#garden .card-art img{width:100%;height:100%}#garden .garden-friends .card-art i{font-size:22px}#garden .garden-friends em{position:absolute;right:-6px;top:-7px;font-style:normal;font-size:13px}#garden .garden-friends small{font-size:13px;color:#70825e}
 .growth-panel>small{color:#74836d;line-height:1.7}footer{color:#bdd0ba;font-size:11px;line-height:1.8;margin-top:18px}
 #reset{font-size:11px;min-height:34px;padding:5px 10px}
 .start-screen{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:16px;background:#1d3129f0;overflow:auto}
@@ -239,10 +241,19 @@ body.paused *,body.paused *:before,body.paused *:after{animation-play-state:paus
 #endNew{width:100%;font-size:19px;min-height:58px;background:linear-gradient(#f8d255,#e0a21a);color:#4a3200;border-color:#b8860b}#endStay{width:100%;margin-top:8px;min-height:46px;font-size:16px}
 /* ---------- 수첩 MVP: 쪽지 문제 칸 · 친구 카드 · 반짝 손님 · 수첩 · 보호자 화면 ---------- */
 #enemies .enemy.shiny img{filter:hue-rotate(150deg) saturate(1.8) brightness(1.25)!important}
+/* 0.17 반짝 손님(그림 화면): 반짝 카드 그림을 그대로(색 필터 없이 금빛 빛만). 카드 그림은 300×400에 발끝이 아래 89% */
+#enemies .enemy[data-art="card"] img{visibility:visible;transform:none;width:48px;margin:0 0 -7px -9px}#enemies .enemy.shiny[data-art="card"] img{filter:drop-shadow(0 0 4px #ffd54a)!important}
+#enemies .enemy[data-art="card"]:before{content:none}
 #quiz.note-q{background:linear-gradient(#fff8e2,#fffdf4 40px);border:2px dashed #c9b27a;border-radius:16px;padding:8px 10px;box-shadow:inset 0 0 0 4px #fffdf4}/* 줄 무늬는 글자를 가로질러서 뺌(CI 캡처 2026-11-19) */
 .fx.fx-note{font-size:26px;animation:noteFall .9s ease-in forwards}@keyframes noteFall{from{transform:translate(-50%,-60px) rotate(-25deg);opacity:0}30%{opacity:1}to{transform:translate(-50%,40px) rotate(20deg);opacity:0}}
 .friend-card{position:absolute;left:50%;top:46%;translate:-50% -50%;z-index:9;display:grid;justify-items:center;gap:2px;padding:14px 24px;border-radius:18px;background:#fffaf0;border:3px solid #f2b931;box-shadow:0 6px 0 #0004;font-weight:900;font-size:20px;white-space:nowrap;animation:cardFlip .6s ease-out}
-.friend-card b{font-size:46px;line-height:1.1}.friend-card small{font-size:15px;color:#3c6b3f}.friend-card.still{animation:none}
+.friend-card b{font-size:46px;line-height:1.1}.friend-card .card-art{width:84px;margin-bottom:2px}.friend-card small{font-size:15px;color:#3c6b3f}.friend-card.still{animation:none}
+/* 0.17 친구 카드 그림 틀(cards.js): 따뜻한 카드 바탕 + 투명 배경 렌더 그림(3:4). 반짝은 금빛 테두리와 지나가는 빛. 그림을 못 불러오면 안쪽이 그림 문자 */
+.card-art{position:relative;display:grid;place-items:center;aspect-ratio:3/4;border-radius:12px;overflow:hidden;background:radial-gradient(130% 85% at 50% 32%,#fffaf0 0%,#fde9c4 58%,#f5d29b 100%);box-shadow:inset 0 0 0 2px #ecd09a}
+.card-art img{display:block;width:100%;height:100%;object-fit:contain}.card-art.emoji{font-size:40px;line-height:1}.card-art.emoji i{font-style:normal}
+.card-art.shiny{background:radial-gradient(130% 85% at 50% 32%,#fffdf4 0%,#fff0bf 45%,#f6c9e0 100%);box-shadow:inset 0 0 0 3px #f2c14e,0 0 8px 2px #ffe27a}
+.card-art.shiny:after{content:'';position:absolute;inset:-30%;background:linear-gradient(115deg,transparent 40%,#fff9 50%,transparent 60%);transform:translateX(-70%);animation:cardShine 3.2s ease-in-out infinite;pointer-events:none}
+@keyframes cardShine{0%,35%{transform:translateX(-70%)}75%,100%{transform:translateX(70%)}}
 @keyframes cardFlip{from{transform:rotateY(90deg);opacity:0}to{transform:none;opacity:1}}
 .book-row{display:flex;gap:8px;margin:0 0 10px}.book-row button{flex:1;min-height:46px;font-size:16px}
 .day-note{margin:0 0 8px;font-size:13px;color:#6a745f;word-break:keep-all}
@@ -253,7 +264,11 @@ body.paused *,body.paused *:before,body.paused *:after{animation-play-state:paus
 .start-card.wide{max-width:780px;text-align:left}.start-card.wide h2{text-align:center}.start-card.wide>button{width:100%;min-height:46px;margin-top:10px}
 .book-pages{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:8px}
 .book-page{display:grid;gap:3px;padding:10px;border-radius:14px;background:#fffdf2;border:2px dashed #c9b27a;font-size:13px;line-height:1.45;word-break:keep-all}
-.book-page .book-pic{font-size:40px;line-height:1.1;text-align:center}.book-page[data-state="foot"] .book-pic{filter:brightness(0) opacity(.35)}.book-page[data-state="none"] .book-pic{opacity:.4}
+.book-page .book-pic{position:relative;display:block;width:min(100%,126px);margin:0 auto 2px}.book-pic>.card-art{width:100%}
+.book-page[data-state="foot"] .book-pic>.card-art:not(.book-shiny)>*{filter:brightness(0) opacity(.35)}
+.book-page[data-state="none"] .book-pic>.card-art:not(.book-shiny){background:#fbf7ea;box-shadow:none;outline:2px dashed #d9cfb2;outline-offset:-5px}.book-page[data-state="none"] .book-pic>.card-art:not(.book-shiny) i{opacity:.4}
+.book-pic>.book-shiny{position:absolute;right:-6px;bottom:-6px;width:44px;border-radius:8px}.book-pic>.book-shiny.emoji{font-size:20px}
+.book-pic>i.book-shiny{display:grid;place-items:center;aspect-ratio:3/4;font-style:normal;font-weight:900;font-size:16px;color:#a39b82;background:#f4efe0;box-shadow:inset 0 0 0 2px #d9cfb2}
 .book-page strong{font-size:15px}.book-page em{font-style:normal;color:#3c6b3f;font-weight:800}.book-page small{margin:0;color:#7a826f}
 .book-steps{display:flex;flex-wrap:wrap;gap:3px}.book-steps i{font-style:normal;padding:1px 6px;border-radius:99px;background:#eee7d2;color:#a39b82;font-size:11.5px;white-space:nowrap}.book-steps i.on{background:#d8efc4;color:#2f5a3a;font-weight:800}
 .book-h{margin:14px 0 6px;font-size:16px}
@@ -299,7 +314,7 @@ body.paused *,body.paused *:before,body.paused *:after{animation-play-state:paus
 <div class="start-screen" id="bookScreen" role="dialog" aria-modal="true" aria-label="발자국 수첩" hidden><div class="start-card wide"><h2 id="bookTitle"></h2><div class="book-pages" id="bookPages"></div><h3 class="book-h">🎖️ 지킴이 훈장</h3><div class="book-medals" id="bookMedals"></div><p class="book-tip" id="bookTip" role="status" aria-live="polite"></p><button id="bookClose">닫기</button></div></div>
 <div class="start-screen" id="guardian" role="dialog" aria-modal="true" aria-label="보호자 화면" hidden><div class="start-card wide"><h2>👪 보호자 화면</h2><div class="g-tabs" id="gTabs"></div><div class="g-body" id="gBody"></div><p id="gNote" role="status" aria-live="polite"></p><input type="file" id="importFile" accept=".json,application/json" hidden><button id="guardClose">닫기</button></div></div>
 <div class="start-screen" id="gate" role="dialog" aria-modal="true" aria-label="어른 확인" hidden><div class="start-card"><h2>어른 확인</h2><p class="start-q" id="gateAsk"></p><p class="gate-code" id="gateCode"></p><p class="gate-in" id="gateIn" aria-label="누른 수"></p><div class="gate-pad" id="gatePad"></div><small>아이가 실수로 누르지 않게 하는 문턱이에요. 보안 장치가 아니에요.</small><button id="gateClose">그만두기</button></div></div>
-<script src="combat.js?v=0.16"></script><script src="world.js?v=0.16"></script><script src="questions-gen.js?v=0.16"></script><script src="questions.js?v=0.16"></script><script src="notes.js?v=0.16"></script><script src="book.js?v=0.16"></script><script>/* 체험 주소 ?demo=1~3: 그 회관 단계까지 자란 마을로 시작해 새 몬스터를 바로 본다(프로듀서·보호자 확인용). 저장은 따로 해서 원래 진행을 건드리지 않는다. */
+<script src="combat.js?v=0.16"></script><script src="world.js?v=0.16"></script><script src="questions-gen.js?v=0.16"></script><script src="questions.js?v=0.16"></script><script src="notes.js?v=0.16"></script><script src="cards.js?v=0.16"></script><script src="book.js?v=0.16"></script><script>/* 체험 주소 ?demo=1~3: 그 회관 단계까지 자란 마을로 시작해 새 몬스터를 바로 본다(프로듀서·보호자 확인용). 저장은 따로 해서 원래 진행을 건드리지 않는다. */
 const DEMO=(()=>{try{const m=/[?&]demo=([123])\b/.exec(location.search);return m?Number(m[1]):0}catch{return 0}})();
 /* 0.14.1 프로듀서 테스트 모드 ?test=1: 화면 아래 '다음 ▶' 막대(testmode.js, 이 스크립트 맨 끝에서 불러옴). 저장은 '-test'를 붙인 열쇠에 따로 해서 아이 저장과 섞이지 않는다 */
 const TEST=(()=>{try{return /[?&]test=1\b/.test(location.search)}catch{return false}})();
@@ -478,9 +493,13 @@ function drawRiver(){
  place(bridge,u[0]*r,u[1]*r);bridge.style.width=(F.bridge*1.12*unit).toFixed(1)+'px';bridge.style.transform='translate(-50%,-59.2%)';
  place(mill,...F.mill);mill.style.width=(2.9*unit).toFixed(1)+'px';mill.style.transform='translate(-53.6%,-72.8%)';
 }
-/* 늑대 왕 · 도둑 여우 그림(0.15): 새 그림이 안 오면 그 자리만 늑대 그림 + 필터(0.14) */
-function wolfLook(el,kind){el.dataset.kind=kind;const img=el._img||el.firstChild;if(!img)return;const png=!ART15_OFF&&el.dataset.bad!==kind&&ART15_PNG[kind];
- if(png){el.dataset.art='15';img.onerror=()=>{el.dataset.bad=kind;wolfLook(el,kind)};if(!img.src.endsWith(png))img.src=png}
+/* 늑대 왕 · 도둑 여우 그림(0.15): 새 그림이 안 오면 그 자리만 늑대 그림 + 필터(0.14)
+   0.17 반짝 손님: 그 종의 반짝 카드 그림(cards.js 반짝 색 표로 렌더, 3D 손님·카드와 같은 색). 그림이 안 오면 위 그림 + 반짝 필터 */
+function wolfLook(el,kind,shiny){el.dataset.kind=kind;el.dataset.look=kind+(shiny?'*':'');const img=el._img||el.firstChild;if(!img)return;
+ const card=shiny&&window.CARDS&&el.dataset.badCard!==kind?window.CARDS.src(kind,true):'';
+ if(card){el.dataset.art='card';img.onerror=()=>{el.dataset.badCard=kind;wolfLook(el,kind,shiny)};if(!img.src.endsWith(card))img.src=card;return}
+ const png=!ART15_OFF&&el.dataset.bad!==kind&&ART15_PNG[kind];
+ if(png){el.dataset.art='15';img.onerror=()=>{el.dataset.bad=kind;wolfLook(el,kind,shiny)};if(!img.src.endsWith(png))img.src=png}
  else{delete el.dataset.art;img.onerror=null;if(!img.src.endsWith('wolves/wolf.png'))img.src=ART+'wolves/wolf.png'}}
 function updateVillageArt(){
  const hall=shownHall(),stamp=[state.level,state.chickens,state.hidden,state.fence,state.farmers,state.pond,hall,state.feast,stageNow(),rivered(),$('scene').clientWidth,$('scene').clientHeight,$('scene').dataset.renderer,World.radius(world)].join(':');if(stamp===artStamp)return;artStamp=stamp;drawRiver();drawStageArt();
@@ -492,6 +511,18 @@ function updateVillageArt(){
  $('fenceRow').innerHTML='';for(let i=0;i<Math.min(6,state.fence);i++){const post=artImage('buildings/fence.png');post.style.left=(26+i*7)+'%';post.style.bottom='calc(16% + 24px)';$('fenceRow').append(post)}
  $('garden').innerHTML='';$('garden').append(artImage(homeArt(),'마을회관'));$('garden').append(artImage('characters/chicken.png','꼬꼬'));if(hall>=1)$('garden').append(artImage('buildings/store.png','가게'));if(state.pond)$('garden').append(Object.assign(document.createElement('i'),{textContent:'🐟'}));
  const label=document.createElement('span');label.textContent=(staged()?Combat.STAGE_NAME[stageNow()]+' · ':'')+'회관 '+hall+'단계 · 타워 '+(1+state.level)+'개 · 닭 '+state.chickens+'마리 · 농부 '+(1+state.farmers)+'명 · 연못 '+state.pond+(state.feast?' · 잔치 '+state.feast+'번':'');$('garden').append(label);
+ gardenFriends();
+}
+/* 0.17 "더 놀기"(종 4, 명세 §1.5): 놀러 온 친구 카드 그림 작은 아이콘(Book.friends: 리본 친구 먼저, 최근 친구 순, 최대 4). 그림을 못 불러오면 그림 문자.
+   #garden은 그릴 때마다 비우므로 친구 줄은 한 번 만들어 두고 다시 붙인다(친구가 바뀔 때만 새로 만든다: 그림을 매번 다시 부르지 않게) */
+let gardenFr=null,gardenFrKey='';
+function gardenFriends(){
+ const list=book&&state.run.bell===4?Book.friends(book):[],key=list.map(f=>f.kind+(f.ribbon?'+':'')).join(',');
+ if(!list.length){gardenFr=null;gardenFrKey='';return}
+ if(!gardenFr||key!==gardenFrKey){gardenFrKey=key;gardenFr=document.createElement('div');gardenFr.className='garden-friends';const names=list.map(f=>NOTES.MON[f.kind].nick);
+  for(const f of list){const w=document.createElement('b');w.className='fr'+(f.ribbon?' ribbon':'');w.dataset.kind=f.kind;w.append(cardPic(f.kind,false));if(f.ribbon){const r=document.createElement('em');r.textContent='🎀';w.append(r)}gardenFr.append(w)}
+  const t=document.createElement('small');t.textContent='🎉 놀러 온 친구: '+names.join(' · ');gardenFr.append(t)}
+ $('garden').append(gardenFr);
 }
 const WOLF_POOL=[];
 const liveWolves=()=>world.wolves.filter(v=>v.state!=='dead'&&v.state!=='gone');
@@ -502,7 +533,7 @@ function drawWolves(){
  if(phase!=='start'){if(world.king)list.push({x:world.king.x,z:world.king.z,state:'walk',kind:'king'});if(world.fox)list.push({x:world.fox.x,z:world.fox.z,state:world.fox.took?'carry':'walk',kind:'fox'});if(world.guest)list.push({x:world.guest.x,z:world.guest.z,state:'walk',kind:world.guest.kind,shiny:true})}
  while(WOLF_POOL.length<Math.min(World.MAX_WOLVES+3,list.length)){const w=document.createElement('div');w.className='enemy';w._img=artImage('wolves/wolf.png','늑대');w.append(w._img);$('enemies').append(w);WOLF_POOL.push(w)}
  for(let i=0;i<WOLF_POOL.length;i++){const el=WOLF_POOL[i],v=list[i];el.classList.toggle('hidden',!v);if(!v)continue;
-  el.style.left=Math.max(2,Math.min(98,50+v.x/span*48))+'%';el.style.bottom=Math.max(2,Math.min(90,45-v.z/span*42))+'%';el.classList.toggle('stunned',v.state==='dead');el.classList.toggle('carry',v.state==='carry');el.classList.toggle('shiny',!!v.shiny);if(el.dataset.kind!==(v.kind||'wolf'))wolfLook(el,v.kind||'wolf')}
+  el.style.left=Math.max(2,Math.min(98,50+v.x/span*48))+'%';el.style.bottom=Math.max(2,Math.min(90,45-v.z/span*42))+'%';el.classList.toggle('stunned',v.state==='dead');el.classList.toggle('carry',v.state==='carry');el.classList.toggle('shiny',!!v.shiny);if(el.dataset.look!==(v.kind||'wolf')+(v.shiny?'*':''))wolfLook(el,v.kind||'wolf',!!v.shiny)}
 }
 
 /* ---------- 화면 갱신 ---------- */
@@ -1234,10 +1265,15 @@ function friendCard(kind){
  const M=NOTES.MON[kind];round.wait=Math.max(round.wait,FRIEND_TICKS);jingle('friend');view([{type:'friend',kind}]);
  say('🤝 '+M.name+' '+josa(M.nick,'과','와')+' 친구가 됐어요! '+M.en);
  const e=document.createElement('div');e.className='friend-card'+(calm()?' still':'');e.setAttribute('role','status');
- const i=document.createElement('b');i.textContent=NOTE_ICON[kind]||'🐺';const t=document.createElement('span');t.textContent=M.name+' '+M.nick;const en=document.createElement('small');en.textContent=M.en;
+ const i=document.createElement('b');i.append(cardPic(kind,false));const t=document.createElement('span');t.textContent=M.name+' '+M.nick;const en=document.createElement('small');en.textContent=M.en;
  e.append(i,t,en);$('effects').append(e);setTimeout(()=>e.remove(),calm()?1500:2600);
 }
 const NOTE_ICON={wolf:'🐺',bramble:'🌿',boar:'🐗',granite:'🪨',frost:'❄️',ember:'🔥',fox:'🦊',king:'👑'};
+/* 0.17 친구 카드 그림(cards.js, art/cards/*.webp): 카드 바탕 틀에 3D 모형 렌더 그림. cards.js가 없거나 그림을 못 불러오면 위 그림 문자 */
+function cardPic(kind,shiny){
+ if(window.CARDS)return window.CARDS.make(document,kind,shiny,NOTE_ICON[kind]||'🐺');
+ const box=document.createElement('span');box.className='card-art emoji'+(shiny?' shiny':'');const t=document.createElement('i');t.textContent=NOTE_ICON[kind]||'🐺';box.append(t);return box;
+}
 /* 세계의 손님과 기록의 손님을 맞춘다(이어하기·불러오기): 기록에 손님이 있으면 세계에도, 없으면 세계에서도 뺀다 */
 function syncGuest(){
  if(!book){if(world.guest)delete world.guest;return}

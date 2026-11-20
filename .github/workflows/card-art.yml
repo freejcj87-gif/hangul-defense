@@ -1,0 +1,42 @@
+name: Card art render
+# 친구 카드 그림 16장(art/cards/*.webp)을 저장소의 3D 모형으로 다시 그린다. 결과는 아티팩트 card-art(webp 16장 · sheet.png · sizes.json).
+# 브라우저 렌더라 로컬 PC 대신 여기서 돌린다. 받은 webp를 눈으로 확인하고 art/cards/에 넣는 것은 사람(개발자)이 한다(docs/v017-card-art.md).
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/card-art]
+    paths:
+      - tools/**
+      - cards.js
+      - scripts/card-shots.cjs
+      - src/monsters.js
+      - art-handoff/v015-v016/glb/wolf-king.glb
+      - art-handoff/v015-v016/glb/thief-fox.glb
+      - .github/workflows/card-art.yml
+concurrency:
+  group: card-art-${{ github.ref_name }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  render:
+    runs-on: ubuntu-24.04
+    container:
+      image: mcr.microsoft.com/playwright:v1.56.1-noble
+      options: --ipc=host
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # 브라우저는 컨테이너에 들어 있다(설치 단계 없음). 렌더 스크립트가 쓰는 npm 모듈만 validate.yml과 같은 판으로 받는다
+      - run: npm install --no-save --package-lock=false playwright@1.56.1 three@0.180.0 esbuild@0.25.10
+      - run: node scripts/card-shots.cjs card-shots
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: card-art
+          path: card-shots/
+          if-no-files-found: warn
+          retention-days: 7

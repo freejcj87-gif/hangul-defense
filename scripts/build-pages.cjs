@@ -41,6 +41,10 @@ const files = ['index.html', 'combat.js', 'world.js', 'questions-gen.js', 'quest
   ...art15.flatMap(name => [ART15_DIR + 'glb/' + name + '.glb', ART15_DIR + 'png/' + name + '.png'])];
 /* 수첩 MVP: 기록 모듈과 쪽지·카드 콘텐츠 */
 files.push('book.js', 'notes.js', 'bookui.js');
+/* 0.17 친구 카드 그림: 8종 × 보통·반짝 = 16장(cards.js가 상대 경로로 부름, docs/v017-card-art.md). 목록은 cards.js의 CARDS.ALL과 같아야 한다(test-book.cjs) */
+const cardKinds = ['wolf', 'bramble', 'boar', 'granite', 'frost', 'ember', 'fox', 'king'];
+const cards = cardKinds.flatMap(kind => ['art/cards/' + kind + '.webp', 'art/cards/' + kind + '-shiny.webp']);
+files.push('cards.js', ...cards);
 // 페이지(index.html)와 3D 스크립트(src/*.js)가 글자 그대로 적은 아트 경로. 참조했는데 묶지 않은 파일이 있으면 빌드를 멈춘다
 // (실제 주소에서는 깨진 그림이나 코드 도형으로만 드러나서 놓치기 쉽다). 경로는 조각내지 말고 한 문자열로 적는다.
 const ART_REF = /art-handoff\/(?:coopnight\/browser|coopnight\/source-3d\/models|v015-v016\/(?:glb|png))\/[a-zA-Z0-9/_-]+\.(?:png|glb)/g;
@@ -70,5 +74,5 @@ function build() {
   console.log('Packaged ' + files.length + ' runtime files for GitHub Pages.');
 }
 // test-dom.cjs가 묶음 목록·참조 검사를 빌드 없이 읽는다(require). `node scripts/build-pages.cjs`로 직접 실행할 때만 빌드한다.
-module.exports = { files, art15, ART15_DIR, references };
+module.exports = { files, art15, ART15_DIR, references, cards };
 if (require.main === module) build();
