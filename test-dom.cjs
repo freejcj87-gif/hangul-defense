@@ -2261,6 +2261,18 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   h.go();const qid=h.n.answers.dataset.qid;const h2=boot({book:true});h2.go();eq([h2.game().state.bank,h2.n.answers.dataset.qid],[Q.BANK_VERSION,qid],'지운 뒤 놀다가 다시 열어도 같은 판·같은 문제(예전 판 1로 바뀌지 않음)');
   saved={[KEY]:mine[0],[BOOK_KEY]:mine[1]};
  }
+ /* M-9b 리뷰 0.16 R1: 기록을 다시 읽은 뒤(진행 파일 바꾸기 · 되돌리기 · 모든 기록 지우기) 그 기록의 영어 설정이 문제은행에 바로 반영된다. 전에는 앞 기록의 비중이 다시 열 때까지 남았다 */
+ {const src=Bk.fresh(Date.now(),77);src.set.en='off';const file=Bk.exportText(src,{...C.fresh(8),seed:77,bank:Q.BANK_VERSION,version:3},{now:Date.now()});
+  const a=bboot(null,{index:1});eq(Q.QUIZ_MIX[8].english,2,'이 기기 기록: 영어 보통');
+  press(a,'openGuard',2100);gatePass(a);a.n.gTabs.children.find(b=>b.dataset.tab==='file').click();a.window.__importText(file);
+  a.n.gBody.children.find(c=>c.textContent==='바꾸기').click();gatePass(a);
+  eq([bookOf(a).set.en,Q.QUIZ_MIX[8].english,Q.QUIZ_MIX[10].english],['off',0,0],'영어 끄기 기록으로 바꾸면 문제은행도 바로 영어 0');
+  a.go();ok(Array.from({length:300},(_,i)=>Q.at(8,'story',i,77)).every(q=>q.cat!=='english'),'바꾼 뒤 판에 영어 문제가 나오지 않음');a.n.pause.click();
+  press(a,'drawerGuard',2100);gatePass(a);a.n.gTabs.children.find(b=>b.dataset.tab==='file').click();a.n.gBody.children.find(c=>c.textContent.startsWith('되돌리기')).click();
+  eq([bookOf(a).set.en,Q.QUIZ_MIX[8].english],['std',2],'되돌리면 다시 보통');
+  const w=bboot(b=>{b.set.en='off'},{index:1});eq(Q.QUIZ_MIX[8].english,0,'영어 끄기 기록으로 시작');
+  press(w,'openGuard',2100);gatePass(w);w.n.gTabs.children.find(b=>b.dataset.tab==='set').click();w.n.gBody.children.find(c=>c.textContent==='모든 기록 지우기').click();gatePass(w);
+  eq([bookOf(w).set.en,Q.QUIZ_MIX[8].english],['std',2],'모든 기록 지우기 뒤 영어 비중도 처음(보통)');Q.setMix()}
  /* M-10 엔딩 카드: 쉬기 권유가 단추 위에, 이번 판 요약, "오늘은 그만하기" */
  {const a=bboot(b=>{Object.assign(b.mon.wolf,{foot:Date.now(),card:Date.now(),note:3,plays:3,kills:50})},{index:60,run:{...C.freshRun(),asked:60,first:50,t0:1,bell:3}});a.go();
   ok(a.game().ending&&!shownOff(a.n.endRest)&&html.includes('id="endRest">🌙 오늘은 여기까지 해도 좋아요</p>')&&!shownOff(a.n.endQuit)&&!shownOff(a.n.endBookBtn),'엔딩 카드: 쉬기 권유 · 오늘은 그만하기 · 수첩 보기');

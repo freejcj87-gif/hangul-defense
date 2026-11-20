@@ -1263,7 +1263,8 @@ function reloadFromStore(){
     다시 열면 예전 판(1)으로 바뀌어 하던 판의 문제가 달라지고 새 마을도 예전 판으로 갔다(리뷰 0.16 R2) */
  if(DEMO&&!state.wins&&!state.index)Object.assign(state,DEMO_VILLAGE[DEMO]);
  if(!(state.seed>0))state.seed=newSeed();if(!(state.bank>=1&&state.bank<=Questions.BANK_VERSION))state.bank=kept?1:Questions.BANK_VERSION;if(!state.run.t0)state.run.t0=Date.now();
- bookOpen();gainReset();world=freshWorld();flowSync();state.broken=World.brokenCount(world);syncKing(true);resetView();round=null;phase='start';sleepyOn=false;
+ bookOpen();applyMix();/* 다시 읽은 기록의 영어 설정을 문제은행에(전에는 지우기·바꾸기 전 기록의 비중이 다시 열 때까지 남았다, 리뷰 0.16 R1). 무리 간격(freshWorld)보다 먼저 */
+ gainReset();world=freshWorld();flowSync();state.broken=World.brokenCount(world);syncKing(true);resetView();round=null;phase='start';sleepyOn=false;
  for(const id of ['ending','sleepy','bookScreen','guardian','gate'])$(id).hidden=true;$('start').hidden=false;$('age').value=String(state.age);drawStart();
 }
 
