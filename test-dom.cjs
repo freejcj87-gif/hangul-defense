@@ -2249,6 +2249,10 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   tab('file');ok(body().includes('파일에는 읽기 단계, 날짜별 놀이 시간, 문제 기록, 수첩과 훈장이 들어 있어요.')&&/기기를 바꾸기 전에/.test(body()),'진행 파일 탭 안내 문장');
   gbtn('파일로 내보내기').click();ok(g.n.gate.hidden===false&&!g.window.__lastExport,'내보내기는 한 번 더 확인');gatePass(g);
   const file=g.window.__lastExport;ok(file&&/^kkomaeul-progress-\d{8}\.json$/.test(file.name)&&JSON.parse(file.text).book.medal.one.n===60&&!('world' in JSON.parse(file.text).run),'진행 파일(세계는 빠짐)');
+  /* 레드팀 r2 B1: 내려받기가 실제로 됐는지 알 수 없으므로 "만들었어요"라고 단정하지 않고 내려받기 목록 확인을 부탁 */
+  ok(g.n.gNote.textContent.includes(file.name)&&/내려받기 목록에서 확인해 주세요/.test(g.n.gNote.textContent)&&!/만들었어요/.test(g.n.gNote.textContent),'내보내기 알림: 내려받기 목록 확인을 부탁(단정하지 않음) '+g.n.gNote.textContent);
+  {const keepURL=URL.createObjectURL;URL.createObjectURL=()=>{throw new Error('막힘')};gbtn('파일로 내보내기').click();gatePass(g);URL.createObjectURL=keepURL;
+   ok(/진행 파일을 만들지 못했어요/.test(g.n.gNote.textContent)&&!/내려받기로 보냈어요/.test(g.n.gNote.textContent),'내려받기를 만들다 예외가 나면 실패 문구')}
   const mine=[saved[KEY],saved[BOOK_KEY]];
   const h=bboot(b=>{b.medal.one.n=3;b.play=2},{index:1,gold:55});press(h,'openGuard',2100);gatePass(h);h.n.gTabs.children.find(b=>b.dataset.tab==='file').click();
   eq([h.window.__importText('{').ok,/진행 파일이 아니에요/.test(h.n.gNote.textContent)],[false,true],'엉뚱한 파일은 거절');

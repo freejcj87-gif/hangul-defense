@@ -132,12 +132,19 @@
   }
   /* 진행 파일: 내보내기는 보호자가 직접 누를 때만. 어디로 보낼지는 보호자가 고른다(앱이 스스로 올리거나 보내지 않는다) */
   function appVersion(){try{const m=/\d+\.\d+(\.\d+)?/.exec($('appVersion').textContent);return m?m[0]:''}catch{return ''}}
+  /* 알림 문구(레드팀 r2 B1): 웹은 내려받기가 실제로 시작됐는지 알 수 없다(브라우저가 막거나 묻는 창을 띄우거나, WebView가 무시할 수 있음).
+     그래서 "만들었어요"라고 단정하지 않고 내려받기 목록 확인을 부탁하며, 예외가 나면 실패 문구를 쓴다. 전에는 실패해도 "진행 파일을 만들었어요"였다.
+     알림은 누른 바로 뒤에 동기로 쓴다: Android 앱 껍데기(app-shell.js)가 a download 누름을 잡아 그 뒤(마이크로태스크)에 자기 문구로 바꾼다 */
+  const EXPORT_SENT=name=>'진행 파일('+name+')을 내려받기로 보냈어요. 저장됐는지 브라우저의 내려받기 목록에서 확인해 주세요.';
+  const EXPORT_FAIL='진행 파일을 만들지 못했어요. 이 브라우저에서는 내려받기가 안 될 수 있어요. 다른 브라우저에서 다시 해 주세요.';
   function exportNow(){
-    const now=Date.now();save(true);
-    const text=Book.exportText(book,{...state,version:Combat.SAVE_VERSION},{now,app:appVersion()}),name=Book.fileName(now);
-    window.__lastExport={name,text};/* 검사·앱 포장용: 방금 만든 진행 파일 */
-    try{const url=URL.createObjectURL(new Blob([text],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),4000)}catch{}
-    put($('gNote'),'진행 파일을 만들었어요: '+name);
+    const now=Date.now();save(true);let sent=false,name='';
+    try{
+      const text=Book.exportText(book,{...state,version:Combat.SAVE_VERSION},{now,app:appVersion()});name=Book.fileName(now);
+      window.__lastExport={name,text};/* 검사·앱 포장용: 방금 만든 진행 파일(앱 껍데기가 a download 누름 때 읽는다) */
+      const url=URL.createObjectURL(new Blob([text],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),4000);sent=true;
+    }catch{}
+    put($('gNote'),sent?EXPORT_SENT(name):EXPORT_FAIL);
   }
   function importText(text){
     const r=Book.importFile(text,{now:Date.now(),knows:bookKnows,cleanRun:run=>Combat.restore(run,AGES)});
