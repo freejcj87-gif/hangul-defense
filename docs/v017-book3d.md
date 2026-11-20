@@ -58,7 +58,16 @@
 
 ## 6. 실행 기록
 
-(커밋 뒤 채움)
+**로컬(2026-11-20, PC 여유 메모리 0.3GB라 노드 검사만 한 번에 하나씩, 브라우저는 돌리지 않음)**
+
+| 명령 | 결과 |
+|---|---|
+| `node scripts/build-pages.cjs` | 43개 파일 묶음(esbuild가 `src/book3d.js`를 `village.js`에 묶음, 문법 확인) |
+| `node test-book.cjs` | PASS 3,191건(0.16 3,178 + B-20 13) |
+| `SOFT=1 node test-dom.cjs` | PASS 19,767건(0.16 19,716 + M-13 51) |
+| `node --check test.cjs` | 문법만 |
+
+**CI(GitHub Actions, PR #31)**: 아래에 이어 적음.
 
 ## 7. 남은 것
 
