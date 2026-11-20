@@ -1,0 +1,133 @@
+/* 친구 카드 그림 렌더(개발용, 배포 묶음에 넣지 않음). scripts/card-shots.cjs가 esbuild로 묶어 headless Chromium(SwiftShader)에서 돌린다.
+   - 몬스터 6종(늑대·덤불 늑대·멧돼지·바위 늑대·서리 늑대·불씨 왕)은 게임과 같은 절차 모형(src/monsters.js, 리그 셰이더 그대로),
+     늑대 왕·도둑 여우는 0.15 GLB(art-handoff/v015-v016/glb)를 그대로 그린다. 새 모형·외부 그림 없음.
+   - 반짝 모습은 꼭짓점 색만 바꾼다(명세 02-MVP §5.1 색 초안: 달빛·단풍·흙빛 금·이끼·눈꽃·푸른 불씨·은여우·금빛 왕).
+   - 배경은 투명. 게임이 CSS로 따뜻한 카드 바탕을 깔고, 발자국 단계 그림자(CSS brightness(0))도 그림 모양대로 나온다.
+   - 두 번 그린다: 1차로 알파 경계를 재고, 2차에 setViewOffset으로 카드(3:4) 안에 같은 여백으로 맞춘다. 2배로 그려 줄여 계단을 없앤다. */
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { monsterGeometry, rigMaterial, rigDepthMaterial, RIG_TIME } from '../src/monsters.js';
+
+const W=300,H=400,SS=2,CW=W*SS,CH=H*SS;
+const GLB={king:'art-handoff/v015-v016/glb/wolf-king.glb',fox:'art-handoff/v015-v016/glb/thief-fox.glb'};
+const KINDS=['wolf','bramble','boar','granite','frost','ember','fox','king'];
+
+/* 반짝 색: 원래 색(sRGB hex) → 반짝 색. 표에 없는 색(눈동자·코·이빨·혀 같은 중립색)은 그대로 둔다 */
+const SHINY={
+ wolf:{0x66717f:0xa3b8da,0x4a5360:0x7489b3,0xf1e4c8:0xf3f6ff,0xffb43a:0xffe98a,0xe8988f:0xc4b5ee},                                    // 달빛(은청)
+ bramble:{0x55893a:0xc94a2c,0x74aa44:0xe8752f,0x96c955:0xf5b440,0x4f7d33:0xb04a2a,0x4d525b:0x5f514c,0x3a3d44:0x4a3a3a},                // 단풍(주홍)
+ boar:{0x7b5034:0xc39531,0x86593a:0xd6ab45,0xa6774e:0xe9cd7e,0x3a2416:0x7b5320,0x6b4228:0xa87a2e,0x6b4429:0xa47830,0xc08a66:0xe0ba74,
+  0xdcb08a:0xf4dda8,0x2e2018:0x4d3518,0xfffaf0:0xfffbe2},                                                                              // 흙빛 금
+ granite:{0xb3b6bb:0x86b45a,0x9a9ea5:0x649a48,0xc6c8cc:0xa9cf70,0x474c55:0x4c5a48,0x34383f:0x37463a,0xe6dcc6:0xe9e7c6},                // 이끼(초록)
+ frost:{0xa8c7ee:0xf4bdd6,0x8fb3e0:0xe79cc0,0xf6f8fd:0xfff5fa,0x4a9cff:0xe2569c,0x8fd8ff:0xffbfe6,0xc4ecff:0xffeefa},                   // 눈꽃(흰분홍)
+ ember:{0xff4a26:0x2f6bff,0xff7a2e:0x3db2ff,0xffb43c:0xaaf0ff,0xffa62b:0x70e2ff,0xff7a3a:0x52a8ff,0x3c3248:0x22304e,0x2a2232:0x17203a,0xead8c0:0xdce5f3}, // 푸른 불씨
+ fox:{0xbd663b:0x8f97a8,0xcf7549:0xa8afbd,0xdc8951:0xc3c9d4,0xf3d7a8:0xeef1f6,0xf7e3bf:0xf6f8fb,0xfff3d6:0xfbfcff,0xf3bf78:0xdde2ea,
+  0x472e2a:0x2d3039,0xb55f56:0xc4a3bd},                                                                                                // 은여우(가방은 그대로)
+ king:{0x63636a:0xcaa23c,0x757784:0xdeb95c,0x565863:0xa88228,0x32323d:0x4a3a1f,0xb6ada1:0xf2e4bd,0xcec2ad:0xfff1cf,0xfff3d6:0xfffaf0,
+  0xefb051:0xfff0ab,0xeab758:0xfff5c4,0xe1a64d:0xffe38c,0xbd8145:0xe9c35c,0xc58342:0xf0cb66,0x9b7676:0xc99272}                          // 금빛 왕
+};
+function recolor(attr,map){
+ const c=new THREE.Color(),miss=new Set();
+ for(let i=0;i<attr.count;i++){
+  c.setRGB(attr.getX(i),attr.getY(i),attr.getZ(i),THREE.LinearSRGBColorSpace);const hex=c.getHex(THREE.SRGBColorSpace),to=map[hex];
+  if(to===undefined){miss.add(hex.toString(16).padStart(6,'0'));continue}
+  c.setHex(to,THREE.SRGBColorSpace);attr.setXYZ(i,c.r,c.g,c.b);
+ }
+ attr.needsUpdate=true;return miss;
+}
+
+/* 자세: 몸을 보는 사람 오른쪽으로 돌리고(정면 3/4) 머리는 카메라 쪽으로, 입은 살짝 벌리고 꼬리는 조금 든다(게임의 대기 자세 tp .35보다 조금 위) */
+const POSE={hy:-.34,hp:-.05,jaw:.1,ty:.25,tp:.5,hr:.1};
+const YAW=.62,ELEV=.26,FOV=26;
+const TUNE={boar:{hy:-.3},granite:{tp:.42},ember:{jaw:.14},king:{hy:-.3},fox:{hy:-.34}};   // 종마다 조금씩
+
+function codeMonster(kind,shiny,miss){
+ const g=monsterGeometry(kind),n=g.attributes.position.count,P={...POSE,...TUNE[kind]};
+ const fill=(name,v)=>{const a=new Float32Array(n*4);for(let i=0;i<n;i++)a.set(v,i*4);g.setAttribute(name,new THREE.BufferAttribute(a,4))};
+ fill('aPoseA',[P.hy,P.hp,P.jaw,P.ty]);fill('aPoseB',[P.tp,0,0,0]);fill('aPoseC',[0,P.hr,1.3,0]);fill('aPoseD',[0,0,0,0]);
+ if(shiny)for(const h of recolor(g.attributes.color,SHINY[kind]))miss.add(h);
+ const mesh=new THREE.Mesh(g,rigMaterial(kind));mesh.customDepthMaterial=rigDepthMaterial(kind);mesh.castShadow=true;mesh.frustumCulled=false;
+ return mesh;
+}
+const loader=new GLTFLoader();
+async function glbMonster(kind,shiny,miss){
+ const gl=await loader.loadAsync(GLB[kind]),root=gl.scene,P={...POSE,...TUNE[kind]};
+ root.traverse(o=>{if(!o.isMesh)return;o.castShadow=true;o.frustumCulled=false;if(shiny){o.geometry=o.geometry.clone();for(const h of recolor(o.geometry.attributes.color,SHINY[kind]))miss.add(h)}});
+ const head=root.getObjectByName('Head'),tail=root.getObjectByName('Tail');
+ if(head){head.rotation.y+=P.hy;head.rotation.x+=P.hp;head.rotation.z-=P.hr}
+ if(tail)tail.rotation.y+=P.ty;
+ return root;
+}
+
+/* 렌더러·조명: 게임(ACES, 따뜻한 반구광 + 햇빛)과 같은 느낌에 앞쪽 보조광과 뒤쪽 테두리 빛을 더함 */
+const canvas=document.createElement('canvas');canvas.width=CW;canvas.height=CH;
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true,preserveDrawingBuffer:true,premultipliedAlpha:true});
+renderer.setPixelRatio(1);renderer.setSize(CW,CH,false);renderer.setClearColor(0x000000,0);
+renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.0;
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+RIG_TIME.value=.7;   // 불꽃 흔들림을 한 순간에 고정
+
+function blob(){
+ const c=document.createElement('canvas');c.width=c.height=128;const x=c.getContext('2d'),g=x.createRadialGradient(64,64,0,64,64,64);
+ g.addColorStop(0,'rgba(60,40,20,.34)');g.addColorStop(.55,'rgba(60,40,20,.16)');g.addColorStop(1,'rgba(60,40,20,0)');x.fillStyle=g;x.fillRect(0,0,128,128);
+ const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;return t;
+}
+const BLOB=blob();
+
+function stage(obj){
+ const scene=new THREE.Scene(),group=new THREE.Group();group.add(obj);group.rotation.y=YAW;scene.add(group);
+ scene.add(new THREE.HemisphereLight(0xfff4dc,0xa08a62,2.0));
+ const key=new THREE.DirectionalLight(0xffe6c2,2.6);key.position.set(-2.5,4.2,4.5);key.castShadow=true;key.shadow.mapSize.set(2048,2048);
+ Object.assign(key.shadow.camera,{left:-3,right:3,top:3,bottom:-3,near:.5,far:20});key.shadow.bias=-.0004;key.shadow.normalBias=.02;scene.add(key);
+ const fill=new THREE.DirectionalLight(0xd8e6ff,.7);fill.position.set(4,1.5,2.5);scene.add(fill);
+ const rim=new THREE.DirectionalLight(0xfff0d0,1.6);rim.position.set(1,3,-4.5);scene.add(rim);
+ group.updateMatrixWorld(true);const box=new THREE.Box3().setFromObject(group),size=box.getSize(new THREE.Vector3()),mid=box.getCenter(new THREE.Vector3());
+ const ground=new THREE.Mesh(new THREE.PlaneGeometry(12,12),new THREE.ShadowMaterial({opacity:.2}));ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
+ const b=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({map:BLOB,transparent:true,depthWrite:false,toneMapped:false}));
+ b.rotation.x=-Math.PI/2;b.position.set(mid.x,.003,mid.z);b.scale.set(size.x*1.25,size.z*1.1,1);scene.add(b);
+ return {scene,box,size,mid};
+}
+function camera(st){
+ const cam=new THREE.PerspectiveCamera(FOV,W/H,.05,60),r=st.size.length()/2,half=Math.min(FOV/2,THREE.MathUtils.radToDeg(Math.atan(Math.tan(THREE.MathUtils.degToRad(FOV/2))*W/H)));
+ const d=r*1.2/Math.sin(THREE.MathUtils.degToRad(half));cam.position.set(st.mid.x,st.mid.y+Math.sin(ELEV)*d,st.mid.z+Math.cos(ELEV)*d);cam.lookAt(st.mid);cam.updateProjectionMatrix();return cam;
+}
+/* 알파 경계(불투명 픽셀만, 바닥 그림자 제외) */
+const probe=document.createElement('canvas');probe.width=CW;probe.height=CH;const px=probe.getContext('2d',{willReadFrequently:true});
+function alphaBox(){
+ px.clearRect(0,0,CW,CH);px.drawImage(canvas,0,0);const d=px.getImageData(0,0,CW,CH).data;let x0=CW,y0=CH,x1=-1,y1=-1;
+ for(let y=0;y<CH;y++)for(let x=0;x<CW;x++)if(d[(y*CW+x)*4+3]>150){if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y}
+ return x1<0?null:{x0,y0,x1,y1};
+}
+/* 반짝 카드: 둘레에 작은 별 반짝임(2D로 덧그림) */
+function sparkle(x,cx,cy,r){
+ x.save();x.translate(cx,cy);x.beginPath();for(let i=0;i<8;i++){const a=i*Math.PI/4,q=i%2?r*.28:r;x.lineTo(Math.sin(a)*q,-Math.cos(a)*q)}x.closePath();
+ const g=x.createRadialGradient(0,0,0,0,0,r);g.addColorStop(0,'#ffffff');g.addColorStop(.45,'#fff3a8');g.addColorStop(1,'#f2b931');x.fillStyle=g;x.shadowColor='rgba(255,214,90,.9)';x.shadowBlur=r*.8;x.fill();x.restore();
+}
+const SPARKS=[[.13,.15,17],[.87,.22,13],[.9,.6,9],[.1,.5,10],[.72,.08,8],[.24,.86,7]];
+const out=document.createElement('canvas');out.width=W;out.height=H;const ox=out.getContext('2d');
+
+window.__cards={};
+window.renderCard=async function(kind,shiny){
+ if(!KINDS.includes(kind))throw new Error('unknown kind '+kind);
+ const miss=new Set(),obj=GLB[kind]?await glbMonster(kind,shiny,miss):codeMonster(kind,shiny,miss),st=stage(obj),cam=camera(st);
+ renderer.render(st.scene,cam);const a=alphaBox();if(!a)throw new Error(kind+': nothing drawn');
+ // 2차: 몬스터(불투명 경계)가 가로 86%·세로 76% 안에, 발끝이 아래 89% 자리에 오게 잘라 확대
+ const bw=a.x1-a.x0+1,bh=a.y1-a.y0+1,s=Math.min(.86*CW/bw,.76*CH/bh),fw=CW*s,fh=CH*s;
+ const ox0=(a.x0+a.x1+1)/2*s-CW/2,oy0=(a.y1+1)*s-.89*CH;
+ cam.setViewOffset(fw,fh,ox0,oy0,CW,CH);renderer.render(st.scene,cam);const b=alphaBox();
+ ox.clearRect(0,0,W,H);ox.imageSmoothingEnabled=true;ox.imageSmoothingQuality='high';ox.drawImage(canvas,0,0,W,H);
+ if(shiny)for(const [x,y,r] of SPARKS)sparkle(ox,x*W,y*H,r);
+ let data=out.toDataURL('image/webp',.9);if(!data.startsWith('data:image/webp'))data=out.toDataURL('image/png');
+ const name=kind+(shiny?'-shiny':'');window.__cards[name]=data;
+ st.scene.traverse(o=>{if(o.isMesh){o.geometry.dispose()}});
+ return {data,info:{name,zoom:+s.toFixed(3),box:b&&[b.x0,b.y0,b.x1,b.y1].map(v=>Math.round(v/SS)),unmapped:[...miss]}};
+};
+/* 확인용 한 장: 종마다 [보통 · 발자국 그림자 · 반짝], 게임과 같은 카드 바탕 */
+window.showSheet=function(names){
+ const sheet=document.getElementById('sheet');sheet.innerHTML='';
+ for(const kind of KINDS){for(const [label,name,cls] of [['보통',kind,''],['발자국',kind,'sil'],['반짝',kind+'-shiny','shiny']]){
+  const cell=document.createElement('div');cell.className='cell';const f=document.createElement('div');f.className='frame '+cls;const img=document.createElement('img');img.src=window.__cards[name]||'';f.append(img);
+  const t=document.createElement('span');t.textContent=kind+' · '+label;cell.append(f,t);sheet.append(cell)}}
+ return Promise.all([...sheet.querySelectorAll('img')].map(i=>i.decode().catch(()=>{})));
+};
+try{const gl=renderer.getContext();window.cardReady=!!gl}catch(e){window.cardError=String(e&&e.message||e)}
