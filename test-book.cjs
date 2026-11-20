@@ -771,5 +771,36 @@ const C_FROM=n;
  {const src=fs.readFileSync(path.join(__dirname,'cards.js'),'utf8'),win={};vm.runInNewContext(src,win);ok(win.CARDS&&win.CARDS.ALL.length===16,'브라우저에서는 window.CARDS');
   for(const w of ['fetch(','XMLHttpRequest','http://','https://','localStorage','Date.now','Math.random'])ok(!src.includes(w),'cards.js는 '+w+'를 쓰지 않음')}
 }
+/* C-2 0.17 반짝 색 표 하나(cards.js SHINY): 카드 렌더 · 3D 반짝 손님 · 그림 화면 반짝 손님(반짝 카드 그림)이 같이 쓴다 */
+{const CA=require('./cards.js'),hex=v=>v.toString(16).padStart(6,'0');
+ eq(Object.keys(CA.SHINY),N.KINDS,'반짝 색 표 8종(수첩 순서)');
+ eq(N.KINDS.map(k=>CA.SHINY_NAME[k]),['달빛','단풍','흙빛 금','이끼','눈꽃','푸른 불씨','은여우','금빛 왕'],'반짝 이름 = 명세 §5.1 색 초안');
+ for(const k of N.KINDS){const m=CA.SHINY[k],keys=Object.keys(m).map(Number);
+  ok(keys.length>=5&&keys.every(x=>Number.isInteger(x)&&x>=0&&x<=0xffffff&&Number.isInteger(m[x])&&m[x]>=0&&m[x]<=0xffffff&&m[x]!==x),k+': 반짝 색 표(sRGB hex → 다른 hex) '+keys.length+'색');
+  eq([CA.shinyHex(k,keys[0]),CA.shinyHex(k,0x010203)],[m[keys[0]],0x010203],k+': shinyHex(표에 없는 색은 그대로)')}
+ /* 표의 원래 색이 실제 모형에 있는 색인지: 절차 모형 6종은 src/monsters.js의 색 글자, 늑대 왕·도둑 여우는 GLB 꼭짓점 색(COLOR_0) */
+ const mon=fs.readFileSync(path.join(__dirname,'src','monsters.js'),'utf8').toLowerCase();
+ for(const k of ['wolf','bramble','boar','granite','frost','ember'])eq(Object.keys(CA.SHINY[k]).map(Number).filter(x=>!mon.includes('0x'+hex(x))).map(hex),[],k+': 표의 원래 색이 모두 src/monsters.js에 있음');
+ const glbColors=file=>{const b=fs.readFileSync(path.join(__dirname,'art-handoff','v015-v016','glb',file)),len=b.readUInt32LE(12),j=JSON.parse(b.toString('utf8',20,20+len)),bin=20+len+8,out=new Set();
+  const s8=x=>Math.round(Math.min(1,Math.max(0,x<.0031308?x*12.92:1.055*Math.pow(x,1/2.4)-.055))*255);
+  for(const m of j.meshes)for(const pr of m.primitives){const a=j.accessors[pr.attributes.COLOR_0],v=j.bufferViews[a.bufferView],ct=a.componentType,sz=ct===5126?4:ct===5123?2:1,st=v.byteStride||(a.type==='VEC4'?4:3)*sz;
+   for(let i=0;i<a.count;i++){const o=bin+(v.byteOffset||0)+(a.byteOffset||0)+i*st,c=[0,1,2].map(q=>ct===5126?b.readFloatLE(o+q*4):ct===5123?b.readUInt16LE(o+q*2)/65535:b.readUInt8(o+q)/255);out.add((s8(c[0])<<16)|(s8(c[1])<<8)|s8(c[2]))}}
+  return out};
+ for(const [k,f] of [['king','wolf-king.glb'],['fox','thief-fox.glb']]){const have=glbColors(f);eq(Object.keys(CA.SHINY[k]).map(Number).filter(x=>!have.has(x)).map(hex),[],k+': 표의 원래 색이 모두 '+f+' 꼭짓점 색에 있음')}
+ /* 쓰는 곳: 렌더 · 3D는 cards.js를 불러 쓰고 자기 표를 따로 두지 않음, 그림 화면은 반짝 카드 그림 */
+ const render=fs.readFileSync(path.join(__dirname,'tools','card-render.js'),'utf8'),village=fs.readFileSync(path.join(__dirname,'src','village.js'),'utf8'),page=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');
+ const targets=N.KINDS.flatMap(k=>Object.entries(CA.SHINY[k]).map(([a,v])=>'0x'+hex(Number(a))+':0x'+hex(v)));   // 표의 '원래 색:반짝 색' 쌍이 다른 파일에 또 적혀 있으면 표가 둘
+ ok(/import CARDS from '\.\.\/cards\.js'/.test(render)&&/const SHINY=CARDS\.SHINY;/.test(render)&&!targets.some(t=>render.toLowerCase().includes(t)),'카드 렌더(tools/card-render.js)는 cards.js 표를 씀(따로 둔 표 없음)');
+ ok(/import CARDS from '\.\.\/cards\.js'/.test(village)&&/CARDS\.SHINY\[k\]/.test(village)&&!targets.some(t=>village.toLowerCase().includes(t)),'3D 마을(src/village.js) 반짝 손님은 cards.js 표를 씀(따로 둔 표 없음)');
+ ok(/shinyGuest:/.test(village)&&/SHINY_TINT/.test(village),'3D: 반짝 손님 상태(inspect().shinyGuest), 메시를 못 만들면 예전 금빛 색조');
+ ok(/window\.CARDS\.src\(kind,true\)/.test(page)&&/el\.dataset\.badCard=kind/.test(page),'그림 화면 반짝 손님 = 반짝 카드 그림, 못 불러오면 예전 그림 + 반짝 필터');
+ const card=fs.readFileSync(path.join(__dirname,'.github','workflows','card-art.yml'),'utf8');ok(/- cards\.js/.test(card),'card-art.yml: 반짝 색 표(cards.js)가 바뀌면 카드를 다시 렌더');
+}
+/* C-3 0.17 "더 놀기" 친구 아이콘(명세 §1.5): #garden 줄에 Book.friends(리본 먼저 · 최대 4) 카드 그림, 못 불러오면 그림 문자 */
+{const page=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');
+ ok(/function gardenFriends\(\)\{\s*const list=book&&state\.run\.bell===4\?Book\.friends\(book\):\[\]/.test(page),'친구 아이콘은 종 4(더 놀기)이고 기록이 있을 때만, Book.friends 순서');
+ ok(/w\.append\(cardPic\(f\.kind,false\)\)/.test(page)&&/gardenFriends\(\);\n\}/.test(page),'친구 아이콘 = 카드 그림(cardPic, 그림 문자 대체), 마을 줄을 그릴 때마다 붙임');
+ eq(B.BOOK.CAPS.friends,4,'놀러 오는 친구 최대 4');
+}
 if(fails.length)process.exitCode=1;
 console.log((fails.length?'FAIL '+fails.length+' / ':'PASS ')+n+' book assertions (콘텐츠 '+A_COUNT+' · 기록 '+(C_FROM-A_COUNT)+' · 카드 그림 '+(n-C_FROM)+').');

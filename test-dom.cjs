@@ -2212,6 +2212,14 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
    eq([img('wolf').tagName,img('wolf').src,img('bramble').src,pic('wolf').children[1].children[0].src,main('king').textContent],['img','art/cards/wolf.webp','art/cards/bramble.webp','art/cards/wolf-shiny.webp','❔'],'cards.js가 있으면 카드 그림(보통 · 반짝 칸), 만나기 전 쪽은 그대로 빈 틀');
    img('bramble').onerror();eq([main('bramble').children.length,main('bramble').children[0].tagName,main('bramble').textContent,main('bramble').classList.contains('emoji')],[1,'i','🌿',true],'카드 그림을 못 불러오면 그 자리에 그림 문자');
    a.n.bookClose.click();delete a.window.CARDS;a.n.openBook.click()}
+  /* 0.17 "더 놀기"(종 4): #garden 줄에 놀러 온 친구 카드 아이콘(리본 먼저 · 최대 4), 종이 울리기 전에는 없음 */
+  {const mk=bell=>bboot(b=>{const t=Date.now();['wolf','bramble','boar','granite','frost'].forEach((k,i)=>Object.assign(b.mon[k],{foot:t-9e6,card:t-i*1000,note:3,plays:3,kills:50}));b.mon.frost.rib={n:3,last:5};b.play=6},{index:5,run:{...C.freshRun(),bell}});
+   const fr=x=>{x.api.render();return x.n.garden.children.find(c=>c.className==='garden-friends')||null};
+   const f4=mk(4),row=fr(f4);
+   eq(row&&[row.children.filter(c=>c.tagName==='b').map(c=>c.dataset.kind+(c.className.includes('ribbon')?'+':'')),row.children.filter(c=>c.tagName==='b').map(c=>c.children[0].textContent),row.children[row.children.length-1].textContent],
+    [['frost+','wolf','bramble','boar'],['❄️','🐺','🌿','🐗'],'🎉 놀러 온 친구: 유리 · 누리 · 보리 · 두부'],'더 놀기: 친구 카드 아이콘 4개(리본 친구 먼저, cards.js 없으면 그림 문자)');
+   ok(fr(f4)===row,'친구가 그대로면 같은 줄을 다시 붙임(그림을 매번 다시 부르지 않음)');
+   eq(fr(mk(0)),null,'종이 울리기 전에는 친구 아이콘 없음')}
   ok(!/한 판만 더|조금만 더|거의 다|서둘러|오늘 안에/.test(a.n.bookPages.textContent+a.n.bookMedals.textContent),'수첩에 재촉 문구 없음');
   const md=a.n.bookMedals.children.find(c=>c.dataset.key==='one');eq(md.dataset.tier,'1','훈장 단계(동)');md.click();ok(/한 번에 읽기: .*동 50 · 은 300 · 금 1000 · 지금 60 · 다음 단계까지 240/.test(a.n.bookTip.textContent),'훈장을 누르면 조건과 남은 수');
   a.n.bookClose.click();ok(a.n.bookScreen.hidden,'닫기');
