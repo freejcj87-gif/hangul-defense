@@ -237,7 +237,7 @@ const played=(()=>{const b=mk(5);let t=T;
  ok(b.rng>0,'난수 상태 0은 기본값으로');
  eq(b.seen,['a8-story-01'],'seen 중복·모양 다듬기');
  eq([b.drop,b.pend],[null,null],'틀린 drop·pend는 비움');
- eq([b.mon.wolf.card,b.mon.wolf.note,b.mon.wolf.kills,b.mon.wolf.rib.n,b.mon.wolf.shiny],[0,0,1e7,0,0],'친구는 발자국이 있어야 인정, 누적 수 10^7 이하, 시각은 지금+1일 이하');
+ eq([b.mon.wolf.card,b.mon.wolf.note,b.mon.wolf.kills,b.mon.wolf.rib.n,b.mon.wolf.shiny],[0,0,1e7,0,NP],'친구는 발자국이 있어야 인정, 누적 수 10^7 이하, 지금+1일보다 뒤인 시각은 지금으로 자름(받은 칸을 지우지 않음)');
  eq(b.mon.bramble,played.mon.bramble,'멀쩡한 몬스터 칸은 그대로');
  eq([b.medal.one.n,b.medal.one.at,b.medal.king.at[0]>0,b.medal.king.at[2]],[0,[0,0,0],true,0],'훈장: 수에 맞지 않는 받은 시각은 지우고, 문턱을 넘었는데 시각이 없으면 채움');
  eq(b.set,{en:'std',day:30,sfx:0},'설정: 범위 밖 하루 시간은 기본값 30');
@@ -253,10 +253,24 @@ const played=(()=>{const b=mk(5);let t=T;
  ok(c.rv.every(e=>e.dp>1)||c.rv.filter(e=>e.dp===1).length<big.rv.filter(e=>e.dp===1).length,'복습 대기열이 넘치면 오래된 것부터 버림');
 }
 
+/* B-3b 리뷰 0.16 R4: 기기 시계가 하루 넘게 뒤로 가도(배터리 방전·날짜 수정) 받은 칸은 남는다. 전에는 지금+1일보다 뒤인 시각을 0으로 지워 발자국·친구 카드·반짝 칸이 사라졌다 */
+{const b=played,cells=B.cells(b),back=b.at-3*DAY,r=B.restore(clone(b),{now:back,knows});
+ ok(cells>0&&B.KINDS.some(k=>b.mon[k].card>0),'고정본에 발자국·친구 카드가 있음');
+ eq(B.cells(r),cells,'시계를 3일 되돌려 열어도 수첩 칸 수 그대로('+cells+')');
+ eq(B.KINDS.map(k=>[r.mon[k].foot>0,r.mon[k].card>0,r.mon[k].shiny>0,r.mon[k].note]),B.KINDS.map(k=>[b.mon[k].foot>0,b.mon[k].card>0,b.mon[k].shiny>0,b.mon[k].note]),'몬스터마다 발자국·친구 카드·반짝·쪽지 단계 그대로');
+ ok(B.KINDS.every(k=>r.mon[k].foot<=back+DAY&&r.mon[k].card<=back+DAY&&r.mon[k].shiny<=back+DAY)&&r.at<=back&&r.made<=back,'미래 시각은 지금+1일 이하');
+ {const one=mk(1);kills(one,'boar',1,T+5*DAY);one.mon.boar.shiny=T+5*DAY;const z=B.restore(clone(one),{now:T});eq([z.mon.boar.foot,z.mon.boar.shiny,z.mon.boar.kills],[T,T,1],'지금+1일보다 뒤인 발자국·반짝 시각은 지금으로 자름')}
+ eq(B.medals(r).map(m=>m.tier),B.medals(b).map(m=>m.tier),'훈장 단계 그대로');
+ const f=B.importFile(B.exportText(b,null,{now:b.at}),{now:back,knows});eq([f.ok,f.preview.cards,B.cells(f.book)],[true,B.KINDS.filter(k=>b.mon[k].card>0).length,cells],'시계가 앞선 기기에서 만든 진행 파일도 칸을 잃지 않음');
+ eq(B.restore({fmt:'kkm-book',v:1,mon:{wolf:{foot:T-400*DAY,card:'x',kills:1}}},{now:T}).mon.wolf.foot,0,'2026-01-01 전 시각은 여전히 없음(0)');
+ eq(B.restore(clone(b),{now:b.at,knows}),b,'시계가 맞으면 한 글자도 바뀌지 않음')}
+
 /* B-4 열기·쓰기: 없음 → 새 기록 / meta 이행(한 번) / 깨짐 / 앱보다 새 버전은 덮어쓰지 않음 / 체험·?book=0은 읽지도 쓰지도 않음 */
 eq(B.keys({}),{book:'hangul-defense-book',bak:'hangul-defense-book-bak',run:null},'열쇠 이름');
 eq(B.keys({test:true,runKey:'hangul-defense-v1-test'}),{book:'hangul-defense-book-test',bak:'hangul-defense-book-test-bak',run:'hangul-defense-v1-test'},'시험 모드 열쇠 -test');
 eq([B.keys({demo:2}).book,B.keys({off:true}).book],[null,null],'체험·?book=0은 기록 열쇠 없음');
+eq([B.keys({tag:'stages0',runKey:'hangul-defense-v1-stages0'}),B.keys({tag:'stages0',test:true}).book,B.keys({tag:'../x'}).book,B.keys({tag:''}).book],
+ [{book:'hangul-defense-book-stages0',bak:'hangul-defense-book-stages0-bak',run:'hangul-defense-v1-stages0'},'hangul-defense-book-stages0-test','hangul-defense-book','hangul-defense-book'],'판 저장을 따로 쓰는 주소(?stages=0)는 기록 열쇠도 따로(리뷰 0.16 R7), 이상한 꼬리는 무시');
 const KS=B.keys({runKey:'hangul-defense-v1'});
 {const st=new Store(),h=B.open(st,KS,{now:T,seed:42});
  eq([h.status,h.locked,h.book.order.seed,h.book.from],['new',false,42,0],'기록이 없으면 새 기록(씨앗 = 지금 판 씨앗)');
@@ -637,8 +651,11 @@ withBook({NOTE:{cap:2}},()=>{/* 상한을 2로 두었을 때: 놀이당 쪽지 2
  ok(st.m.has(KS.book)&&JSON.parse(st.getItem(KS.book)).medal.king.n===1,'기록 열쇠가 저장소에 그대로 있음');
  withBook({ON:false},()=>{const x=clone(after);B.resetVillage(after,T,{age:8,used:{story:9}});eq(after,x,'?book=0이면 아무것도 바꾸지 않음')});
  /* 모든 기록 지우기(보호자 화면에서만) */
- B.swapIn(st,KS,after,st.getItem(KS.run),{now:T});
+ B.swapIn(st,KS,after,st.getItem(KS.run),{now:T});st.setItem(KS.run+'-bak','{"version":1,"gold":80,"seenOk":["a8-story-01"]}');st.setItem('other-app','x');
  ok(B.wipeAll(st,KS),'모든 기록 지우기');eq([st.m.has(KS.book),st.m.has(KS.run),st.m.has(KS.bak),B.open(st,KS,{now:T}).status],[false,false,false,'new'],'두 열쇠와 되돌리기 사본까지 비움');
+ eq([st.m.has(KS.run+'-bak'),st.m.has('other-app')],[false,true],'판 저장의 이행 전 원본(run-bak)도 지움, 다른 열쇠는 그대로(리뷰 0.16 R3: 방침 "게임 기록을 모두 지웁니다")');
+ {const s2=new Store(),tk=B.keys({test:true,runKey:'hangul-defense-v1-test'});for(const k of ['hangul-defense-v1','hangul-defense-v1-bak','hangul-defense-book','hangul-defense-v1-test','hangul-defense-v1-test-bak','hangul-defense-book-test'])s2.setItem(k,'x');
+  B.wipeAll(s2,tk);eq([...s2.m.keys()].sort(),['hangul-defense-book','hangul-defense-v1','hangul-defense-v1-bak'],'시험 모드에서 지우면 시험 열쇠만(아이 기록은 그대로)')}
 }
 
 /* B-13 수첩을 끄면(?book=0) 규칙이 아무것도 바꾸지 않음 + 방치·틀리기만으로는 진행 0 */
@@ -713,7 +730,10 @@ withBook({ON:false},()=>{const b=mk(),x=clone(b);
   eq([o2.off,o2.bank,o2.seed],[u,1,4242],'예전 판(1)으로 시작한 아이: 읽기 묶음 한 바퀴가 끝나기 전에는 그 판 그대로 이어 감');
   const big={story:Q.bankCount(a,1).story,common:0,math:0,english:0},o3=B.advanceOrder(b,a,big,{bank:1,latest:V,size:Q.bankCount(a,1)});
   eq([o3.off,o3.bank],[zero,V],'한 바퀴가 끝난 곳에서 최신 판('+V+')으로 올리고 새 바퀴 처음부터');
-  ok(Q.at(a,'story',0,4242,o3.bank,o3.off).id===Q.at(a,'story',0,4242,V).id,'올린 뒤 첫 문제 = 최신 판의 첫 문제');}
+  ok(Q.at(a,'story',0,4242,o3.bank,o3.off).id===Q.at(a,'story',0,4242,V).id,'올린 뒤 첫 문제 = 최신 판의 첫 문제');
+  /* 리뷰 0.16 R2: 판의 bank 0(아직 안 정함)은 문제은행이 최신 판으로 낸 판이다. 마친 뒤에도 최신 판(예전 판 1로 내려가지 않음) */
+  const b4=B.fresh(T,4242),o4=B.advanceOrder(b4,a,Q.used(a,40,4242,0),{bank:0,latest:V,size:Q.bankCount(a,0)});
+  eq([o4.bank,b4.order.bank[a],o4.off],[V,V,Q.used(a,40,4242,V)],'bank 0으로 푼 판을 마치면 다음 판도 최신 판('+V+'), 쓴 수 그대로');}
  /* byId: 은행 문항 복사본 */
  {const q=Q.get(8,'story',5),z=Q.byId(q.id);eq(z,q,'byId = 은행 문항');z.choices.push('x');eq(Q.byId(q.id).choices.length,q.choices.length,'byId는 복사본');
   const e=bankQuiz(9).find(x=>x.cat==='english');eq(Q.byId(e.id),e,'퀴즈 문항도');eq([Q.byId('nope'),Q.byId(undefined)],[null,null],'모르는 id는 null');

@@ -48,7 +48,9 @@
   const int=(v,lo,hi,d)=>Number.isFinite(v)?Math.min(hi,Math.max(lo,Math.floor(v))):d;
   const cnt=v=>int(v,0,BOOK.CAPS.count,0);
   const nowOf=now=>Number.isFinite(now)&&now>=T0?Math.floor(now):T0;
-  const stamp=(v,now)=>Number.isFinite(v)&&v>=T0&&v<=nowOf(now)+DAYMS?Math.floor(v):0;
+  /* 시각 칸: 숫자가 아니거나 2026-01-01 전이면 0(없음). 지금+1일보다 뒤면 지금으로 자른다(0으로 지우지 않는다).
+     0으로 지우면 기기 시계가 뒤로 간 기기(배터리 방전·날짜 수정)나 시계가 앞선 기기의 진행 파일에서 발자국·친구 카드·반짝 칸이 통째로 사라졌다(리뷰 0.16 R4) */
+  const stamp=(v,now)=>{if(!Number.isFinite(v)||v<T0)return 0;const t=nowOf(now);return Math.floor(v<=t+DAYMS?v:t)};
   const p2=n=>(n<10?'0':'')+n;
   /* 기기 현지 날짜 YYYY-MM-DD */
   const dayOf=now=>{const d=new Date(nowOf(now));return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate())};
@@ -149,8 +151,10 @@
   }
 
   /* ---------- 저장소(인자로 받은 storage에만 손댐) ---------- */
-  /* 열쇠: 체험(?demo=N)·?book=0은 기록을 읽지도 쓰지도 않는다(book=null). 시험(?test=1)은 -test. run = 화면이 쓰는 판 저장 열쇠 */
-  function keys(opt){const o=opt||{},book=o.off||o.demo?null:'hangul-defense-book'+(o.test?'-test':'');return {book,bak:book?book+'-bak':null,run:o.runKey||null}}
+  /* 열쇠: 체험(?demo=N)·?book=0은 기록을 읽지도 쓰지도 않는다(book=null). 시험(?test=1)은 -test. run = 화면이 쓰는 판 저장 열쇠.
+     tag = 판 저장을 따로 쓰는 주소의 꼬리(?stages=0 → 'stages0'): 기록도 따로 둔다. 전에는 단계 끄기 주소로 놀면 아이 기록(수첩·하루 시간·이어 순서)이 바뀌고,
+     거기서 모든 기록 지우기를 누르면 아이 기록까지 지워졌다(리뷰 0.16 R7) */
+  function keys(opt){const o=opt||{},tag=typeof o.tag==='string'&&/^[a-z0-9]{1,16}$/.test(o.tag)?'-'+o.tag:'',book=o.off||o.demo?null:'hangul-defense-book'+tag+(o.test?'-test':'');return {book,bak:book?book+'-bak':null,run:o.runKey||null}}
   /* 저장 글을 읽어 기록으로. status: none(없음) · ok · broken(깨짐: 새 기록으로 시작) · newer(앱보다 새 버전: 메모리 안 새 기록, 쓰지 않음) */
   function parse(text,opt){
     const o=opt||{},now=nowOf(o.now);
@@ -175,8 +179,9 @@
     if(!handle||handle.locked||!ks||!ks.book||!store)return false;
     try{store.setItem(ks.book,JSON.stringify(handle.book));return true}catch(e){return false}
   }
-  /* 모든 기록 지우기(보호자 화면에서만): 기록·되돌리기 사본·판 저장 */
-  function wipeAll(store,ks){let ok=true;for(const k of [ks&&ks.book,ks&&ks.bak,ks&&ks.run])if(k)try{store.removeItem(k)}catch(e){ok=false}return ok}
+  /* 모든 기록 지우기(보호자 화면에서만): 기록·되돌리기 사본·판 저장·판 저장의 이행 전 원본(run-bak, 0.12부터 예전 저장을 이어받을 때 한 번 복사).
+     개인정보처리방침 3항 "기기에 저장된 게임 기록을 모두 지웁니다". 전에는 run-bak(도장·맞힌 문제 번호가 든 예전 판 저장)이 남았다(리뷰 0.16 R3) */
+  function wipeAll(store,ks){let ok=true;for(const k of [ks&&ks.book,ks&&ks.bak,ks&&ks.run,ks&&ks.run&&ks.run+'-bak'])if(k)try{store.removeItem(k)}catch(e){ok=false}return ok}
 
   /* ---------- 진행 파일(§2.7) ---------- */
   const sumOf=(book,run)=>fnv1a(JSON.stringify({fmt:FILE_FMT,v:FILE_V,book,run}));
@@ -276,7 +281,8 @@
     if(!AGES.includes(age))return orderFor(b,8);
     const o=opt||{},off=offOf(b,age),u=isObj(used)?used:{};
     for(const p of POOLS)off[p]=cnt(off[p]+cnt(u[p]));
-    const bank=int(o.bank,1,9999,b.order.bank[age]||1),latest=int(o.latest,1,9999,bank),size=isObj(o.size)?o.size:null;
+    /* bank 0 = 아직 안 정함 = 문제은행이 최신 판으로 냄(Questions.at). 1로 자르면 최신 판으로 푼 판을 마친 뒤 예전 판으로 내려갔다(리뷰 0.16 R2) */
+    const bank=Number.isFinite(o.bank)&&o.bank<1&&o.latest>=1?int(o.latest,1,9999,1):int(o.bank,1,9999,b.order.bank[age]||1),latest=int(o.latest,1,9999,bank),size=isObj(o.size)?o.size:null;
     let next=bank;
     if(latest>bank&&size&&size.story>0&&off.story>=size.story){next=latest;for(const p of POOLS)off[p]=0}
     b.order.off[age]=off;b.order.bank[age]=next;

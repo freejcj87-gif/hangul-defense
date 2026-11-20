@@ -41,6 +41,10 @@
   }
   function askGate(cb){gate.cb=cb;if(Date.now()>=gate.until)gateNew();$('gate').hidden=false;gateDraw()}
   $('gateClose').onclick=()=>{gate.cb=null;$('gate').hidden=true};
+  /* 1초마다 보는 것(세계 시계와 따로: 시작 화면·쉬는 중에도 돈다) */
+  const watch=[];setInterval(()=>{for(const f of watch)try{f()}catch{}},1000);
+  /* 30초 쉼이 끝나면 문턱 화면 그대로 새 수와 숫자판을 다시 보인다. 전에는 "잠깐 쉬었다가 다시 해 주세요"에서 멈춰, 그만두기를 누르고 다시 길게 눌러야 했다(리뷰 0.16 R8) */
+  watch.push(()=>{if(!$('gate').hidden&&gate.until&&Date.now()>=gate.until){gate.until=0;gateNew();gateDraw()}});
 
   /* ---------- 발자국 수첩(세계가 멈춘 때만 열린다: 시작 화면 · 엔딩 카드 · 잠깐 쉬기) ---------- */
   function pageLine(p,M){
@@ -83,6 +87,11 @@
   let guardAt=0,guardTab='log',guardInfo=false,incoming=null;
   const guardAlive=()=>{if(guardInfo)return true;if(Date.now()-guardAt>Book.BOOK.GATE.idle*100){closeGuard();return false}guardAt=Date.now();return true};
   function closeGuard(){$('guardian').hidden=true;incoming=null}
+  /* 보호자 화면을 3분 동안 손대지 않으면 닫는다(명세 §1.4 "3분 동안 손대지 않으면 닫힌다"). 전에는 다음 손길에야 닫혀 어른이 자리를 비운 뒤에도 열린 채 남았다(리뷰 0.16 R9).
+     문턱이 떠 있는 동안은 기다린다. 화면을 누르거나 글을 내려 읽으면(3분 안) 손댄 것으로 친다 */
+  const guardTouch=()=>{if(!guardInfo&&Date.now()-guardAt<=Book.BOOK.GATE.idle*100)guardAt=Date.now()};
+  $('guardian').onpointerdown=guardTouch;$('gBody').onscroll=guardTouch;
+  watch.push(()=>{if(!$('guardian').hidden&&!guardInfo&&$('gate').hidden&&Date.now()-guardAt>Book.BOOK.GATE.idle*100)closeGuard()});
   const para=(box,text,cls)=>{const p=el('p',cls||'',text);box.append(p);return p};
   const button=(box,text,fn,cls)=>{const b=el('button',cls||'',text);b.onclick=()=>{if(guardAlive())fn()};box.append(b);return b};
   const STORE_LINE="게임 기록은 이 기기에 저장되고, 개발자에게 보내지 않아요. 기기 백업을 켜 두면 이 기기의 Google 계정 백업에 함께 보관될 수 있어요(화면 잠금을 쓰는 기기에서만). 보호자가 '진행 파일 옮기기'로 직접 내보낼 수도 있어요.";
@@ -93,6 +102,8 @@
     const r=Book.report(book,Date.now()),w=r.week,a=r.all;
     if(bookH.status==='newer')para(box,'새 버전에서 만든 기록이에요. 앱을 업데이트하면 이어져요. 지금 놀이는 저장되지 않아요.','g-warn');
     if(bookH.locked&&bookH.status==='memory'&&!DEMO)para(box,'저장 공간을 쓸 수 없어 지금 놀이는 저장되지 않아요.','g-warn');
+    /* 쓰기 실패(용량 등)도 보호자 화면에 알린다(명세 §2.5 "보호자 화면에 경고". 전에는 판 중 한 줄 안내뿐이었다, 리뷰 0.16 W) */
+    else if(bookFailNow)para(box,'저장 공간이 모자라 수첩 기록을 저장하지 못했어요. 기기의 저장 공간을 확인해 주세요. 지금 놀이는 계속할 수 있어요.','g-warn');
     para(box,'이번 주(최근 7일): 푼 문제 '+w.q+' · 한 번에 맞힌 문제 '+w.f+' · 처음 맞힌 새 글 '+w.nw+' · 논 시간 '+min(w.s)+'분 · 논 날 '+w.days+'일');
     para(box,'전체: 놀이 '+a.plays+'번 · 푼 문제 '+a.q+' · 한 번에 맞힌 문제 '+a.f+' · 논 날 '+a.days+'일 · 지킨 마을 '+a.villages+'곳');
     para(box,'분류별 한 번에 맞힌 문제(최근 놀이 30번): '+(r.rate.rd[0]+r.rate.qz[0]+r.rate.en[0]?'한글 읽기 '+r.rate.rd[1]+' / '+r.rate.rd[0]+' · 상식·수학 '+r.rate.qz[1]+' / '+r.rate.qz[0]+' · 영어 '+r.rate.en[1]+' / '+r.rate.en[0]:'아직 기록이 없어요.'));
@@ -121,12 +132,19 @@
   }
   /* 진행 파일: 내보내기는 보호자가 직접 누를 때만. 어디로 보낼지는 보호자가 고른다(앱이 스스로 올리거나 보내지 않는다) */
   function appVersion(){try{const m=/\d+\.\d+(\.\d+)?/.exec($('appVersion').textContent);return m?m[0]:''}catch{return ''}}
+  /* 알림 문구(레드팀 r2 B1): 웹은 내려받기가 실제로 시작됐는지 알 수 없다(브라우저가 막거나 묻는 창을 띄우거나, WebView가 무시할 수 있음).
+     그래서 "만들었어요"라고 단정하지 않고 내려받기 목록 확인을 부탁하며, 예외가 나면 실패 문구를 쓴다. 전에는 실패해도 "진행 파일을 만들었어요"였다.
+     알림은 누른 바로 뒤에 동기로 쓴다: Android 앱 껍데기(app-shell.js)가 a download 누름을 잡아 그 뒤(마이크로태스크)에 자기 문구로 바꾼다 */
+  const EXPORT_SENT=name=>'진행 파일('+name+')을 내려받기로 보냈어요. 저장됐는지 브라우저의 내려받기 목록에서 확인해 주세요.';
+  const EXPORT_FAIL='진행 파일을 만들지 못했어요. 이 브라우저에서는 내려받기가 안 될 수 있어요. 다른 브라우저에서 다시 해 주세요.';
   function exportNow(){
-    const now=Date.now();save(true);
-    const text=Book.exportText(book,{...state,version:Combat.SAVE_VERSION},{now,app:appVersion()}),name=Book.fileName(now);
-    window.__lastExport={name,text};/* 검사·앱 포장용: 방금 만든 진행 파일 */
-    try{const url=URL.createObjectURL(new Blob([text],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),4000)}catch{}
-    put($('gNote'),'진행 파일을 만들었어요: '+name);
+    const now=Date.now();save(true);let sent=false,name='';
+    try{
+      const text=Book.exportText(book,{...state,version:Combat.SAVE_VERSION},{now,app:appVersion()});name=Book.fileName(now);
+      window.__lastExport={name,text};/* 검사·앱 포장용: 방금 만든 진행 파일(앱 껍데기가 a download 누름 때 읽는다) */
+      const url=URL.createObjectURL(new Blob([text],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),4000);sent=true;
+    }catch{}
+    put($('gNote'),sent?EXPORT_SENT(name):EXPORT_FAIL);
   }
   function importText(text){
     const r=Book.importFile(text,{now:Date.now(),knows:bookKnows,cleanRun:run=>Combat.restore(run,AGES)});
@@ -138,7 +156,9 @@
   const pv=p=>'친구 카드 '+p.cards+' · 훈장 '+p.medals+' · 놀이 '+p.play+'번 · 마지막 '+p.last;
   function tabFile(box){
     para(box,STORE_LINE);
-    button(box,'파일로 내보내기',()=>askGate(exportNow));
+    /* 앱보다 새 버전 기록이 있으면 이 앱은 메모리 안 빈 기록만 들고 있어 내보내지 않는다. 전에는 빈 기록 파일을 만들어, 그 파일을 다른 기기에서 바꾸기 하면 진행이 비었다(리뷰 0.16 N) */
+    if(bookH.status==='newer')para(box,'새 버전에서 만든 기록이라 이 앱에서는 내보낼 수 없어요. 앱을 업데이트한 뒤 내보내 주세요.','g-warn');
+    else button(box,'파일로 내보내기',()=>askGate(exportNow));
     para(box,FILE_LINE,'g-note');para(box,'기기를 바꾸기 전에 진행 파일을 내보내 두세요.','g-note');
     button(box,'파일 불러오기',()=>{try{$('importFile').value='';$('importFile').click()}catch{}});
     if(incoming){
@@ -151,7 +171,10 @@
     }
     if(Book.canUndo(localStorage,BK))button(box,'되돌리기(바꾸기 전 기록으로)',()=>{if(Book.undo(localStorage,BK)){bookDirty=false;reloadFromStore();openGuard('file',true);put($('gNote'),'바꾸기 전 기록으로 되돌렸어요.')}});
   }
-  $('importFile').onchange=()=>{try{const f=$('importFile').files&&$('importFile').files[0];if(!f)return;if(f.size>Book.FILE_MAX){put($('gNote'),'진행 파일이 아니에요.');return}const rd=new FileReader();rd.onload=()=>importText(String(rd.result||''));rd.readAsText(f)}catch{}};
+  /* 파일 고르기는 형식으로 거르지 않는다(index.html #importFile에 accept 없음). 메신저·Android Chrome으로 받은 파일은 이름이 .json이 아니거나
+     형식이 application/octet-stream·text/plain이라 accept=".json,application/json"이면 고를 수 없었다(레드팀 r2). 대신 크기(1MB)와 내용(Book.importFile: JSON · fmt · 버전 · 검사합)으로 거른다.
+     읽지 못하면(파일이 사라짐·권한) 그렇다고 알린다 */
+  $('importFile').onchange=()=>{try{const f=$('importFile').files&&$('importFile').files[0];if(!f)return;if(f.size>Book.FILE_MAX){put($('gNote'),'진행 파일이 아니에요.');return}const rd=new FileReader();rd.onload=()=>importText(String(rd.result||''));rd.onerror=()=>put($('gNote'),'파일을 읽지 못했어요. 다시 골라 주세요.');rd.readAsText(f)}catch{put($('gNote'),'파일을 읽지 못했어요. 다시 골라 주세요.')}};
   function tabHelp(box){
     if(!guardInfo){para(box,'보호자 화면에 대하여','g-h');para(box,'보호자 화면의 문턱(길게 누르기와 글로 적힌 수)은 아이가 실수로 누르지 않게 하는 문턱이에요. 보안 장치가 아니에요.');
       para(box,'반짝 손님','g-h');para(box,Book.shinyText());

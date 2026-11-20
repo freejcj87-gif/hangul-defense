@@ -2063,6 +2063,11 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   eq([d.game().book.status,d.game().book.locked,Object.keys(saved).filter(k=>k.includes('book')),d.game().book.data.medal.one.n],['memory',true,[],1],'체험(?demo=1): 기록은 메모리 안에서만(열쇠를 쓰지 않음)');
   saved={};const t=boot({book:true,query:'?test=1'});t.go();t.unlock();t.right();
   ok((BOOK_KEY+'-test') in saved&&!(BOOK_KEY in saved),'시험 모드(?test=1)는 -test 열쇠');
+  /* 리뷰 0.16 R7: 단계 끄기 주소(?stages=0)는 판 저장처럼 기록도 따로. 전에는 아이 기록 열쇠를 같이 써서 수첩·하루 시간이 섞이고 모든 기록 지우기가 아이 기록까지 지웠다 */
+  withFlags({},()=>{const kid=JSON.stringify(Bk.fresh(Date.now(),9));saved={[BOOK_KEY]:kid};const s=boot({book:true,query:'?stages=0'});s.go();s.unlock();s.right();
+   ok((BOOK_KEY+'-stages0') in saved&&saved[BOOK_KEY]===kid&&s.game().book.status==='new','?stages=0: 기록은 -stages0 열쇠에, 아이 기록은 글자 그대로');
+   press(s,'openGuard',2100);gatePass(s);s.n.gTabs.children.find(b=>b.dataset.tab==='set').click();s.n.gBody.children.find(c=>c.textContent==='모든 기록 지우기').click();gatePass(s);
+   ok(saved[BOOK_KEY]===kid&&!((BOOK_KEY+'-stages0') in saved),'?stages=0에서 모든 기록 지우기는 그 주소의 기록만')});
  }
  {saved={[BOOK_KEY]:'{깨진 글'};const a=boot({book:true});a.go();a.unlock();a.right();
   eq([a.game().book.status,stored().medal.one.n],['broken',1],'깨진 기록이 판을 막지 않음(새 기록으로 계속)');
@@ -2167,6 +2172,13 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   const c=bboot(x=>{x.shiny.guest='wolf';x.shiny.run=1},{index:30,run:{...C.freshRun(),asked:30,t0:1,bell:1}},{view:true});c.go();ok(c.api.world.guest&&c.api.world.guest.kind==='wolf','기록에 손님이 있으면 세계에도 세움');
   c.buy('bell');eq([bookOf(c).shiny.guest,bookOf(c).shiny.miss,c.api.world.guest&&c.api.world.guest.state],[null,2,'leave'],'결전이 시작되면 손님은 숲으로(다음 기회 확정)');
  }
+ /* M-6b 리뷰 0.16 R6: 신바람 2단(6연속 이상)인 채로 새로고침해도 신바람 훈장을 한 번 더 세지 않는다. 연속이 끊겼다가 다시 오르면 센다 */
+ {const a=bboot(null,{index:12,streak:C.FLOW.boost2-1});a.go();quiet(a);a.unlock();a.right();const r1=bookOf(a).medal.rush.n;
+  nextAsk(a);a.n.pause.click();a.unload();const b=boot({book:true});b.go();quiet(b);b.unlock();b.right();
+  eq([r1,bookOf(b).medal.rush.n,b.game().state.streak],[1,1,C.FLOW.boost2+1],'6연속에서 새로고침 뒤 이어 맞혀도 신바람 훈장 수 그대로');
+  nextAsk(b);b.unlock();b.wrong(0);b.tick(C.DASH_TICKS+2);b.unlock();b.btn(b.api.round.q.answer).click();for(let i=0;i<120&&!b.api.round.ready;i++)b.tick();b.btn(b.api.round.q.answer).click();b.untilAsk();
+  eq(b.game().state.streak,0,'틀리면 연속이 끊김');for(let i=0;i<C.FLOW.boost2;i++){b.unlock();b.right();nextAsk(b)}
+  eq(bookOf(b).medal.rush.n,2,'끊겼다가 다시 신바람 2단에 오르면 한 번 더 셈')}
  /* M-7 '마을을 처음부터'는 판 저장만 새로 만들고 기록은 그대로 */
  {const a=bboot(b=>{Object.assign(b.mon.wolf,{foot:Date.now(),card:Date.now(),note:3,plays:3,kills:50});b.medal.king.n=2;b.medal.king.at=[Date.now(),0,0];b.rv=[{id:'a8-story-03',box:2,due:0,dp:1,miss:2,seen:1}];b.play=5},{index:40,gold:900,level:3});
   a.go();a.unlock();a.right();const before=bookOf(a);a.n.reset.click();const g=a.game();
@@ -2237,6 +2249,10 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   tab('file');ok(body().includes('파일에는 읽기 단계, 날짜별 놀이 시간, 문제 기록, 수첩과 훈장이 들어 있어요.')&&/기기를 바꾸기 전에/.test(body()),'진행 파일 탭 안내 문장');
   gbtn('파일로 내보내기').click();ok(g.n.gate.hidden===false&&!g.window.__lastExport,'내보내기는 한 번 더 확인');gatePass(g);
   const file=g.window.__lastExport;ok(file&&/^kkomaeul-progress-\d{8}\.json$/.test(file.name)&&JSON.parse(file.text).book.medal.one.n===60&&!('world' in JSON.parse(file.text).run),'진행 파일(세계는 빠짐)');
+  /* 레드팀 r2 B1: 내려받기가 실제로 됐는지 알 수 없으므로 "만들었어요"라고 단정하지 않고 내려받기 목록 확인을 부탁 */
+  ok(g.n.gNote.textContent.includes(file.name)&&/내려받기 목록에서 확인해 주세요/.test(g.n.gNote.textContent)&&!/만들었어요/.test(g.n.gNote.textContent),'내보내기 알림: 내려받기 목록 확인을 부탁(단정하지 않음) '+g.n.gNote.textContent);
+  {const keepURL=URL.createObjectURL;URL.createObjectURL=()=>{throw new Error('막힘')};gbtn('파일로 내보내기').click();gatePass(g);URL.createObjectURL=keepURL;
+   ok(/진행 파일을 만들지 못했어요/.test(g.n.gNote.textContent)&&!/내려받기로 보냈어요/.test(g.n.gNote.textContent),'내려받기를 만들다 예외가 나면 실패 문구')}
   const mine=[saved[KEY],saved[BOOK_KEY]];
   const h=bboot(b=>{b.medal.one.n=3;b.play=2},{index:1,gold:55});press(h,'openGuard',2100);gatePass(h);h.n.gTabs.children.find(b=>b.dataset.tab==='file').click();
   eq([h.window.__importText('{').ok,/진행 파일이 아니에요/.test(h.n.gNote.textContent)],[false,true],'엉뚱한 파일은 거절');
@@ -2252,12 +2268,75 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   /* 3분 동안 손대지 않으면 닫힘 */
   skew+=181000;h.n.gTabs.children[0].click();ok(h.n.guardian.hidden,'3분 동안 손대지 않으면 다음 손길에 닫힘');
   /* 모든 기록 지우기: 보호자 화면에서만, 한 번 더 확인 */
+  saved[KEY+'-bak']='{"version":1,"gold":80}';/* 0.12부터 예전 저장을 이어받을 때 남기는 판 저장 원본 */
   press(h,'openGuard',2100);gatePass(h);h.n.gTabs.children.find(b=>b.dataset.tab==='set').click();h.n.gBody.children.find(c=>c.textContent==='모든 기록 지우기').click();ok(h.n.gate.hidden===false&&saved[BOOK_KEY],'모든 기록 지우기도 한 번 더 확인');gatePass(h);
   eq([KEY in saved,BOOK_KEY in saved,h.game().book.status,h.game().state.gold,h.game().book.data.medal.one.n,h.api.phase],[false,false,'new',20,0,'start'],'두 열쇠를 비우고 새로 시작');
+  ok(!((KEY+'-bak') in saved),'판 저장의 이행 전 원본(-bak)도 지움(리뷰 0.16 R3: 방침 "기기에 저장된 게임 기록을 모두 지웁니다")');
   /* 보호자 안내(시작 화면): 문턱 없이 개인정보처리방침 본문만 */
   h.n.openInfo.click();ok(h.n.guardian.hidden===false&&h.n.gTabs.children.length===1&&/개인정보처리방침/.test(h.n.gBody.textContent)&&!h.n.gBody.children.some(c=>c.tagName==='button'),'보호자 안내: 방침 본문만(문턱·단추 없음)');h.n.guardClose.click();
+  /* 리뷰 0.16 R2: 지운 뒤(판 저장 없음) 새 판도 처음 불러올 때처럼 최신 문제은행 판. 전에는 bank 0으로 저장돼 다시 열면 예전 판(1)으로 바뀌었다 */
+  eq(h.game().state.bank,Q.BANK_VERSION,'모든 기록 지우기 뒤 판의 문제은행 판 = 최신('+Q.BANK_VERSION+')');
+  h.go();const qid=h.n.answers.dataset.qid;const h2=boot({book:true});h2.go();eq([h2.game().state.bank,h2.n.answers.dataset.qid],[Q.BANK_VERSION,qid],'지운 뒤 놀다가 다시 열어도 같은 판·같은 문제(예전 판 1로 바뀌지 않음)');
   saved={[KEY]:mine[0],[BOOK_KEY]:mine[1]};
  }
+ /* M-9c 리뷰 0.16 R8: 3번 틀려 30초 쉰 뒤에는 문턱 화면을 닫지 않아도 새 수와 숫자판이 돌아온다(bookui의 1초 타이머) */
+ {const g=bboot(null,{index:5}),sec=()=>g.intervals.slice(1).forEach(f=>f());press(g,'openGuard',2100);
+  const wrong=()=>{const d=gateDigits(g);gateType(g,[d[0]==='9'?'8':'9',d[1],d[2]])};wrong();wrong();wrong();
+  sec();ok(g.n.gatePad.children.length===0&&/잠깐 쉬었다가/.test(g.n.gateAsk.textContent),'쉬는 동안(30초 안)에는 숫자판 없음');
+  skew+=29000;sec();ok(g.n.gatePad.children.length===0,'29초 뒤에도 쉼');
+  skew+=2000;sec();ok(g.n.gatePad.children.length===10&&gateDigits(g)&&!/잠깐/.test(g.n.gateAsk.textContent),'30초가 지나면 문턱 화면 그대로 새 수와 숫자판');
+  wrong();ok(/수가 달라요/.test(g.n.gateAsk.textContent)&&g.n.gatePad.children.length===10,'쉰 뒤에는 다시 세 번 기회(한 번 틀려도 쉬지 않음)');
+  gatePass(g);ok(g.n.gate.hidden&&g.n.guardian.hidden===false,'맞히면 보호자 화면');
+  /* 리뷰 0.16 R9: 보호자 화면을 3분 동안 손대지 않으면 닫힘(명세 §1.4). 전에는 다음 손길에야 닫혔다 */
+  skew+=170000;sec();ok(g.n.guardian.hidden===false,'2분 50초: 아직 열림');g.n.gBody.onscroll();skew+=20000;sec();ok(g.n.guardian.hidden===false,'글을 내려 읽으면 손댄 것으로 침');
+  skew+=181000;sec();ok(g.n.guardian.hidden===true,'3분 동안 손대지 않으면 저절로 닫힘');
+  press(g,'openGuard',2100);gatePass(g);g.n.gTabs.children.find(b=>b.dataset.tab==='set').click();g.n.gBody.children.find(c=>c.textContent==='모든 기록 지우기').click();
+  skew+=200000;sec();ok(g.n.guardian.hidden===false&&g.n.gate.hidden===false,'문턱이 떠 있는 동안은 닫지 않음');g.n.gateClose.click();sec();ok(g.n.guardian.hidden===true,'문턱을 닫으면 그때 닫힘');
+  skew+=181000;g.n.guardian.onpointerdown();g.n.guardian.hidden=false;sec();ok(g.n.guardian.hidden===true,'3분이 지난 뒤의 손길은 시간을 늘리지 않음');
+  g.n.openInfo.click();skew+=400000;sec();ok(g.n.guardian.hidden===false,'보호자 안내(방침 본문만)는 저절로 닫지 않음');g.n.guardClose.click()}
+ /* M-9d 리뷰 0.16 S: 효과음 켜고 끄기가 기록(set.sfx)에 남는다. 전에는 칸만 있고 쓰지 않아 끈 효과음이 다시 열면 켜졌다 */
+ {const a=bboot(b=>{b.set.sfx=0},{index:1});eq(a.n.sfx.checked,false,'기록의 효과음 끔 → 설정 체크 해제');
+  const c=bboot(null,{index:1});eq(c.n.sfx.checked,true,'기록의 효과음 켬 → 설정 체크');c.go();c.n.sfx.checked=false;c.n.sfx.onchange();
+  eq([bookOf(c).set.sfx,stored().set.sfx],[0,0],'풀이 중에 꺼도 기록에 바로 저장');const d=boot({book:true});eq(d.n.sfx.checked,false,'다시 열어도 꺼져 있음');
+  d.n.sfx.checked=true;d.n.sfx.onchange();eq(stored().set.sfx,1,'다시 켜면 저장');
+  saved={};const off=boot({book:true,query:'?book=0'});off.n.sfx.checked=false;off.n.sfx.onchange();ok(!(BOOK_KEY in saved),'?book=0이면 기록 열쇠를 쓰지 않음(0.15와 같음)')}
+ /* M-9e 리뷰 0.16 W: 기록 쓰기가 실패하면(용량 등) 보호자 기록 탭에 경고(명세 §2.5), 다시 써지면 경고가 사라짐 */
+ {let full=true;const store={[KEY]:JSON.stringify({version:3,...C.fresh(8),seed:4242}),[BOOK_KEY]:JSON.stringify(Bk.fresh(Date.now(),4242))};
+  saved=new Proxy(store,{set(t,k,v){if(k===BOOK_KEY&&full)throw new Error('가득');t[k]=v;return true}});
+  const a=boot({book:true});a.go();a.unlock();a.right();ok(a.game().book.dirty,'쓰기 실패: 기록은 메모리에 남음');
+  press(a,'drawerGuard',2100);gatePass(a);ok(/수첩 기록을 저장하지 못했어요/.test(a.n.gBody.textContent),'보호자 기록 탭에 쓰기 실패 경고');
+  full=false;a.n.guardClose.click();a.n.pause.click();a.n.pause.click();press(a,'drawerGuard',2100);gatePass(a);ok(!/저장하지 못했어요/.test(a.n.gBody.textContent)&&JSON.parse(store[BOOK_KEY]).medal.one.n===1,'다시 써지면 경고가 사라짐');
+  const ok2=bboot(null,{index:1});press(ok2,'openGuard',2100);gatePass(ok2);ok(!/저장하지 못했어요|저장되지 않아요/.test(ok2.n.gBody.textContent),'평소에는 경고 없음')}
+ /* M-9f 리뷰 0.16 N: 앱보다 새 버전 기록이 있는 기기에서는 진행 파일을 내보내지 않는다(메모리 안 빈 기록뿐이라 그 파일이 다른 기기의 진행을 비울 수 있었다) */
+ {const newer=JSON.stringify({...Bk.fresh(Date.now(),1),v:2,medal:{one:{n:777}}});saved={[KEY]:JSON.stringify({version:3,...C.fresh(8),seed:1}),[BOOK_KEY]:newer};
+  const a=boot({book:true});press(a,'openGuard',2100);gatePass(a);a.n.gTabs.children.find(b=>b.dataset.tab==='file').click();
+  ok(!a.n.gBody.children.some(c=>c.tagName==='button'&&c.textContent.startsWith('파일로 내보내기'))&&/이 앱에서는 내보낼 수 없어요/.test(a.n.gBody.textContent),'새 버전 기록: 내보내기 단추 대신 업데이트 안내');
+  ok(!a.window.__lastExport&&saved[BOOK_KEY]===newer&&a.n.gBody.children.some(c=>c.tagName==='button'&&c.textContent==='파일 불러오기'),'파일을 만들지 않고 기록은 글자 그대로(불러오기는 그대로 가능)')}
+ /* M-9g 레드팀 r2: 불러오기 파일 고르기를 형식(accept)으로 거르지 않고 크기·내용으로 거른다. 메신저·Android Chrome으로 받은 파일(.txt · octet-stream)도 고를 수 있게 */
+ {ok(html.includes('<input type="file" id="importFile" hidden>')&&!/id="importFile"[^>]*accept=/.test(html),'파일 고르기에 형식 거르기(accept) 없음');
+  const src=Bk.fresh(Date.now(),55);src.play=7;const text=Bk.exportText(src,null,{now:Date.now()}),keepFR=globalThis.FileReader;
+  globalThis.FileReader=class{readAsText(f){if(f.fail){this.onerror&&this.onerror();return}this.result=f.text;this.onload()}};
+  try{const a=bboot(null,{index:1});press(a,'openGuard',2100);gatePass(a);a.n.gTabs.children.find(b=>b.dataset.tab==='file').click();
+   const pick=f=>{a.n.importFile.files=[f];a.n.importFile.onchange()};
+   pick({name:'kkomaeul-progress-20261120 (1).txt',type:'text/plain',size:text.length,text});ok(/불러올 기록: 친구 카드 0 · 훈장 0 · 놀이 7번/.test(a.n.gBody.textContent),'이름이 .txt인 진행 파일도 내용으로 알아보고 미리보기');
+   pick({name:'download',type:'application/octet-stream',size:text.length,text});ok(/불러올 기록: .*놀이 7번/.test(a.n.gBody.textContent),'이름·형식을 모르는 파일(octet-stream)도 내용이 맞으면 미리보기');
+   pick({name:'photo.jpg',type:'image/jpeg',size:5000,text:'ÿØÿàJFIF'});ok(/진행 파일이 아니에요/.test(a.n.gNote.textContent)&&!/불러올 기록/.test(a.n.gBody.textContent),'사진 같은 다른 파일은 내용 검사에서 거름(미리보기 없음)');
+   pick({name:'other.json',type:'application/json',size:20,text:'{"fmt":"other","v":1}'});ok(/진행 파일이 아니에요/.test(a.n.gNote.textContent),'다른 게임의 JSON도 거름');
+   pick({name:'big.json',type:'application/json',size:Bk.FILE_MAX+1,text:''});ok(/진행 파일이 아니에요/.test(a.n.gNote.textContent),'1MB 넘는 파일은 읽기 전에 거름');
+   pick({name:'gone.json',size:10,fail:true});ok(/파일을 읽지 못했어요/.test(a.n.gNote.textContent),'읽기에 실패하면 그렇다고 알림');
+  }finally{if(keepFR===undefined)delete globalThis.FileReader;else globalThis.FileReader=keepFR}}
+ /* M-9b 리뷰 0.16 R1: 기록을 다시 읽은 뒤(진행 파일 바꾸기 · 되돌리기 · 모든 기록 지우기) 그 기록의 영어 설정이 문제은행에 바로 반영된다. 전에는 앞 기록의 비중이 다시 열 때까지 남았다 */
+ {const src=Bk.fresh(Date.now(),77);src.set.en='off';const file=Bk.exportText(src,{...C.fresh(8),seed:77,bank:Q.BANK_VERSION,version:3},{now:Date.now()});
+  const a=bboot(null,{index:1});eq(Q.QUIZ_MIX[8].english,2,'이 기기 기록: 영어 보통');
+  press(a,'openGuard',2100);gatePass(a);a.n.gTabs.children.find(b=>b.dataset.tab==='file').click();a.window.__importText(file);
+  a.n.gBody.children.find(c=>c.textContent==='바꾸기').click();gatePass(a);
+  eq([bookOf(a).set.en,Q.QUIZ_MIX[8].english,Q.QUIZ_MIX[10].english],['off',0,0],'영어 끄기 기록으로 바꾸면 문제은행도 바로 영어 0');
+  a.go();ok(Array.from({length:300},(_,i)=>Q.at(8,'story',i,77)).every(q=>q.cat!=='english'),'바꾼 뒤 판에 영어 문제가 나오지 않음');a.n.pause.click();
+  press(a,'drawerGuard',2100);gatePass(a);a.n.gTabs.children.find(b=>b.dataset.tab==='file').click();a.n.gBody.children.find(c=>c.textContent.startsWith('되돌리기')).click();
+  eq([bookOf(a).set.en,Q.QUIZ_MIX[8].english],['std',2],'되돌리면 다시 보통');
+  const w=bboot(b=>{b.set.en='off'},{index:1});eq(Q.QUIZ_MIX[8].english,0,'영어 끄기 기록으로 시작');
+  press(w,'openGuard',2100);gatePass(w);w.n.gTabs.children.find(b=>b.dataset.tab==='set').click();w.n.gBody.children.find(c=>c.textContent==='모든 기록 지우기').click();gatePass(w);
+  eq([bookOf(w).set.en,Q.QUIZ_MIX[8].english],['std',2],'모든 기록 지우기 뒤 영어 비중도 처음(보통)');Q.setMix()}
  /* M-10 엔딩 카드: 쉬기 권유가 단추 위에, 이번 판 요약, "오늘은 그만하기" */
  {const a=bboot(b=>{Object.assign(b.mon.wolf,{foot:Date.now(),card:Date.now(),note:3,plays:3,kills:50})},{index:60,run:{...C.freshRun(),asked:60,first:50,t0:1,bell:3}});a.go();
   ok(a.game().ending&&!shownOff(a.n.endRest)&&html.includes('id="endRest">🌙 오늘은 여기까지 해도 좋아요</p>')&&!shownOff(a.n.endQuit)&&!shownOff(a.n.endBookBtn),'엔딩 카드: 쉬기 권유 · 오늘은 그만하기 · 수첩 보기');
@@ -2282,6 +2361,24 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   ok((BOOK_KEY+'-test') in saved&&!(BOOK_KEY in saved)&&!(KEY in saved),'시험 열쇠만 씀(아이 기록은 건드리지 않음)');
   T.bookTest('wipe');eq([(BOOK_KEY+'-test') in saved,a.api.phase,bookOf(a).mon.wolf.card,bookOf(a).play],[false,'start',0,1],'기록 비우기: 시험 기록을 비우고 시작 화면으로');
   const off=boot({query:'?test=1'});eq(off.window.__testmode.bookTest('note'),false,'수첩이 꺼져 있으면 아무 일도 없음')}
+ /* M-13 리뷰 0.16 G: 판 중간에 나이를 바꿔도, 떠난 나이의 글이 다음에 그 나이로 놀 때 처음부터 다시 나오지 않는다(이어 순서: 한 바퀴 안 같은 글 0) */
+ {const a=bboot(null,{index:0});a.go();quiet(a);const ids=n=>{const out=[];for(let i=0;i<n;i++){const r=a.game().round;if(r.mode==='story'&&!a.n.answers.dataset.special)out.push(r.id);a.unlock();a.right();nextAsk(a)}return out};
+  const seen8=ids(14),i8=a.game().state.index,bank=a.game().state.bank;ok(seen8.length>=8&&i8===14,'8세로 14문제('+seen8.length+'개 읽기 글)');
+  a.n.age.value='7';a.n.age.onchange();eq(bookOf(a).order.off[8],Q.used(8,i8,4242,bank),'판 중간 8세 → 7세: 떠난 8세의 이어 순서를 이 판에서 쓴 만큼 밂');
+  const seen7=ids(6);a.n.age.value='8';a.n.age.onchange();a.n.age.value='7';a.n.age.onchange();a.n.age.value='8';a.n.age.onchange();a.n.age.value='7';a.n.age.onchange();
+  eq(bookOf(a).order.off[8],Q.used(8,i8,4242,bank),'답하지 않고 나이를 오가면 8세를 더 밀지 않음');
+  ok(bookOf(a).order.off[7]&&bookOf(a).order.off[7].story>0,'7세로 풀다 떠나면 7세도 밂');
+  const b0=a.game().state.index;a.n.reset.click();a.n.age.value='8';a.n.age.onchange();eq(bookOf(a).order.off[8],Q.used(8,i8,4242,bank),'새 판 첫 칸(번호 0)에서 나이를 바꾸면 밀 것이 없음');
+  const again=ids(14);eq(again.filter(id=>seen8.includes(id)),[],'다음 판에 8세로 돌아와도 앞 판에서 본 8세 글이 다시 나오지 않음');
+  const s=boot({book:true});eq(s.game().book.data.order.off[8],bookOf(a).order.off[8],'민 자리는 기록에 저장됨');ok(seen7.length>0&&b0>i8,'7세로도 풀었음');
+  /* 시작 화면에서 나이를 바꿔도 같음(하던 판을 다른 나이로 이어 감) */
+  const c=bboot(null,{index:0});c.go();quiet(c);for(let i=0;i<10;i++){c.unlock();c.right();c.tick(REWARD+2);c.untilAsk()}c.n.pause.click();c.unload();
+  const d=boot({book:true}),i2=d.game().state.index;d.n.ageRow.children.find(b=>b.dataset.age==='9').click();d.n.ageRow.children.find(b=>b.dataset.age==='8').click();d.n.ageRow.children.find(b=>b.dataset.age==='9').click();
+  eq(d.game().book.data.order.off[8],Q.used(8,i2,4242,d.game().state.bank),'시작 화면에서 나이를 바꿔도 떠난 나이를 한 번만 밂');
+  /* '마을을 처음부터' 뒤 새 판도 판 번호가 1: 앞 판과 같은 번호에서 같은 나이를 떠나도 다시 민다(같은 자리 표시는 새 판마다 비움) */
+  const e=bboot(null,{index:0});e.go();quiet(e);const ans=n=>{for(let i=0;i<n;i++){e.unlock();e.right();nextAsk(e)}};
+  ans(5);e.n.age.value='7';e.n.age.onchange();ans(1);e.n.reset.click();e.n.age.value='8';e.n.age.onchange();const o8=bookOf(e).order.off[8].story;
+  ans(5);e.n.age.value='7';e.n.age.onchange();ok(bookOf(e).order.off[8].story>o8,'처음부터 뒤 새 판에서 같은 번호에 같은 나이를 떠나도 다시 밂('+o8+' → '+bookOf(e).order.off[8].story+')');}
  /* M-11 바깥 링크·외부 요청 없음(문자열 검사): 수첩 화면·규칙·콘텐츠 파일과 페이지 */
  {const files={'index.html':html,'bookui.js':BOOKUI_SRC,'book.js':fs.readFileSync(__dirname+'/book.js','utf8'),'notes.js':fs.readFileSync(__dirname+'/notes.js','utf8')};
   for(const [name,text] of Object.entries(files)){

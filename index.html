@@ -297,7 +297,7 @@ body.paused *,body.paused *:before,body.paused *:after{animation-play-state:paus
 <button id="go">시작하기 ▶</button><small>어려우면 나이를 낮춰도 괜찮아요.</small><button id="openInfo" class="linkish hidden">보호자 안내</button></div></div>
 <div class="start-screen" id="sleepy" role="dialog" aria-modal="true" aria-label="오늘은 여기까지" hidden><div class="start-card"><img src="art-handoff/coopnight/browser/characters/chicken.png" alt=""><h2>🌙 꼬꼬가 졸려요</h2><p class="start-q">오늘은 여기까지! 내일 또 만나요.</p><button id="sleepyMore">👪 보호자: 15분 더</button><small id="sleepyNote">모은 것은 그대로 있어요.</small></div></div>
 <div class="start-screen" id="bookScreen" role="dialog" aria-modal="true" aria-label="발자국 수첩" hidden><div class="start-card wide"><h2 id="bookTitle"></h2><div class="book-pages" id="bookPages"></div><h3 class="book-h">🎖️ 지킴이 훈장</h3><div class="book-medals" id="bookMedals"></div><p class="book-tip" id="bookTip" role="status" aria-live="polite"></p><button id="bookClose">닫기</button></div></div>
-<div class="start-screen" id="guardian" role="dialog" aria-modal="true" aria-label="보호자 화면" hidden><div class="start-card wide"><h2>👪 보호자 화면</h2><div class="g-tabs" id="gTabs"></div><div class="g-body" id="gBody"></div><p id="gNote" role="status" aria-live="polite"></p><input type="file" id="importFile" accept=".json,application/json" hidden><button id="guardClose">닫기</button></div></div>
+<div class="start-screen" id="guardian" role="dialog" aria-modal="true" aria-label="보호자 화면" hidden><div class="start-card wide"><h2>👪 보호자 화면</h2><div class="g-tabs" id="gTabs"></div><div class="g-body" id="gBody"></div><p id="gNote" role="status" aria-live="polite"></p><input type="file" id="importFile" hidden><button id="guardClose">닫기</button></div></div>
 <div class="start-screen" id="gate" role="dialog" aria-modal="true" aria-label="어른 확인" hidden><div class="start-card"><h2>어른 확인</h2><p class="start-q" id="gateAsk"></p><p class="gate-code" id="gateCode"></p><p class="gate-in" id="gateIn" aria-label="누른 수"></p><div class="gate-pad" id="gatePad"></div><small>아이가 실수로 누르지 않게 하는 문턱이에요. 보안 장치가 아니에요.</small><button id="gateClose">그만두기</button></div></div>
 <script src="combat.js?v=0.16"></script><script src="world.js?v=0.16"></script><script src="questions-gen.js?v=0.16"></script><script src="questions.js?v=0.16"></script><script src="notes.js?v=0.16"></script><script src="book.js?v=0.16"></script><script>/* 체험 주소 ?demo=1~3: 그 회관 단계까지 자란 마을로 시작해 새 몬스터를 바로 본다(프로듀서·보호자 확인용). 저장은 따로 해서 원래 진행을 건드리지 않는다. */
 const DEMO=(()=>{try{const m=/[?&]demo=([123])\b/.exec(location.search);return m?Number(m[1]):0}catch{return 0}})();
@@ -345,7 +345,7 @@ if(!state.run.t0)state.run.t0=Date.now();/* 판 시작 시각(보호자 보기�
 const qOff=n=>{try{return new RegExp('[?&]'+n+'=0\\b').test(location.search)}catch{return false}};
 const BOOK_ON=typeof Book!=='undefined'&&typeof NOTES!=='undefined'&&!!Book.BOOK.ON&&!qOff('book');
 if(BOOK_ON)for(const f of Object.keys(Book.BOOK.FLAGS))if(qOff(f))Book.BOOK.FLAGS[f]=false;
-const BK=BOOK_ON?Book.keys({demo:DEMO,test:TEST,runKey:KEY}):null;
+const BK=BOOK_ON?Book.keys({demo:DEMO,test:TEST,tag:STAGES_OFF?'stages0':'',runKey:KEY}):null;/* ?stages=0은 판 저장처럼 기록도 따로(리뷰 0.16 R7) */
 /* 문항 id → 은행 문항 복사본(기억 늑대가 다시 낼 글). Questions.byId가 생기면(문제은행 판 연결 뒤) 그것을 쓴다 */
 let QMAP=null;
 function qById(id){
@@ -354,7 +354,7 @@ function qById(id){
  const q=QMAP.get(id);if(!q)return null;const o={...q,choices:q.choices.slice()};delete o.note;return o;
 }
 const bookKnows=id=>!!qById(id)||!!NOTES.byId(id);
-let bookH=null,book=null,bookDirty=false,bookSavedAt=0,bookFail=false,bookWrites=0;
+let bookH=null,book=null,bookDirty=false,bookSavedAt=0,bookFail=false,bookFailNow=false,bookWrites=0;
 function bookOpen(){
  bookH=BOOK_ON?Book.open(localStorage,BK,{now:Date.now(),seed:state.seed,meta:state.meta,knows:bookKnows}):null;book=bookH?bookH.book:null;
  bookDirty=!!bookH&&(bookH.status==='new'||bookH.status==='migrated');bookSavedAt=0;
@@ -379,7 +379,7 @@ const Shop={list:s=>Combat.shop(s),buy:(s,k)=>Combat.buy(s,k)|0};
    긴 글을 읽는 나이는 그만큼 늑대도 느긋하게 온다. 무리 사이에도 낙오 늑대가 계속 온다. */
 const TEMPO_SPAN=120;
 /* 수첩 MVP 이어 순서: 판이 바뀌어도 같은 씨앗(book.order.seed)을 쓰고 묶음 순번을 지난 판들이 쓴 만큼(off) 밀어, 문제은행을 한 바퀴 다 돌 때까지 같은 글이 다시 나오지 않게 한다.
-   한 판 안에서 off는 바뀌지 않는다(판이 끝날 때 Book.newVillage · resetVillage가 더한다). 씨앗이 기록과 다른 판(이어 순서를 켜기 전에 시작한 판 등)·?order=0은 밀지 않는다 */
+   한 판 안에서 off는 바뀌지 않는다(판이 끝날 때 Book.newVillage · resetVillage가 더한다. 판 중간에 나이를 바꾸면 떠난 나이만 그 자리에서 민다: ageLeft). 씨앗이 기록과 다른 판(이어 순서를 켜기 전에 시작한 판 등)·?order=0은 밀지 않는다 */
 const ordOff=()=>book&&Book.BOOK.FLAGS.order&&state.seed===book.order.seed?Book.orderFor(book,state.age).off:undefined;
 function waveInterval(){let sum=0;const off=ordOff();for(let i=0;i<TEMPO_SPAN;i++)sum+=Combat.baseSeconds(Questions.at(state.age,state.mode,state.index+i,state.seed,state.bank,off));return World.tempoInterval(sum/TEMPO_SPAN)}
 /* guard(0.10): 새 판은 처음 한 번에 맞힐 때까지(3번) 늑대가 쫓기만 하고, 마지막 닭 한 마리는 늘 지켜진다 */
@@ -436,7 +436,8 @@ function bookSave(force){
  if(!book||!bookDirty)return;const now=Date.now();
  if(!force&&phase==='ask'&&now-bookSavedAt<30000)return;
  bookSavedAt=now;if(bookH.locked){bookDirty=false;return}
- if(Book.save(localStorage,BK,bookH)){bookDirty=false;bookWrites++}else if(!bookFail){bookFail=true;say('저장 공간을 사용할 수 없어요. 이번 판은 계속할 수 있어요.')}
+ /* bookFailNow: 마지막 쓰기가 실패했는가(보호자 기록 탭 경고, 명세 §2.5. 리뷰 0.16 W) */
+ if(Book.save(localStorage,BK,bookH)){bookDirty=false;bookWrites++;bookFailNow=false}else{bookFailNow=true;if(!bookFail){bookFail=true;say('저장 공간을 사용할 수 없어요. 이번 판은 계속할 수 있어요.')}}
 }
 
 /* ---------- 그림 마을(3D를 못 쓰는 기기) ---------- */
@@ -1194,8 +1195,11 @@ const laterNotes=[];
 function later(icon,text,sub){if(phase==='reward'||phase==='learn')banner(icon,text,sub,false,false,true);else{laterNotes.push([icon,text,sub]);if(laterNotes.length>4)laterNotes.shift()}}
 function flushLater(){while(laterNotes.length){const n=laterNotes.shift();banner(n[0],n[1],n[2],false,false,true)}}
 /* 이번 판에 얻은 것(엔딩 카드 요약용, 화면 기억: 저장하지 않는다) */
-let gain={foot:0,card:0,ribbon:0,shiny:0,medal:[0,0,0]},lastBoost=0,sleepyOn=false;
-function gainReset(){gain={foot:0,card:0,ribbon:0,shiny:0,medal:[0,0,0]};lastBoost=0;laterNotes.length=0}
+/* lastBoost: 직전 정답의 신바람 단계(신바람 훈장은 2단에 "새로 오를 때"만 센다). 불러온 판이 이미 6연속 이상이면 2단에 있던 것으로 시작한다.
+   전에는 0으로 시작해 6연속 이상인 채로 새로고침할 때마다 다음 정답에서 한 번 더 셌다(리뷰 0.16 R6) */
+const boostNow=()=>(state.streak|0)>=Combat.FLOW.boost2?2:0;
+let gain={foot:0,card:0,ribbon:0,shiny:0,medal:[0,0,0]},lastBoost=boostNow(),sleepyOn=false;
+function gainReset(){gain={foot:0,card:0,ribbon:0,shiny:0,medal:[0,0,0]};lastBoost=boostNow();laterNotes.length=0}
 function bookGot(r){if(!r)return;if(r.foot)gain.foot++;if(r.friend)gain.card++;if(r.ribbon)gain.ribbon++;if(r.shiny)gain.shiny++;for(const m of r.medals||[])gain.medal[m.tier-1]++;bookDirty=true}
 const josa=(w,a,b)=>w+(Questions.hangul.hasBatchim([...w].pop())?a:b);
 /* 정답 화살에 쓰러진 몬스터(여우는 구출, 왕은 승리)가 이름 쪽지를 떨어뜨림: 3D에는 종이 한 장, 띠 알림은 문제 사이에 */
@@ -1257,8 +1261,14 @@ function wakeUp(){
 /* 저장소에서 판 저장과 기록을 다시 읽어 시작 화면으로(진행 파일 바꾸기·되돌리기·모든 기록 지우기 뒤) */
 function reloadFromStore(){
  let saved=null;try{saved=JSON.parse(localStorage.getItem(KEY))}catch{}
- state=saved&&typeof saved==='object'?Combat.restore(saved,AGES):Combat.fresh(8);if(!(state.seed>0))state.seed=newSeed();if(!state.run.t0)state.run.t0=Date.now();
- bookOpen();gainReset();world=freshWorld();flowSync();state.broken=World.brokenCount(world);syncKing(true);resetView();round=null;phase='start';sleepyOn=false;
+ const kept=!!saved&&typeof saved==='object'&&(saved.version===1||saved.version===Combat.SAVE_VERSION);
+ state=saved&&typeof saved==='object'?Combat.restore(saved,AGES):Combat.fresh(8);
+ /* 처음 불러올 때(맨 위)와 같은 정리: 체험 마을 · 씨앗 · 문제은행 판. 전에는 판 저장이 없을 때(모든 기록 지우기 · 판 없는 진행 파일) bank 0으로 시작해,
+    다시 열면 예전 판(1)으로 바뀌어 하던 판의 문제가 달라지고 새 마을도 예전 판으로 갔다(리뷰 0.16 R2) */
+ if(DEMO&&!state.wins&&!state.index)Object.assign(state,DEMO_VILLAGE[DEMO]);
+ if(!(state.seed>0))state.seed=newSeed();if(!(state.bank>=1&&state.bank<=Questions.BANK_VERSION))state.bank=kept?1:Questions.BANK_VERSION;if(!state.run.t0)state.run.t0=Date.now();
+ bookOpen();applyMix();applySfx();/* 다시 읽은 기록의 영어 설정을 문제은행에(전에는 지우기·바꾸기 전 기록의 비중이 다시 열 때까지 남았다, 리뷰 0.16 R1). 무리 간격(freshWorld)보다 먼저 */
+ gainReset();ageMark='';world=freshWorld();flowSync();state.broken=World.brokenCount(world);syncKing(true);resetView();round=null;phase='start';sleepyOn=false;
  for(const id of ['ending','sleepy','bookScreen','guardian','gate'])$(id).hidden=true;$('start').hidden=false;$('age').value=String(state.age);drawStart();
 }
 
@@ -1279,15 +1289,25 @@ function changeSetting(){
  if(phase==='ask'){const tries=round.tries;newRound();round.tries=tries;say(state.age+'세 문제로 바꿨어요. 늑대는 그대로 와요.');render()}
  else{say('다음 문제부터 '+state.age+'세 문제가 나와요.');save();render()}
 }
-$('age').value=String(state.age);$('age').onchange=()=>{const age=Number($('age').value);if(!AGES.includes(age)||paused){$('age').value=String(state.age);return}state.age=age;changeSetting()};
+/* 판 중간에 나이를 바꾸면 떠나는 나이의 이어 순서를 이 판에서 쓴 만큼 민다(판 끝의 ordDone()은 마지막 나이만 센다). 전에는 떠난 나이의 글이
+   다음에 그 나이로 놀 때 처음부터 다시 나왔다(한 바퀴 안 같은 글, 리뷰 0.16 G). 그 나이로 마지막에 답했을 때만(답하지 않고 나이를 오가면 밀지 않음), 같은 자리에서는 한 번만.
+   이 판에서 그 나이로 돌아오면 민 자리부터 낸다(건너뛴 글은 다음 바퀴에 나오고, 같은 글이 되풀이되지는 않음).
+   ageMark(같은 자리 한 번만)는 새 판을 시작할 때(새 마을 · 마을을 처음부터 · 기록 다시 읽기) 비운다: 처음부터 뒤 새 판도 판 번호가 1이라 앞 판의 표시와 겹쳤다 */
+let ageMark='';
+function ageLeft(old){
+ if(!book||old===state.age||!AGES.includes(old)||!Book.BOOK.FLAGS.order||state.seed!==book.order.seed||!(state.index>0)||book.cur.age!==old)return;
+ const mark=state.run.no+':'+state.index+':'+old;if(mark===ageMark)return;ageMark=mark;
+ Book.advanceOrder(book,old,Questions.used(old,state.index,state.seed,state.bank),{bank:state.bank,latest:Questions.BANK_VERSION,size:Questions.bankCount(old,state.bank)});bookDirty=true;
+}
+$('age').value=String(state.age);$('age').onchange=()=>{const age=Number($('age').value);if(!AGES.includes(age)||paused){$('age').value=String(state.age);return}const was=state.age;state.age=age;ageLeft(was);changeSetting()};
 /* 처음부터 시작: 마을·금화·도장(지도)을 새로 만든다. 수첩 MVP: 수첩·훈장·기억 늑대 기록은 지우지 않는다(판 저장만 새로, Book.resetVillage). 모든 기록 지우기는 보호자 화면에서만 */
-$('reset').onclick=()=>{if(!confirm(book?'마을을 처음부터 다시 시작할까요? 수첩과 훈장은 그대로 남아요.':'저장된 금화와 마을을 초기화할까요?'))return;let ord=null;if(book){ord=Book.resetVillage(book,Date.now(),ordDone());bookDirty=true;gainReset()}
+$('reset').onclick=()=>{if(!confirm(book?'마을을 처음부터 다시 시작할까요? 수첩과 훈장은 그대로 남아요.':'저장된 금화와 마을을 초기화할까요?'))return;ageMark='';let ord=null;if(book){ord=Book.resetVillage(book,Date.now(),ordDone());bookDirty=true;gainReset()}
  state=Object.assign(Combat.fresh(state.age),{seed:ord&&ord.seed&&Book.BOOK.FLAGS.order?ord.seed:newSeed(),bank:ord&&ord.bank||Questions.BANK_VERSION},DEMO?DEMO_VILLAGE[DEMO]:{});state.run.t0=Date.now();world=freshWorld();resetView();$('ending').hidden=true;$('sleepy').hidden=true;sleepyOn=false;nextQuestion()};
 /* 엔딩 카드의 두 버튼. 새 마을: 회관 0부터, 도장 수만큼 타워·닭을 덤으로(Combat.nextRun), 늑대 세계도 새로. 더 놀기: 이 마을에서 자유 놀이(잔치가 열리고, 기본은 늑대 없음) */
 $('endNew').onclick=()=>{
  if(phase!=="ending"||state.run.bell<3)return;
  /* 수첩: 놀이 번호 +1, 이 판이 쓴 만큼 이어 순서를 민다. 새 판은 같은 씨앗으로, 문제은행 판은 읽기 묶음 한 바퀴가 끝난 곳에서만 최신으로 올린다(Book.advanceOrder) */
- let ord=null;if(book){ord=Book.newVillage(book,Date.now(),ordDone());bookDirty=true;gainReset()}
+ let ord=null;ageMark='';if(book){ord=Book.newVillage(book,Date.now(),ordDone());bookDirty=true;gainReset()}
  const next=Combat.nextRun(state,{seed:ord&&ord.seed&&Book.BOOK.FLAGS.order?ord.seed:newSeed(),bank:ord&&ord.bank||Questions.BANK_VERSION,now:Date.now()});if(!next)return;
  state=next;world=freshWorld();resetView();$('ending').hidden=true;nextQuestion();
  banner('🗺️',Combat.VILLAGE_NAME[state.run.village]+' 마을에 왔어요!',state.run.built0?'타워와 꼬꼬를 덤으로 데려왔어요':'');
@@ -1298,10 +1318,14 @@ $('endStay').onclick=()=>{
  worldNote={text:'🎉 늑대 왕을 물리친 마을이에요. 잔치를 열어요!',until:world.t+60};render();
 };
 $('motion').onchange=()=>document.body.classList.toggle('reduced',$('motion').checked);
+/* 효과음 켜고 끄기는 기록(set.sfx)에 둔다. 전에는 기록에 칸만 있고 아무도 쓰지 않아, 끈 효과음이 다시 열면 켜졌다(리뷰 0.16). 수첩이 꺼져 있으면 0.15처럼 페이지 기본값 */
+function applySfx(){if(book)$('sfx').checked=!!book.set.sfx}
+$('sfx').onchange=()=>{if(!book)return;Book.setOpt(book,'sfx',$('sfx').checked,{now:Date.now()});bookDirty=true;bookSave(true)};
+applySfx();
 if(DEMO){const t=document.querySelector('header small');if(t){const d=document.createElement('span');d.className='demo-tag';d.textContent='체험: 마을회관 '+DEMO+'단계';t.append(' · ',d)}}
 /* 시작 화면: 나이만 고른다. */
 function drawStart(){
- if(!$('ageRow').children.length)for(const a of AGES){const b=document.createElement('button');b.textContent=a+'살';b.dataset.age=String(a);b.onclick=()=>{state.age=a;regrow();drawStart()};$('ageRow').append(b)}
+ if(!$('ageRow').children.length)for(const a of AGES){const b=document.createElement('button');b.textContent=a+'살';b.dataset.age=String(a);b.onclick=()=>{const was=state.age;state.age=a;ageLeft(was);regrow();drawStart()};$('ageRow').append(b)}
  for(const b of $('ageRow').children)b.classList.toggle('on',Number(b.dataset.age)===state.age);
  put($('go'),state.run.bell===3||state.round&&state.round.token===token()?'이어서 하기 ▶':'시작하기 ▶');drawMap($('mapRow'),false);if(window.bookStart)window.bookStart();render();
 }
