@@ -2063,6 +2063,11 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   eq([d.game().book.status,d.game().book.locked,Object.keys(saved).filter(k=>k.includes('book')),d.game().book.data.medal.one.n],['memory',true,[],1],'체험(?demo=1): 기록은 메모리 안에서만(열쇠를 쓰지 않음)');
   saved={};const t=boot({book:true,query:'?test=1'});t.go();t.unlock();t.right();
   ok((BOOK_KEY+'-test') in saved&&!(BOOK_KEY in saved),'시험 모드(?test=1)는 -test 열쇠');
+  /* 리뷰 0.16 R7: 단계 끄기 주소(?stages=0)는 판 저장처럼 기록도 따로. 전에는 아이 기록 열쇠를 같이 써서 수첩·하루 시간이 섞이고 모든 기록 지우기가 아이 기록까지 지웠다 */
+  withFlags({},()=>{const kid=JSON.stringify(Bk.fresh(Date.now(),9));saved={[BOOK_KEY]:kid};const s=boot({book:true,query:'?stages=0'});s.go();s.unlock();s.right();
+   ok((BOOK_KEY+'-stages0') in saved&&saved[BOOK_KEY]===kid&&s.game().book.status==='new','?stages=0: 기록은 -stages0 열쇠에, 아이 기록은 글자 그대로');
+   press(s,'openGuard',2100);gatePass(s);s.n.gTabs.children.find(b=>b.dataset.tab==='set').click();s.n.gBody.children.find(c=>c.textContent==='모든 기록 지우기').click();gatePass(s);
+   ok(saved[BOOK_KEY]===kid&&!((BOOK_KEY+'-stages0') in saved),'?stages=0에서 모든 기록 지우기는 그 주소의 기록만')});
  }
  {saved={[BOOK_KEY]:'{깨진 글'};const a=boot({book:true});a.go();a.unlock();a.right();
   eq([a.game().book.status,stored().medal.one.n],['broken',1],'깨진 기록이 판을 막지 않음(새 기록으로 계속)');

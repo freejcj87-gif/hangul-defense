@@ -345,7 +345,7 @@ if(!state.run.t0)state.run.t0=Date.now();/* 판 시작 시각(보호자 보기�
 const qOff=n=>{try{return new RegExp('[?&]'+n+'=0\\b').test(location.search)}catch{return false}};
 const BOOK_ON=typeof Book!=='undefined'&&typeof NOTES!=='undefined'&&!!Book.BOOK.ON&&!qOff('book');
 if(BOOK_ON)for(const f of Object.keys(Book.BOOK.FLAGS))if(qOff(f))Book.BOOK.FLAGS[f]=false;
-const BK=BOOK_ON?Book.keys({demo:DEMO,test:TEST,runKey:KEY}):null;
+const BK=BOOK_ON?Book.keys({demo:DEMO,test:TEST,tag:STAGES_OFF?'stages0':'',runKey:KEY}):null;/* ?stages=0은 판 저장처럼 기록도 따로(리뷰 0.16 R7) */
 /* 문항 id → 은행 문항 복사본(기억 늑대가 다시 낼 글). Questions.byId가 생기면(문제은행 판 연결 뒤) 그것을 쓴다 */
 let QMAP=null;
 function qById(id){

@@ -269,6 +269,8 @@ const played=(()=>{const b=mk(5);let t=T;
 eq(B.keys({}),{book:'hangul-defense-book',bak:'hangul-defense-book-bak',run:null},'열쇠 이름');
 eq(B.keys({test:true,runKey:'hangul-defense-v1-test'}),{book:'hangul-defense-book-test',bak:'hangul-defense-book-test-bak',run:'hangul-defense-v1-test'},'시험 모드 열쇠 -test');
 eq([B.keys({demo:2}).book,B.keys({off:true}).book],[null,null],'체험·?book=0은 기록 열쇠 없음');
+eq([B.keys({tag:'stages0',runKey:'hangul-defense-v1-stages0'}),B.keys({tag:'stages0',test:true}).book,B.keys({tag:'../x'}).book,B.keys({tag:''}).book],
+ [{book:'hangul-defense-book-stages0',bak:'hangul-defense-book-stages0-bak',run:'hangul-defense-v1-stages0'},'hangul-defense-book-stages0-test','hangul-defense-book','hangul-defense-book'],'판 저장을 따로 쓰는 주소(?stages=0)는 기록 열쇠도 따로(리뷰 0.16 R7), 이상한 꼬리는 무시');
 const KS=B.keys({runKey:'hangul-defense-v1'});
 {const st=new Store(),h=B.open(st,KS,{now:T,seed:42});
  eq([h.status,h.locked,h.book.order.seed,h.book.from],['new',false,42,0],'기록이 없으면 새 기록(씨앗 = 지금 판 씨앗)');

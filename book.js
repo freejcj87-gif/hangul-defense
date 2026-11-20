@@ -151,8 +151,10 @@
   }
 
   /* ---------- 저장소(인자로 받은 storage에만 손댐) ---------- */
-  /* 열쇠: 체험(?demo=N)·?book=0은 기록을 읽지도 쓰지도 않는다(book=null). 시험(?test=1)은 -test. run = 화면이 쓰는 판 저장 열쇠 */
-  function keys(opt){const o=opt||{},book=o.off||o.demo?null:'hangul-defense-book'+(o.test?'-test':'');return {book,bak:book?book+'-bak':null,run:o.runKey||null}}
+  /* 열쇠: 체험(?demo=N)·?book=0은 기록을 읽지도 쓰지도 않는다(book=null). 시험(?test=1)은 -test. run = 화면이 쓰는 판 저장 열쇠.
+     tag = 판 저장을 따로 쓰는 주소의 꼬리(?stages=0 → 'stages0'): 기록도 따로 둔다. 전에는 단계 끄기 주소로 놀면 아이 기록(수첩·하루 시간·이어 순서)이 바뀌고,
+     거기서 모든 기록 지우기를 누르면 아이 기록까지 지워졌다(리뷰 0.16 R7) */
+  function keys(opt){const o=opt||{},tag=typeof o.tag==='string'&&/^[a-z0-9]{1,16}$/.test(o.tag)?'-'+o.tag:'',book=o.off||o.demo?null:'hangul-defense-book'+tag+(o.test?'-test':'');return {book,bak:book?book+'-bak':null,run:o.runKey||null}}
   /* 저장 글을 읽어 기록으로. status: none(없음) · ok · broken(깨짐: 새 기록으로 시작) · newer(앱보다 새 버전: 메모리 안 새 기록, 쓰지 않음) */
   function parse(text,opt){
     const o=opt||{},now=nowOf(o.now);
