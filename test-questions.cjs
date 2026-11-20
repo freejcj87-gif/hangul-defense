@@ -727,7 +727,11 @@ const gfile=path.join(__dirname,'questions-gen.js'),gbuf=fs.readFileSync(gfile);
 /* 크기는 저장소·배포 기준(LF)으로 셈: Windows 체크아웃(autocrlf)의 CR은 빼고 */
 const lfSize=b=>Buffer.byteLength(b.toString('utf8').replace(/\r\n/g,'\n'));
 ok(lfSize(buf)<=60*1024,'questions.js 60KB 이하 ('+lfSize(buf)+')');
-ok(lfSize(gbuf)<=1024*1024,'questions-gen.js 1MB 이하 ('+lfSize(gbuf)+'). 은행 판 2에서 약 690KB(gzip 약 95KB)');
+/* 은행 판 4(2026-11-20): 한 파일 그대로 두고 한도를 1MB → 1.5MB로 올리고, 실제 전송 크기(gzip) 한도를 함께 둔다(근거 docs/bank-v4-20261120.md 2절).
+   GitHub Pages는 이 파일을 gzip으로 보낸다. 판 3 705,967B(gzip 96KB) → 판 4 1,020,688B(gzip 143KB). 첫 화면 묶음(png·glb·village.js) 약 12MB 가운데 1% 남짓 */
+{const lfBuf=Buffer.from(gbuf.toString('utf8').replace(/\r\n/g,'\n')),gz=require('node:zlib').gzipSync(lfBuf).length;
+ ok(lfBuf.length<=1536*1024,'questions-gen.js 1.5MB 이하 ('+lfBuf.length+')');
+ ok(gz<=220*1024,'questions-gen.js gzip 220KB 이하 ('+gz+'). 넘으면 나이별 파일 나누기(필요한 나이만 불러오기)를 검토')}
 for(const [name,b] of [['questions.js',buf],['questions-gen.js',gbuf]]){
   ok(!(b[0]===0xEF&&b[1]===0xBB&&b[2]===0xBF),name+' BOM 없음');
   ok(!b.toString('utf8').includes('�'),name+' UTF-8로 깨짐 없이 읽힘');
