@@ -1271,7 +1271,7 @@ function reloadFromStore(){
    ?book3d=0 · ?book=0이면 모두 끔. 수치는 Book.BOOK.SCENE */
 var b3=null;
 function b3S(){return book&&Book.BOOK.FLAGS.book3d!==false&&Book.BOOK.SCENE?Book.BOOK.SCENE:null}
-function b3Reset(){b3={note:null,sign:null,visit:null,quiet:0,wait:null,n:0,seq:0,last:null,visits:0,reads:0,downs:0}}
+function b3Reset(){b3={note:null,sign:null,visit:null,quiet:0,wait:null,n:0,seq:0,last:null,visits:0,papers:0,reads:0,signs:0,downs:0}}
 b3Reset();
 const b3r=v=>Math.round(v*100)/100;
 /* 쪽지 종이를 놓을 자리: 쓰러진 자리(숲 쪽 화면 밖이면 마을 반지름 + edge까지 당김), 자리를 모르면 첫 길 앞 */
@@ -1279,7 +1279,7 @@ function b3Paper(kind,at){
  const S=b3S();if(!S)return null;if(!b3)b3Reset();const R=World.radius(world);
  let x=at&&Number.isFinite(at.x)?at.x:Math.cos(.39)*(R+1.5),z=at&&Number.isFinite(at.z)?at.z:Math.sin(.39)*(R+1.5);
  const r=Math.hypot(x,z),lim=R+S.edge;if(r>lim){x*=lim/r;z*=lim/r}
- b3.note={id:++b3.seq,kind,x:b3r(x),z:b3r(z),age:0};return b3.note;
+ b3.papers++;b3.note={id:++b3.seq,kind,x:b3r(x),z:b3r(z),age:0};return b3.note;
 }
 /* 길 p가 강(물레방아 마을부터) 쪽이면 친구가 물을 건너지 않게 고르지 않는다 */
 function b3RiverRoad(p,S){if(!rivered()||stageNow()<3)return false;let d=Math.abs(((p+.5)*45-FALLBACK_RIVER.dir)%360);if(d>180)d=360-d;return d<S.river}
@@ -1297,7 +1297,7 @@ function b3Tick(){
   if(!g.wolf&&!g.down&&phase==='ask'){let best=null,far=null,fr=R+.5;
    for(const v of world.wolves){if(v.state==='dead'||v.state==='gone'||v.state==='leave'||v.state==='carry')continue;
     if(v.id>=g.since){if(!best||v.id<best.id)best=v}else if(g.t>=S.sign){const r=Math.hypot(v.x,v.z);if(r>fr){fr=r;far=v}}}
-   if(best||far)g.wolf=(best||far).id}
+   if(best||far){g.wolf=(best||far).id;b3.signs++}}
   if(round.result==='first'&&!g.down){g.down=true;if(g.wolf){b3.downs++;view([{type:'signDown',wolf:g.wolf}])}}
  }else b3.sign=null;
  /* 친구 방문: 늑대 · 늑대 왕 · 여우가 없는 틈(결전 앞뒤 제외)이 S.quiet틱 이어지면, 간격이 지난 뒤 한 마리가 열린 길로 걸어와 울타리 밖에서 인사하고 돌아간다 */
@@ -1324,11 +1324,11 @@ function b3Tick(){
 function b3View(){
  if(!b3S()||!b3)return null;const n=b3.note,g=b3.sign,v=b3.visit;
  return {note:n?{id:n.id,kind:n.kind,x:n.x,z:n.z}:null,sign:g&&g.wolf?{wolf:g.wolf,down:g.down}:null,
-  visit:v?{id:v.id,kind:v.kind,ribbon:v.ribbon,shiny:v.shiny,x:v.x,z:v.z,act:v.act,road:v.road}:null,visits:b3.visits,reads:b3.reads,downs:b3.downs};
+  visit:v?{id:v.id,kind:v.kind,ribbon:v.ribbon,shiny:v.shiny,x:v.x,z:v.z,act:v.act,road:v.road}:null,visits:b3.visits,papers:b3.papers,reads:b3.reads,signs:b3.signs,downs:b3.downs};
 }
 window.getBook3dState=b3View;
 /* 3D 종이를 누름(장면 안 손길, 규칙에는 영향 없음): 아래 상태 줄에 한 줄 */
-window.onBookPaper=()=>{if(!b3||!b3.note||phase==='start'||phase==='ending')return false;const M=NOTES.MON[b3.note.kind];worldNote={text:'📜 '+josa(M.name,'이','가')+' 떨어뜨린 이름 쪽지예요. 곧 쪽지 문제가 나와요',until:world.t+30,low:true};frame();return true};
+window.onBookPaper=()=>{if(!b3||!b3.note||phase==='start'||phase==='ending')return false;if(worldNote&&!worldNote.low)return true;/* 부서짐·여우 같은 알림은 가리지 않음 */const M=NOTES.MON[b3.note.kind];worldNote={text:'📜 '+josa(M.name,'이','가')+' 떨어뜨린 이름 쪽지예요. 곧 쪽지 문제가 나와요',until:world.t+30,low:true};frame();return true};
 /* 그림 화면: 늑대와 같은 % 변환으로 같은 자리에 작은 표시(3D 화면에서는 #enemies째 숨음) */
 function b3Draw(){
  if(!b3)return;const on=fallbackOn()&&!!b3S()&&phase!=='start';
