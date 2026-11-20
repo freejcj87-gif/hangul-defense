@@ -1,6 +1,7 @@
 /* node test-book.cjs : 발자국 수첩 MVP 1단계 검사(브라우저 없음).
    A. 콘텐츠(notes.js): 몬스터 카드 8종 · 쪽지 문항 64 · 영어 이름 문항 48 — 기존 문제은행 검사 규칙(나이 수준·맞춤법·조사·금지 낱말)을 그대로 적용
    B. 기록 모듈(book.js): 아래 'B.' 절부터
+   C. 0.17 친구 카드 그림(cards.js · art/cards 16장): 경로·파일(webp, 300×400, 크기)·배포 목록·그림을 못 불러올 때 그림 문자 대체
    SOFT=1 이면 첫 실패에서 멈추지 않고 모아 보여 준다. */
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const Q=require('./questions.js'),C=require('./combat.js'),W=require('./world.js'),N=require('./notes.js');
@@ -729,5 +730,46 @@ withBook({ON:false},()=>{const b=mk(),x=clone(b);
   Q.setMix();for(const a of Q.AGES){eq(JSON.stringify(Array.from({length:200},(_,i)=>Q.at(a,'story',i,99))),base[a],a+'세: 되돌리면 처음과 같은 출제');eq(Q.QUIZ_MIX[a],K.MIX.std[a],a+'세: 처음 비중')}
   for(const a of [9,10]){const [all]=share(a);ok(all>0,a+'세 보통: 영어 '+(100*all).toFixed(1)+'%')}}
 }
+/* ======================= C. 0.17 친구 카드 그림(cards.js · art/cards) ======================= */
+const C_FROM=n;
+{const CA=require('./cards.js'),Pg=require('./scripts/build-pages.cjs'),dir=path.join(__dirname,'art','cards');
+ eq(CA.KINDS,N.KINDS,'카드 그림 8종 = 수첩 8종(같은 순서)');
+ eq(CA.ALL.length,16,'카드 그림 16장(8종 × 보통·반짝)');eq(new Set(CA.ALL).size,16,'카드 그림 경로가 서로 다름');
+ eq(CA.ALL,N.KINDS.flatMap(k=>['art/cards/'+k+'.webp','art/cards/'+k+'-shiny.webp']),'경로 = art/cards/<키>.webp · art/cards/<키>-shiny.webp');
+ ok(CA.ALL.every(p=>!p.startsWith('/')&&!p.includes('..')&&!/^[a-z]+:/i.test(p)),'카드 그림은 상대 경로만(Pages · Android 오프라인 포장에서 같은 자리)');
+ let total=0;
+ for(const p of CA.ALL){const f=path.join(__dirname,p);ok(fs.existsSync(f),p+': 파일 있음');if(!fs.existsSync(f))continue;
+  const b=fs.readFileSync(f);total+=b.length;
+  ok(b.toString('latin1',0,4)==='RIFF'&&b.toString('latin1',8,12)==='WEBP'&&b.readUInt32LE(4)+8===b.length,p+': webp 파일');
+  /* 확장 머리(VP8X)의 캔버스 크기: 24비트 (너비-1)·(높이-1). 투명 배경이라 확장 머리가 있어야 함 */
+  ok(b.toString('latin1',12,16)==='VP8X'&&(b[20]&0x10)!==0,p+': 투명(알파) webp');
+  eq([1+b.readUIntLE(24,3),1+b.readUIntLE(27,3)],[CA.W,CA.H],p+': 300×400(카드 3:4)');
+  ok(b.length<=64*1024,p+': 64KB 이하('+b.length+')');
+ }
+ ok(total<=1024*1024,'카드 그림 16장 합계 1MB 이하('+total+')');
+ eq(fs.readdirSync(dir).filter(f=>!f.startsWith('.')).sort(),CA.ALL.map(p=>path.basename(p)).sort(),'art/cards에는 16장만(쓰지 않는 그림 없음)');
+ /* 배포 묶음 · 워크플로 */
+ eq(Pg.cards,CA.ALL,'배포 목록(build-pages.cjs)의 카드 그림 = cards.js 목록');ok(Pg.files.includes('cards.js')&&CA.ALL.every(p=>Pg.files.includes(p)),'배포 묶음에 cards.js와 카드 그림 16장');
+ for(const wf of ['pages.yml','package-test.yml']){const y=fs.readFileSync(path.join(__dirname,'.github','workflows',wf),'utf8');ok(/- cards\.js/.test(y)&&/- art\/cards\/\*\*/.test(y),wf+': cards.js · art/cards가 바뀌면 다시 묶음')}
+ {const y=fs.readFileSync(path.join(__dirname,'.github','workflows','pages.yml'),'utf8');ok(y.includes("'art/cards/'")&&y.includes('WEBP'),'pages.yml: 실제 주소에서 카드 그림 16장 확인')}
+ const page=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');
+ ok(page.indexOf('<script src="cards.js')>page.indexOf('<script src="notes.js')&&page.indexOf('<script src="cards.js')<page.indexOf('<script src="book.js'),'index.html이 cards.js를 notes.js 뒤 · book.js 앞(인라인 스크립트 전)에 불러옴');
+ ok(/function cardPic\(kind,shiny\)\{\s*if\(window\.CARDS\)return window\.CARDS\.make\(document,kind,shiny,NOTE_ICON\[kind\]/.test(page),'cardPic: cards.js가 있으면 CARDS.make, 없으면 그림 문자(NOTE_ICON)');
+ ok(/cardPic\(kind,false\)/.test(fs.readFileSync(path.join(__dirname,'bookui.js'),'utf8'))&&/i\.append\(cardPic\(kind,false\)\)/.test(page),'수첩 쪽(bookui.js)과 친구 카드 연출(index.html)이 카드 그림을 씀');
+ /* 대체 길: 가짜 문서로 만든 틀. 그림을 못 불러오면(onerror) 그 자리를 그림 문자로 바꾼다 */
+ class FE{constructor(t){this.tagName=t;this.children=[];this.attrs={};this._t='';this._c=new Set();this.classList={add:(...x)=>x.forEach(c=>this._c.add(c)),contains:c=>this._c.has(c)}}
+  get className(){return [...this._c].join(' ')}set className(v){this._c=new Set(String(v).split(/\s+/).filter(Boolean))}
+  get textContent(){return this._t+this.children.map(c=>c.textContent).join('')}set textContent(v){this._t=String(v);this.children=[]}
+  setAttribute(k,v){this.attrs[k]=String(v)}append(...xs){for(const x of xs){x.parentNode=this;this.children.push(x)}}remove(){const p=this.parentNode;if(p)p.children=p.children.filter(c=>c!==this)}}
+ const doc={createElement:t=>new FE(t)};
+ for(const [kind,shiny] of [['wolf',false],['king',true]]){const box=CA.make(doc,kind,shiny,'X'),img=box.children[0];
+  eq([box.tagName,box.className,box.attrs['aria-hidden'],box.children.length,img.tagName,img.src,img.alt],['span','card-art'+(shiny?' shiny':''),'true',1,'img','art/cards/'+kind+(shiny?'-shiny':'')+'.webp',''],kind+(shiny?' 반짝':'')+': 틀 안에 카드 그림');
+  img.onerror();eq([box.children.length,box.children[0].tagName,box.textContent,box.classList.contains('emoji'),img.onerror],[1,'i','X',true,null],kind+(shiny?' 반짝':'')+': 그림을 못 불러오면 그림 문자로 바뀜(한 번만)');
+ }
+ {const box=CA.make(doc,'nope',false,'🐺');eq([box.children.length,box.children[0].tagName,box.textContent,box.className],[1,'i','🐺','card-art emoji'],'모르는 종은 바로 그림 문자');eq(CA.make(doc,'nope',false).textContent,'❔','그림 문자가 없으면 ❔')}
+ /* 브라우저 전역 · 바깥 요청 없음 */
+ {const src=fs.readFileSync(path.join(__dirname,'cards.js'),'utf8'),win={};vm.runInNewContext(src,win);ok(win.CARDS&&win.CARDS.ALL.length===16,'브라우저에서는 window.CARDS');
+  for(const w of ['fetch(','XMLHttpRequest','http://','https://','localStorage','Date.now','Math.random'])ok(!src.includes(w),'cards.js는 '+w+'를 쓰지 않음')}
+}
 if(fails.length)process.exitCode=1;
-console.log((fails.length?'FAIL '+fails.length+' / ':'PASS ')+n+' book assertions (콘텐츠 '+A_COUNT+' · 기록 '+(n-A_COUNT)+').');
+console.log((fails.length?'FAIL '+fails.length+' / ':'PASS ')+n+' book assertions (콘텐츠 '+A_COUNT+' · 기록 '+(C_FROM-A_COUNT)+' · 카드 그림 '+(n-C_FROM)+').');

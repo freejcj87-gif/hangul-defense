@@ -26,9 +26,9 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
  const withBook=req=>/[?&]book=1\b/.test(String(req.headers.referer||''));
  const server=http.createServer((req,res)=>{
  const pathname=new URL(req.url,'http://localhost').pathname;
- const file=pathname==='/'?'index.html':['/combat.js','/world.js','/questions-gen.js','/questions.js','/village.js','/testmode.js','/notes.js','/bookui.js'].includes(pathname)||pathname==='/book.js'&&withBook(req)?pathname.slice(1):pathname==='/art-handoff/coopnight/source-3d/models/environment-pack.glb'?pathname.slice(1):/^\/art-handoff\/coopnight\/browser\/[a-z/-]+[0-9a-z-]*\.png$/.test(pathname)?pathname.slice(1):/^\/art-handoff\/v015-v016\/(glb\/[a-z-]+\.glb|png\/[a-z-]+\.png)$/.test(pathname)?pathname.slice(1):null;
+ const file=pathname==='/'?'index.html':['/combat.js','/world.js','/questions-gen.js','/questions.js','/village.js','/testmode.js','/notes.js','/cards.js','/bookui.js'].includes(pathname)||pathname==='/book.js'&&withBook(req)?pathname.slice(1):pathname==='/art-handoff/coopnight/source-3d/models/environment-pack.glb'?pathname.slice(1):/^\/art-handoff\/coopnight\/browser\/[a-z/-]+[0-9a-z-]*\.png$/.test(pathname)?pathname.slice(1):/^\/art-handoff\/v015-v016\/(glb\/[a-z-]+\.glb|png\/[a-z-]+\.png)$/.test(pathname)?pathname.slice(1):/^\/art\/cards\/[a-z]+(-shiny)?\.webp$/.test(pathname)?pathname.slice(1):null;
  if(!file||!fs.existsSync(path.join(output,file))){res.writeHead(404);return res.end()}
- res.setHeader('Content-Type',file.endsWith('.glb')?'model/gltf-binary':file.endsWith('.png')?'image/png':file.endsWith('.js')?'text/javascript; charset=utf-8':'text/html; charset=utf-8');
+ res.setHeader('Content-Type',file.endsWith('.glb')?'model/gltf-binary':file.endsWith('.png')?'image/png':file.endsWith('.webp')?'image/webp':file.endsWith('.js')?'text/javascript; charset=utf-8':'text/html; charset=utf-8');
  res.end(fs.readFileSync(path.join(output,file)));
  });
  await new Promise(r=>server.listen(0,'127.0.0.1',r));const url='http://127.0.0.1:'+server.address().port;
@@ -864,10 +864,15 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
  if(run('book')){const bookBrowser=await chromium.launch({headless:true,args:SWIFT});
   try{
    const BOOK_KEY='hangul-defense-book';
-   const open=async(w,h,seed)=>{const ctx=await bookBrowser.newContext({viewport:{width:w,height:h},hasTouch:true,reducedMotion:'reduce'});await ctx.addInitScript(HOLD);await ctx.addInitScript(FAKE_TTS);
+   /* noCards: 0.17 카드 그림(art/cards/*.webp) 요청을 막아 그림 문자 대체 길을 본다 */
+   const open=async(w,h,seed,noCards)=>{const ctx=await bookBrowser.newContext({viewport:{width:w,height:h},hasTouch:true,reducedMotion:'reduce'});await ctx.addInitScript(HOLD);await ctx.addInitScript(FAKE_TTS);
     if(seed)await ctx.addInitScript(s=>{if(!localStorage.getItem(s.key)){localStorage.setItem(s.key,s.book);localStorage.setItem('hangul-defense-v1',s.run)}},seed);
     const page=await ctx.newPage(),errors=[],outside=[];page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(!r.url().startsWith(url)&&!r.url().startsWith('data:')&&!r.url().startsWith('blob:'))outside.push(r.url())});
+    if(noCards)await page.route('**/art/cards/*.webp',r=>r.abort());
     await page.route('**/environment-pack.glb',r=>r.abort());await page.goto(url+'/?book=1');await ready(page);return {ctx,page,errors,outside}};
+   /* 0.17 카드 그림: 쪽마다 [그림 주소, 불러온 너비, 그림자 필터 여부, 그림 문자] */
+   const cardArt=page=>page.evaluate(()=>['wolf','bramble','king'].map(k=>{const pic=document.querySelector('#bookPages .book-page[data-kind="'+k+'"] .book-pic'),i=pic&&pic.querySelector('.card-art img');
+    return i?[i.getAttribute('src'),i.complete?i.naturalWidth:-1,getComputedStyle(i).filter!=='none']:[null,0,false,pic?pic.querySelector('.card-art').textContent:'']}).concat([document.querySelectorAll('#bookPages i.book-shiny').length]));
    /* 보호자 단추를 길게 누르고 글로 적힌 수를 눌러 문턱을 지난다 */
    const passGate=async page=>{await page.evaluate(()=>{const code=document.getElementById('gateCode').textContent,N={이:2,삼:3,사:4,오:5,육:6,칠:7,팔:8,구:9},m=/^(.)백(.)십(.)$/.exec(code);for(const c of [m[1],m[2],m[3]])[...document.getElementById('gatePad').children].find(b=>b.dataset.d===String(N[c])).click()})};
    const longPress=async(page,id)=>{await page.evaluate(id=>{const b=document.getElementById(id),now=Date.now;b.onpointerdown();Date.now=()=>now()+2500;b.onpointerup();Date.now=now},id)};
@@ -882,6 +887,8 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
     await page.locator('#openBook').click();ok(await page.locator('#bookScreen').isVisible(),tag+': notebook opens from the start screen');
     eq(await page.locator('#bookPages .book-page').count(),8,tag+': 8 pages');eq(await page.locator('#bookMedals .medal').count(),12,tag+': 12 medals');
     ok((await page.locator('#bookTitle').textContent()).includes('3 / 32'),tag+': cover count');
+    await page.waitForFunction(()=>[...document.querySelectorAll('#bookPages .card-art img')].every(i=>i.complete),{},{timeout:15000}).catch(()=>{});
+    eq(await cardArt(page),[['art/cards/wolf.webp',300,false],['art/cards/bramble.webp',300,true],[null,0,false,'❔'],2],tag+': card art (friend = picture, footprint = shadow of the picture, not met = empty frame, 2 shiny slots "?")');
     let f=await fits(page,'bookScreen');ok(f.left>=-.5&&f.right<=f.w+.5&&f.sw<=f.w&&f.small===0,tag+': notebook fits the width, buttons at least 44px '+JSON.stringify(f));
     await shot(page,'book-notebook-'+w+'x'+h);await page.locator('#bookClose').click();
     await longPress(page,'openGuard');ok(await page.locator('#gate').isVisible()&&!/\d/.test(await page.locator('#gateCode').textContent()),tag+': long press opens the adult check, the number is written in words');
@@ -896,9 +903,18 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
     ok(await page.locator('#quiz.note-q').isVisible()&&!(await page.locator('#pauseBook').isVisible()),tag+': note card, no notebook button while reading');
     await page.evaluate(()=>{const g=window.__game();window.__tick(Math.max(g.round.lock,40));document.querySelector('#answers button[data-i="'+g.round.answer+'"]').click()});
     const r=await game(page);eq([r.phase,r.state.index,r.book.data.mon.bramble.note],['reward',20,3],tag+': first-try answer makes a friend, the index still stays');
-    ok(await page.locator('.friend-card').isVisible(),tag+': friend card');await shot(page,'book-friend-'+w+'x'+h);
+    ok(await page.locator('.friend-card').isVisible(),tag+': friend card');
+    {const loaded=await page.waitForFunction(()=>{const i=document.querySelector('.friend-card .card-art img');return !!i&&i.complete&&i.naturalWidth>0},{},{timeout:2000}).then(()=>true,()=>false);
+     ok(loaded&&await page.evaluate(()=>document.querySelector('.friend-card .card-art img').getAttribute('src'))==='art/cards/bramble.webp',tag+': friend card shows the card art')}
+    await shot(page,'book-friend-'+w+'x'+h);
     await page.locator('#pause').click();ok(await page.locator('#pauseBook').isVisible(),tag+': notebook button while paused');
     eq(outside,[],tag+': no request leaves the page origin');eq(errors,[],tag+' page errors');await ctx.close()}
+   /* 0.17 카드 그림을 못 불러오면(요청 실패) 그 자리는 지금까지의 그림 문자 */
+   {const {ctx,page,errors}=await open(1180,820,book,true);await page.locator('#openBook').click();
+    await page.waitForFunction(()=>document.querySelectorAll('#bookPages .card-art img').length===0,{},{timeout:15000}).catch(()=>{});
+    eq(await cardArt(page),[[null,0,false,'🐺'],[null,0,false,'🌿'],[null,0,false,'❔'],2],'card art blocked: the emoji stands in');
+    ok(await page.evaluate(()=>getComputedStyle(document.querySelector('#bookPages .book-page[data-kind="bramble"] .book-pic>.card-art i')).filter!=='none'),'card art blocked: the footprint emoji is still a shadow');
+    await shot(page,'book-notebook-nocards-1180x820');eq(errors,[],'card art blocked: page errors');await ctx.close()}
    /* 수첩을 끄면(?book=0과 같은 길: book.js 없음) 수첩 단추가 없다 */
    {const ctx=await bookBrowser.newContext({viewport:{width:1366,height:640}});await ctx.addInitScript(HOLD);const page=await ctx.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.route('**/environment-pack.glb',r=>r.abort());await page.goto(url+'/?book=0');await ready(page);
     ok(!(await page.locator('#bookRow').isVisible())&&!(await page.locator('#openInfo').isVisible())&&(await page.locator('#reset').textContent())==='처음부터 시작','book=0: no notebook buttons, the 0.15 reset label');eq((await game(page)).book.on,false,'book=0: no record');eq(errors,[],'book=0 page errors');await ctx.close()}
