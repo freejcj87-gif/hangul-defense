@@ -1754,10 +1754,16 @@ async function start(){
     길마다 한 자리: 길 입구(울타리 바깥, 화면 안에 드는 가장 먼 곳)에 대형 깃발, 그 길 끝 숲 위(화면 안에 드는 가장 먼 곳) 하늘에 까마귀 2 + 그 길 묶음 수 마리가 맴돈다.
     글자 · 소리 · 깜빡임 · 카메라 움직임 없음. 날아들기 · 날아가기는 World.HERALD.arrive · leave초, 움직임 줄이기면 연출 없이 바로 서고 사라지며 까마귀는 멈춰 있다.
     그리기: 까마귀 몸 · 날개 · 대형별 깃발이 인스턴스 메시 하나씩(보일 때만, 그림자 없음), 땅 그늘은 기존 효과 풀(그리기 호출 늘지 않음) ----- */
- const HLOOK=(()=>{const H=W('HERALD');return H&&H.look&&Array.isArray(H.look.cloth)&&H.look.cloth.length===4?H.look:null})();
- const HCROWS=15,hspots=new Map();let hclock=0;
- const crowBody=HLOOK?instanced(crowGeometry(HLOOK),HCROWS,false):null,crowWing=HLOOK?instanced(crowWingGeometry(),HCROWS*2,false):null,heraldFlags=HLOOK?[0,1,2,3].map(fm=>instanced(heraldFlagGeometry(HLOOK,fm),3,false)):[];
- if(HLOOK){crowBody.name='herald-crow';crowWing.name='herald-wing';heraldFlags.forEach((m,fm)=>{m.name='herald-flag-'+fm});for(const m of [crowBody,crowWing,...heraldFlags]){m.receiveShadow=false;m.visible=false}}
+ // A herald that cannot be built or drawn turns itself off (warn once); it never takes the 3D village down with it (the frame loop falls back on any throw).
+ let HLOOK=(()=>{const H=W('HERALD');return H&&H.look&&Array.isArray(H.look.cloth)&&H.look.cloth.length===4?H.look:null})();
+ const HCROWS=15,hspots=new Map();let hclock=0,crowBody=null,crowWing=null,heraldFlags=[];
+ function heraldOff(error){console.warn('0.17 herald unavailable:',error&&error.message);HLOOK=null;hspots.clear();for(const m of [crowBody,crowWing,...heraldFlags])if(m){m.count=0;m.visible=false}}
+ if(HLOOK)try{
+  const made=[];const add=m=>{made.push(m);return m};
+  try{crowBody=add(instanced(crowGeometry(HLOOK),HCROWS,false));crowWing=add(instanced(crowWingGeometry(),HCROWS*2,false));heraldFlags=[0,1,2,3].map(fm=>add(instanced(heraldFlagGeometry(HLOOK,fm),3,false)))}
+  catch(error){for(const m of made)world.remove(m);crowBody=crowWing=null;heraldFlags=[];throw error}
+  crowBody.name='herald-crow';crowWing.name='herald-wing';heraldFlags.forEach((m,fm)=>{m.name='herald-flag-'+fm});for(const m of made){m.receiveShadow=false;m.visible=false}
+ }catch(error){heraldOff(error)}
  const heraldScale=()=>Math.max(1,fxScale*.8);
  const inView=(x,y,z,m)=>{ndc.set(x,y,z).project(camera);return Math.abs(ndc.x)<=m&&ndc.y<=m&&ndc.y>=-m};
  const ndcOf=(x,y,z)=>{ndc.set(x,y,z).project(camera);return [+ndc.x.toFixed(3),+ndc.y.toFixed(3)]};
@@ -1772,8 +1778,9 @@ async function start(){
   if(!rc){rc=rf+.8;yC=1.8*sc}
   return {fx:c*rf,fz:s*rf,cx:c*rc,cz:s*rc,yC,H};
  }
- function heraldStep(fdt,less){
-  if(!HLOOK)return;hclock+=fdt;
+ function heraldStep(fdt,less){if(!HLOOK)return;try{heraldMove(fdt,less)}catch(error){heraldOff(error)}}
+ function heraldMove(fdt,less){
+  hclock+=fdt;
   const h=curS&&curS.herald,live=new Set();
   if(h&&Array.isArray(h.points)&&Array.isArray(h.forms))h.points.forEach((p,i)=>{const pt=count(p,7),key=num(h.n)+':'+pt;live.add(key);let sp=hspots.get(key);
    if(!sp){sp={key,point:pt,age:less?9:0,out:-1,phase:pt*1.37+i*.6,dir:pt%2?-1:1,place:null,sc:1,fade:0};hspots.set(key,sp)}
@@ -1802,10 +1809,10 @@ async function start(){
   for(const m of [crowBody,crowWing,...heraldFlags]){m.visible=m.count>0;if(m.count)m.instanceMatrix.needsUpdate=true}
  }
  // soft ground shade under the circling crows and at the flag foot (drawn in the existing decal pool: no extra draw call)
- function heraldGround(){for(const sp of hspots.values()){const P=sp.place;if(!P)continue;decal(CELL.glow,P.cx,P.cz,2.6*sp.sc,INK,.16*sp.fade,0,.05);decal(CELL.glow,P.fx,P.fz,.9*sp.sc,INK,.28*sp.fade,0,.05)}}
+ function heraldGround(){if(HLOOK)for(const sp of hspots.values()){const P=sp.place;if(!P)continue;decal(CELL.glow,P.cx,P.cz,2.6*sp.sc,INK,.16*sp.fade,0,.05);decal(CELL.glow,P.fx,P.fz,.9*sp.sc,INK,.28*sp.fade,0,.05)}}
  function heraldInfo(){
   const all=[...hspots.values()],on=all.filter(sp=>sp.out<0&&sp.place);
-  return {spots:on.length,leaving:all.length-on.length,crows:crowBody?crowBody.count:0,flags:heraldFlags.reduce((n,m)=>n+m.count,0),
+  return {on:!!HLOOK,spots:on.length,leaving:all.length-on.length,crows:crowBody?crowBody.count:0,flags:heraldFlags.reduce((n,m)=>n+m.count,0),
    list:on.map(sp=>{const P=sp.place;return {point:sp.point,form:sp.form,crows:sp.k,flag:[+P.fx.toFixed(2),+P.fz.toFixed(2)],crow:[+P.cx.toFixed(2),+P.cz.toFixed(2)],flagNdc:ndcOf(P.fx,0,P.fz),flagTopNdc:ndcOf(P.fx,P.H,P.fz),crowNdc:ndcOf(P.cx,P.yC,P.cz)}})};
  }
 

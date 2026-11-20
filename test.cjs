@@ -733,6 +733,7 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
    if(query)eq([vs,v.herald.spots,v.herald.crows,v.herald.flags],[null,0,0,0],tag+': no herald at all');
    else{
     ok(!!vs&&vs.points.length>=1&&vs.form===2&&vs.left===38,tag+': the page reads the coming pack ahead (roads, formation 2 = split, 38 ticks left): '+JSON.stringify(vs));
+    eq(v.herald.on,true,tag+': the 3D herald was built (it turns itself off on an error instead of taking the village down)');
     eq([v.herald.list.map(s=>s.point),v.herald.list.map(s=>s.form)],[vs.points,vs.forms],tag+': one herald spot per road of the coming pack, the flag shows that road\'s formation');
     const off=(xz,p)=>{const d=Math.atan2(xz[1],xz[0])-(p+.5)*Math.PI/4;return Math.abs(Math.atan2(Math.sin(d),Math.cos(d)))};
     ok(v.herald.list.every(s=>off(s.flag,s.point)<.01&&off(s.crow,s.point)<.01),tag+': flag and crows stand on that road\'s side: '+JSON.stringify(v.herald.list));
