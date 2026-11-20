@@ -6,7 +6,7 @@
    - 두 번 그린다: 1차로 알파 경계를 재고, 2차에 setViewOffset으로 카드(3:4) 안에 같은 여백으로 맞춘다. 2배로 그려 줄여 계단을 없앤다. */
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { monsterGeometry, rigMaterial, rigDepthMaterial, RIG_TIME } from '../src/monsters.js';
+import { monsterGeometry, rigMaterial, RIG_TIME } from '../src/monsters.js';
 
 const W=300,H=400,SS=2,CW=W*SS,CH=H*SS;
 const GLB={king:'art-handoff/v015-v016/glb/wolf-king.glb',fox:'art-handoff/v015-v016/glb/thief-fox.glb'};
@@ -46,30 +46,30 @@ function codeMonster(kind,shiny,miss){
  const fill=(name,v)=>{const a=new Float32Array(n*4);for(let i=0;i<n;i++)a.set(v,i*4);g.setAttribute(name,new THREE.BufferAttribute(a,4))};
  fill('aPoseA',[P.hy,P.hp,P.jaw,P.ty]);fill('aPoseB',[P.tp,0,0,0]);fill('aPoseC',[0,P.hr,1.3,0]);fill('aPoseD',[0,0,0,0]);
  if(shiny)for(const h of recolor(g.attributes.color,SHINY[kind]))miss.add(h);
- const mesh=new THREE.Mesh(g,rigMaterial(kind));mesh.customDepthMaterial=rigDepthMaterial(kind);mesh.castShadow=true;mesh.frustumCulled=false;
+ const mesh=new THREE.Mesh(g,rigMaterial(kind));mesh.frustumCulled=false;
  return mesh;
 }
 const loader=new GLTFLoader();
 async function glbMonster(kind,shiny,miss){
  const gl=await loader.loadAsync(GLB[kind]),root=gl.scene,P={...POSE,...TUNE[kind]};
- root.traverse(o=>{if(!o.isMesh)return;o.castShadow=true;o.frustumCulled=false;if(shiny){o.geometry=o.geometry.clone();for(const h of recolor(o.geometry.attributes.color,SHINY[kind]))miss.add(h)}});
+ root.traverse(o=>{if(!o.isMesh)return;o.frustumCulled=false;if(shiny){o.geometry=o.geometry.clone();for(const h of recolor(o.geometry.attributes.color,SHINY[kind]))miss.add(h)}});
  const head=root.getObjectByName('Head'),tail=root.getObjectByName('Tail');
  if(head){head.rotation.y+=P.hy;head.rotation.x+=P.hp;head.rotation.z-=P.hr}
  if(tail)tail.rotation.y+=P.ty;
  return root;
 }
 
-/* 렌더러·조명: 게임(ACES, 따뜻한 반구광 + 햇빛)과 같은 느낌에 앞쪽 보조광과 뒤쪽 테두리 빛을 더함 */
+/* 렌더러·조명: 게임(ACES, 따뜻한 반구광 + 햇빛)과 같은 느낌에 앞쪽 보조광과 뒤쪽 테두리 빛을 더함.
+   그림자 맵은 쓰지 않는다(확대하면 몬스터 뒤 바닥에 계단진 띠가 생겨 발자국 그림자 카드까지 지저분해짐, 1차 렌더 2026-11-20). 발밑은 부드러운 원형 그림자만 */
 const canvas=document.createElement('canvas');canvas.width=CW;canvas.height=CH;
 const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true,preserveDrawingBuffer:true,premultipliedAlpha:true});
 renderer.setPixelRatio(1);renderer.setSize(CW,CH,false);renderer.setClearColor(0x000000,0);
 renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.0;
-renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 RIG_TIME.value=.7;   // 불꽃 흔들림을 한 순간에 고정
 
 function blob(){
  const c=document.createElement('canvas');c.width=c.height=128;const x=c.getContext('2d'),g=x.createRadialGradient(64,64,0,64,64,64);
- g.addColorStop(0,'rgba(60,40,20,.34)');g.addColorStop(.55,'rgba(60,40,20,.16)');g.addColorStop(1,'rgba(60,40,20,0)');x.fillStyle=g;x.fillRect(0,0,128,128);
+ g.addColorStop(0,'rgba(60,40,20,.42)');g.addColorStop(.5,'rgba(60,40,20,.2)');g.addColorStop(1,'rgba(60,40,20,0)');x.fillStyle=g;x.fillRect(0,0,128,128);
  const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;return t;
 }
 const BLOB=blob();
@@ -77,14 +77,12 @@ const BLOB=blob();
 function stage(obj){
  const scene=new THREE.Scene(),group=new THREE.Group();group.add(obj);group.rotation.y=YAW;scene.add(group);
  scene.add(new THREE.HemisphereLight(0xfff4dc,0xa08a62,2.0));
- const key=new THREE.DirectionalLight(0xffe6c2,2.6);key.position.set(-2.5,4.2,4.5);key.castShadow=true;key.shadow.mapSize.set(2048,2048);
- Object.assign(key.shadow.camera,{left:-3,right:3,top:3,bottom:-3,near:.5,far:20});key.shadow.bias=-.0004;key.shadow.normalBias=.02;scene.add(key);
+ const key=new THREE.DirectionalLight(0xffe6c2,2.6);key.position.set(-2.5,4.2,4.5);scene.add(key);
  const fill=new THREE.DirectionalLight(0xd8e6ff,.7);fill.position.set(4,1.5,2.5);scene.add(fill);
  const rim=new THREE.DirectionalLight(0xfff0d0,1.6);rim.position.set(1,3,-4.5);scene.add(rim);
  group.updateMatrixWorld(true);const box=new THREE.Box3().setFromObject(group),size=box.getSize(new THREE.Vector3()),mid=box.getCenter(new THREE.Vector3());
- const ground=new THREE.Mesh(new THREE.PlaneGeometry(12,12),new THREE.ShadowMaterial({opacity:.2}));ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
  const b=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({map:BLOB,transparent:true,depthWrite:false,toneMapped:false}));
- b.rotation.x=-Math.PI/2;b.position.set(mid.x,.003,mid.z);b.scale.set(size.x*1.25,size.z*1.1,1);scene.add(b);
+ b.rotation.x=-Math.PI/2;b.position.set(mid.x,.003,mid.z);b.scale.set(size.x*1.15,size.z*1.0,1);scene.add(b);
  return {scene,box,size,mid};
 }
 function camera(st){
