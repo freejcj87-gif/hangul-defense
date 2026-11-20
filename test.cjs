@@ -607,7 +607,8 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
     const g=await game(page),v=await insp(page),R=World.STAGE.radius[k];
     eq([g.stage.now,g.state.hall,g.world.radius,g.stage.tag],[k,HALL[k],R,NAME[k]],'stage '+k+': stage, hall, radius and name tag');
     /* 0.15: 물레방아 마을(3)부터 6번 길의 길목 표시 2개 자리에 다리가 선다 */
-    eq([v.stage,v.roads,v.stageHouses,v.roadMarks,v.radius,v.hall],[k,ROADS[k],HOUSES[k],k>=3?2*World.STAGE.open[k].length-2:k?2*World.STAGE.open[k].length:0,R,HALL[k]],'stage '+k+': the 3D village shows the stage (roads, houses, road marks, radius)');
+    /* 0.17: 성곽 마을(4)부터는 길목 표시 대신 성문(성벽 구간이 본다) */
+    eq([v.stage,v.roads,v.stageHouses,v.roadMarks,v.radius,v.hall],[k,ROADS[k],HOUSES[k],k>=4?0:k>=3?2*World.STAGE.open[k].length-2:k?2*World.STAGE.open[k].length:0,R,HALL[k]],'stage '+k+': the 3D village shows the stage (roads, houses, road marks, radius)');
     eq([v.river.on,v.river.radius,v.mill.shown],[k>=3,k>=3?R:0,k>=3],'stage '+k+': 0.15 river, bridge and mill from the mill village on');
     if(k>=3)eq([v.art15,v.mill.art,v.river.bridge],[{watermill:true,bridge:true,king:true,fox:true},'glb','glb'],'stage '+k+': the mill and the bridge are the 0.15 GLBs');
     ok(Math.abs(v.radiusShown-R)<.05,'stage '+k+': the view has settled on the new radius: '+v.radiusShown);ok(v.cameraHalf>=lastHalf-.01&&(k===0||v.cameraHalf>lastHalf+.3),'stage '+k+': the camera is further back than at stage '+(k-1)+': '+v.cameraHalf.toFixed(2)+' > '+lastHalf.toFixed(2));lastHalf=v.cameraHalf;
@@ -730,14 +731,79 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
   /* 주소 ?river=0: 0.14 화면(강 · 다리 · 바퀴 없음, 길목 표시 0.14 개수, 0.14 오두막). ?art15=0: 강은 있고 물레방아 · 다리는 코드 도형 */
   {const {ctx,page,errors}=await open({query:'/?river=0'});await seed(page,{age:8,index:0,gold:300,...VILLAGE[5]});await page.waitForFunction(()=>window.VillageView?.inspect().ready,{},{timeout:45000});
    await begin(page,{age:8},true);await frames(page,3);const v=await insp(page),vs=await page.evaluate(()=>getVillageState());
-   eq([v.stage,v.river.on,v.mill.shown,v.roadMarks,vs.river,vs.bridge],[5,false,false,2*World.STAGE.open[5].length,false,false],'river=0: the 0.14 castle (no river, bridge or wheel, every road mark)');eq(errors,[],'river=0 page errors');await ctx.close()}
+   /* 0.17: 강을 꺼도 성벽은 그대로라 성에는 길목 표시 대신 성문(성벽까지 끈 0.14 성은 ?walls=0 구간) */
+   eq([v.stage,v.river.on,v.mill.shown,v.roadMarks,vs.river,vs.bridge,v.walls.on,v.walls.gates],[5,false,false,0,false,false,true,World.STAGE.open[5].length],'river=0: the castle without the river, bridge or wheel (0.17: gates instead of road marks)');eq(errors,[],'river=0 page errors');await ctx.close()}
   {const {ctx,page,errors}=await open({query:'/?art15=0'});await seed(page,{age:8,index:0,gold:300,...VILLAGE[3]});await page.waitForFunction(()=>window.VillageView?.inspect().ready,{},{timeout:45000});
    await begin(page,{age:8},true);await frames(page,3);const v=await insp(page);
    eq([v.stage,v.river.on,v.mill.shown,v.mill.art,v.river.bridge,v.roadMarks],[3,true,true,'code','code',2*World.STAGE.open[3].length-2],'art15=0: the river with the code-drawn mill and bridge');await shot(page.locator('.stage-card'),'river-art15-0-stage3');eq(errors,[],'art15=0 river page errors');await ctx.close()}
+  /* ---------- 0.17 성벽 · 성문 · 성탑 · 성(계획서 v016-plan §6.3 test.cjs, 프로듀서 결정 '26.11.20: 6면 모두 막음 · 늑대는 넓게 · 왕은 정문을 밂) ----------
+     화면 시계는 debug hold로 세우고 advance로만 민다(벽시계 대기 없음). 한 순간 값이 아니라 조건까지 최대 N번 돌린다(0.14 간헐 실패 교훈) */
+  const W16={castle:true,wall:true,gate:true,watch:true},VILLAGE35={level:15,fence:8,chickens:9,farmers:2,power:2};
+  /* 1·2 기준 화면 3개 × 성곽 마을 · 성: 조각 · 성문 · 성탑 수, 길목 표시 · 울타리 패널 0, 성 회관 GLB, 0.16 아트, 그리기 예산, 정문 · 성탑 꼭대기 화면 안, 가려진 머리 ≤ 20% */
+  for(const [w,h] of [[1366,768],[1180,820],[820,1180]])for(const k of [4,5]){
+   const tag='walls '+w+'x'+h+' stage '+k,{ctx,page,errors}=await open({width:w,height:h});await seed(page,{age:8,index:0,wins:0,gold:300,farmers:0,power:0,pond:0,hall:0,...VILLAGE[k]});await page.waitForFunction(()=>window.VillageView?.inspect().ready,{},{timeout:45000});
+   await begin(page,{age:8},true);await page.evaluate(()=>{window.VillageView.debug({hold:true});world.calm=0;for(const b of world.buildings)if(b.kind==='tower')b.cd=1e9});await roll(page,4);
+   const v=await insp(page),open=World.STAGE.open[k];
+   eq([v.stage,v.walls.on,v.walls.segments,v.walls.gates,v.walls.gateRoads,v.walls.towers,v.roadMarks,v.walls.fencePanels,v.castle,v.art16,v.walls.art],[k,true,k===4?48:59,open.length,open,6,0,0,k===5?'glb':null,W16,{wall:true,gate:true,watch:true}],tag+': the wall, gates and towers (no road marks, no fence panels), the castle hall at stage 5');
+   ok(v.drawCalls<=52&&v.triangles<=520000,tag+': draw budget: '+v.drawCalls+' calls, '+v.triangles+' triangles');
+   const g=v.walls.gateNdc,tops=v.walls.towerTopNdc;ok(g&&Math.abs(g[0])<=.97&&g[1]<=.97&&g[1]>=-.97,tag+': the front gate top is on screen: '+JSON.stringify(g));
+   ok(tops.length===6&&tops.every(([x,y])=>Math.abs(x)<=.97&&y<=.97),tag+': every watchtower top is on screen: '+JSON.stringify(tops));ok(await noOverflow(page),tag+': no overflow');
+   /* 가려진 머리(계획서 §2.5): 타워를 쉬게 해 늑대가 성벽에 모이게 하고, 성벽을 두드리는 늑대가 가장 많이 모인 때의 비율(최대 300번 = 600틱) */
+   let best=null;for(let i=0;i<300;i++){await roll(page,1);const x=(await insp(page)).walls;if(x.smashing>=4&&(!best||x.smashing>best.smashing))best=x;if(best&&best.smashing>=8)break}
+   ok(best&&best.hiddenHeads<=.2,tag+': heads hidden behind the wall ≤ 20%: '+JSON.stringify(best&&{smashing:best.smashing,hidden:best.hidden,share:best.hiddenHeads}));
+   console.log('WALL_METRICS:'+JSON.stringify({w,h,k,drawCalls:v.drawCalls,triangles:v.triangles,smashing:best&&best.smashing,hidden:best&&best.hiddenHeads,gate:g,towers:tops}));
+   await shot(page.locator('.stage-card'),'walls-'+w+'x'+h+'-stage'+k);eq(errors,[],tag+' page errors');await ctx.close()}
+  /* 3 부서짐: 성벽 한 면이 무너지면 그 면 조각이 모두 넘어지고(누적 수) 그 면 성문의 쇠창살이 올라가며, 늑대가 없으면 15초 뒤 다시 서고 쇠창살이 내려온다 */
+  {const {ctx,page,errors}=await open({width:1366,height:768});await seed(page,{age:8,index:0,wins:0,gold:300,farmers:0,power:0,pond:0,hall:0,...VILLAGE[4]});await page.waitForFunction(()=>window.VillageView?.inspect().ready,{},{timeout:45000});
+   await begin(page,{age:8},true);await page.evaluate(()=>{window.VillageView.debug({hold:true});world.wolves=[];world.trickle=1e9;world.wave.arrive=1e9;world.wave.spawned=true;world.calm=0});await roll(page,2);
+   let v=await insp(page);const f0=v.walls.fallen;eq([v.walls.on,v.walls.portsUp],[true,0],'wall fall: every portcullis is down while the wall stands');
+   await page.evaluate(()=>{const f=world.buildings.find(b=>b.kind==='fence'&&b.side===0);f.hp=.2;world.wolves.push({id:world.nextId++,kind:'wolf',x:f.x*1.02,z:f.z*1.02,sx:f.x*2,sz:f.z*2,hp:9999,max:9999,speed:1,state:'smash',target:f.id,timer:0,inside:0,hen:0})});
+   let fell=null;for(let i=0;i<300&&!fell;i++){await roll(page,1);const x=(await insp(page)).walls;if(x.fallen>f0)fell=x}
+   ok(fell&&fell.fallen-f0===fell.perSide[0],'wall fall: the broken side falls, all its pieces (cumulative): '+JSON.stringify(fell&&{fallen:fell.fallen-f0,side:fell.perSide[0]}));
+   await view(page,1.2);v=await insp(page);ok(v.walls.portsUp>=1,'wall fall: the gate on that side lifts its portcullis: '+v.walls.portsUp);await shot(page.locator('.stage-card'),'walls-fallen');
+   await page.evaluate(()=>{world.wolves=[]});let up=false;for(let i=0;i<150&&!up;i++){await roll(page,1);up=await page.evaluate(()=>!world.buildings.find(b=>b.kind==='fence'&&b.side===0).broken)}
+   await view(page,1.5);v=await insp(page);ok(up&&v.walls.portsUp===0,'wall fall: 15 s later the farmers raise it again and the portcullis drops: '+JSON.stringify([up,v.walls.portsUp]));
+   eq(errors,[],'wall fall page errors');await ctx.close()}
+  /* 4 전환: 물레방아 마을(지은 수 35)에서 읽는 중에 사면, 답한 뒤 울타리가 가라앉고 성벽이 솟으며(rise 0 → 1) 바깥 고리 타워가 옮겨 서고, 정답 연출(1.6초) 안에 끝난다 */
+  {const {ctx,page,errors}=await open({width:1366,height:768});await seed(page,{age:8,index:0,wins:0,gold:900,pond:0,hall:0,...VILLAGE35});await page.waitForFunction(()=>window.VillageView?.inspect().ready,{},{timeout:45000});
+   await begin(page,{age:8},true);await page.evaluate(()=>{world.wolves=[];world.peace=-1;window.VillageView.debug({hold:true})});await roll(page,2);
+   let v=await insp(page);eq([v.stage,v.walls.on,v.walls.fencePanels>0],[3,false,true],'wall shift: (the mill village with its fence)');const m0=v.towerMoves;
+   await buy(page,'chicken',true);await answer(page,true,true);await view(page,.2);v=await insp(page);
+   ok(v.stage===4&&v.walls.on&&v.walls.rise===0&&v.walls.fencePanels>0,'wall shift: right after the answer the old fence sinks first: '+JSON.stringify([v.stage,v.walls.rise,v.walls.fencePanels]));
+   const bn=await page.locator('.banner').first().textContent();eq(bn,'🧱성곽 마을이 되었어요!돌 성벽이 저절로 섰어요 · 늑대는 길 5곳으로 와요 · 알값 +1','wall shift: the banner says the stone wall stood up by itself');
+   await view(page,.45);v=await insp(page);ok(v.walls.rise>0&&v.walls.rise<1&&v.walls.fencePanels===0&&v.towerMoves>m0,'wall shift: the wall rises piece by piece and the outer towers hop out: '+JSON.stringify([v.walls.rise,v.towerMoves-m0]));
+   await shot(page.locator('.stage-card'),'walls-shift-rising');
+   await view(page,.9);v=await insp(page);eq([v.walls.rise,v.stageRising],[1,false],'wall shift: settled within the 1.6 s reward beat');
+   const moved=await page.evaluate(()=>world.buildings.filter(b=>b.kind==='tower'&&b.slot>=6).map(b=>+Math.hypot(b.x,b.z).toFixed(2)));ok(moved.length>0&&moved.every(r=>r===World.SLOT_R[4][0]||r===World.SLOT_R[4][1]),'wall shift: the outer towers stand on the new rings: '+moved);
+   await shot(page.locator('.stage-card'),'walls-shift-done');eq(errors,[],'wall shift page errors');await ctx.close()}
+  /* 5 주소: ?walls=0 = 0.16 성(울타리 패널 · 길목 표시, 성 GLB만 새것), ?ring=0 = ALL_SLOTS 좌표, ?art16=0 = 코드 도형 · 0.14 회관 + 성탑, 0.16 GLB를 요청하지 않음 */
+  for(const [query,tag] of [['/?walls=0','walls=0'],['/?ring=0','ring=0'],['/?art16=0','art16=0']]){
+   const {ctx,page,errors}=await open({width:1366,height:768,query});await seed(page,{age:8,index:0,wins:0,gold:300,farmers:0,power:0,pond:0,hall:0,...VILLAGE[5]});await page.waitForFunction(()=>window.VillageView?.inspect().ready,{},{timeout:45000});
+   await begin(page,{age:8},true);await frames(page,3);const v=await insp(page),vs=await page.evaluate(()=>getVillageState());
+   const slots=await page.evaluate(()=>world.buildings.filter(b=>b.kind==='tower').every(b=>{const p=World.ALL_SLOTS[b.slot];return b.x===p[0]&&b.z===p[1]}));
+   const asked=await page.evaluate(()=>performance.getEntriesByType('resource').map(e=>new URL(e.name).pathname).filter(p=>/castle-hall|wall-segment|castle-gate|watchtower/.test(p)&&p.endsWith('.glb')));
+   if(query==='/?walls=0')eq([v.walls.on,vs.walls,v.roadMarks,v.fencePanels>0,v.castle,slots],[false,false,2*World.STAGE.open[5].length-2,true,'glb',false],tag+': the 0.16 castle fence and road marks (only the castle hall is new), the outer ring still moved');
+   if(query==='/?ring=0')eq([v.walls.on,vs.ring,slots],[true,false,true],tag+': the wall with the towers on the 0.16 places');
+   if(query==='/?art16=0')eq([v.walls.on,v.art16,v.walls.art,v.castle,asked],[true,{castle:false,wall:false,gate:false,watch:false},{wall:false,gate:false,watch:false},'code',[]],tag+': code-drawn wall, gates, towers and the 0.14 hall + keep, no 0.16 model requested');
+   await shot(page.locator('.stage-card'),'walls-'+tag.replace(/\W+/g,''));eq(errors,[],tag+' page errors');await ctx.close()}
+  /* 6 결전(?demo=3 = 회관 3 = 성): 왕은 정문 밖 반지름 + 4.0에 서고 쇠창살이 내려와 있다. 두 번 틀려 걸음이 늘면 정문을 밀고(gatePush, 자리 그대로),
+     이기면 정문이 열린다(쇠창살 올라감). 기준 화면 3개에서 왕 머리가 화면 안 */
+  for(const [w,h] of [[1366,768],[1180,820],[820,1180]]){
+   const tag='finale wall '+w+'x'+h,{ctx,page,errors}=await open({width:w,height:h,query:'/?demo=3'});await page.waitForFunction(()=>window.VillageView?.inspect().ready,{},{timeout:45000});await begin(page,{age:8},true);
+   await page.evaluate(()=>{window.VillageView.debug({hold:true});world.wolves=[];world.trickle=1e9;world.wave.arrive=1e9;world.wave.spawned=true;state.run.bell=1;syncKing(true);Combat.ringBell(state,{});syncKing(true);render()});
+   for(let i=0;i<10;i++){await tick(page,20);await view(page,.5)}
+   let v=await insp(page);const R=await page.evaluate(()=>World.radius(world));
+   ok(v.walls.on&&v.king&&v.king.state==='stand'&&Math.abs(v.king.r-(R+World.KING.wall.stop))<.05&&v.walls.mainPort===0,tag+': the king stands outside the front gate (radius + 4.0), its portcullis down: '+JSON.stringify([v.king,v.walls.mainPort]));
+   ok(v.king.size>3&&v.king.headNdc[1]>=-.95&&Math.abs(v.king.headNdc[0])<=.97,tag+': the king (as big as before) has his head on screen: '+JSON.stringify(v.king.headNdc));await shot(page.locator('.scene'),'walls-finale-'+w+'x'+h);
+   await page.evaluate(()=>{state.run.steps=(state.run.steps|0)+1;World.king(world,'fight',state.run.steps);window.VillageView.events([{type:'kingStep'}])});await tick(page,10);await view(page,.8);
+   const p=await insp(page);ok(p.walls.gatePush===1&&Math.abs(p.king.r-v.king.r)<.01&&p.king.steps===1,tag+': two misses: he shoves the gate instead of stepping closer: '+JSON.stringify([p.walls.gatePush,p.king.r,p.king.steps]));
+   if(w===1366)await shot(page.locator('.scene'),'walls-finale-push');
+   await page.evaluate(()=>{state.run.bell=3;World.king(world,'flee');World.retreat(world,-1);window.VillageView.events([{type:'kingFlee'}]);render()});await tick(page,10);await view(page,1.5);
+   const q=await insp(page);ok(q.walls.mainPort>.5,tag+': he flees and the front gate opens: '+q.walls.mainPort);eq(errors,[],tag+' page errors');await ctx.close()}
   /* 0.15 그림 화면(3D 실패: environment-pack.glb를 막음). 0.14 한계(이름표 · 8번째 칸만)를 메워 열린 길(흙길 띠, 농가는 점선 8갈래)과 단계별 집을 그리고,
      물레방아 마을부터 강 띠 · 다리 · 물레방아 그림, 늑대 왕 · 도둑 여우는 새 그림. 그림이 받아질 때까지 조건으로 기다린다.
      ?river=0이면 강 · 다리 · 물레방아가 없고, ?art15=0이면 새 그림(다리 · 물레방아 · 왕 · 여우)을 쓰지 않는다 */
-  for(const [k,query] of [[0,''],[3,''],[5,''],[3,'/?river=0'],[3,'/?art15=0']]){
+  for(const [k,query] of [[0,''],[3,''],[4,''],[5,''],[3,'/?river=0'],[3,'/?art15=0'],[5,'/?art16=0']]){
    const ctx=await stageBrowser.newContext({viewport:{width:1366,height:768},hasTouch:true,reducedMotion:'reduce'});await ctx.addInitScript(HOLD);await ctx.addInitScript(FAKE_TTS);
    const page=await ctx.newPage(),errors=[],tag='fallback stage '+k+(query||'');page.on('pageerror',e=>errors.push(e.message));await page.route('**/environment-pack.glb',r=>r.abort());await page.goto(url+query);await ready(page);
    await seed(page,{age:8,index:0,wins:0,gold:300,farmers:0,power:0,pond:0,hall:0,...VILLAGE[k]});eq(await page.locator('.scene').getAttribute('data-renderer'),'fallback',tag+': the picture screen');await begin(page,{age:8},true);
@@ -750,6 +816,12 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
      river:shown(document.getElementById('river'))&&inside(document.getElementById('river')),bridge:shown(document.getElementById('bridgeArt'))&&inside(document.getElementById('bridgeArt')),mill:shown(document.getElementById('millArt'))&&inside(document.getElementById('millArt'))}});
    eq([a.lanes,a.trail,a.lanesIn,a.houses,a.housesIn],[k?World.STAGE.open[k]:[0,1,2,3,4,5,6,7],!k,true,HOUSES[k],true],tag+': open roads (a dotted trail per direction on the farm) and the stage cottages are drawn: '+JSON.stringify(a));
    eq([a.river,a.bridge,a.mill],[river,river&&art,river&&art],tag+': river strip, bridge and mill pictures');
+   /* 0.17 그림 화면의 성벽(성곽 마을부터): 6면 호, 열린 길마다 성문 그림, 성탑 그림 6, 성(5)의 회관은 castle-hall.png. ?art16=0이면 호만 */
+   if(k>=4){const art16=query!=='/?art16=0';if(art16)await page.waitForFunction(()=>{const l=[...document.querySelectorAll('#wallArt img')];return l.length>0&&l.every(e=>e.complete&&e.naturalWidth>0)},{},{timeout:20000});
+    if(k===5&&art16)await page.waitForFunction(()=>{const e=document.getElementById('houseArt');return e.complete&&e.naturalWidth>0&&e.getAttribute('src').endsWith('castle-hall.png')},{},{timeout:20000});
+    const wa=await page.evaluate(()=>({sides:new Set([...document.querySelectorAll('#wallArt path')].map(e=>e.dataset.side)).size,gates:document.querySelectorAll('#wallArt img[data-kind="gate"]').length,towers:document.querySelectorAll('#wallArt img[data-kind="watch"]').length,house:document.getElementById('houseArt').getAttribute('src'),fence:document.querySelectorAll('#fenceRow img').length}));
+    eq(wa,{sides:6,gates:art16?World.STAGE.open[k].length:0,towers:art16?6:0,house:k===5&&art16?'art-handoff/v015-v016/png/castle-hall.png':wa.house,fence:0},tag+': 0.17 stone wall arcs on six sides, gate and watchtower pictures, the castle hall picture at stage 5, no fence posts');
+    ok(k<5||art16||!wa.house.endsWith('castle-hall.png'),tag+': art16=0 keeps the 0.16 hall picture')}
    if(k===3){await page.evaluate(()=>{world.wolves=[];world.trickle=1e9;state.run.bell=1;syncKing(true);render()});await page.waitForFunction(()=>{const e=document.querySelector('#enemies .enemy[data-kind="king"] img');return e&&e.complete&&e.naturalWidth>0},{},{timeout:20000});
     const king=await page.evaluate(()=>{const e=document.querySelector('#enemies .enemy[data-kind="king"]');return {src:e.querySelector('img').getAttribute('src'),art:e.dataset.art||null}});
     eq(king,art?{src:'art-handoff/v015-v016/png/wolf-king.png',art:'15'}:{src:'art-handoff/coopnight/browser/wolves/wolf.png',art:null},tag+': the wolf king picture')}
@@ -794,14 +866,17 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
   const GLB={art:{king:true,fox:true},tris:{king:2010,fox:1814}},CODE={art:{king:false,fox:false},tris:{king:1400,fox:1136}};
   {const {ctx,page,errors,asked}=await open();const v=await insp(page);
    eq(await page.locator('.scene').getAttribute('data-renderer'),'three','art15: 3D');eq(v.art15,ALL,'art15: the four 0.15 models are loaded');eq(await beasts(page),GLB,'art15: the wolf king and the thief fox are drawn from the GLBs');eq([v.mill.art,v.river.bridge],['glb','glb'],'art15: the mill and the bridge are baked from the GLBs');
-   eq([...new Set(asked)].sort(),['bridge','thief-fox','watermill','wolf-king'].map(n=>'/art-handoff/v015-v016/glb/'+n+'.glb'),'art15: the four GLBs are requested (the 0.16 castle pieces are not)');
+   eq([...new Set(asked)].sort(),['bridge','castle-gate','castle-hall','thief-fox','wall-segment','watchtower','watermill','wolf-king'].map(n=>'/art-handoff/v015-v016/glb/'+n+'.glb'),'art15 + 0.17: the four 0.15 GLBs and the four 0.16 castle pieces are requested');eq(v.art16,{castle:true,wall:true,gate:true,watch:true},'0.17: the four 0.16 castle pieces are loaded');
    eq(errors,[],'art15 page errors');await ctx.close()}
   /* ?art15=0: 요청조차 하지 않는다 */
   {const {ctx,page,errors,asked}=await open({query:'/?art15=0'});const v=await insp(page);
-   eq([await page.locator('.scene').getAttribute('data-renderer'),v.art15,asked],['three',NONE,[]],'art15=0: 3D without the 0.15 models, nothing requested');eq(await beasts(page),CODE,'art15=0: the 0.14 code-built king and fox');eq(errors,[],'art15=0 page errors');await ctx.close()}
+   eq([await page.locator('.scene').getAttribute('data-renderer'),v.art15,asked.filter(p=>/watermill|bridge|wolf-king|thief-fox/.test(p))],['three',NONE,[]],'art15=0: 3D without the 0.15 models, none of them requested (0.17: the castle pieces are their own ?art16)');eq(await beasts(page),CODE,'art15=0: the 0.14 code-built king and fox');eq(errors,[],'art15=0 page errors');await ctx.close()}
   /* 네 파일이 모두 안 와도 3D는 그대로 */
   {const {ctx,page,errors}=await open({block:'**/art-handoff/v015-v016/**'});const v=await insp(page);
-   eq([await page.locator('.scene').getAttribute('data-renderer'),v.art15],['three',NONE],'art15 all blocked: still 3D, every model keeps its 0.14 look');eq(await beasts(page),CODE,'art15 all blocked: the 0.14 king and fox');eq([v.mill.art,v.river.bridge],['code','code'],'art15 all blocked: code-drawn mill and bridge');eq(errors,[],'art15 blocked page errors');await ctx.close()}
+   eq([await page.locator('.scene').getAttribute('data-renderer'),v.art15,v.art16],['three',NONE,{castle:false,wall:false,gate:false,watch:false}],'art15 all blocked: still 3D, every model keeps its 0.14 look (0.17: the castle pieces too)');eq(await beasts(page),CODE,'art15 all blocked: the 0.14 king and fox');eq([v.mill.art,v.river.bridge],['code','code'],'art15 all blocked: code-drawn mill and bridge');eq(errors,[],'art15 blocked page errors');await ctx.close()}
+  /* 0.17: 성 회관 GLB 하나만 안 오면 성만 0.14 회관 + 성탑(코드), 성벽 · 성문 · 성탑은 GLB 그대로 */
+  {const {ctx,page,errors}=await open({block:'**/castle-hall.glb*'});const v=await insp(page);
+   eq([await page.locator('.scene').getAttribute('data-renderer'),v.art16,v.art15],['three',{castle:false,wall:true,gate:true,watch:true},ALL],'art16 castle blocked: only the castle hall falls back');eq(errors,[],'art16 castle blocked page errors');await ctx.close()}
   /* 한 파일만 안 오면 그 모델만 */
   {const {ctx,page,errors}=await open({block:'**/wolf-king.glb*'});const v=await insp(page);
    eq([await page.locator('.scene').getAttribute('data-renderer'),v.art15],['three',{...ALL,king:false}],'art15 one file blocked: only that model falls back');eq(await beasts(page),{art:{king:false,fox:true},tris:{king:1400,fox:1814}},'art15 king blocked: 0.14 king, GLB fox');eq(errors,[],'art15 one blocked page errors');await ctx.close()}

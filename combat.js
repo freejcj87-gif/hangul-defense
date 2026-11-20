@@ -72,6 +72,9 @@
     BRIDGE:true,              /* true = 단계 3부터 6번 길(다리 길) 늑대가 출현 각도 흔들림 ±0.03rad로 다리 위에 줄지어 온다(World.BRIDGE). false = 0.14처럼 넓게(?bridge=0) */
     /* ---------- 0.15.2 늑대 무리 대형(기획 wolf-paths-plan-20261119 안 B, 프로듀서 결정 '26.11.19: 무리 대형부터, 따라 도는 늑대는 옆 길 울타리 면까지, 예고는 2차) ---------- */
     FORMS:true,               /* true = 마을(단계 1)부터 무리마다 곧장 · 휘어 오기 · 갈라지기 · 따라 돌기 가운데 하나로 온다(World.FORM). false = 0.15.1처럼 곧게(?forms=0). 저장 형식은 그대로 */
+    /* ---------- 0.17 성벽 · 성문 · 성탑 · 성(계획서 v016-plan, 프로듀서 결정 '26.11.20: 6면 모두 막음 · 늑대는 지금처럼 넓게 · 왕은 정문을 밂) ---------- */
+    WALLS:true,               /* true = 성곽 마을(단계 4)부터 울타리 6면 최대 체력 +70(안 산 면도 70짜리 성벽, World.WALL), 화면은 돌 성벽 · 성문 · 성탑, 늑대 왕은 정문 밖. false = 0.16(?walls=0) */
+    TOWER_RING:true,          /* true = 성곽 마을 · 성에서 바깥 타워 고리 자리를 성벽 가까이(World.SLOT_R, 자리 번호 그대로). false = 0.16 자리(?ring=0) */
   };
   /* 흐르는 농장의 경제 쪽 상수(세계 쪽 상수는 world.js FLOW). 값은 scripts/sim-flow.cjs로 맞춤(2026-11-14, game-plan §13.2)
      beat: 박(틱) = 그 문제 필요 시간 × beat × max(paceFloor, pace)/100. 박 하나에 농부 한 명이 World.FLOW.carry알을 나른다
@@ -329,6 +332,7 @@
        wolvesInside: 마을 안 늑대 수 · towers: 타워 수(없으면 1 + level) · lostHenRecently: 30초 안에 닭을 잃음
        brokenKinds: 부서진 진짜 건물 종류(coop·market·tower·nursery·barn) · opened: 이미 '새 상품' 말풍선(rule 4)을 띄운 key 목록
        pile(0.13 흐르는 농장): 마당 알이 닭 수 이상인 채로 문제 2개가 이어짐(World.flowPile) → 규칙 6·8의 농부 추천 조건(0.12의 '둥지에 알이 남음' 대신)
+       walled(0.17): 성벽 단계(World.walled) → 울타리 추천 말을 '성벽을 더 튼튼하게 쌓아요!'로(고르는 규칙은 그대로)
      규칙 순서: 1 고치기 → 2 위험(타워, 못 사면 울타리) → 3 닭 0~1 → 4 회관으로 열린 새 상품(1회) → 5 회관 → 6 둥지에 알이 남음(농부)
                → 보너스(회관 목표: 회관 값의 70%를 모았거나 이 단계에서 지은 것이 REC.hallGoal에 이름 → 모으자는 말, 살 수 없는 key 'hall', urgent false, rule 0)
                → 7 닭 < 6 또는 닭 < 타워 × 2 → 8 덜 산 쪽(지켜요/벌어요)
@@ -338,7 +342,7 @@
     repairCoop:'회관을 고쳐야 할 것 같아요!',repairTower:'타워가 부서졌어요. 고쳐 줄래요?',repairMarket:'매대가 부서지면 알을 반값에 팔아요!',
     repairNursery:'작은 닭장이 부서졌어요. 고쳐 줄래요?',repairBarn:'헛간이 부서졌어요. 고쳐 줄래요?',repair:'부서진 건물을 고쳐 줄래요?',
     lostHen:'꼬꼬를 지키려면 타워가 더 필요해요!',manyWolves:'늑대가 너무 많아요! 타워를 세워요!',
-    fenceGap:'이쪽이 뻥 뚫렸어요. 울타리를 쳐요!',fenceThick:'울타리를 더 두껍게 쌓아요!',
+    fenceGap:'이쪽이 뻥 뚫렸어요. 울타리를 쳐요!',fenceThick:'울타리를 더 두껍게 쌓아요!',wallUp:'성벽을 더 튼튼하게 쌓아요!',
     noHen:'꼬꼬가 한 마리도 없어요. 꼬꼬를 데려와요!',moreHens:'닭이 많으면 알을 많이 낳아서 골드를 빨리 모을 수 있어요!',
     openPower:'펑! 터지는 화살을 쓸 수 있어요!',openPond:'연못을 파면 물고기도 팔 수 있어요!',openFeast:'마을 잔치를 열면 금화가 더 생겨요!',
     hall:'회관을 키우면 마을이 더 커져요!',hallSoon:'조금만 더 모으면 회관을 키울 수 있어요!',hallSave:'금화를 모아서 회관을 키워 봐요!',
@@ -354,7 +358,8 @@
   const REC={hallSoon:.7,hallGoal:[12,35,40]};
   function recommend(s,ctx){
     const c=ctx||{},ok=k=>canBuy(s,k),hens=s.chickens|0,towers=Number.isFinite(c.towers)?c.towers:1+(s.level|0);
-    const say=(key,line,rule,urgent)=>({key,line:LINES[line],urgent:!!urgent,rule});
+    /* 0.17: 성벽 단계(ctx.walled)에는 빈 면이 없으므로 울타리 말(뻥 뚫렸어요 · 두껍게)을 '성벽을 더 튼튼하게'로. key는 그대로 fence(시뮬 영향 없음) */
+    const say=(key,line,rule,urgent)=>({key,line:LINES[c.walled&&key==='fence'?'wallUp':line],urgent:!!urgent,rule});
     /* 1 진짜 건물이 부서짐. 단, 닭이 0~1마리이고 부서진 것이 닭장·매대가 아니면 닭을 먼저(0.10, 10세 점검: 첫 금화가 고치기로 나가 닭 0마리가 몇 분씩 이어짐) */
     const kinds=Array.isArray(c.brokenKinds)?c.brokenKinds:[];
     if(ok('repair')&&!(hens<=1&&ok('chicken')&&!kinds.includes('coop')&&!kinds.includes('market'))){const hit=REPAIR_LINE.find(([k])=>kinds.includes(k));return say('repair',hit?hit[1]:'repair',1,true)}

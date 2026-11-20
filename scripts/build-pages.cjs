@@ -34,11 +34,13 @@ const assets = [
 ];
 
 // 0.15 아트(art-handoff/v015-v016, 묶음 원본은 outputs\art-v015-v016-20261117): 0.15가 쓰는 4개만 배포한다(GLB는 3D, PNG는 그림 화면).
-// 성·성벽·성문·성탑은 0.16에서 넣고, 따로 된 바퀴(waterwheel)는 쓰지 않는다(물레방아 GLB 안의 바퀴를 돌린다).
+// 따로 된 바퀴(waterwheel)는 쓰지 않는다(물레방아 GLB 안의 바퀴를 돌린다).
+// 0.17(계획서 v016-plan): 성 회관 · 성벽 조각 · 성문 · 성탑 4쌍을 같은 묶음 폴더에서 더 배포한다(GLB는 3D, PNG는 그림 화면 · 가게 칸).
 const ART15_DIR = 'art-handoff/v015-v016/';
 const art15 = ['watermill', 'bridge', 'wolf-king', 'thief-fox'];
+const art16 = ['castle-hall', 'wall-segment', 'castle-gate', 'watchtower'];
 const files = ['index.html', 'combat.js', 'world.js', 'questions-gen.js', 'questions.js', 'testmode.js', 'art-handoff/coopnight/source-3d/models/environment-pack.glb', ...assets.map(file => prefix + file),
-  ...art15.flatMap(name => [ART15_DIR + 'glb/' + name + '.glb', ART15_DIR + 'png/' + name + '.png'])];
+  ...[...art15, ...art16].flatMap(name => [ART15_DIR + 'glb/' + name + '.glb', ART15_DIR + 'png/' + name + '.png'])];
 /* 수첩 MVP: 기록 모듈과 쪽지·카드 콘텐츠 */
 files.push('book.js', 'notes.js', 'bookui.js');
 // 페이지(index.html)와 3D 스크립트(src/*.js)가 글자 그대로 적은 아트 경로. 참조했는데 묶지 않은 파일이 있으면 빌드를 멈춘다
@@ -70,5 +72,5 @@ function build() {
   console.log('Packaged ' + files.length + ' runtime files for GitHub Pages.');
 }
 // test-dom.cjs가 묶음 목록·참조 검사를 빌드 없이 읽는다(require). `node scripts/build-pages.cjs`로 직접 실행할 때만 빌드한다.
-module.exports = { files, art15, ART15_DIR, references };
+module.exports = { files, art15, art16, ART15_DIR, references };
 if (require.main === module) build();

@@ -4,8 +4,9 @@ import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { SimplifyModifier } from 'three/addons/modifiers/SimplifyModifier.js';
 import { KIND_ORDER, RIG, GAIT, RIG_TIME, monsterGeometry, shadowGeometry, rigMaterial, rigDepthMaterial, rigMaterialAt, gaitPose, setRig } from './monsters.js';
 import { prep, fuse, solid, flat, merge } from './geo.js';
-import { POND, POND_R, HAY, GARDEN, ZONE, FARM_ZONE, FARM_HOME, PICK, DROP, MARKET_FRONT, MARKET_GATE, TENTS, MILL, RIVER, riverFrame, riverOffset, millRace, bridgeSpot, deckY, BRIDGE as BRIDGE_ART } from './layout.js';
-import { STOREY_H, storeyGeometry, basketGeometry, basketEggs, railGeometry, wallGeometry, marketExtras, STALL_OMIT, NESTS, NEST_MAX, nestSpots, villageProps, lanterns, LANTERN_TOP, drawHammer, trailGeometry, stageProps, riverGeometry, codeWheelGeometry } from './props.js';
+import { POND, POND_R, HAY, GARDEN, ZONE, FARM_ZONE, FARM_HOME, PICK, DROP, MARKET_FRONT, MARKET_GATE, TENTS, MILL, RIVER, riverFrame, riverOffset, millRace, bridgeSpot, deckY, BRIDGE as BRIDGE_ART, WALLS, CASTLE, wallPlan } from './layout.js';
+import { STOREY_H, storeyGeometry, basketGeometry, basketEggs, railGeometry, wallGeometry, marketExtras, STALL_OMIT, NESTS, NEST_MAX, nestSpots, villageProps, lanterns, LANTERN_TOP, drawHammer, trailGeometry, stageProps, riverGeometry, codeWheelGeometry,
+ portcullisGeometry } from './props.js';
 
 const host=document.querySelector('.scene');
 const motion=matchMedia('(prefers-reduced-motion: reduce)');
@@ -26,6 +27,10 @@ const BEAST_PARTS=['Head','Tail','FrontFoot_L','FrontFoot_R','RearFoot_L','RearF
 const ART15_NODES={watermill:['WaterWheel'],bridge:['Timber_Bridge'],king:BEAST_PARTS,fox:BEAST_PARTS};   // a file without these nodes counts as failed
 const ART15_GRACE=8000;   // ms to wait for them once the core assets are in (a stalled request must not hold the whole 3D village back)
 const art15Off=(()=>{try{return /[?&]art15=0\b/.test(location.search)}catch{return false}})();
+// 0.17 (계획서 v016-plan §2.3): the 0.16 castle pieces, loaded the same way (each on its own, a failure keeps that piece's code shape). ?art16=0 skips them.
+const ART16={castle:'art-handoff/v015-v016/glb/castle-hall.glb',wall:'art-handoff/v015-v016/glb/wall-segment.glb',gate:'art-handoff/v015-v016/glb/castle-gate.glb',watch:'art-handoff/v015-v016/glb/watchtower.glb'};
+const ART16_V='?v=0.16',ART16_NODES={castle:['Castle_Hall'],wall:['Wall_Segment'],gate:['Gatehouse'],watch:['Watchtower']};
+const art16Off=(()=>{try{return /[?&]art16=0\b/.test(location.search)}catch{return false}})();
 // Until the 3D village is ready (or when it falls back) the page still gets a safe API.
 const stubView=()=>({events(){},reward(){},build(){return null},upgrade(){return null},marketScreen(){return null},focus(){return null},inspect(){return {ready:false}}});
 window.VillageView=stubView();
@@ -278,12 +283,14 @@ function bunting(points,sag,masts=[]){
 
 // The 0.15 models, each its own request: a failed (or stalled, or malformed) file resolves to null instead of failing start(). Everything is settled
 // before the scene first shows (renderer='three'), so a model never swaps in later. `core` = the assets start() cannot do without.
-function loadArt15(loader,core){
- const keys=Object.keys(ART15);if(art15Off)return Promise.resolve(Object.fromEntries(keys.map(k=>[k,null])));
+function loadArtSet(loader,core,files,nodes,v,off){
+ const keys=Object.keys(files);if(off)return Promise.resolve(Object.fromEntries(keys.map(k=>[k,null])));
  const late=core.then(()=>new Promise(done=>setTimeout(done,ART15_GRACE)),()=>{}).then(()=>null);
- const one=k=>loader.loadAsync(ART15[k]+ART15_V).then(g=>ART15_NODES[k].every(n=>g.scene.getObjectByName(n))?g:null);
+ const one=k=>loader.loadAsync(files[k]+v).then(g=>nodes[k].every(n=>g.scene.getObjectByName(n))?g:null);
  return Promise.all(keys.map(k=>Promise.race([one(k),late]).catch(()=>null))).then(list=>Object.fromEntries(keys.map((k,i)=>[k,list[i]])));
 }
+const loadArt15=(loader,core)=>loadArtSet(loader,core,ART15,ART15_NODES,ART15_V,art15Off);
+const loadArt16=(loader,core)=>loadArtSet(loader,core,ART16,ART16_NODES,ART16_V,art16Off);
 async function start(){
  const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'low-power'});
  renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));renderer.setClearColor(0x9fbf7c);renderer.outputColorSpace=THREE.SRGBColorSpace;
@@ -308,7 +315,7 @@ async function start(){
  const viewHalf=R=>{const base=fitHalf(7);return Math.max(ringHalf(R),base+(fitHalf(R)-base)*VIEW_PULL)};
  const resize=()=>{viewW=host.clientWidth||1;const h=host.clientHeight||1;aspect=viewW/h;camHalf=-1;renderer.setSize(viewW,h,false);applyView()};
  const gltf=new GLTFLoader(),core=Promise.all([new THREE.TextureLoader().loadAsync(ART+'backgrounds/grass.png'),gltf.loadAsync('art-handoff/coopnight/source-3d/models/environment-pack.glb'),makeAtlas()]);
- const [[grass,pack,atlas],art15]=await Promise.all([core,loadArt15(gltf,core)]);
+ const [[grass,pack,atlas],art15,art16]=await Promise.all([core,loadArt15(gltf,core),loadArt16(gltf,core)]);
 
  /* ----- ground: big tiled meadow, the village yard tint, one merged decal mesh (paths, wolf trails, flowers) ----- */
  const MAP=150,SEG=100;
@@ -352,6 +359,12 @@ async function start(){
  const millArt=(()=>{if(!art15.watermill)return null;try{const b=bake(art15.watermill.scene,MILL.h,['WaterWheel']);if(!b.main||!b.WaterWheel)throw new Error('mill parts missing');return {house:b.main.geometry,wheel:b.WaterWheel.geometry,pivot:b.WaterWheel.pivot}}catch(error){art15.watermill=null;console.warn('0.15 mill model unavailable:',error.message);return null}})();
  const bridgeArt=(()=>{if(!art15.bridge)return null;try{return bake(art15.bridge.scene,BRIDGE_ART.h).main.geometry}catch(error){art15.bridge=null;console.warn('0.15 bridge model unavailable:',error.message);return null}})();
  G.wheel=millArt?millArt.wheel:codeWheelGeometry();
+ // 0.17 castle pieces (계획서 §2.3): the wall segment keeps its own size (instances stretch it per piece and squash it to the wall height), the gate keeps its
+ // origin (opening on x = 0, depth −0.46…+0.54), the watchtower and the castle hall are box-centred. A failed bake leaves the code shape and art16[k] = null.
+ const bake16=(k,h,opt)=>{if(!art16[k])return null;try{return bake(art16[k].scene,h,[],opt).main.geometry}catch(error){art16[k]=null;console.warn('0.16 '+k+' model unavailable:',error.message);return null}};
+ const wallArt=bake16('wall',WALLS.segH),gateArt=bake16('gate',WALLS.gateH,{origin:true}),watchArt=bake16('watch',WALLS.towerH),castleArt=bake16('castle',CASTLE.h);
+ G.wallSeg=wallArt||wallGeometry(WALLS.segW);G.wallSeg.computeBoundingBox();
+ const WALL_H=WALLS.segH*WALLS.h,WALL_SY=WALL_H/Math.max(.3,G.wallSeg.boundingBox.max.y);   // every wall piece is drawn WALL_H tall (GLB × 0.8, the code wall × about 1.4)
  const bakeMs=Math.round(performance.now()-bakeStart);
  const door=coopArt.anchors['Door dark opening']||new THREE.Box3(new V3(-.3,0,1),new V3(.3,1,1.3));
  const actors=[];
@@ -430,6 +443,14 @@ async function start(){
  const fenceShade=shadowOnly(solid([['box',0,[-FP,.42,0],[.1,.84,.1]],['box',0,[FP,.42,0],[.1,.84,.1]],['box',0,[0,.34,0],[FENCE_W,.08,.06]],['box',0,[0,.62,0],[FENCE_W,.08,.06]]]),FCAP);
  const FENCE_TINT=DAMAGE.map(h=>new THREE.Color(h)),FENCE_TINT2=DAMAGE.map(h=>new THREE.Color(h).multiply(new THREE.Color(.84,.7,.56))),LAYER_H=[1,1.2,1.14];   // 0.13: a second layer is taller and darker wood, the stone wall a little taller
  for(let i=0;i<FCAP;i++)for(const m of [fences,rails,walls])m.setColorAt(i,FENCE_TINT[0]);
+ /* ----- 0.17 stone wall (계획서 v016-plan §2.3): from the walled village the six fence sides are drawn as one instanced mesh of wall pieces (wallPlan: up to
+    6 sides × 11), their shadow through a box stand-in, and an iron portcullis in every gate (down while its side stands, up when it falls; the front gate
+    also drops when the bell rings and opens when the wolf king flees). The fence panels are not drawn then. Same damage tints, fall, smash shake and
+    rise as the fence (stone: heavy). The rule is unchanged: a wall side is a fence building with more hit points. ----- */
+ const WALL_CAP=96,wallMesh=instanced(G.wallSeg,WALL_CAP,false),wallShade=shadowOnly(solid([['box',0,[0,G.wallSeg.boundingBox.max.y/2,0],[2,G.wallSeg.boundingBox.max.y,.5]]]),WALL_CAP),portMesh=instanced(portcullisGeometry(),8,false);
+ for(let i=0;i<WALL_CAP;i++)wallMesh.setColorAt(i,FENCE_TINT[0]);
+ let wallNow=null,wallOld=null,wallOldT=-9,wallRiseT=-9,fenceSink=false,castleOn=false,lastDt=0;
+ const wallStats={fallen:0,risen:0,gatePush:0,pushT:-9,hidden:0,smashers:0},ports=[];let towerMoves=0;   // ports: one per gate {g, side, y, want, shakeT}
  for(const m of [...towerBody,bows])for(let i=0;i<MAXT;i++)m.setColorAt(i,FENCE_TINT[0]);for(let i=0;i<MAXT*MAX_FLOORS;i++)storeys.setColorAt(i,FENCE_TINT[0]);
  // What each hall stage adds (egg nests from the start; dirt paths, lanterns, hay and feast flags later): one mesh, swapped per stage.
  const props=new THREE.Mesh(G.props[0],lit);props.castShadow=props.receiveShadow=true;world.add(props);let propsStage=0;
@@ -480,13 +501,14 @@ async function start(){
  // ground distance from the river band / the race (0 inside): decor (trees, bushes, rocks) keeps out of both
  const riverGap=(x,z)=>{if(!riverR)return 9;let d=Math.abs(riverOffset(riverR,x,z))-(RIVER.water/2+RIVER.bank);
   const [x0,z0,x1,z1,w]=raceSeg,dx=x1-x0,dz=z1-z0,u=clamp(((x-x0)*dx+(z-z0)*dz)/(dx*dx+dz*dz),0,1);return Math.min(d,Math.hypot(x-x0-dx*u,z-z0-dz*u)-w/2-.12)};
- function setStage(st,R,routes,fx,river){
-  const key=st+':'+R+':'+(routes?routes.join(','):'')+(river?':river':'');if(key===stageKey)return false;
+ function setStage(st,R,routes,fx,river,walls){
+  const key=st+':'+R+':'+(routes?routes.join(','):'')+(river?':river':'')+(walls?':walls':'');if(key===stageKey)return false;
   const up=fx&&st>stageShown,on=!!river&&st>=RIVER.stage;stageKey=key;stageShown=st;
   const riverNew=on&&!riverR;setRiver(on?R:0);
   if(riverNew&&up&&!reduced()){popIn(wheel,.18,.87);riverMesh.scale.x=.001;tween(.05,.9,u=>{riverMesh.scale.x=Math.max(.001,easeInOut(u))},()=>{riverMesh.scale.x=1})}   // the river flows in along its length (0.9 s, inside the 1.6 s beat)
+  setWalls(walls&&st>=WALLS.from&&routes?wallPlan(R,routes):null,up);syncCastle(st,up);   // 0.17
   if(st<1){stageMesh.visible=stageNew.obj.visible=false;stageInfo={houses:0,marks:0,spots:[]};stageRising=false;return true}
-  if(!stageCache.has(key))stageCache.set(key,stageProps(st,R,routes,river?{river:true,house:millArt&&millArt.house,bridge:bridgeArt}:{}));
+  if(!stageCache.has(key))stageCache.set(key,stageProps(st,R,routes,{...(river?{river:true,house:millArt&&millArt.house,bridge:bridgeArt}:{}),walls:!!walls,gate:gateArt,watch:watchArt,castle:!!castleArt}));
   const g=stageCache.get(key);stageInfo=g;
   const settle=()=>{if(stageKey!==key)return;stageMesh.geometry=g.all||EMPTY;stageMesh.visible=!!g.all;stageNew.obj.visible=false;stageRising=false;dirty=true};
   if(up&&g.fresh&&!reduced()){
@@ -495,6 +517,24 @@ async function start(){
   }else settle();
   return true;
  }
+ // 0.17 the wall plan for the stage (null = no wall). A new plan with the effect: the fence (or the narrower wall) sinks, then the wall rises piece by piece.
+ function setWalls(plan,up){
+  const key=p=>p?p.R+':'+p.gates.map(g=>g.p).join(','):'';if(key(plan)===key(wallNow))return false;
+  const anim=!!plan&&up&&!reduced();
+  if(anim){wallOld=wallNow;wallOldT=time;fenceSink=!wallNow;wallRiseT=time;wallStats.risen++}else{wallOld=null;fenceSink=false;wallRiseT=-9}
+  wallNow=plan;ports.length=0;
+  if(plan)for(const g of plan.gates){const a=((g.a%(Math.PI*2))+Math.PI*2)%(Math.PI*2);ports.push({g,side:Math.floor(a/(Math.PI/3))%6,y:0,want:0,shakeT:-9,main:g.p===WALLS.main})}
+  dirty=true;return true;
+ }
+ // 0.17 the castle hall (stage 5, castle-hall.glb): the hall actor takes the castle's shape at scale 0.9; without the model the 0.14 hall and keep stay.
+ function syncCastle(st,up){
+  const want=st>=CASTLE.stage&&!!castleArt;if(want===castleOn)return false;castleOn=want;
+  home.a.obj.geometry=want?castleArt:G.coop;home.height=want?CASTLE.h:2.7;home.size=want?1.9:1.4;home.a.s=want?CASTLE.s:1+shown.hall*.07;
+  if(want&&up&&!reduced()){const a=home.a,T=.2;popIn(a,T,.9);after(T,()=>{a.flash=.1;dustBurst(a.x,a.z+1,16,1.4);ringWave(a.x,a.z,6,GOLD,.5);starBurst(a.x,CASTLE.h*CASTLE.s,a.z,14,1.1,[GOLD,WHITE,SKY]);shake(.1);startle(a.x,a.z,5)})}
+  dirty=true;return true;
+ }
+ // Where the hens slip in (and peek out): the coop door, or the castle's doorway at stage 5
+ function doorSpot(){const a=home.a,s=a.s;if(castleOn)return {x:a.x+CASTLE.door.x*s,z:a.z+CASTLE.door.z*s+.25};return {x:a.x+(door.min.x+door.max.x)/2*s,z:a.z+door.max.z*s+.25}}
  const hay=actor(solid([['cyl',0xe9c75a,[-.33,.3,0],[.3,.62,.3],[Math.PI/2,0,0]],['cyl',0xe9c75a,[.33,.3,0],[.3,.62,.3],[Math.PI/2,0,0]],['cyl',0xf4d877,[0,.82,0],[.3,.62,.3],[Math.PI/2,0,0]],
   ['cyl',0xc79a3a,[-.33,.3,0],[.31,.09,.31],[Math.PI/2,0,0]],['cyl',0xc79a3a,[.33,.3,0],[.31,.09,.31],[Math.PI/2,0,0]],['cyl',0xc79a3a,[0,.82,0],[.31,.09,.31],[Math.PI/2,0,0]]]),HAY.x,HAY.z,-.35);
  hay.obj.visible=false;
@@ -709,7 +749,7 @@ async function start(){
  const APPLY={
   farmers:n=>farmers.forEach((f,k)=>{const on=k<=n;if(on&&!f.on){f.a.x=f.tx=FARM_HOME[k][0];f.a.z=f.tz=FARM_HOME[k][1]}f.on=on}),
   pond:n=>{pond.obj.visible=n>0;pond.s=POND_R[n]||.001},
-  hall:n=>{hay.obj.visible=n>=2;home.a.s=1+n*.07;setMarketTier(n);setProps(n)},
+  hall:n=>{hay.obj.visible=n>=2;home.a.s=castleOn?CASTLE.s:1+n*.07;setMarketTier(n);setProps(n)},
   feast:n=>garlands.forEach((g,i)=>{g.obj.visible=n>i})};
  // 0.9 hands over farmersTotal (1 + hired); 0.8 only the hired count
  const econ=(s,key)=>key==='farmers'&&Number.isFinite(Number(s.farmersTotal))?count(Number(s.farmersTotal)-1,ECON.farmers):count(s[key],ECON[key]);
@@ -727,7 +767,7 @@ async function start(){
  const stageOf=s=>Number.isInteger(s.stage)?clamp(s.stage,-1,5):-1,routesOf=s=>Array.isArray(s.routes)&&s.routes.length?s.routes.slice(0,8):null;
  function syncStage(s,fx=false){
   const routes=routesOf(s);let changed=setTrails(routes);
-  if(setStage(stageOf(s),radiusOf(s,s.world),routes,fx,!!s.river))changed=true;
+  if(setStage(stageOf(s),radiusOf(s,s.world),routes,fx,!!s.river,!!s.walls))changed=true;
   return changed;
  }
  function buildStage(){             // a new stage: the new houses and gate posts rise with dust and stars, the new village edge lights up
@@ -751,7 +791,7 @@ async function start(){
  const pendKey=k=>k==='tower'?'tower':k==='fence'?'fence':k==='nursery'||k==='barn'?'hall':null;
  // Tower floors: world.js gives `floor` = storeys (1 = the plain tower); every storey above the first is a stone drum under it.
  const extraFloors=b=>{const f=Number(b.floor);return Number.isFinite(f)&&f>=1?clamp(Math.floor(f)-1,0,MAX_FLOORS):0};
- const layerOf=b=>clamp(Number.isFinite(Number(b.layer))?Math.floor(Number(b.layer)):1,1,3);
+ const layerOf=b=>clamp(Number.isFinite(Number(b.layer))?Math.floor(Number(b.layer)):1,0,3);   // 0.17: layer 0 = a wall side with no fence bought (walled stages only)
  function syncRecords(s,volley=false){
   const real=s&&s.world&&typeof s.world==='object'&&Array.isArray(s.world.buildings)?s.world:null,w=real||fakeWorld(s);
   const init=w!==wRef;
@@ -785,6 +825,8 @@ async function start(){
     if(sl.kind==='fence'){sl.layer=layerOf(b);sl.layerFx=true}
     const key=pendKey(b.kind);if(!init&&key&&time-pending[key]<2.5){pending[key]=-9;sl.fxDone=true;playBuilt(sl)}
    }
+   // 0.17 바깥 고리: a standing tower whose world place moved by more than 0.5 (the ring stepped out with the wall) hops over to it in 0.9 s
+   if(sl.kind==='tower'){const wx=num(b.x),wz=num(b.z);if(!fresh&&!init&&sl.wx!==undefined&&Math.hypot(wx-sl.wx,wz-sl.wz)>.5&&!reduced()){sl.move={x0:sl.a.x,z0:sl.a.z,t0:time};towerMoves++}sl.wx=wx;sl.wz=wz}
    sl.b=b;if(sl.a){sl.a.x=num(b.x);sl.a.z=num(b.z)}
    if(!fresh&&sl.kind==='tower'){const f=extraFloors(b);if(f!==sl.floors){const up=f>sl.floors;sl.floors=f;   // a bought tower raised this one a storey
      if(up&&!init){sl.floorAt=time;sl.floorFx=false;if(time-pending.tower<2.5){pending.tower=-9;sl.floorFx=true;raiseStorey(sl)}}}}
@@ -855,7 +897,7 @@ async function start(){
   const live=new Set();
   for(const a of Array.isArray(w.arrows)?w.arrows:[]){
    if(!a||typeof a!=='object')continue;live.add(a.id);let o=arrowVis.get(a.id);
-   if(!o){const t=towerById.get(a.tower),from=t?bowWorld(t):{x:num(a.fx),y:TOWER_H*.75,z:num(a.fz)};
+   if(!o){const t=towerById.get(a.tower),from=t?bowWorld(t):{x:num(a.fx),y:a.gold&&castleOn?CASTLE.h*CASTLE.s*.78:TOWER_H*.75,z:num(a.fz)};   // 0.17: the castle's golden arrow leaves from the bell tower
     o={id:a.id,a,sx:from.x,sy:from.y,sz:from.z,ex:num(a.fx),ey:.8,ez:num(a.fz),u:0,u0:0,fin:-1,born:time,volley:volley&&num(a.t)>=num(a.total)};arrowVis.set(a.id,o);
     const target=wolfVis.get(a.wolf);if(target){o.ex=target.x;o.ez=target.z}
     if(t){t.aimId=a.wolf;t.aimAt=time}}
@@ -947,7 +989,8 @@ async function start(){
  function brokenFx(sl){             // smashed: a crunch of planks, dust and smoke
   sl.brokeAt=time;
   const p=sl.kind==='fence'?sideMid(sl.side):{x:sl.a.x,z:sl.a.z},h=sl.kind==='fence'?.6:sl.height*.5;
-  flashAt(p.x,h,p.z,2.2,RED);chipBurst(p.x,h,p.z,12);dustBurst(p.x,p.z,14,1.3);smokeBurst(p.x,h,p.z,sl.kind==='fence'?4:9);shake(.1);startle(p.x,p.z,4,1);
+  const stone=sl.kind==='fence'&&!!wallNow;if(stone)wallStats.fallen+=wallNow.segs.filter(g=>g.side===sl.side).length;   // 0.17: a wall side falls (cumulative count of fallen pieces)
+  flashAt(p.x,h,p.z,2.2,RED);chipBurst(p.x,h,p.z,12,stone?[STONE,ROCK]:undefined);dustBurst(p.x,p.z,stone?18:14,1.3);smokeBurst(p.x,h,p.z,sl.kind==='fence'?4:9);shake(stone?.13:.1);startle(p.x,p.z,4,1);
  }
  function buildFarmer(k){           // a hired farmer jumps out of a puff, spins once and waves
   const f=farmers[k];if(!f)return;const a=f.a,[x,z]=FARM_HOME[k],T=.1;
@@ -1052,7 +1095,7 @@ async function start(){
  // The market (and so the counter spots and the coin burst) follows the world's market building.
  const marketShift=()=>({x:market.a.x-WORLD.PLACE.market[0],z:market.a.z-WORLD.PLACE.market[1]});
  const marketFront=()=>{const m=marketShift();return {x:MARKET_FRONT.x+m.x,z:MARKET_FRONT.z+m.z}};
- const coopDoor=()=>{const s=home.a.s;return {x:home.a.x+(door.min.x+door.max.x)/2*s,z:home.a.z+door.max.z*s+.25}};
+ const coopDoor=()=>doorSpot();   // 0.17: the castle doorway at stage 5
  // 0.9 produce: hens lay `laid` eggs; the farmers carry the `sold` eggs to the market in baskets of four (as many farmers as needed);
  // `left` eggs stay in the nests by the hall until the next sale. 0.8 sends only `eggs` (= sold, nothing left over).
  function produceFx(e){             // hens lay -> eggs fly into baskets (and the nests) -> farmers run to the market -> coins
@@ -1116,6 +1159,13 @@ async function start(){
   ids.forEach((id,i)=>{const t=towerById.get(id);if(!t)return;t.stunAt=time;const d=.22+i*.05;wobble(t.a,.12,d);
    after(d,()=>{const H=TOWER_H*t.a.s;flashAt(t.a.x,H,t.a.z,1.8,ORANGE);smokeBurst(t.a.x,H*.8,t.a.z,4);starBurst(t.a.x,H*1.05,t.a.z,5,.6,[GOLD,WHITE])})});
  }
+ // 0.17 (프로듀서 결정 ③): in front of the walls the wolf king does not step closer, he shoves the front gate: a lunge, the portcullis rattles, dust bursts
+ // from the gate and a crack appears on it (one per push, up to three). Looks only; his place and the rule are unchanged.
+ function gatePush(kg){
+  const p=ports.find(q=>q.main)||ports[0],o=wolfVis.get(kg.id);wallStats.gatePush++;wallStats.pushT=time;if(!p)return;
+  if(o)knock(o,-o.x,-o.z,3.2);
+  after(.14,()=>{p.shakeT=time;const g=p.g,c=Math.cos(g.a),sn=Math.sin(g.a),x=g.x+c*.6,z=g.z+sn*.6;dustBurst(x,z,14,1.3);chipBurst(x,1.2,z,8,[STONE,ROCK]);flashAt(x,1.4,z,2.2,WHITE);shake(.14);rattle(g.x,g.z,4,.06)});
+ }
  function events(list){
   if(!Array.isArray(list))return;const s=read();if(s.paused)return;
   let volley=false;for(const e of list)if(e&&e.type==='volley')volley=true;
@@ -1152,7 +1202,7 @@ async function start(){
     case 'king':{const kg=s.world&&s.world.king;if(kg){const x=num(kg.x),z=num(kg.z);redPulse=Math.max(redPulse,.7);shake(.1);ringWave(x,z,9,WHITE,.8,0,CELL.halo,.6);ringWave(x,z,6,ICE,.6,.15,CELL.ring,.6);warns.push({x,z,t0:time,color:WHITE,life:2.6})}break}
     case 'bell':ringWave(0,0,(Rgoal+.3)*2.5,GOLD,.9,0,CELL.halo,.5,.08,true);ringWave(0,0,(Rgoal+.3)*1.6,GOLD,.7,.18,CELL.ring,.5,.08,true);sparkles(0,3,0,14,2,GOLD,0,.6);shake(.08);break;
     case 'shield':{const kg=s.world&&s.world.king,o=kg&&wolfVis.get(kg.id);if(kg){const x=num(kg.x),z=num(kg.z);flashAt(x,3.2,z,5,GOLD,.18);starBurst(x,3.4,z,16,1.3,[GOLD,WHITE],.18);ringWave(x,z,7,GOLD,.5,.18,CELL.halo,.6);shake(.12);if(o){o.hit=.3;o.hitT=time}}break}
-    case 'kingStep':{const kg=s.world&&s.world.king;if(kg){stomp(num(kg.x),num(kg.z),3,true);redPulse=Math.max(redPulse,.5);shake(.09)}break}
+    case 'kingStep':{const kg=s.world&&s.world.king;if(kg){stomp(num(kg.x),num(kg.z),3,true);redPulse=Math.max(redPulse,.5);shake(.09);if(wallNow)gatePush(kg)}break}   // 0.17: at the castle he shoves the front gate
     case 'kingFlee':{const kg=s.world&&s.world.king;if(kg)dustBurst(num(kg.x),num(kg.z),18,1.4);confetti(0,4.5,0,60,Math.max(4,Rgoal*.7));sparkles(0,2.5,0,18,Rgoal*.5,GOLD,0,.9);redPulse=0;break}
     case 'fox':{const R=Rgoal+num(W('EDGE')),a=spawnAngle(num(e.point)),x=Math.cos(a)*R,z=Math.sin(a)*R;warns.push({x,z,t0:time,color:ORANGE,life:2.4});dustBurst(x,z,6,.7);break}
     case 'foxSaved':{const fx=s.world&&s.world.fox;if(fx){const x=num(fx.x),z=num(fx.z);flashAt(x,.7,z,2.2,GOLD,.1);starBurst(x,.8,z,10,.9,[GOLD,WHITE],.1)}break}
@@ -1198,13 +1248,34 @@ async function start(){
  // Public close-up (0.12, the old test-only debug focus made official): focus([x,z,half]) holds the camera on a ground point, focus(null) hands it back.
  // During the wolf-king finale the view also leans toward the king by itself (KING_PULL, see updateView) unless a manual focus is held.
  function focus(f){return debug({focus:Array.isArray(f)?f:null}).focus}
+ /* 0.17 (계획서 §2.5): is a point hidden from the camera by the wall? Orthographic view: walk from the point toward the camera (EYE_DIR) and see whether the ray
+    passes through the wall band (wall line ± 0.3) below the wall top of that side, a gate's stone (its opening is see-through bars) or a watchtower. */
+ function wallHides(x,y,z){
+  if(!wallNow)return false;const L=wallNow.line,S=Math.PI/3,tr=WALLS.towerR*WALLS.towerScale,th=WALLS.towerH*WALLS.towerScale;
+  for(let t=0;t<5;t+=.03){const px=x+EYE_DIR.x*t,py=y+EYE_DIR.y*t,pz=z+EYE_DIR.z*t;if(py>th)break;
+   for(const w of wallNow.towers)if(Math.hypot(px-w.x,pz-w.z)<tr&&py<th)return true;
+   if(Math.abs(Math.hypot(px,pz)-L)>.3)continue;const a=Math.atan2(pz,px),k=Math.floor(((a%(Math.PI*2))+Math.PI*2)%(Math.PI*2)/S)%6,b=sides[k]&&sides[k].b;
+   let top=b&&b.broken?WALL_H*.4:WALL_H*(1+.06*clamp(Math.floor(num(b&&b.layer)),0,3));
+   for(const g of wallNow.gates){let d=a-g.a;d=Math.atan2(Math.sin(d),Math.cos(d));const off=Math.abs(d)*L;if(off<=WALLS.gateW/2*g.s){top=off<=WALLS.opening.w/2*g.s&&py<WALLS.opening.h*g.s?-1:WALLS.gateH*g.s;break}}
+   if(py<top)return true}
+  return false;
+ }
+ function wallInfo(){
+  let hid=0,of=0;for(const o of wolfVis.values()){if(o.ghost||o.state!=='smash')continue;const b=bById.get(o.v&&o.v.target);if(!b||b.kind!=='fence')continue;of++;topOf(o,tv);if(wallHides(tv.x,tv.y-.15*o.size,tv.z))hid++}
+  const rise=riseOf(reduced()),t0=fenceSink||wallOld?SINK:0;
+  return {on:!!wallNow,radius:wallNow?wallNow.R:0,line:wallNow?wallNow.line:0,segments:wallNow?wallNow.segs.length:0,drawn:wallMesh.count,perSide:wallNow?[0,1,2,3,4,5].map(k=>wallNow.segs.filter(g=>g.side===k).length):[],
+   gates:ports.length,gateRoads:ports.map(p=>p.g.p),towers:wallNow?wallNow.towers.length:0,fallen:wallStats.fallen,risen:wallStats.risen,rise:wallNow?+clamp((rise-t0)/(RISE_END-t0),0,1).toFixed(3):0,
+   portsUp:ports.filter(p=>p.y>.5).length,mainPort:(()=>{const p=ports.find(q=>q.main);return p?+p.y.toFixed(3):null})(),gatePush:wallStats.gatePush,hiddenHeads:of?+(hid/of).toFixed(3):0,smashing:of,hidden:hid,
+   fencePanels:fences.count,art:{wall:!!wallArt,gate:!!gateArt,watch:!!watchArt},gateNdc:(()=>{const p=ports.find(q=>q.main);if(!p)return null;ndc.set(p.g.x,WALLS.gateH*p.g.s,p.g.z).project(camera);return [+ndc.x.toFixed(3),+ndc.y.toFixed(3)]})(),
+   towerTopNdc:wallNow?wallNow.towers.map(w=>{ndc.set(w.x,WALLS.towerH*WALLS.towerScale,w.z).project(camera);return [+ndc.x.toFixed(3),+ndc.y.toFixed(3)]}):[]};
+ }
  window.VillageView={events,reward(){},build,upgrade:()=>build('tower'),debug,marketScreen,focus,
   inspect(){
    const states={},kinds={};let onScreenW=0,shownW=0,ghosts=0;
    for(const o of wolfVis.values()){if(o.ghost){ghosts++;continue}shownW++;states[o.state]=(states[o.state]||0)+1;kinds[o.kind]=(kinds[o.kind]||0)+1;ndc.set(o.x,.6,o.z).project(camera);if(Math.abs(ndc.x)<=1&&Math.abs(ndc.y)<=1)onScreenW++}
    const sw=read().world,stunned=sw&&Array.isArray(sw.buildings)?towers.filter(t=>t.on&&t.b&&num(t.b.stun)>0&&!t.b.broken).length:0;
    return {ready:true,time,frames,phase:read().phase,radius:Rgoal,radiusShown:Rd,cameraHalf:camHalf,aspect,cameraFocus:[+FOCUS.x.toFixed(2),+FOCUS.z.toFixed(2)],
-    king:(()=>{const kg=sw&&sw.king,o=kg&&wolfVis.get(kg.id);return o?{state:kg.state,size:+o.size.toFixed(2),x:+o.x.toFixed(2),z:+o.z.toFixed(2)}:null})(),fox:(()=>{const fx=sw&&sw.fox,o=fx&&wolfVis.get(fx.id);return o?{state:fx.state,size:+o.size.toFixed(2)}:null})(),
+    king:(()=>{const kg=sw&&sw.king,o=kg&&wolfVis.get(kg.id);if(!o)return null;topOf(o,tv);ndc.copy(tv).project(camera);return {state:kg.state,size:+o.size.toFixed(2),x:+o.x.toFixed(2),z:+o.z.toFixed(2),r:+Math.hypot(num(kg.x),num(kg.z)).toFixed(3),steps:num(kg.steps)|0,headNdc:[+ndc.x.toFixed(3),+ndc.y.toFixed(3)]}})(),fox:(()=>{const fx=sw&&sw.fox,o=fx&&wolfVis.get(fx.id);return o?{state:fx.state,size:+o.size.toFixed(2)}:null})(),
     wolvesVisible:shownW,wolvesOnScreen:onScreenW,wolfStates:states,wolfKinds:kinds,wolfGhosts:ghosts,maxWolvesDrawn,wolfCap:WCAP,highlighted:[...hl.values()].filter(t=>t>time).length,
     power:powerShown,stunnedTowers:stunned,splashFx:{active:booms.filter(b=>time-b.t0<.8).length,total:boomTotal,scorches:scorches.length},
     arrowsVisible:arrowsDrawn,fireArrows:fireDrawn,wolfPos:[...wolfVis.values()].filter(o=>!o.ghost).slice(0,8).map(o=>[Math.round(o.x*100)/100,Math.round(o.z*100)/100]),
@@ -1215,7 +1286,7 @@ async function start(){
     towers:towers.filter(t=>t.on).length,fences:sides.filter(f=>f.on).length,fencePanels:fences.count,
     hall:shown.hall,farmers:shown.farmers,pond:shown.pond,feast:shown.feast,farmerActors:farmers.filter(f=>f.on).length,
     towerFloors:towers.reduce((n,t)=>n+(t.on?t.floors:0),0),farmersVisible:farmersDrawn,farmersCarrying:farmers.filter(f=>f.on&&f.eggs>0).length,basketEggs:basketDrawn,nestEggs:nestShown,flow:!!flowS,yardEggs:yardDrawn,farmersRunning:runners,repairers,boost:flowLv(),
-    fenceLayers:(()=>{const o={1:0,2:0,3:0};for(const sd of sides)if(sd.on)o[sd.layer]++;return o})(),wallSegments:walls.count,railSegments:rails.count,
+    fenceLayers:(()=>{const o={1:0,2:0,3:0};for(const sd of sides)if(sd.on&&sd.layer>0)o[sd.layer]++;return o})(),wallSegments:walls.count,railSegments:rails.count,
     stage:stageShown,roads:trailKey,stageHouses:stageInfo.houses|0,roadMarks:stageInfo.marks|0,stageRising,marketTier:market.mtier,marketDown:market.on&&isBroken(market),hammers:hammersDrawn,propsStage,lanterns:lanterns(propsStage).length,
     pondVisible:pond.obj.visible,garlands:garlands.filter(g=>g.obj.visible).length,sale:!!sale||time<popUntil,
     decor:{forest:forest.count,grove:grove.count,bushes:shrubs.count,rocks:stones.count},
@@ -1224,6 +1295,7 @@ async function start(){
     river:(()=>{const o={on:riverR>0,radius:riverR,bridge:bridgeArt?'glb':'code',bridged:crossed.bridged.size,waded:crossed.waded.size,wadedIn:crossed.wadedIn.size,splashes:crossed.splashes,flow:+riverMesh.scale.x.toFixed(3)};if(!riverR)return o;const b=bridgeSpot(riverR),at=(f,y)=>{ndc.set(b.at[0]+b.u[0]*f,y,b.at[1]+b.u[1]*f).project(camera);return [+ndc.x.toFixed(3),+ndc.y.toFixed(3)]};
      o.bridgeNdc=at(0,.5);o.bridgeFarNdc=at(BRIDGE_ART.len/2,.3);return o})(),   // where the bridge's middle and its far (forest) end are on screen (−1…1)
     mill:{art:millArt?'glb':'code',shown:wheel.obj.visible,turns:Math.round(millSpin.angle/(Math.PI*2)*100)/100,spinning:millSpin.vel>0,kicks:millSpin.kicks},
+    walls:wallInfo(),art16:Object.fromEntries(Object.keys(ART16).map(k=>[k,!!art16[k]])),castle:castleOn?'glb':stageShown>=CASTLE.stage?'code':null,towerMoves,   // 0.17
     drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,builds:{...builds},effects:particles.length+anims.length,warnings:warns.length,blend:{t:+blendT.toFixed(3),dur:+blendDur.toFixed(3),ticks:blendTicks},shake:shakeNow,
     memory:{geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures}}}};
 
@@ -1277,6 +1349,7 @@ async function start(){
  function animateBuildings(dt,wdt,less){const fdt=dt;
   for(const sl of BUILDINGS){if(!sl.on||!sl.b)continue;const a=sl.a,b=sl.b,br=isBroken(sl);
    a.x=num(b.x);a.z=num(b.z);
+   if(sl.move){const u=less?1:(time-sl.move.t0)/.9;if(u>=1)sl.move=null;else{const e=easeInOut(clamp(u,0,1));a.x=sl.move.x0+(a.x-sl.move.x0)*e;a.z=sl.move.z0+(a.z-sl.move.z0)*e;leap(a,clamp(u,0,1),.9)}}
    const f=br?0:num(b.max)>0?clamp(num(b.hp)/num(b.max),0,1):1,tier=br?3:f<=.34?2:f<=.67?1:0;sl.hp=f;sl.dmg=tier;
    a.base=damageMat(sl.tint,tier);
    if(br){const k=less?1:easeIn(clamp((time-sl.brokeAt)/.4,0,1));a.tilt+=sl.lean*.26*k;a.pitch+=.1*k;a.sy*=1-.38*k;a.lift-=.05*k}
@@ -1301,15 +1374,17 @@ async function start(){
  const pm=new THREE.Matrix4(),pq=new THREE.Quaternion(),pe=new THREE.Euler(0,0,0,'YXZ'),pp=new V3(),ps=new V3();
  // Each side is a row of segments along the ring: layer 1 panels, layer 2 panels + outer rails, layer 3 stone wall (same layout).
  const REBUILD_T=num(W('REBUILD'))||150;
+ // 0.17: the stage change into (and within) the walled stages: the old fence (or the old wall) sinks for SINK s, then the wall rises piece by piece (0.035 s apart)
+ const SINK=.3,RISE_END=SINK+.035*11+.7,riseOf=less=>wallNow&&!less?time-wallRiseT:9;
  function updateFences(less){
-  let n=0,nr=0,nw=0;const Rf=Rd-FENCE_IN,max=FCAP;
-  for(const side of sides){if(!side.on||!side.b)continue;
+  let n=0,nr=0,nw=0;const Rf=Rd-FENCE_IN,max=FCAP,rise=riseOf(less),fenceMode=!wallNow||(fenceSink&&rise<SINK),sink=wallNow?Math.max(.001,1-rise/SINK):1;
+  if(fenceMode)for(const side of sides){if(!side.on||!side.b||side.layer<1)continue;
    const b=side.b,k=side.side,L=side.layer,a0=k*Math.PI/3,arc=Rf*Math.PI/3,cnt=Math.max(3,Math.round(arc/FENCE_W)),step=Math.PI/3/cnt,sx=arc/cnt/FENCE_W*1.03;
    const f=num(b.max)>0?clamp(num(b.hp)/num(b.max),0,1):1,tier=b.broken?3:f<=.34?2:f<=.67?1:0,fallAll=b.broken?(less?1:easeIn(clamp((time-side.brokeAt)/.4,0,1))):0;
    const smash=!less&&smashOn.get(b.id)?Math.min(3,smashOn.get(b.id)):0,heavy=L>=3?.45:1;   // a stone wall barely shakes and tips over less
    const up=b.broken&&side.fixer&&side.fixing?Math.floor(clamp(1-num(b.rebuild)/REBUILD_T,0,1)*cnt+.001):0,tintOf=L===2?FENCE_TINT2:FENCE_TINT;   // panels a farmer has already hammered up
    for(let i=0;i<cnt;i++){
-    const a=a0+(i+.5)*step,j=hash(k*31+i),fall=i<up?0:fallAll;let r=Rf,y=0,rx=0,ry=-a-Math.PI/2,rz=0,sy=LAYER_H[L-1];
+    const a=a0+(i+.5)*step,j=hash(k*31+i),fall=i<up?0:fallAll;let r=Rf,y=0,rx=0,ry=-a-Math.PI/2,rz=0,sy=LAYER_H[L-1]*sink;
     if(!less&&time-side.pop<1.5){const t=time-side.pop-.035*i;sy*=t<0?.001:Math.max(.001,springy(t))}
     if(fall>0){rx=(j>.5?1:-1)*1.42*fall*heavy;r+=(j-.5)*.9*fall;ry+=(j-.5)*.7*fall;y=.03*fall;if(L>=3)sy*=1-.45*fall}
     else if(i<up){rx=(j-.5)*.16;rz=(hash(k*17+i)-.5)*.1}
@@ -1323,6 +1398,32 @@ async function start(){
   }
   for(const [m,c] of [[fences,n],[rails,nr],[walls,nw]]){m.count=c;m.instanceMatrix.needsUpdate=true;if(m.instanceColor)m.instanceColor.needsUpdate=true}
   fenceShade.instanceMatrix.array.set(fences.instanceMatrix.array.subarray(0,n*16));fenceShade.count=n;fenceShade.instanceMatrix.needsUpdate=true;
+  updateWall(less,rise);
+ }
+ // The stone wall: every piece of wallPlan on the wall line (the target radius: gates and towers stand there too), damage tint, fall, smash shake and rise like the fence
+ function updateWall(less,rise){
+  let nw=0;
+  const put=(a,r,rx,ry,rz,y,sx,sy,tint)=>{if(nw>=WALL_CAP)return;pe.set(rx,ry,rz);pq.setFromEuler(pe);pm.compose(pp.set(Math.cos(a)*r,y,Math.sin(a)*r),pq,ps.set(sx,sy,1));wallMesh.setMatrixAt(nw,pm);wallMesh.setColorAt(nw,tint);nw++};
+  if(wallNow&&wallOld&&!less&&time-wallOldT<SINK){const u=(time-wallOldT)/SINK;for(const sg of wallOld.segs)put(sg.a,wallOld.line,0,-sg.a-Math.PI/2,0,0,sg.len/WALLS.segW*1.01,WALL_SY*Math.max(.001,1-u),FENCE_TINT[0])}
+  if(wallNow){const t0=fenceSink||wallOld?SINK:0;
+   for(const sg of wallNow.segs){const side=sides[sg.side],b=side&&side.on&&side.b;if(!b)continue;
+    const f=num(b.max)>0?clamp(num(b.hp)/num(b.max),0,1):1,tier=b.broken?3:f<=.34?2:f<=.67?1:0,fall=b.broken?(less?1:easeIn(clamp((time-side.brokeAt)/.4,0,1))):0;
+    const smash=!less&&smashOn.get(b.id)?Math.min(3,smashOn.get(b.id)):0,heavy=.45,L=clamp(Math.floor(num(b.layer)),0,3),j=hash(sg.side*31+sg.k);
+    let r=wallNow.line,y=0,rx=0,ry=-sg.a-Math.PI/2,rz=0,sy=WALL_SY*(1+.06*L);
+    if(rise<9){const t=rise-t0-.035*sg.k;sy*=t<0?.001:Math.max(.001,springy(t))}
+    if(!less&&time-side.pop<1.5){const t=time-side.pop-.035*sg.k;sy*=t<0?.001:Math.max(.001,springy(t))}
+    if(fall>0){rx=(j>.5?1:-1)*1.42*fall*heavy;r+=(j-.5)*.6*fall;ry+=(j-.5)*.4*fall;y=.03*fall;sy*=1-.45*fall}
+    else{rx=(1-f)*(j-.5)*.5*heavy;rz=(1-f)*(hash(sg.side*17+sg.k)-.5)*.25*heavy;if(smash)rz+=Math.sin(wclock*33+sg.k*1.7)*.035*smash*heavy}
+    put(sg.a,r,rx,ry,rz,y,sg.len/WALLS.segW*1.01,sy,FENCE_TINT[tier])}}
+  wallMesh.count=nw;wallMesh.instanceMatrix.needsUpdate=true;if(wallMesh.instanceColor)wallMesh.instanceColor.needsUpdate=true;
+  wallShade.instanceMatrix.array.set(wallMesh.instanceMatrix.array.subarray(0,nw*16));wallShade.count=nw;wallShade.instanceMatrix.needsUpdate=true;
+  // portcullis: down while its side stands, up when it is broken; the front gate drops when the bell rings (finale) and opens when the king has fled
+  let np=0;const bell=curS&&curS.bell|0;
+  for(const p of ports){const side=sides[p.side],b=side&&side.on&&side.b;let want=b&&b.broken?1:0;if(p.main){if(bell===2)want=0;else if(bell>=3)want=1}p.want=want;
+   p.y=less?want:p.y+(want-p.y)*Math.min(1,(want>p.y?2.2:5)*Math.max(0,lastDt));
+   const g=p.g,s=g.s,c=Math.cos(g.a),sn=Math.sin(g.a),sh=!less&&time-p.shakeT<.6?Math.sin((time-p.shakeT)*48)*.06*(1-(time-p.shakeT)/.6):0;
+   pq.setFromAxisAngle(YAX,g.ry);pm.compose(pp.set(g.x+c*.3*s-sn*sh,p.y*1.3*s,g.z+sn*.3*s+c*sh),pq,ps.set(s,s,s));portMesh.setMatrixAt(np++,pm)}
+  portMesh.count=np;portMesh.instanceMatrix.needsUpdate=true;
  }
  /* ----- monsters: gaits, attacks, reactions and falls, written straight into the per-kind instanced meshes.
     The world position is authoritative; everything here (knock-back, hops, rearing) is a visual offset on top. ----- */
@@ -1487,9 +1588,9 @@ async function start(){
   }
   // Hidden hens peek out of the coop door, pale and trembling, until the wolves have gone.
   peeking=home.on&&home.b&&!home.b.broken?Math.min(3,hensHidden):0;
-  const s=home.a.s,dx=(door.min.x+door.max.x)/2*s,dz=door.max.z*s+.25;
+  const ds=doorSpot();   // 0.17: the castle doorway at stage 5
   peeks.forEach((a,i)=>{a.hide=i>=peeking;if(a.hide)return;const off=(i-(peeking-1)/2)*.5;
-   a.x=home.a.x+dx+camRight.x*off;a.z=home.a.z+dz+camRight.z*off;a.y=0;a.ry=toCam+(i-1)*.35;a.shy=true;
+   a.x=ds.x+camRight.x*off;a.z=ds.z+camRight.z*off;a.y=0;a.ry=toCam+(i-1)*.35;a.shy=true;
    if(!less){a.lift+=-.06+.08*Math.abs(Math.sin(wclock*2.4+i*1.9));a.tilt+=Math.sin(wclock*30+i)*.04}});
  }
  function writeHens(){
@@ -1667,7 +1768,7 @@ async function start(){
  const KING_FLAMES=[[0,1.2,.06,.6],[-.24,1.06,.12,.45],[.24,1.06,.12,.45],[0,1.55,.3,.42],[0,1.28,-.92,.62],[-.12,1.12,-.86,.42],[.12,1.12,-.86,.42]];   // ember king flame points (unit model)
  function ambient(less){
   const t=less?0:time;
-  if(home.on&&home.b&&!home.b.broken&&!less)for(let i=0;i<3;i++){const cycle=(t*.22+i/3)%1;sprite(CELL.glow,home.a.x-.55+Math.sin(t+i)*.13,2.75*home.a.s+cycle*1.3,home.a.z-.3,.45+cycle*.7,.45+cycle*.7,WHITE,(1-cycle)*.5)}
+  if(home.on&&home.b&&!home.b.broken&&!less&&!castleOn)for(let i=0;i<3;i++){const cycle=(t*.22+i/3)%1;sprite(CELL.glow,home.a.x-.55+Math.sin(t+i)*.13,2.75*home.a.s+cycle*1.3,home.a.z-.3,.45+cycle*.7,.45+cycle*.7,WHITE,(1-cycle)*.5)}
   for(const tw of towers)if(tw.on){decal(CELL.dot,tw.a.x,tw.a.z,1.9,STONE,.92,0,.03);decal(CELL.halo,tw.a.x,tw.a.z,1.9,PADRIM,.6,0,.032)}
   if(barn.on)decal(CELL.dot,barn.a.x,barn.a.z+.2,3.6,SAND,.85,0,.02);
   hammersDrawn=0;
@@ -1686,7 +1787,10 @@ async function start(){
    for(const h of wRef.hens)if(h&&(h.egg|0)>0&&Number.isInteger(h.slot)){const hm=W('HOME')(h.slot);decal(CELL.glow,hm[0],hm[1]+.18,1.5,GOLD,.3,.6,.035)}
    const lv=flowLv();if(lv>0&&!less)for(const c of yardHens()){const bob=Math.abs(Math.sin(time*6+c.phase));sprite(lv>=2?CELL.star:CELL.sparkle,c.a.x,1.05+.18*bob,c.a.z,.3,.3,GOLD,.9,.4,Math.sin(time*3+c.phase)*.4)}
   }
-  for(const sd of sides)if(sd.on&&sd.b&&!sd.b.broken&&num(sd.b.hp)<num(sd.b.max)){const {x,z}=sideMid(sd.side),f=clamp(num(sd.b.hp)/num(sd.b.max),0,1);bar(x,1.35,z,f,1,hpColor(f))}
+  for(const sd of sides)if(sd.on&&sd.b&&!sd.b.broken&&num(sd.b.hp)<num(sd.b.max)){const {x,z}=sideMid(sd.side,wallNow?wallNow.line:undefined),f=clamp(num(sd.b.hp)/num(sd.b.max),0,1);bar(x,wallNow?WALL_H+.6:1.35,z,f,1,hpColor(f))}
+  // 0.17: cracks on the front gate, one per shove of the wolf king (during the finale)
+  {const kg=curS&&curS.bell===2&&curS.world&&curS.world.king,p=kg&&wallNow&&ports.find(q=>q.main),n=p?Math.min(3,num(kg.steps)|0):0;
+   if(n){const g=p.g,c=Math.cos(g.a),sn=Math.sin(g.a),d=(WALLS.gateD[1]+.02)*g.s,tx=-sn,tz=c;for(let i=0;i<n;i++){const u=[-.95,.9,-.2][i]*g.s,h=[1.9,1.6,2.3][i]*g.s;sprite(CELL.impact,g.x+c*d+tx*u,h,g.z+sn*d+tz*u,.7*g.s,.7*g.s,CRACK,.9,0,i*1.7)}}}
   for(let i=scorches.length-1;i>=0;i--){const sc=scorches[i],age=time-sc.t0;if(age>4.5){scorches.splice(i,1);continue}   // fire-arrow scorch marks fade out
    const k=age<.12?age/.12:age>2.5?1-(age-2.5)/2:1;flatPool.push(lying,sc.x,.045,sc.z,sc.r*1.35,sc.r*1.35,sc.rot,CELL.scorch,CRACK[0],CRACK[1],CRACK[2],.34*k,0)}
   if(less)for(const b of booms)if(time-b.t0<.6)decal(CELL.ring,b.x,b.z,b.r*2.5,ORANGE,.85,.5,.08);   // reduced motion: a still ring instead of the fireball
@@ -1729,7 +1833,7 @@ async function start(){
  // names only label the debug({tris}) breakdown
  Object.entries({meadow:land,yard,decor,forest,grove,shrubs,stones,fences,hens:henMesh,arrows:arrowMesh,fxFlat:flatPool.mesh,fxAir:airPool.mesh,shadowStandIn:shade.mesh,'garden-bush':garden[0],'garden-rock':garden[1],hay:hay.obj,pond:pond.obj,
   'shade-fence':fenceShade,'shade-hen':henShade,'shade-farmer':farmerShade,'shade-tower-a':towerShade[0],'shade-tower-b':towerShade[1],'shade-bush':garden[2],
-  'tower-a':towerBody[0],'tower-b':towerBody[1],'tower-storey':storeys,crossbow:bows,'fence-rails':rails,'fence-wall':walls,props,farmer:crew.mesh,baskets,eggs:eggMesh})
+  'tower-a':towerBody[0],'tower-b':towerBody[1],'tower-storey':storeys,crossbow:bows,'fence-rails':rails,'fence-wall':walls,props,farmer:crew.mesh,baskets,eggs:eggMesh,'wall-stone':wallMesh,'shade-wall':wallShade,portcullis:portMesh})
   .forEach(([n,m])=>{m.name=n});
  for(const k of KIND_ORDER)herd[k].mesh.name='monster-'+k;for(const sl of BUILDINGS)sl.a.obj.name=sl.kind;
  garlands.forEach(g=>{g.obj.name='garland'});
@@ -1741,7 +1845,7 @@ async function start(){
  host.classList.add('is3d');host.dataset.renderer='three';
  // One step of the view: dt-driven; `still` freezes everything (paused, hidden tab), the world clock only runs in listen/ask/learn.
  function step(dt,still,less,running){
-  const fdt=still?0:dt,wdt=running&&!still?dt:0;
+  const fdt=still?0:dt,wdt=running&&!still?dt:0;lastDt=fdt;
   if(!still){time+=dt;wclock+=wdt;blendT+=dt;sinceTick+=dt}
   if(!still||dirty){
    updateView(fdt,less);
