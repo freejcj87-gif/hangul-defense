@@ -146,6 +146,13 @@ jobs:
           # Allowlist: anything new must be a deliberate decision (progress-file transfer uses the system document screen and share sheet, no permission).
           unexpected=$(grep -o 'android:name="[^"]*"' "$RUNNER_TEMP/release-permissions.txt" | sed 's/^android:name="//; s/"$//' | grep -Ev '^android\.permission\.(INTERNET|VIBRATE)$|\.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION$' || true)
           if [ -n "$unexpected" ]; then echo "Permission not on the allowlist: $unexpected"; exit 1; fi
+          # Phones and tablets (producer decision 2026-11-20): nothing may filter out phones or lock orientation in the manifest.
+          # Phones get portrait at runtime (MainActivity, smallest width < 600dp); large screens stay free.
+          grep -o 'uses-feature[^>]*' "$merged" || echo 'uses-feature: none'
+          if grep -Eq 'compatible-screens|requiresSmallestWidthDp|smallScreens="false"|normalScreens="false"|android:screenOrientation' "$merged"; then
+            grep -En 'compatible-screens|requiresSmallestWidthDp|supports-screens|screenOrientation' "$merged"
+            echo 'Merged manifest filters screen sizes or locks orientation (phones and tablets must both be served)'; exit 1
+          fi
           echo 'Native libraries in AAB (16KB page size matters only if any are listed):'
           unzip -l app/build/outputs/bundle/release/*.aab | grep '\.so$' || echo 'none'
           cp "$RUNNER_TEMP/release-dependencies.txt" "$RUNNER_TEMP/release-permissions.txt" app/build/outputs/
