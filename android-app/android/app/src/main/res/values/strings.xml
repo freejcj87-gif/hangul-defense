@@ -4,4 +4,6 @@
     <string name="title_activity_main">꼬꼬마을</string>
     <string name="package_name">io.github.freejcj87gif.hanguldefense</string>
     <string name="custom_url_scheme">io.github.freejcj87gif.hanguldefense</string>
+    <!-- 보호자 화면 '진행 파일 옮기기'의 Android 공유 창 제목(ProgressFilePlugin.share) -->
+    <string name="progress_share_title">진행 파일 보내기</string>
 </resources>

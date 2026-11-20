@@ -40,6 +40,22 @@ swap('</head>', '<style id="app-shell-css">html{-webkit-tap-highlight-color:tran
 swap('</body>', '<script src="app-shell.js" defer></script></body>', '</body>');
 fs.writeFileSync(indexFile, html);
 
+/* app-shell.js가 기대는 게임 쪽 자리(겹창·단추 id, 진행 파일 훅, 도움말의 오픈소스 고지 제목). 게임이 바뀌어 하나라도 없어지면
+   앱에서 뒤로 가기·진행 파일 옮기기·오픈소스 고지가 조용히 깨지므로 여기서 멈춘다. 고칠 때는 shell/app-shell.js와 함께 고친다. */
+const bookui = fs.readFileSync(path.join(www, 'bookui.js'), 'utf8');
+const hooks = [
+  ...['drawer', 'pause', 'guardian', 'gBody', 'gNote', 'importFile', 'guardClose', 'gate', 'gateClose', 'bookScreen', 'bookClose'].map(id => ['index.html', html, 'id="' + id + '"']),
+  ['bookui.js', bookui, 'window.__lastExport='], // 내보내기: 방금 만든 진행 파일 {name,text}
+  ['bookui.js', bookui, 'a.download=name'], // 내보내기: 웹은 a download 누름. 앱은 이 누름을 잡는다
+  ['bookui.js', bookui, 'window.__importText=importText'], // 불러오기: 앱이 읽은 글을 넘길 곳
+  ['bookui.js', bookui, "$('importFile').click()"], // 불러오기: 웹은 파일 고르기. 앱은 이 누름을 잡는다
+  ['bookui.js', bookui, "para(box,'오픈소스 고지','g-h')"], // 도움말: 앱이 그 아래에 '오픈소스 고지 전체 보기'를 붙인다
+];
+for (const [file, text, needle] of hooks) {
+  const count = text.split(needle).length - 1;
+  assert.equal(count, 1, file + '에서 앱 껍데기가 쓰는 자리 "' + needle + '"가 ' + count + '번 나와요(1번이어야 함). shell/app-shell.js와 이 목록을 함께 고쳐 주세요.');
+}
+
 require('esbuild').buildSync({
   entryPoints: [path.join(appRoot, 'shell', 'app-shell.js')],
   bundle: true, format: 'iife', target: 'es2020', minify: true, legalComments: 'eof',
@@ -53,22 +69,23 @@ fs.writeFileSync(path.join(www, 'webview-old.html'), '<!doctype html><html lang=
   + '<body><div><h1>꼬꼬마을을 열지 못했어요</h1><p>보호자께: 이 기기의 화면 엔진(Android System WebView)이 오래되었거나 화면을 불러오지 못했어요.</p>'
   + '<p>Play 스토어에서 \'Android System WebView\'와 \'Chrome\'을 업데이트한 뒤 앱을 다시 열어 주세요.</p></div></body></html>\n');
 
-/* 오픈소스 고지(정책 04 문서 §2.1): 앱 안 오프라인 화면 oss-licenses.html. 보호자 화면에서 이 파일로 가는 줄은 게임 쪽(보호자 화면)이 붙인다.
-   AndroidX 등 Gradle 의존성은 Apache-2.0 전문 한 벌로 고지한다(정확한 의존성 목록은 CI 빌드 뒤 확인: launch\android\02 문서). */
+/* 오픈소스 고지(정책 04 문서 §2.1): 앱 안 오프라인 화면 oss-licenses.html. 보호자 화면 도움말(보호자 안내 포함)의 '오픈소스 고지 전체 보기'
+   (app-shell.js가 붙임)가 이 파일을 겹창 안 iframe으로 연다. 그래서 '게임으로' 링크는 두지 않는다(iframe 안에서 게임이 또 열린다).
+   AndroidX 등 Gradle 의존성은 Apache-2.0 전문 한 벌로 고지한다. 이름 목록은 CI의 release-dependencies.txt(첫 실행 44219925998)에 맞춘 것. */
 const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const lic = (...p) => fs.readFileSync(path.join(...p), 'utf8').trim();
 const notices = [
   ['three.js 0.180.0 (MIT)', lic(repo, 'node_modules', 'three', 'LICENSE')],
   ['Capacitor: @capacitor/core, @capacitor/android ' + require('@capacitor/core/package.json').version + ' (MIT)', lic(appRoot, 'node_modules', '@capacitor', 'core', 'LICENSE')],
   ['@capacitor/app ' + require('@capacitor/app/package.json').version + ' (MIT)', lic(appRoot, 'node_modules', '@capacitor', 'app', 'LICENSE')],
-  ['AndroidX (AppCompat, Activity, Core, CoordinatorLayout, Fragment, SplashScreen, WebKit), Apache Cordova Android (Apache License 2.0)', lic(appRoot, 'shell', 'licenses', 'Apache-2.0.txt')],
+  ['AndroidX (Activity, AppCompat, Core, CoordinatorLayout, Fragment, Lifecycle, SplashScreen, WebKit 외), Apache Cordova Android, Kotlin 표준 라이브러리, kotlinx.coroutines, Guava ListenableFuture, JetBrains·AndroidX 주석 라이브러리 (Apache License 2.0)', lic(appRoot, 'shell', 'licenses', 'Apache-2.0.txt')],
 ];
 fs.writeFileSync(path.join(www, 'oss-licenses.html'), '<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>오픈소스 고지 · 꼬꼬마을</title>'
-  + '<style>body{margin:0;padding:20px;background:#fff9e9;color:#294235;font-family:system-ui,sans-serif;line-height:1.5}h1{font-size:22px}h2{font-size:16px;margin-top:28px}pre{white-space:pre-wrap;word-break:break-word;font-size:12px;background:#fff;border:1px solid #e6d9b8;border-radius:10px;padding:12px}a{display:inline-block;padding:10px 16px;border:1px solid #d8c89e;border-radius:12px;background:#f3e8c9;color:inherit;text-decoration:none;font-weight:700}</style></head>'
-  + '<body><a href="index.html">← 게임으로</a><h1>오픈소스 고지</h1><p>꼬꼬마을은 아래 오픈소스 소프트웨어를 사용합니다.</p>'
+  + '<style>body{margin:0;padding:16px;background:#fff9e9;color:#294235;font-family:system-ui,sans-serif;line-height:1.5}h1{font-size:20px;margin:0 0 8px}h2{font-size:15px;margin-top:24px}pre{white-space:pre-wrap;word-break:break-word;font-size:12px;background:#fff;border:1px solid #e6d9b8;border-radius:10px;padding:12px}</style></head>'
+  + '<body><h1>오픈소스 고지</h1><p>꼬꼬마을은 아래 오픈소스 소프트웨어를 사용합니다.</p>'
   + notices.map(([name, text]) => '<h2>' + esc(name) + '</h2><pre>' + esc(text) + '</pre>').join('') + '</body></html>\n');
 
-for (const file of ['index.html', 'village.js', 'combat.js', 'world.js', 'questions.js', 'questions-gen.js', 'app-shell.js', 'webview-old.html', 'oss-licenses.html','art-handoff/coopnight/source-3d/models/environment-pack.glb']) {
+for (const file of ['index.html', 'village.js', 'combat.js', 'world.js', 'questions.js', 'questions-gen.js', 'book.js', 'notes.js', 'bookui.js', 'app-shell.js', 'webview-old.html', 'oss-licenses.html', 'art-handoff/coopnight/source-3d/models/environment-pack.glb']) {
   assert(fs.statSync(path.join(www, file)).isFile(), '앱 묶음에 없는 파일: ' + file);
 }
 for (const file of WEB_ONLY) assert(!fs.existsSync(path.join(www, file)), '웹 전용 파일이 앱 묶음에 들어갔어요: ' + file);

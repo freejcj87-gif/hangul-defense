@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- FileProvider가 바깥 앱에 열어 줄 수 있는 폴더. 진행 파일 보내기(ProgressFilePlugin.share)가 쓰는 캐시 폴더 하나만 둔다.
+     Capacitor 템플릿의 external-path(외부 저장소 전체)와 cache 전체는 쓰지 않아 뺐다(카메라 촬영 입력용인데 게임에 없음). -->
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <external-path name="my_images" path="." />
-    <cache-path name="my_cache_images" path="." />
+    <cache-path name="progress" path="progress/" />
 </paths>
