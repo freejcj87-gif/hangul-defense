@@ -2223,7 +2223,8 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   ok(!/%|순위|등수|평균|또래|보다 잘|실력|효과|향상/.test(body()),'기록 탭에 비율·순위·비교·효과 문구 없음');
   tab('help');ok(body().includes(Bk.shinyText())&&/25% 확률/.test(body())&&/수첩은 몬스터 8종, 32칸으로 끝이 있어요/.test(body())&&/보안 장치가 아니에요/.test(body()),'도움말: 반짝 손님 확률(상수에서 만든 문구) · 수집 구조 · 문턱 안내');
   ok(body().includes('게임 기록은 이 기기에 저장되고, 개발자에게 보내지 않아요.')&&!/이 기기에만|기기 안에만|밖으로 나가지 않아요/.test(body()),'저장 위치는 기준 문장 그대로("에만" 없음)');
-  ok(/개인정보처리방침/.test(body())&&/수집하는 개인정보: 없습니다/.test(body())&&/\[개발자 이름\]/.test(body())&&/\[문의 이메일\]/.test(body())&&/오픈소스 고지/.test(body()),'도움말: 개인정보처리방침 본문(개발자 이름·이메일은 자리표시)과 오픈소스 고지');
+  ok(/개인정보처리방침/.test(body())&&/수집하는 개인정보: 없습니다/.test(body())&&body().includes('개발자: '+Nt.POLICY.developer)&&body().includes('이메일: '+Nt.POLICY.email)&&/오픈소스 고지/.test(body()),'도움말: 개인정보처리방침 본문(개발자 이름·이메일은 notes.js POLICY 값, 지금은 자리표시)과 오픈소스 고지');
+  ok(Nt.PRIVACY.every(([h,l])=>body().includes(h)&&l.every(t=>body().includes(t))),'도움말: 개인정보처리방침의 제목과 모든 줄이 화면에 그대로(웹 페이지 privacy/index.html과 같은 원본)');
   ok(!/https?:|www\./.test(body()),'보호자 화면 글에 바깥 주소 없음');
   /* 설정: 하루 시간 바꾸기, 끄기는 한 번 더 확인 */
   tab('set');const sel=g.n.gBody.children.find(c=>c.tagName==='label').children.find(c=>c.tagName==='select');sel.value='45';sel.onchange();eq([bookOf(g).set.day,stored().set.day],[45,45],'하루 시간 45분(바로 저장)');
@@ -2293,6 +2294,23 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   ok(Nt.PRIVACY.length>=13&&Nt.PRIVACY.every(([h,l])=>typeof h==='string'&&Array.isArray(l)&&l.every(t=>typeof t==='string'&&t.length>0)),'개인정보처리방침 본문 모양');
  }
  Date.now=realNow;
+}
+
+/* 출시 준비: 개인정보처리방침 웹 페이지(privacy/index.html, 주소 …/hangul-defense/privacy/)는 앱 안 본문(NOTES.PRIVACY)과 같은 글이고, 배포 묶음·배포 뒤 확인에 들어 있다.
+   채울 칸(개발자 이름·이메일·시행일 등)은 notes.js 맨 위 POLICY 한 곳. 자리표시가 남았는지는 scripts/check-release.cjs가 따로 경고한다 */
+{const PP=require('./scripts/privacy-page.cjs'),page=PP.read()||'',P=Nt.POLICY,flat=Nt.PRIVACY.flatMap(([h,l])=>[h,...l]).join('\n');
+ ok(PP.same(),'privacy/index.html = notes.js에서 다시 만든 글(notes.js를 고치고 node scripts/privacy-page.cjs를 안 돌리면 실패)');
+ eq(PP.parse(page),Nt.PRIVACY,'웹 처리방침의 제목·줄을 HTML에서 다시 읽으면 앱 안 본문(NOTES.PRIVACY)과 같음');
+ ok(/<title>[^<]*개인정보처리방침[^<]*<\/title>/.test(page)&&page.includes('<html lang="ko">'),'웹 처리방침: 제목에 "개인정보처리방침", 한국어 페이지');
+ ok(!/<script|<link|<img|<iframe|<object|@import|url\(|\bsrc=|\bhref=/i.test(page),'웹 처리방침: 스크립트·바깥 글꼴·그림·링크 없음(정적 글만)');
+ ok(page.includes("default-src 'none'"),'웹 처리방침: CSP 메타가 바깥 요청을 막음');
+ for(const k of ['developer','email','since','internet'])ok(typeof P[k]==='string'&&P[k].length>0&&flat.includes(P[k]),'POLICY.'+k+'가 처리방침 본문에 들어감: '+P[k]);
+ ok(flat.split(P.developer).length-1>=2&&flat.split(P.email).length-1>=2,'개발자 이름·이메일은 머리와 12항 두 곳에 같은 값(한 곳에서 채움)');
+ ok(Array.isArray(P.history)&&P.history.length>=1&&P.history[P.history.length-1][0]===P.since,'개정 이력 마지막 줄 날짜 = 시행일');
+ ok(!/https?:|www\./.test(flat),'처리방침 본문에 바깥 주소 없음(앱 안 보호자 화면 규칙)');
+ const BP=require('./scripts/build-pages.cjs');ok(BP.files.includes('privacy/index.html'),'배포 묶음(build-pages.cjs)에 privacy/index.html');
+ for(const wf of ['pages.yml','package-test.yml'])ok(/^\s*- privacy\/\*\*\s*$/m.test(fs.readFileSync(__dirname+'/.github/workflows/'+wf,'utf8')),wf+': privacy/를 고치면 워크플로가 돈다(paths)');
+ ok(fs.readFileSync(__dirname+'/.github/workflows/pages.yml','utf8').includes("fetch('privacy/')"),'pages.yml: 배포 뒤 privacy/ 페이지를 받아 제목·본문 확인');
 }
 
 eq(spoken,0,'검사 전체에서 음성 합성(speechSynthesis)을 한 번도 부르지 않음');
