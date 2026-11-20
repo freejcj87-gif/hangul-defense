@@ -8,7 +8,8 @@
      진행 중인 저장(state.bank)은 예전 판의 문항·순서를 그대로 쓰고, 새 판부터 새 문항이 섞인다(questions.js '문제은행 판').
      한 번에 여러 파일을 주면 판은 한 번만 오른다(10·9세를 같이 붙일 때는 한 번에).
    - 붙인 뒤 Questions.validate()와 거부 목록을 보고, 문제가 있으면 파일을 되돌린다. 그다음 node test-questions.cjs를 돌린다.
-     test-questions.cjs의 BANK_PRINT(이행 검사)에 새 판 줄을 더한다(끝에 찍어 주는 값). 예전 판 줄은 절대 고치지 않는다. */
+     test-questions.cjs의 BANK_PRINT(이행 검사)에 새 판 줄을 더한다(끝에 찍어 주는 값). 예전 판 줄은 절대 고치지 않는다.
+   - 그다음 node scripts/bank-migrate-check.cjs(기준 origin/main)로 예전 최신 판으로 풀던 저장(문항 id · 이어 순서 · 기억 늑대)이 그대로인지 예전 파일과 견준다. */
 const fs=require('fs'),path=require('path'),crypto=require('crypto');
 const ROOT=path.join(__dirname,'..'),FILE=path.join(ROOT,'questions-gen.js'),QFILE=path.join(ROOT,'questions.js');
 const args=process.argv.slice(2),dry=args.includes('--dry'),files=args.filter(a=>!a.startsWith('--'));

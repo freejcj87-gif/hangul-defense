@@ -2282,6 +2282,19 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   ok((BOOK_KEY+'-test') in saved&&!(BOOK_KEY in saved)&&!(KEY in saved),'시험 열쇠만 씀(아이 기록은 건드리지 않음)');
   T.bookTest('wipe');eq([(BOOK_KEY+'-test') in saved,a.api.phase,bookOf(a).mon.wolf.card,bookOf(a).play],[false,'start',0,1],'기록 비우기: 시험 기록을 비우고 시작 화면으로');
   const off=boot({query:'?test=1'});eq(off.window.__testmode.bookTest('note'),false,'수첩이 꺼져 있으면 아무 일도 없음')}
+ /* M-13 문제은행 판 이행(판 4, 2026-11-20): 직전 판(BANK_VERSION − 1)으로 풀던 판 저장 + 수첩(이어 순서 off·기억 늑대 id)이 새 판에서도 그 판 그대로.
+    예전 파일과 직접 견주는 검사(모든 id · 씨앗 × 번호 × off)는 node scripts/bank-migrate-check.cjs */
+ {const P=Q.BANK_VERSION-1,off={story:40,common:3,math:6,english:1},S=Q.snapshot()[8],qc=Q.bankCount(8,P);
+  const lastS=S.story[qc.story-1].id,lastQ=S.quiz[qc.common+qc.math+qc.english-1].id;/* 직전 판 묶음의 마지막 문항(판 묶음은 은행 순서의 앞쪽) */
+  const a=bboot(b=>{b.order.bank[8]=P;b.order.off[8]={...off};b.rv=[{id:lastS,box:2,due:999,dp:1,miss:1,seen:0},{id:lastQ,box:1,due:999,dp:1,miss:1,seen:0}]},{bank:P,index:12});
+  a.go();eq([a.api.state.bank,bookOf(a).order.bank[8]],[P,P],'직전 판 '+P+'로 풀던 저장: 판 번호 그대로(최신 '+Q.BANK_VERSION+'로 바꾸지 않음)');
+  eq(a.n.answers.dataset.qid,Q.at(8,'story',12,4242,P,off).id,'이어 하기 12번 = 직전 판의 12번(이어 순서 off 포함)');
+  ok(Array.from({length:40},(_,i)=>Q.at(8,'story',i,4242,P,off).id).join()!==Array.from({length:40},(_,i)=>Q.at(8,'story',i,4242,Q.BANK_VERSION,off).id).join(),'(같은 번호라도 최신 판은 다른 문항 = 판을 저장하는 까닭)');
+  eq(bookOf(a).rv.map(e=>e.id),[lastS,lastQ],'기억 늑대가 기억한 직전 판 문항 id가 기록을 열어도 남음');
+  eq([Q.byId(lastS)&&Q.byId(lastS).id,Q.byId(lastQ)&&Q.byId(lastQ).id],[lastS,lastQ],'그 글을 문제은행에서 다시 꺼낼 수 있음');
+  a.n.pause.click();eq([JSON.parse(saved[KEY]).bank,stored().order.bank[8]],[P,P],'다시 저장해도 판 '+P);
+  const b=Bk.advanceOrder(bookOf(a),8,{story:qc.story,common:0,math:0,english:0},{bank:P,latest:Q.BANK_VERSION,size:qc});
+  eq([b.bank,b.off.story],[Q.BANK_VERSION,0],'읽기 한 바퀴를 다 돈 뒤에야 최신 판으로')}
  /* M-11 바깥 링크·외부 요청 없음(문자열 검사): 수첩 화면·규칙·콘텐츠 파일과 페이지 */
  {const files={'index.html':html,'bookui.js':BOOKUI_SRC,'book.js':fs.readFileSync(__dirname+'/book.js','utf8'),'notes.js':fs.readFileSync(__dirname+'/notes.js','utf8')};
   for(const [name,text] of Object.entries(files)){

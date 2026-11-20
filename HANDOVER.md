@@ -375,3 +375,4 @@ Playwright 시스템 의존성 설치는 WSL/Ubuntu 환경에 맞춰 수행하�
 - 새 문항 붙이기: `node scripts/bank-add.cjs 초안.json …`(배열 또는 `{story, quiz}`). 생성 구간 맨 뒤에 g 번호로 붙이고 `questions-gen.js`의 `DATA.editions`에 한 줄을 더해 판을 올립니다. 규칙에 어긋나면 파일을 되돌립니다. 끝에 찍히는 지문 줄을 `test-questions.cjs` 10-2 `BANK_PRINT`에 더하세요. **예전 판 줄과 예전 문항의 순서·수는 바꾸지 않습니다**(내용 고치기는 됨). `--print`는 판마다 지문만, `--dry`는 쓰지 않고 수만 봅니다.
 - `questions-gen.js`는 약 690KB(gzip 약 95KB)라 검사 한도를 1MB로 올렸습니다. 나이별 파일로 나누는 안은 빌드 목록·오프라인·Android 포장을 함께 바꿔야 해서 하지 않았습니다.
 - 확인하지 못한 것: 브라우저·`test.cjs`(CI), 새 그림 4개(🐭 👒 🍛 📻)의 실기기 표시.
+- 판 4(2026-11-20, 브랜치 `claude/bank-v4`, 기록 `docs/bank-v4-20261120.md`): 7·8세 306 + 9·10세 483문항을 한 번에 붙여 판 3 → 4. 크기 한도는 한 파일 그대로 1.5MB + gzip 220KB. 판을 올린 뒤에는 `node scripts/bank-migrate-check.cjs [기준=origin/main]`으로 예전 은행과 직접 견줍니다(예전 최신 판으로 풀던 저장의 모든 id · 씨앗 × 번호 × 이어 순서 off · 수첩 이어 순서 · 기억 늑대 id).
