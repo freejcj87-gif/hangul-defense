@@ -261,7 +261,7 @@ body.paused *,body.paused *:before,body.paused *:after{animation-play-state:paus
 .book-page{display:grid;gap:3px;padding:10px;border-radius:14px;background:#fffdf2;border:2px dashed #c9b27a;font-size:13px;line-height:1.45;word-break:keep-all}
 .book-page .book-pic{position:relative;display:block;width:min(100%,126px);margin:0 auto 2px}.book-pic>.card-art{width:100%}
 .book-page[data-state="foot"] .book-pic>.card-art:not(.book-shiny)>*{filter:brightness(0) opacity(.35)}
-.book-page[data-state="none"] .book-pic>.card-art{background:#fbf7ea;box-shadow:none;outline:2px dashed #d9cfb2;outline-offset:-5px}.book-page[data-state="none"] .book-pic>.card-art i{opacity:.4}
+.book-page[data-state="none"] .book-pic>.card-art:not(.book-shiny){background:#fbf7ea;box-shadow:none;outline:2px dashed #d9cfb2;outline-offset:-5px}.book-page[data-state="none"] .book-pic>.card-art:not(.book-shiny) i{opacity:.4}
 .book-pic>.book-shiny{position:absolute;right:-6px;bottom:-6px;width:44px;border-radius:8px}.book-pic>.book-shiny.emoji{font-size:20px}
 .book-pic>i.book-shiny{display:grid;place-items:center;aspect-ratio:3/4;font-style:normal;font-weight:900;font-size:16px;color:#a39b82;background:#f4efe0;box-shadow:inset 0 0 0 2px #d9cfb2}
 .book-page strong{font-size:15px}.book-page em{font-style:normal;color:#3c6b3f;font-weight:800}.book-page small{margin:0;color:#7a826f}
