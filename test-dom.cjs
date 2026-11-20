@@ -2252,8 +2252,10 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   /* 3분 동안 손대지 않으면 닫힘 */
   skew+=181000;h.n.gTabs.children[0].click();ok(h.n.guardian.hidden,'3분 동안 손대지 않으면 다음 손길에 닫힘');
   /* 모든 기록 지우기: 보호자 화면에서만, 한 번 더 확인 */
+  saved[KEY+'-bak']='{"version":1,"gold":80}';/* 0.12부터 예전 저장을 이어받을 때 남기는 판 저장 원본 */
   press(h,'openGuard',2100);gatePass(h);h.n.gTabs.children.find(b=>b.dataset.tab==='set').click();h.n.gBody.children.find(c=>c.textContent==='모든 기록 지우기').click();ok(h.n.gate.hidden===false&&saved[BOOK_KEY],'모든 기록 지우기도 한 번 더 확인');gatePass(h);
   eq([KEY in saved,BOOK_KEY in saved,h.game().book.status,h.game().state.gold,h.game().book.data.medal.one.n,h.api.phase],[false,false,'new',20,0,'start'],'두 열쇠를 비우고 새로 시작');
+  ok(!((KEY+'-bak') in saved),'판 저장의 이행 전 원본(-bak)도 지움(리뷰 0.16 R3: 방침 "기기에 저장된 게임 기록을 모두 지웁니다")');
   /* 보호자 안내(시작 화면): 문턱 없이 개인정보처리방침 본문만 */
   h.n.openInfo.click();ok(h.n.guardian.hidden===false&&h.n.gTabs.children.length===1&&/개인정보처리방침/.test(h.n.gBody.textContent)&&!h.n.gBody.children.some(c=>c.tagName==='button'),'보호자 안내: 방침 본문만(문턱·단추 없음)');h.n.guardClose.click();
   /* 리뷰 0.16 R2: 지운 뒤(판 저장 없음) 새 판도 처음 불러올 때처럼 최신 문제은행 판. 전에는 bank 0으로 저장돼 다시 열면 예전 판(1)으로 바뀌었다 */

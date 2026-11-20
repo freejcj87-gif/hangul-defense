@@ -177,8 +177,9 @@
     if(!handle||handle.locked||!ks||!ks.book||!store)return false;
     try{store.setItem(ks.book,JSON.stringify(handle.book));return true}catch(e){return false}
   }
-  /* 모든 기록 지우기(보호자 화면에서만): 기록·되돌리기 사본·판 저장 */
-  function wipeAll(store,ks){let ok=true;for(const k of [ks&&ks.book,ks&&ks.bak,ks&&ks.run])if(k)try{store.removeItem(k)}catch(e){ok=false}return ok}
+  /* 모든 기록 지우기(보호자 화면에서만): 기록·되돌리기 사본·판 저장·판 저장의 이행 전 원본(run-bak, 0.12부터 예전 저장을 이어받을 때 한 번 복사).
+     개인정보처리방침 3항 "기기에 저장된 게임 기록을 모두 지웁니다". 전에는 run-bak(도장·맞힌 문제 번호가 든 예전 판 저장)이 남았다(리뷰 0.16 R3) */
+  function wipeAll(store,ks){let ok=true;for(const k of [ks&&ks.book,ks&&ks.bak,ks&&ks.run,ks&&ks.run&&ks.run+'-bak'])if(k)try{store.removeItem(k)}catch(e){ok=false}return ok}
 
   /* ---------- 진행 파일(§2.7) ---------- */
   const sumOf=(book,run)=>fnv1a(JSON.stringify({fmt:FILE_FMT,v:FILE_V,book,run}));

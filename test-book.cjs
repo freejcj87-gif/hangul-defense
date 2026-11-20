@@ -649,8 +649,11 @@ withBook({NOTE:{cap:2}},()=>{/* 상한을 2로 두었을 때: 놀이당 쪽지 2
  ok(st.m.has(KS.book)&&JSON.parse(st.getItem(KS.book)).medal.king.n===1,'기록 열쇠가 저장소에 그대로 있음');
  withBook({ON:false},()=>{const x=clone(after);B.resetVillage(after,T,{age:8,used:{story:9}});eq(after,x,'?book=0이면 아무것도 바꾸지 않음')});
  /* 모든 기록 지우기(보호자 화면에서만) */
- B.swapIn(st,KS,after,st.getItem(KS.run),{now:T});
+ B.swapIn(st,KS,after,st.getItem(KS.run),{now:T});st.setItem(KS.run+'-bak','{"version":1,"gold":80,"seenOk":["a8-story-01"]}');st.setItem('other-app','x');
  ok(B.wipeAll(st,KS),'모든 기록 지우기');eq([st.m.has(KS.book),st.m.has(KS.run),st.m.has(KS.bak),B.open(st,KS,{now:T}).status],[false,false,false,'new'],'두 열쇠와 되돌리기 사본까지 비움');
+ eq([st.m.has(KS.run+'-bak'),st.m.has('other-app')],[false,true],'판 저장의 이행 전 원본(run-bak)도 지움, 다른 열쇠는 그대로(리뷰 0.16 R3: 방침 "게임 기록을 모두 지웁니다")');
+ {const s2=new Store(),tk=B.keys({test:true,runKey:'hangul-defense-v1-test'});for(const k of ['hangul-defense-v1','hangul-defense-v1-bak','hangul-defense-book','hangul-defense-v1-test','hangul-defense-v1-test-bak','hangul-defense-book-test'])s2.setItem(k,'x');
+  B.wipeAll(s2,tk);eq([...s2.m.keys()].sort(),['hangul-defense-book','hangul-defense-v1','hangul-defense-v1-bak'],'시험 모드에서 지우면 시험 열쇠만(아이 기록은 그대로)')}
 }
 
 /* B-13 수첩을 끄면(?book=0) 규칙이 아무것도 바꾸지 않음 + 방치·틀리기만으로는 진행 0 */
