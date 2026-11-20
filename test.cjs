@@ -904,8 +904,10 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
     await page.evaluate(()=>{const g=window.__game();window.__tick(Math.max(g.round.lock,40));document.querySelector('#answers button[data-i="'+g.round.answer+'"]').click()});
     const r=await game(page);eq([r.phase,r.state.index,r.book.data.mon.bramble.note],['reward',20,3],tag+': first-try answer makes a friend, the index still stays');
     ok(await page.locator('.friend-card').isVisible(),tag+': friend card');
-    {const loaded=await page.waitForFunction(()=>{const i=document.querySelector('.friend-card .card-art img');return !!i&&i.complete&&i.naturalWidth>0},{},{timeout:2000}).then(()=>true,()=>false);
-     ok(loaded&&await page.evaluate(()=>document.querySelector('.friend-card .card-art img').getAttribute('src'))==='art/cards/bramble.webp',tag+': friend card shows the card art')}
+    /* 카드는 움직임 줄이기에서 1.5초 뒤 사라지므로 기다리지 않고 한 번에 읽는다(같은 그림을 수첩에서 이미 불러 와 캐시에 있음) */
+    {const fc=()=>page.evaluate(()=>{const i=document.querySelector('.friend-card .card-art img');return i?[i.getAttribute('src'),i.complete&&i.naturalWidth>0]:null});
+     let s=await fc();if(s&&!s[1]){await page.waitForTimeout(200);s=(await fc())||s}
+     ok(!!s&&s[0]==='art/cards/bramble.webp'&&s[1],tag+': friend card shows the card art '+JSON.stringify(s))}
     await shot(page,'book-friend-'+w+'x'+h);
     await page.locator('#pause').click();ok(await page.locator('#pauseBook').isVisible(),tag+': notebook button while paused');
     eq(outside,[],tag+': no request leaves the page origin');eq(errors,[],tag+' page errors');await ctx.close()}
