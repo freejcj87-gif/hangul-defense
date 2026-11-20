@@ -167,10 +167,12 @@ for(const q of NEW[8].story){
    const kp=unsubj(q.passage),pp=pass8.get(kp);if(pp&&pp.passage!==q.passage)F(q.id,'이름·동물만 다른 지문 '+pp.id);if(!pp)pass8.set(kp,q);
  }
  /* 거의 같은 글: 글자 두 자 묶음 겹침(자카드)이 0.6 이상이면 사람이 다시 봄(목록으로 남김), 0.8 이상은 실패 */
- const pool=snap[8].story.map(q=>({id:q.id,t:q.passage,b:bigr(q.passage)}));
+ const pool=snap[8].story.map(q=>({id:q.id,t:q.passage,b:bigr(q.passage)})),tops=[];
  for(const q of NEW[8].story){const b=bigr(q.passage);let best=null;for(const o of pool){if(o.id===q.id)continue;const s=jac(b,o.b);if(!best||s>best.s)best={s,o}}
    if(best&&best.s>=.8)F(q.id,'거의 같은 지문 '+best.o.id+' ('+best.s.toFixed(2)+') '+best.o.t);else if(best&&best.s>=.6)W(q.id,'비슷한 지문 '+best.o.id+' ('+best.s.toFixed(2)+') '+q.passage+' ~ '+best.o.t);
+   if(best)tops.push([best.s,q.id+' '+q.passage+' ~ '+best.o.id+' '+best.o.t]);
    pool.push({id:q.id,t:q.passage,b});}
+ tops.sort((x,y)=>y[0]-x[0]);console.log('8세 새 읽기와 가장 비슷한 지문(글자 두 자 묶음 자카드, 위 6개):');tops.slice(0,6).forEach(([s,t])=>console.log('  '+s.toFixed(2)+' '+t));
  /* 퀴즈: 같은 나이·다른 나이 모두 (질문, 지문)이 같으면 실패, 같은 나이에서 정답·보기 묶음이 같으면(7세 상식) 실패, 질문 글이 거의 같으면 목록 */
  const qkey=new Map();for(const a of Q.AGES)for(const q of snap[a].quiz)qkey.set(q.prompt+'\n'+q.passage,q.id);
  for(const a of [7,8]){
