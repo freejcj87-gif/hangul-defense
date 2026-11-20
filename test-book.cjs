@@ -729,5 +729,26 @@ withBook({ON:false},()=>{const b=mk(),x=clone(b);
   Q.setMix();for(const a of Q.AGES){eq(JSON.stringify(Array.from({length:200},(_,i)=>Q.at(a,'story',i,99))),base[a],a+'세: 되돌리면 처음과 같은 출제');eq(Q.QUIZ_MIX[a],K.MIX.std[a],a+'세: 처음 비중')}
   for(const a of [9,10]){const [all]=share(a);ok(all>0,a+'세 보통: 영어 '+(100*all).toFixed(1)+'%')}}
 }
+/* B-20 0.17 수첩 3D(장면 전용): 친구 방문 고르기 Book.visitPick · 장면 수치 · ?book3d=0 손잡이 */
+{const S=K.SCENE;
+ eq(K.FLAGS.book3d,true,'수첩 3D(쪽지 종이·팻말·친구 방문) 기본 켬');
+ ok(S&&[S.note,S.sign,S.quiet,S.gap,S.first,S.free,S.stay].every(x=>Number.isInteger(x)&&x>0)&&S.jitter>=0&&S.walk>0&&S.run>=1&&S.r0>S.r1&&S.r1>0&&S.edge>0,'장면 수치는 양수(틱·거리), 숲 쪽 출발 r0 > 인사 자리 r1');
+ ok(S.gap>=300&&S.r1>=1&&(S.r0-S.r1)/S.walk*2+S.stay<=160,'방문은 가끔(간격 30초 이상), 짧게(걸어오고 인사하고 돌아가기 '+((S.r0-S.r1)/S.walk*2+S.stay)+'틱), 울타리 밖에서');
+ const v=mk();['wolf','boar','fox','king','frost'].forEach((k,i)=>Object.assign(v.mon[k],{foot:T,card:T+i,note:3,rib:{n:k==='boar'?3:0,last:1}}));v.mon.fox.shiny=T;
+ const before=JSON.stringify(v),rng0=v.rng;
+ const p=B.visitPick(v,{seed:4242,run:1,n:0});ok(p&&['wolf','boar','fox','king','frost'].includes(p.kind)&&p.u>=0&&p.u<1&&p.v>=0&&p.v<1,'친구 카드가 있는 종 가운데 하나 + [0,1) 두 수: '+(p&&p.kind));
+ eq(B.visitPick(v,{seed:4242,run:1,n:0}),p,'같은 씨앗·판·방문 수 = 같은 친구(결정적)');
+ eq([JSON.stringify(v)===before,v.rng],[true,rng0],'기록을 바꾸지 않고 기록 난수(b.rng, 반짝 손님)도 건드리지 않음');
+ {const seen={};let last=null,repeat=0;for(let n=0;n<60;n++){const q=B.visitPick(v,{seed:4242,run:1,n,last});seen[q.kind]=(seen[q.kind]||0)+1;if(q.kind===last)repeat++;last=q.kind}
+  eq([Object.keys(seen).sort(),repeat],[['boar','fox','frost','king','wolf'],0],'60번 방문: 모은 친구 5종이 모두 오고(처음 만난 친구만이 아님), 같은 친구가 연달아 오지 않음 '+JSON.stringify(seen))}
+ {const a=B.visitPick(v,{seed:4242,run:1,n:3}),b=B.visitPick(v,{seed:4243,run:1,n:3}),c=B.visitPick(v,{seed:4242,run:2,n:3});ok([a,b,c].some(x=>x.kind!==a.kind||x.u!==a.u),'씨앗·판이 다르면 다른 차례')}
+ eq([B.visitPick(mk(),{seed:1,n:0}),withBook({FLAGS:{friends:false}},()=>B.visitPick(v,{seed:1,n:0})),withBook({ON:false},()=>B.visitPick(v,{seed:1,n:0})),B.visitPick(null,{seed:1})],[null,null,null,null],'친구가 없거나 ?friends=0 · ?book=0이면 방문 없음');
+ {const one=mk();Object.assign(one.mon.ember,{foot:T,card:T,note:3});eq([B.visitPick(one,{seed:9,n:0,last:'ember'}).kind,B.visitPick(one,{seed:9,n:1}).kind],['ember','ember'],'친구가 하나면 그 친구가 또 옴')}
+ {const r=B.visitPick(v,{seed:4242,run:1,n:0});const rb=['wolf','boar','fox','king','frost'].map(k=>B.visitPick(Object.assign(mk(),{mon:Object.fromEntries(B.KINDS.map(x=>[x,{...v.mon[x],card:x===k?T:0}]))}),{seed:5,n:0}));
+  eq(rb.map(x=>[x.kind,x.ribbon,x.shiny]),[['wolf',false,false],['boar',true,false],['fox',false,true],['king',false,false],['frost',false,false]],'리본·반짝 칸을 함께 넘김(리본 친구는 목에 리본)');ok(r.kind,'(확인용)')}
+ /* 세계 결과와 무관: visitPick은 world.js를 부르지 않는다(세계 지문 동일은 test-dom M-13) */
+ ok(!/World\.|w\.rng|rand\(b\)/.test(B.visitPick.toString()),'visitPick 안에 세계·기록 난수 호출 없음');
+}
+
 if(fails.length)process.exitCode=1;
 console.log((fails.length?'FAIL '+fails.length+' / ':'PASS ')+n+' book assertions (콘텐츠 '+A_COUNT+' · 기록 '+(n-A_COUNT)+').');

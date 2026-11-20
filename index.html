@@ -241,6 +241,9 @@ body.paused *,body.paused *:before,body.paused *:after{animation-play-state:paus
 #enemies .enemy.shiny img{filter:hue-rotate(150deg) saturate(1.8) brightness(1.25)!important}
 #quiz.note-q{background:linear-gradient(#fff8e2,#fffdf4 40px);border:2px dashed #c9b27a;border-radius:16px;padding:8px 10px;box-shadow:inset 0 0 0 4px #fffdf4}/* 줄 무늬는 글자를 가로질러서 뺌(CI 캡처 2026-11-19) */
 .fx.fx-note{font-size:26px;animation:noteFall .9s ease-in forwards}@keyframes noteFall{from{transform:translate(-50%,-60px) rotate(-25deg);opacity:0}30%{opacity:1}to{transform:translate(-50%,40px) rotate(20deg);opacity:0}}
+/* 0.17 그림 화면(3D를 못 쓰는 기기)의 쪽지 종이 · 기억 늑대 팻말 · 놀러 온 친구: 3D와 같은 자리(늑대와 같은 % 변환) */
+.b3-mark{position:absolute;transform:translateX(-50%);pointer-events:none;line-height:1}#paperMark{font-size:20px;animation:paperBob 1.8s ease-in-out infinite}@keyframes paperBob{50%{transform:translate(-50%,-4px) rotate(8deg)}}
+#signMark{width:18px;height:12px;margin-bottom:34px;background:#cfeeff;border:2px solid #9a6634;border-radius:3px;box-shadow:0 0 0 2px #fff8}#friendMark{font-size:22px;filter:drop-shadow(0 0 4px #ff8fb3)}#friendMark.hello{animation:friendHop .45s ease-in-out infinite alternate}@keyframes friendHop{to{margin-bottom:8px}}
 .friend-card{position:absolute;left:50%;top:46%;translate:-50% -50%;z-index:9;display:grid;justify-items:center;gap:2px;padding:14px 24px;border-radius:18px;background:#fffaf0;border:3px solid #f2b931;box-shadow:0 6px 0 #0004;font-weight:900;font-size:20px;white-space:nowrap;animation:cardFlip .6s ease-out}
 .friend-card b{font-size:46px;line-height:1.1}.friend-card small{font-size:15px;color:#3c6b3f}.friend-card.still{animation:none}
 @keyframes cardFlip{from{transform:rotateY(90deg);opacity:0}to{transform:none;opacity:1}}
@@ -527,7 +530,7 @@ function frame(){
  if(worldNote&&world.t>worldNote.until)worldNote=null;
  put($('villageStatus'),paused?'⏸️ 쉬는 동안 늑대도 멈춰요':phase==='start'?'시작하기를 누르면 늑대 무리가 와요':worldNote?worldNote.text:round&&round.dash>0?'🐺 늑대가 성큼 다가왔어요!':inside?'🐺 늑대 '+inside+'마리가 마을에 들어왔어요!':state.run.bell===2?'👑 늑대 왕과 겨뤄요! 한 번에 맞혀요':alive?'🐺 늑대 '+alive+'마리가 다가와요':world.peace?'🌅 늑대가 물러났어요. 마을이 평화로워요':state.run.bell===1?'👑 늑대 왕이 숲에서 기다려요':'🌾 조용해요. 늑대가 또 올 거예요');
  $('scene').classList.toggle('dash',!!(round&&round.dash>0&&phase==='ask'));
- fastLight();pills();renderShop();drawWolves();finaleHud();flowHud();stageHud();
+ fastLight();pills();renderShop();drawWolves();b3Draw();finaleHud();flowHud();stageHud();
  $('foxIcon').classList.toggle('hidden',!(phase!=='start'&&world.fox&&world.fox.state==='come'));
 }
 /* 결전 표시: 늑대 왕 머리 위 별 방패 6개를 장면 위쪽에 그린다(3D·그림 화면 공통). 깨진 방패는 흐리게. 시간 표시는 없다 */
@@ -695,7 +698,7 @@ function foxMaybe(){
 }
 function foxShoo(){
  if(!World.foxShoo(world))return false;
- if(book){const r=Book.foxSaved(book,{now:Date.now()});bookGot(r);if(r.drop)noteDropped('fox')}
+ if(book){const r=Book.foxSaved(book,{now:Date.now()});bookGot(r);if(r.drop)noteDropped('fox',world.fox)}
  Combat.foxEnded(state,true);jingle('bounty');worldNote={text:'🏹 황금 화살! 여우를 쫓아냈어요',until:world.t+40};view([{type:'foxSaved'}]);return true;
 }
 function choose(i,b){
@@ -766,7 +769,7 @@ function shieldBroken(fz){
 /* 방패 6개를 다 깸: 왕이 달아나고 늑대가 모두 물러난다(판 끝에서 한 번만 쓰는 장면). 잠깐 본 뒤 엔딩 카드 */
 const END_TICKS=35;
 function victory(){
- if(book){const r=Book.kingWon(book,{now:Date.now(),stars:Combat.stars(state),village:state.run.village,perfect:(state.run.fq|0)===Combat.FINALE.shields});bookGot(r);if(r.drop)noteDropped('king')}
+ if(book){const r=Book.kingWon(book,{now:Date.now(),stars:Combat.stars(state),village:state.run.village,perfect:(state.run.fq|0)===Combat.FINALE.shields});bookGot(r);if(r.drop)noteDropped('king',world.king)}
  World.king(world,'flee');World.retreat(world,-1);round.wait=END_TICKS;jingle('bounty');jingle('feast');rec.glow=null;hideBubble();
  banner('🌅','늑대 왕이 달아났어요!','마을을 지켰어요!',false,true);worldNote={text:'🌅 늑대 왕이 달아났어요! 늑대들도 물러나요',until:world.t+80};view([{type:'kingFlee'}]);save();render();
 }
@@ -788,7 +791,7 @@ function showEnding(){
  drawMap($('endMap'),true);if(window.bookEnding)window.bookEnding();$('ending').hidden=false;save(true);render();
 }
 /* 새 판(새 마을·처음부터)에 맞춰 화면 쪽 기억을 비운다 */
-function resetView(){lastBoom=lastShot=lastYelp=lastCrash=lastHowl=hushUntil=-99;state.broken=World.brokenCount(world);syncMarket();worldNote=null;paused=false;artStamp='';clearCoins();recReset();shopPrev=[];bannerQueue.length=0;if(bannerEl){bannerEl.remove();bannerEl=null}acc=0;last=null}
+function resetView(){b3Reset();lastBoom=lastShot=lastYelp=lastCrash=lastHowl=hushUntil=-99;state.broken=World.brokenCount(world);syncMarket();worldNote=null;paused=false;artStamp='';clearCoins();recReset();shopPrev=[];bannerQueue.length=0;if(bannerEl){bannerEl.remove();bannerEl=null}acc=0;last=null}
 /* 번개: 기본 시간의 60% 안이면서 글을 읽을 만한 최소 시간은 지나서 맞혔을 때(Combat.isFast) */
 const isFast=()=>Combat.isFast(round.q,round.t);
 const isFastAt=r=>Combat.isFast(r.q,r.t);
@@ -1116,6 +1119,7 @@ function tick(){
  uiT++;if(book&&uiT%10===0){Book.tick(book,Date.now(),1);bookDirty=true}/* 세계 시계가 흐른 초(하루 시간) */
  bannerTick();coinTick();recTick();if(shopLock>0)shopLock--;if(tipLeft>0&&--tipLeft===0)$('shopTip').classList.add('hidden');
  {const n=phase==='ask'&&round.dash>0?Math.max(1,Math.round(World.dashTicks(world)/Combat.DASH_TICKS)):1;for(let i=0;i<n;i++)worldStep()}
+ b3Tick();/* 0.17 수첩 3D(장면 전용: 세계를 읽기만 함) */
  if(phase==='ask'){
   if(round.dash>0){if(--round.dash===0){answerButtons().forEach(b=>b.disabled=b.classList.contains('wrong'));if(round.lock<=0)say('한 번만 더 고를 수 있어요.',true)}}
   else round.t++;
@@ -1164,7 +1168,7 @@ function worldStep(){
   else if(e.type==='splash'){if(!hush()&&world.t-lastBoom>=SFX_GAP.boom){lastBoom=world.t;jingle('boom')}}
   else if(e.type==='shoot'){if(!hush()&&world.t-lastShot>=SFX_GAP.shoot){lastShot=world.t;jingle('shoot',1)}}
   else if(e.type==='shinyMet'){if(book){bookGot(Book.shinyMet(book,{now:Date.now()}));jingle('shiny');later('✨','반짝 손님이 인사하고 갔어요!','수첩에 반짝 칸이 생겼어요')}}
-  else if(e.type==='kill'){if(book&&e.by==='volley'){const k=Book.volleyKill(book,e.kind,{now:Date.now()});bookGot(k);if(k.drop)noteDropped(e.kind)}
+  else if(e.type==='kill'){if(book&&e.by==='volley'){const k=Book.volleyKill(book,e.kind,{now:Date.now()});bookGot(k);if(k.drop)noteDropped(e.kind,world.wolves.find(v=>v.id===e.wolf))}
    if(e.boss){state.gold+=Combat.BOUNTY;jingle('bounty');pop($('gold'),'bump');banner('👑','불씨 왕을 쓰러뜨렸어요!','🪙 +'+Combat.BOUNTY,false,true);worldNote={text:'👑 불씨 왕을 쓰러뜨렸어요! 🪙 +'+Combat.BOUNTY,until:world.t+40}}else if(!hush()&&world.t-lastYelp>=SFX_GAP.yelp){lastYelp=world.t;jingle('yelp')}}
  }
 }
@@ -1199,9 +1203,9 @@ function gainReset(){gain={foot:0,card:0,ribbon:0,shiny:0,medal:[0,0,0]};lastBoo
 function bookGot(r){if(!r)return;if(r.foot)gain.foot++;if(r.friend)gain.card++;if(r.ribbon)gain.ribbon++;if(r.shiny)gain.shiny++;for(const m of r.medals||[])gain.medal[m.tier-1]++;bookDirty=true}
 const josa=(w,a,b)=>w+(Questions.hangul.hasBatchim([...w].pop())?a:b);
 /* 정답 화살에 쓰러진 몬스터(여우는 구출, 왕은 승리)가 이름 쪽지를 떨어뜨림: 3D에는 종이 한 장, 띠 알림은 문제 사이에 */
-function noteDropped(kind){
- const M=NOTES.MON[kind];view([{type:'noteDrop',kind}]);
- if(fallbackOn()&&!calm())fx('fx-note',{x:.5,y:.4},900).textContent='📜';
+function noteDropped(kind,at){
+ const M=NOTES.MON[kind],p=b3Paper(kind,at);view([p?{type:'noteDrop',kind,x:p.x,z:p.z,id:p.id}:{type:'noteDrop',kind}]);/* 0.17: 쓰러진 자리(at)에 종이가 남는다(b3Paper) */
+ if(fallbackOn()&&!calm()){const span=World.radius(world)+World.EDGE;fx('fx-note',p?{x:Math.max(.02,Math.min(.98,.5+p.x/span*.48)),y:Math.max(.1,Math.min(.98,.55+p.z/span*.42))}:{x:.5,y:.4},900).textContent='📜'}
  later('📜',josa(M.name,'이','가')+' 이름 쪽지를 떨어뜨렸어요!','곧 쪽지 문제가 나와요');
 }
 /* 지금 나오는 몬스터 종류(+ 이 판에 여우가 남았으면 여우): 반짝 손님 후보 */
@@ -1260,6 +1264,79 @@ function reloadFromStore(){
  state=saved&&typeof saved==='object'?Combat.restore(saved,AGES):Combat.fresh(8);if(!(state.seed>0))state.seed=newSeed();if(!state.run.t0)state.run.t0=Date.now();
  bookOpen();gainReset();world=freshWorld();flowSync();state.broken=World.brokenCount(world);syncKing(true);resetView();round=null;phase='start';sleepyOn=false;
  for(const id of ['ending','sleepy','bookScreen','guardian','gate'])$(id).hidden=true;$('start').hidden=false;$('age').value=String(state.age);drawStart();
+}
+/* ---------- 0.17 수첩 3D: 쪽지 종이 · 기억 늑대 팻말 · 친구 방문(장면 전용, 저장하지 않음) ----------
+   세계(world)는 읽기만 하고 쓰지 않는다: 늑대 경로·도착·경제·세계 난수가 그대로다. 친구 고르기·길·간격의 난수는 Book.visitPick(판 씨앗·판 번호·방문 수의 해시)에서만 나온다.
+   3D(src/book3d.js)는 window.getBook3dState()를 매 프레임 읽고 일회성 연출(noteDrop·noteRead·signDown·visitHello)만 사건으로 받는다. 그림 화면은 b3Draw가 같은 자리에 작은 표시를 그린다.
+   ?book3d=0 · ?book=0이면 모두 끔. 수치는 Book.BOOK.SCENE */
+var b3=null;
+function b3S(){return book&&Book.BOOK.FLAGS.book3d!==false&&Book.BOOK.SCENE?Book.BOOK.SCENE:null}
+function b3Reset(){b3={note:null,sign:null,visit:null,quiet:0,wait:null,n:0,seq:0,last:null,visits:0,papers:0,reads:0,signs:0,downs:0}}
+b3Reset();
+const b3r=v=>Math.round(v*100)/100;
+/* 쪽지 종이를 놓을 자리: 쓰러진 자리(숲 쪽 화면 밖이면 마을 반지름 + edge까지 당김), 자리를 모르면 첫 길 앞 */
+function b3Paper(kind,at){
+ const S=b3S();if(!S)return null;if(!b3)b3Reset();const R=World.radius(world);
+ let x=at&&Number.isFinite(at.x)?at.x:Math.cos(.39)*(R+1.5),z=at&&Number.isFinite(at.z)?at.z:Math.sin(.39)*(R+1.5);
+ const r=Math.hypot(x,z),lim=R+S.edge;if(r>lim){x*=lim/r;z*=lim/r}
+ b3.papers++;b3.note={id:++b3.seq,kind,x:b3r(x),z:b3r(z),age:0};return b3.note;
+}
+/* 길 p가 강(물레방아 마을부터) 쪽이면 친구가 물을 건너지 않게 고르지 않는다 */
+function b3RiverRoad(p,S){if(!rivered()||stageNow()<3)return false;let d=Math.abs(((p+.5)*45-FALLBACK_RIVER.dir)%360);if(d>180)d=360-d;return d<S.river}
+/* 틱마다(세계 한 틱 뒤). 세계 · 기록 · 판 저장에 쓰지 않는다 */
+function b3Tick(){
+ const S=b3S();if(!b3)b3Reset();if(!S){if(b3.note||b3.sign||b3.visit)b3Reset();return}
+ const sp=round&&round.special,R=World.radius(world);
+ /* 쪽지 종이: 그 쪽지 문제가 나오면 주워 읽은 것(사라짐), 아니면 S.note틱 뒤 사라짐 */
+ const n=b3.note;if(n){if(sp&&sp.kind==='note'&&sp.key===n.kind){b3.reads++;view([{type:'noteRead',id:n.id,kind:n.kind}]);b3.note=null}else if(++n.age>=S.note)b3.note=null}
+ /* 기억 늑대 팻말: 기억 늑대 문제 동안 늑대 한 마리 머리 위. 문제가 시작된 뒤 처음 오는 늑대, S.sign틱이 지나도 없으면 울타리 밖에서 다가오는 늑대 가운데 가장 바깥.
+    한 번에 맞히면 내려놓는다(down). 그 늑대가 쓰러지면 팻말도 떨어지고 다른 늑대로 옮기지 않는다(3D가 그린다) */
+ if(sp&&sp.kind==='review'){
+  let g=b3.sign;if(!g||g.round!==round)g=b3.sign={round,wolf:0,since:world.nextId|0,t:0,down:false};
+  g.t++;
+  if(!g.wolf&&!g.down&&phase==='ask'){let best=null,far=null,fr=R+.5;
+   for(const v of world.wolves){if(v.state==='dead'||v.state==='gone'||v.state==='leave'||v.state==='carry')continue;
+    if(v.id>=g.since){if(!best||v.id<best.id)best=v}else if(g.t>=S.sign){const r=Math.hypot(v.x,v.z);if(r>fr){fr=r;far=v}}}
+   if(best||far){g.wolf=(best||far).id;b3.signs++}}
+  if(round.result==='first'&&!g.down){g.down=true;if(g.wolf){b3.downs++;view([{type:'signDown',wolf:g.wolf}])}}
+ }else b3.sign=null;
+ /* 친구 방문: 늑대 · 늑대 왕 · 여우가 없는 틈(결전 앞뒤 제외)이 S.quiet틱 이어지면, 간격이 지난 뒤 한 마리가 열린 길로 걸어와 울타리 밖에서 인사하고 돌아간다 */
+ const quiet=!world.king&&!world.fox&&!world.wolves.some(v=>v.state!=='dead'&&v.state!=='gone')&&state.run.bell!==1&&state.run.bell!==2&&state.run.bell!==3;
+ const V=b3.visit;
+ if(V){
+  if(!quiet&&V.act!=='back'){V.act='back';V.hurry=true}
+  if(V.act==='come'){V.r=Math.max(R+S.r1,V.r-S.walk);if(V.r<=R+S.r1+1e-9){V.act='hello';V.t=0;view([{type:'visitHello',id:V.id,kind:V.kind}]);
+    if(!worldNote||worldNote.low){const M=NOTES.MON[V.kind];worldNote={text:'👋 친구 '+josa(M.nick,'이','가')+' 놀러 왔어요',until:world.t+40,low:true}}}}
+  else if(V.act==='hello'){if(++V.t>=S.stay)V.act='back'}
+  else{V.r+=S.walk*(V.hurry?S.run:1);if(V.r>=R+S.r0){b3.visit=null;b3.wait=(state.run.bell===4?S.free:S.gap)+Math.floor(V.v*S.jitter)}}
+  if(b3.visit){V.x=b3r(Math.cos(V.a)*V.r);V.z=b3r(Math.sin(V.a)*V.r)}
+  return}
+ b3.quiet=quiet?b3.quiet+1:0;
+ if(b3.wait===null)b3.wait=state.run.bell===4?S.free:S.first;
+ if(b3.wait>0)b3.wait--;
+ if(b3.wait>0||b3.quiet<S.quiet)return;
+ const p=Book.visitPick(book,{seed:state.seed,run:state.run.no|0,n:b3.n,last:b3.last});if(!p)return;
+ const all=World.routes(world)||Array.from({length:World.SPAWNS||8},(_,k)=>k),dry=all.filter(q=>!b3RiverRoad(q,S)),roads=dry.length?dry:all,road=roads[Math.floor(p.u*roads.length)%roads.length];
+ const a=(road+.5)*Math.PI*2/(World.SPAWNS||8),r=R+S.r0;
+ b3.n++;b3.visits++;b3.last=p.kind;b3.visit={id:++b3.seq,kind:p.kind,ribbon:p.ribbon,shiny:p.shiny,v:p.v,road,a,r,x:b3r(Math.cos(a)*r),z:b3r(Math.sin(a)*r),act:'come',t:0,hurry:false};
+}
+/* 3D가 읽는 장면 상태(수첩이 꺼져 있으면 null) */
+function b3View(){
+ if(!b3S()||!b3)return null;const n=b3.note,g=b3.sign,v=b3.visit;
+ return {note:n?{id:n.id,kind:n.kind,x:n.x,z:n.z}:null,sign:g&&g.wolf?{wolf:g.wolf,down:g.down}:null,
+  visit:v?{id:v.id,kind:v.kind,ribbon:v.ribbon,shiny:v.shiny,x:v.x,z:v.z,act:v.act,road:v.road}:null,visits:b3.visits,papers:b3.papers,reads:b3.reads,signs:b3.signs,downs:b3.downs};
+}
+window.getBook3dState=b3View;
+/* 3D 종이를 누름(장면 안 손길, 규칙에는 영향 없음): 아래 상태 줄에 한 줄 */
+window.onBookPaper=()=>{if(!b3||!b3.note||phase==='start'||phase==='ending')return false;if(worldNote&&!worldNote.low)return true;/* 부서짐·여우 같은 알림은 가리지 않음 */const M=NOTES.MON[b3.note.kind];worldNote={text:'📜 '+josa(M.name,'이','가')+' 떨어뜨린 이름 쪽지예요. 곧 쪽지 문제가 나와요',until:world.t+30,low:true};frame();return true};
+/* 그림 화면: 늑대와 같은 % 변환으로 같은 자리에 작은 표시(3D 화면에서는 #enemies째 숨음) */
+function b3Draw(){
+ if(!b3)return;const on=fallbackOn()&&!!b3S()&&phase!=='start';
+ const mark=id=>{let e=document.getElementById(id);if(!e){e=document.createElement('i');e.id=id;e.setAttribute('aria-hidden','true');$('enemies').append(e)}if(!e.classList.contains('b3-mark'))e.classList.add('b3-mark');return e};
+ const span=World.radius(world)+World.EDGE,place=(e,x,z)=>{e.style.left=Math.max(2,Math.min(98,50+x/span*48))+'%';e.style.bottom=Math.max(2,Math.min(90,45-z/span*42))+'%'};
+ const p=mark('paperMark'),n=on&&b3.note;p.classList.toggle('hidden',!n);if(n){put(p,'📜');place(p,n.x,n.z)}
+ const g=mark('signMark'),sw=on&&b3.sign&&b3.sign.wolf&&!b3.sign.down?world.wolves.find(v=>v.id===b3.sign.wolf&&v.state!=='dead'&&v.state!=='gone'):null;g.classList.toggle('hidden',!sw);if(sw)place(g,sw.x,sw.z);
+ const f=mark('friendMark'),v=on&&b3.visit;f.classList.toggle('hidden',!v);if(v){put(f,NOTE_ICON[v.kind]||'🐾');place(f,v.x,v.z);f.classList.toggle('hello',v.act==='hello')}
 }
 
 /* ---------- 버튼 ---------- */

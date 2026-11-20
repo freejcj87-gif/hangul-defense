@@ -2292,6 +2292,106 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   ok(!/실력 향상|학습 효과|성적/.test(BOOKUI_SRC+files['index.html']),'화면 글에 효과 주장 없음');
   ok(Nt.PRIVACY.length>=13&&Nt.PRIVACY.every(([h,l])=>typeof h==='string'&&Array.isArray(l)&&l.every(t=>typeof t==='string'&&t.length>0)),'개인정보처리방침 본문 모양');
  }
+ /* M-13 0.17 수첩 3D(장면 전용): 쪽지 종이 · 기억 늑대 팻말 · 친구 방문. 장면 상태는 window.getBook3dState(), 3D는 src/book3d.js(브라우저 검사는 test.cjs book3d 구간).
+    화면이 세계를 읽기만 하는지는 맨 끝 지문 비교(켬 · ?book3d=0, 같은 시각 · 같은 손길)로 본다 */
+ {const crypto=require('node:crypto'),st=a=>a.window.getBook3dState(),Sc=Bk.BOOK.SCENE,shown=e=>!e.classList.contains('hidden');
+  const wolfPut=(a,o)=>{const w=a.api.world,v=Object.assign({id:w.nextId++,kind:'wolf',x:3,z:0,sx:20,sz:0,hp:1,max:1,speed:.01,state:'walk',target:0,timer:0,inside:0,hen:0},o);w.wolves.push(v);return v};
+  const span=a=>W.radius(a.api.world)+W.EDGE,leftOf=(a,x)=>Math.max(2,Math.min(98,50+x/span(a)*48))+'%',bottomOf=(a,z)=>Math.max(2,Math.min(90,45-z/span(a)*42))+'%';
+  const noteBook=b=>{Object.assign(b.mon.wolf,{foot:Date.now(),plays:2,last:1,kills:40,note:1});b.pq=6};
+  const cards=b=>{['boar','fox','frost'].forEach((k,i)=>Object.assign(b.mon[k],{foot:Date.now(),card:Date.now()+i,note:3,rib:{n:k==='boar'?3:0,last:1}}))};
+  const killNote=a=>{const v=wolfPut(a,{vh:1});for(let i=0;i<60&&v.state!=='dead';i++)a.tick();return v};
+  /* 쪽지 종이: 정답 화살에 쓰러진 자리에 남고, 그 쪽지 문제가 나오면 사라짐. 그림 화면도 같은 자리 */
+  {const a=bboot(noteBook,{index:3},{view:true});a.go();quiet(a);
+   eq(st(a),{note:null,sign:null,visit:null,visits:0,papers:0,reads:0,signs:0,downs:0},'처음: 종이·팻말·친구 없음');
+   const v=killNote(a),n=st(a).note,e=a.events.find(x=>x.type==='noteDrop');
+   ok(v.state==='dead'&&n&&n.kind==='wolf'&&Math.abs(n.x-v.x)<=.01&&Math.abs(n.z-v.z)<=.01,'정답 화살에 쓰러진 자리에 쪽지 종이 '+JSON.stringify(n)+' (늑대 '+v.x.toFixed(2)+', '+v.z.toFixed(2)+')');
+   eq(e&&[e.kind,e.x,e.z,e.id],[n.kind,n.x,n.z,n.id],'3D 사건 noteDrop에 자리와 번호');
+   a.tick(80);eq([st(a).note&&st(a).note.id,st(a).papers,bookOf(a).drop],[n.id,1,{kind:'wolf',at:1}],'읽기 전에는 땅에 그대로(8초 뒤에도), 기록의 쪽지는 0.16 그대로');
+   a.n.scene.dataset.renderer='fallback';a.tick(1);const pm=a.n.paperMark;
+   ok(shown(pm)&&pm.textContent==='📜'&&pm.style.left===leftOf(a,n.x)&&pm.style.bottom===bottomOf(a,n.z),'그림 화면: 늑대와 같은 % 변환 자리에 📜 ('+pm.style.left+', '+pm.style.bottom+')');
+   const g0=JSON.stringify(a.api.world);ok(a.window.onBookPaper()===true&&/늑대가 떨어뜨린 이름 쪽지예요/.test(a.n.villageStatus.textContent),'종이를 누르면 상태 줄 한 줄: '+a.n.villageStatus.textContent);eq(JSON.stringify(a.api.world),g0,'누름은 세계를 바꾸지 않음');
+   a.unlock();a.right();nextAsk(a);a.tick(1);
+   eq([a.n.answers.dataset.special,st(a).note,st(a).reads],['note',null,1],'그 쪽지 문제가 나오면 종이가 사라짐(주워 읽음)');
+   ok(a.events.some(x=>x.type==='noteRead'&&x.id===n.id&&x.kind==='wolf'),'3D 사건 noteRead(같은 번호)');ok(!shown(a.n.paperMark),'그림 화면 표시도 사라짐');delete a.n.scene.dataset.renderer;
+  }
+  /* 읽지 않으면 일정 시간 뒤 사라짐(규칙의 쪽지는 그대로 남아 다음 칸에 나옴) · 멀리서 쓰러지면 화면 안(반지름 + edge)으로 당김 */
+  {const a=bboot(noteBook,{index:3},{view:true});a.go();quiet(a);killNote(a);let k=0;while(st(a).note&&k<Sc.note+10){a.tick();k++}
+   ok(Math.abs(k-(Sc.note-1))<=1&&!a.events.some(x=>x.type==='noteRead')&&st(a).reads===0,'읽지 않으면 '+Sc.note/10+'초 뒤 사라짐('+k+'틱, 읽은 것으로 세지 않음)');
+   a.unlock();a.right();nextAsk(a);eq([a.n.answers.dataset.special,bookOf(a).pend&&bookOf(a).pend.kind],['note','note'],'(규칙 그대로) 다음 칸은 쪽지 문제');
+   const b=bboot(noteBook,{index:3},{view:true});b.go();quiet(b);const w=b.api.world,R=W.radius(w),far=wolfPut(b,{x:R+9,z:2,sx:R+10,sz:2,speed:0}),tw=w.buildings.find(x=>x.kind==='tower');
+   w.arrows.push({id:w.nextId++,tower:tw.id,wolf:far.id,fx:tw.x,fz:tw.z,tx:far.x,tz:far.z,t:1,total:5,damage:50,splash:0,share:.6,v:1});/* 정답 화살 한 발이 숲 쪽 늑대에 닿음 */
+   for(let i=0;i<5&&far.state!=='dead';i++)b.tick();const fn=st(b).note;
+   ok(far.state==='dead'&&fn&&Math.abs(Math.hypot(fn.x,fn.z)-(R+Sc.edge))<.02&&Math.abs(Math.atan2(fn.z,fn.x)-Math.atan2(far.z,far.x))<.01,'숲 쪽(반지름 + 9)에서 쓰러지면 같은 방향 반지름 + '+Sc.edge+'(화면 안)에 놓음 '+JSON.stringify(fn));
+  }
+  /* ?book3d=0: 장면만 끔(규칙·쪽지 문제는 그대로, noteDrop은 0.16 모양) */
+  {const a=bboot(noteBook,{index:3},{view:true,query:'?book3d=0'});a.go();quiet(a);killNote(a);const e=a.events.find(x=>x.type==='noteDrop');
+   eq([Bk.BOOK.FLAGS.book3d,st(a),e&&e.kind,e&&('x' in e),bookOf(a).drop&&bookOf(a).drop.kind],[false,null,'wolf',false,'wolf'],'?book3d=0: 장면 상태 없음, noteDrop은 자리 없이(0.16), 쪽지 규칙은 그대로');
+   a.n.scene.dataset.renderer='fallback';a.tick(1);ok(!shown(a.n.paperMark),'?book3d=0: 그림 화면 표시 없음');delete a.n.scene.dataset.renderer;Bk.BOOK.FLAGS.book3d=true}
+  /* 기억 늑대 팻말: 문제가 시작된 뒤 처음 온 늑대가 들고 옴, 다른 늑대로 옮기지 않음, 한 번에 맞히면 내려놓음, 다음 문제에는 없음 */
+  {const X=Q.get(8,'story',150);const a=bboot(b=>{b.pq=6;b.rv=[{id:X.id,box:1,due:0,dp:1,miss:1,seen:0}]},{index:9},{view:true});a.go();quiet(a);
+   eq(a.n.answers.dataset.special,'review','기억 늑대 문제');a.tick(5);eq(st(a).sign,null,'늑대가 없으면 팻말도 없음(규칙은 같음)');
+   const R=W.radius(a.api.world),v=wolfPut(a,{x:R+3,z:0,sx:R+10,sz:0,hp:999,max:999,speed:.01});a.tick(1);
+   eq([st(a).sign,st(a).signs],[{wolf:v.id,down:false},1],'문제가 시작된 뒤 처음 온 늑대가 팻말을 들고 옴');
+   wolfPut(a,{x:0,z:R+3,sx:0,sz:R+10,hp:999,max:999,speed:.01});a.tick(3);eq(st(a).sign.wolf,v.id,'다른 늑대가 와도 팻말 늑대는 그대로');
+   a.n.scene.dataset.renderer='fallback';a.tick(1);ok(shown(a.n.signMark)&&a.n.signMark.style.left===leftOf(a,v.x)&&a.n.signMark.style.bottom===bottomOf(a,v.z),'그림 화면: 팻말 늑대 자리에 작은 팻말');delete a.n.scene.dataset.renderer;
+   a.unlock();a.right();a.tick(1);
+   eq([st(a).sign,st(a).downs],[{wolf:v.id,down:true},1],'한 번에 맞히면 팻말을 내려놓음');ok(a.events.some(e=>e.type==='signDown'&&e.wolf===v.id),'3D 사건 signDown');
+   nextAsk(a);a.tick(1);eq([a.n.answers.dataset.special,st(a).sign],['',null],'다음 평소 문제에는 팻말 없음');
+   /* 두 번째 정답이면 내려놓지 않음(그 문제가 끝나면 사라짐) */
+   const c=bboot(b=>{b.pq=6;b.rv=[{id:X.id,box:1,due:0,dp:1,miss:1,seen:0}]},{index:9},{view:true});c.go();quiet(c);c.tick(2);const cv=wolfPut(c,{x:R+3,z:0,sx:R+10,sz:0,hp:999,max:999,speed:.01});c.tick(1);
+   c.unlock();c.wrong(0);c.tick(C.DASH_TICKS+2);c.unlock();c.btn(c.api.round.q.answer).click();c.tick(1);eq([c.api.phase,st(c).sign,st(c).downs],['learn',{wolf:cv.id,down:false},0],'두 번째 정답: 팻말은 내려놓지 않음');
+   for(let i=0;i<120&&!c.api.round.ready;i++)c.tick();c.btn(c.api.round.q.answer).click();c.untilAsk();c.tick(1);eq(st(c).sign,null,'그 문제가 끝나면 팻말도 사라짐')}
+  {/* 새 늑대가 S.sign틱 안에 오지 않으면 울타리 밖에서 다가오는 늑대 가운데 가장 바깥 */
+   const X=Q.get(8,'story',150);const a=bboot(b=>{b.pq=6;b.rv=[{id:X.id,box:1,due:0,dp:1,miss:1,seen:0}]},{index:9},{view:true});
+   const w=a.api.world,R=W.radius(w),near=wolfPut(a,{x:R+2,z:-1,sx:R+10,sz:-1,hp:999,max:999,speed:0}),old=wolfPut(a,{x:R+4,z:1,sx:R+10,sz:1,hp:999,max:999,speed:0});
+   a.go();w.wave.arrive=w.t+1e6;w.trickle=w.t+1e6;a.tick(Sc.sign-5);eq(st(a).sign,null,'문제 앞에 와 있던 늑대는 바로 들지 않음(새로 오는 늑대를 기다림)');
+   a.tick(10);eq(st(a).sign&&st(a).sign.wolf,old.id,Sc.sign/10+'초가 지나도 새 늑대가 없으면 울타리 밖 가장 바깥 늑대('+old.id+', 안쪽 '+near.id+')')}
+  /* 친구 방문: 조용한 틈에 모은 친구 가운데 한 마리가 길을 따라 와서 울타리 밖에서 인사하고 돌아감 */
+  {const a=bboot(cards,{index:5},{view:true});a.go();quiet(a);
+   let k=0;while(!st(a).visit&&k<Sc.first+Sc.quiet+20){a.tick();k++}
+   const v1=st(a).visit,R=W.radius(a.api.world);
+   ok(v1&&k>=Sc.first-1&&k<=Sc.first+2,'조용한 틈에 첫 방문('+k+'틱, 첫 간격 '+Sc.first+'): '+(v1&&v1.kind));
+   ok(['boar','fox','frost'].includes(v1.kind)&&v1.act==='come'&&Math.abs(Math.hypot(v1.x,v1.z)-(R+Sc.r0))<.2,'모은 친구 가운데 하나가 숲 쪽(반지름 + '+Sc.r0+')에서 걸어옴');
+   {const ang=Math.atan2(v1.z,v1.x),ra=(v1.road+.5)*Math.PI/4;ok(Math.abs(Math.atan2(Math.sin(ang-ra),Math.cos(ang-ra)))<.01,'늑대 길 '+v1.road+' 위로')}
+   let t=0;while(st(a).visit&&st(a).visit.act==='come'&&t<200){a.tick();t++}const hello=st(a).visit;
+   ok(hello&&hello.act==='hello'&&Math.abs(Math.hypot(hello.x,hello.z)-(R+Sc.r1))<.02,'울타리 밖(반지름 + '+Sc.r1+')에서 멈춰 인사('+t+'틱)');
+   ok(a.events.some(e=>e.type==='visitHello'&&e.id===hello.id&&e.kind===hello.kind)&&/놀러 왔어요/.test(a.n.villageStatus.textContent),'3D 사건 visitHello · 상태 줄 '+a.n.villageStatus.textContent);
+   a.n.scene.dataset.renderer='fallback';a.tick(1);ok(shown(a.n.friendMark)&&a.n.friendMark.classList.contains('hello')&&a.n.friendMark.style.left===leftOf(a,hello.x)&&a.n.friendMark.textContent.length>0,'그림 화면: 친구 표시(인사 중 깡충)');delete a.n.scene.dataset.renderer;
+   let dur=t+1;while(st(a).visit&&dur<400){a.tick();dur++}
+   ok(!st(a).visit&&dur<=Math.ceil(2*(Sc.r0-Sc.r1)/Sc.walk)+Sc.stay+4,'인사하고 돌아감: 한 번 방문 '+dur+'틱(짧게)');eq([st(a).visits,a.api.world.wolves.length],[1,0],'방문 1번, 세계에 친구를 넣지 않음');
+   let gap=0;while(!st(a).visit&&gap<Sc.gap+Sc.jitter+Sc.quiet+20){a.tick();gap++}
+   const v2=st(a).visit;ok(v2&&gap>=Sc.gap-1&&gap<=Sc.gap+Sc.jitter+1,'다음 방문은 '+gap+'틱 뒤(간격 '+Sc.gap+'~'+(Sc.gap+Sc.jitter)+', 가끔)');ok(v2.kind!==v1.kind,'바로 전 친구와 다른 친구('+v1.kind+' → '+v2.kind+')');
+   ok([v1,v2].every(x=>x.ribbon===(x.kind==='boar')),'리본을 단 친구만 리본(boar)');
+   a.tick(5);const r0=Math.hypot(st(a).visit.x,st(a).visit.z);wolfPut(a,{x:R+9,z:0,sx:R+10,sz:0,hp:1e6,max:1e6,speed:0});a.tick(1);
+   eq(st(a).visit.act,'back','늑대가 나오면 곧바로 돌아감');let back=1;while(st(a).visit&&back<200){a.tick();back++}
+   ok(back<=Math.ceil((R+Sc.r0-r0)/(Sc.walk*Sc.run))+2,'서둘러 돌아감('+back+'틱)');
+   a.tick(Sc.gap+Sc.jitter+Sc.quiet+10);eq(st(a).visit,null,'늑대가 있는 동안에는 오지 않음');
+   a.api.world.wolves=[];let q=0;while(!st(a).visit&&q<Sc.quiet+5){a.tick();q++}ok(st(a).visit&&q>=Sc.quiet-1,'늑대가 사라지고 '+Sc.quiet/10+'초 조용하면 다시 옴('+q+'틱)');
+   a.n.pause.click();const pv=JSON.stringify(st(a).visit);a.tick(50);eq(JSON.stringify(st(a).visit),pv,'쉬는 동안 친구도 멈춤');a.n.pause.click()}
+  {const a=bboot(cards,{index:5},{view:true,query:'?friends=0'});a.go();quiet(a);a.tick(Sc.first+Sc.quiet+50);eq([st(a).visit,st(a).visits,st(a)!==null],[null,0,true],'?friends=0: 친구 방문만 없음');Bk.BOOK.FLAGS.friends=true}
+  {const a=bboot(null,{index:5},{view:true});a.go();quiet(a);a.tick(Sc.first+Sc.quiet+50);eq(st(a).visits,0,'친구 카드가 없으면 방문 없음')}
+  {saved={};const a=boot({book:true,view:true,query:'?book=0'});a.go();a.tick(5);eq(a.window.getBook3dState(),null,'?book=0: 셋 다 없음')}
+  {/* 더 놀기(늑대 없음)에서도 가끔 */const a=bboot(cards,{index:60,run:{...C.freshRun(),asked:60,first:50,t0:1,bell:3}},{view:true});a.go();a.n.endStay.click();a.untilAsk();
+   let k=0;while(!st(a).visit&&k<Sc.free+Sc.quiet+20){a.tick();k++}ok(st(a).visit&&k<=Sc.free+2,'더 놀기: '+k+'틱 만에 친구가 놀러 옴')}
+  /* 세계 지문: 같은 시각 · 같은 손길로 켬과 ?book3d=0을 돌리면 세계 · 판 상태 · 기록이 한 글자도 같다(친구 방문 · 쪽지 종이 · 팻말이 실제로 일어난 판) */
+  {const T0=realNow();Date.now=()=>T0;
+   const prep=b=>{cards(b);noteBook(b);b.rv=[{id:Q.get(8,'story',150).id,box:1,due:10,dp:1,miss:1,seen:0}]};
+   const run=q=>{saved={};const a=bboot(prep,{index:3},{view:true,query:q});a.go();const w=a.api.world;w.wave.arrive=w.t+1e6;w.trickle=w.t+1e6;const prints=[];
+    const play=n=>{for(let i=0;i<n;i++){const ph=a.api.phase,r=a.api.round;
+      if(ph==='ask'&&r.lock<=0&&r.dash<=0&&(r.tries>0||r.t>=fastAt(r.q))){if(r.tries===0&&a.api.state.index%4===3)a.wrong();else a.rightNow()}
+      else if(ph==='learn'&&r.ready)a.btn(r.q.answer).click();
+      a.tick()}};
+    play(450);prints.push(JSON.stringify(a.api.world));w.wave.arrive=w.t+20;w.trickle=w.t+5;
+    for(let s=0;s<5;s++){play(500);prints.push(JSON.stringify(a.api.world))}
+    return {prints,state:JSON.stringify(a.api.state),book:JSON.stringify(bookOf(a)),b3:a.window.getBook3dState(),kills:a.api.world.stats.volleyKills|0}};
+   const A=run(''),B=run('?book3d=0');Bk.BOOK.FLAGS.book3d=true;
+   console.log('  수첩 3D 지문 비교(켬 · ?book3d=0): 친구 방문 '+(A.b3&&A.b3.visits)+' · 쪽지 종이 '+(A.b3&&A.b3.papers)+'(읽음 '+(A.b3&&A.b3.reads)+') · 팻말 '+(A.b3&&A.b3.signs)+'(내려놓음 '+(A.b3&&A.b3.downs)+') · 정답 화살 처치 '+A.kills+' · 세계 지문 '+crypto.createHash('sha256').update(A.prints.join('|')).digest('hex').slice(0,16)+(A.prints.join('|')===B.prints.join('|')?' 같음':' 다름'));
+   ok(A.b3&&A.b3.visits>=1&&A.b3.papers>=1,'(켬) 친구 방문 '+(A.b3&&A.b3.visits)+' · 쪽지 종이 '+(A.b3&&A.b3.papers)+' · 읽음 '+(A.b3&&A.b3.reads)+' · 팻말 '+(A.b3&&A.b3.signs)+' · 내려놓음 '+(A.b3&&A.b3.downs)+' (정답 화살 처치 '+A.kills+')');
+   eq(B.b3,null,'(?book3d=0) 장면 상태 없음');
+   eq(A.prints.map(p=>crypto.createHash('sha256').update(p).digest('hex').slice(0,16)),B.prints.map(p=>crypto.createHash('sha256').update(p).digest('hex').slice(0,16)),'세계 지문이 한 글자도 같음(조용한 틈 450틱 + 늑대 무리 2,500틱, 500틱마다 6번)');
+   eq([A.state===B.state,A.book===B.book],[true,true],'판 상태 · 기록도 같음(경제 · 수첩 규칙 그대로)');
+   Date.now=()=>realNow()+skew}
+ }
  Date.now=realNow;
 }
 
