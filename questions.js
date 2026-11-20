@@ -388,6 +388,25 @@
   }
   const QPOOL={};
   for(const a of AGES){QPOOL[a]={};for(const c of Object.keys(CATS))QPOOL[a][c]=BANK[a].quiz.filter(q=>q.cat===c);}
+  /* ---------- 문제은행 판(edition) ----------
+     문항을 더하면 묶음 크기가 달라져 번호 → 문항 순서가 통째로 바뀐다. 그래서 진행 중인 판은 시작할 때의 은행 판을 저장(state.bank)해
+     끝날 때까지 그 판의 문항만으로 예전과 똑같은 순서를 쓴다. 새 판(새 마을·처음부터)부터 최신 판을 쓴다.
+     규칙: 새 문항은 생성 구간 맨 뒤에만 붙인다(scripts/bank-add.cjs). questions-gen.js의 editions[k] = 판 k+1의 생성 문항 수(나이·묶음별).
+     판 v의 묶음 = 손 문항 + 생성 문항 앞쪽 editions[v-1]개. BANK_VERSION = editions 수 + 1(최신 판 = 전부). bank 없는 예전 저장 = 판 1 */
+  const EDITIONS=GEN&&Array.isArray(GEN.editions)?GEN.editions:[],BANK_VERSION=EDITIONS.length+1;
+  const normBank=b=>Number.isInteger(b)&&b>=1&&b<BANK_VERSION?b:BANK_VERSION;
+  const POOLS={};
+  function pools(v){
+    if(POOLS[v])return POOLS[v];
+    const o={};
+    for(const a of AGES){
+      const e=v<BANK_VERSION&&EDITIONS[v-1]&&EDITIONS[v-1][a],cut=(list,n)=>e&&Number.isInteger(n)?list.slice(0,list.filter(q=>!/-g\d+$/.test(q.id)).length+n):list;
+      const story=cut(BANK[a].story,e&&e.story),quiz=cut(BANK[a].quiz,e&&e.quiz),q={};
+      for(const c of Object.keys(CATS))q[c]=quiz.filter(x=>x.cat===c);
+      o[a]={story,q};
+    }
+    return POOLS[v]=o;
+  }
 
   /* 전체 검사(인자 없으면 내장 은행). 손 문항 뒤 생성 문항, 정답 위치 3연속은 구간별 */
   function validate(bank){
@@ -468,22 +487,32 @@
     ph.forEach(([s,q],k)=>{const e=k+1<ph.length?ph[k+1][0]:Infinity;n+=q*Math.max(0,Math.min(b,e)-s)});
     return n+slotsOf(qIn(age,b)).filter(p=>p<i%20).length;
   }
-  const CYCLE={};
-  for(const a of AGES){
+  const CYCLE={},MIX0={};for(const a of AGES)MIX0[a]=Object.assign({},QUIZ_MIX[a]);
+  function cycleOf(a){
     const w=QUIZ_MIX[a],cur={math:0,common:0,english:0},out=[];
     for(let k=0;k<20;k++){let best=null;for(const c of ['math','common','english']){cur[c]+=w[c];if(best===null||cur[c]>cur[best])best=c}cur[best]-=20;out.push(best)}
     CYCLE[a]=out;
   }
+  for(const a of AGES)cycleOf(a);
+  /* 수첩 MVP 보호자 설정 '영어 끄기 · 보통 · 조금 더': 그 나이의 퀴즈 분류 가중치(합 20)를 바꾼다. 인자 없이 부르면 모든 나이를 처음 값으로.
+     칸 종류(읽기·퀴즈)와 퀴즈 칸 수는 그대로이고, 퀴즈 칸 안의 분류만 달라진다. 틀린 값은 무시(false) */
+  function setMix(age,mix){
+    if(age===undefined){for(const a of AGES){Object.assign(QUIZ_MIX[a],MIX0[a]);cycleOf(a)}return true}
+    if(!AGES.includes(age))return false;
+    const m=mix||MIX0[age],v=['math','common','english'].map(c=>m[c]);
+    if(!v.every(x=>Number.isInteger(x)&&x>=0)||v[0]+v[1]+v[2]!==20)return false;
+    Object.assign(QUIZ_MIX[age],{math:v[0],common:v[1],english:v[2]});cycleOf(age);return true;
+  }
   const hash=str=>{let h=2166136261;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0};
   const rng=a=>()=>{a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
-  const GAP=10,STEP=.5,MEMO=new Map();
+  const GAP=10,STEP=.5,MEMO=new Map(),MEMO_MAX=192;
   /* 같은 묶음(한 판에서 멀리 띄울 문항): 같은 지문의 질문들, 7세는 같은 낱말(낱말 → 그림, 그림 → 낱말) */
   const grp=q=>q.mode!=='story'?q.id:q.age===7?(HANGUL_RE.test(q.passage)?q.passage:q.choices[q.answer]):q.passage;
   const TIER=8;
-  const memo=(key,f)=>{if(MEMO.has(key))return MEMO.get(key);if(MEMO.size>96)MEMO.clear();const v=f();MEMO.set(key,v);return v};
+  const memo=(key,f)=>{if(MEMO.has(key))return MEMO.get(key);if(MEMO.size>MEMO_MAX)MEMO.clear();const v=f();MEMO.set(key,v);return v};
   function rawOrder(age,pool,list,seed,lap){
     return memo('r|'+age+'|'+pool+'|'+seed+'|'+lap,()=>{
-      const r=rng(hash(age+'|'+pool+'|'+seed+'|'+lap)),n=list.length,w=list.map(q=>r()+((q.level||2)-1)*STEP);
+      const r=rng(hash(age+'|'+pool.replace(/@\d+$/,'')+'|'+seed+'|'+lap))/* '@판'은 캐시 열쇠에만: 예전 판의 순서는 그때와 같은 난수 */,n=list.length,w=list.map(q=>r()+((q.level||2)-1)*STEP);
       /* 같은 묶음의 둘째·셋째 문항은 첫째 자리 + TIER씩 뒤로: 묶음마다 하나씩 다 나온 뒤에야 둘째가 나온다 */
       const first=new Map();
       [...Array(n).keys()].sort((x,y)=>w[x]-w[y]||x-y).forEach(x=>{const g=grp(list[x]),f=first.get(g);if(f)w[x]=f[0]+TIER*f[1]++;else first.set(g,[w[x],1])});
@@ -499,21 +528,59 @@
       return c;
     });
   }
+  /* ---------- 보기 순서(2026-11-17 감사 후속) ----------
+     화면은 at()가 준 보기 순서를 그대로 보여 준다(예전의 '두 바퀴째 한 칸 돌리기'는 이것으로 대신함).
+     정답 자리: 20칸 묶음마다 (나이, 씨앗, 묶음)으로 정한다. 묶음 안에서는 같은 자리가 RUN_MAX(3)번까지만 이어지고,
+     묶음의 처음 두 칸과 끝 두 칸은 서로 달라 묶음 경계에서도 2번까지만 이어진다 → 같은 자리 4연속 없음. 자리는 고르게 뽑는다.
+     나머지 보기(오답) 순서는 (나이, 씨앗, 번호)로 섞는다. 같은 (나이, 씨앗, 번호) = 같은 순서(이어하기·결전 문제도 같음).
+     '가장 큰·작은' 문항은 보기가 크기순으로 늘어서지 않게 오답 둘을 바꾼다. 은행 순서(get·quiz·snapshot)는 그대로다. */
+  const SPOT_BLOCK=20,RUN_MAX=3;
+  const choiceCount=(a,i)=>isQuiz(a,i)?QUIZ_CHOICES[a]:CHOICE_COUNT[a].story;
+  function answerSpots(a,s,b){
+    return memo('p|'+a+'|'+s+'|'+b,()=>{
+      const r=rng(hash('p|'+a+'|'+s+'|'+b)),out=[];
+      for(let j=0;j<SPOT_BLOCK;j++){
+        const n=choiceCount(a,b*SPOT_BLOCK+j),ban=new Set();
+        if(j>=RUN_MAX&&out.slice(j-RUN_MAX).every(v=>v===out[j-1]))ban.add(out[j-1]);
+        if(j===1||j===SPOT_BLOCK-1)ban.add(out[j-1]);
+        const can=[...Array(n).keys()].filter(v=>!ban.has(v));
+        out.push(can[Math.floor(r()*can.length)]);
+      }
+      return out;
+    });
+  }
+  const numOf=c=>{const m=String(c).match(/^(\d+)분의 (\d+)$/);return m?+m[2]/+m[1]:Number(c)};
+  const monotone=v=>v.every((x,k)=>!k||x>v[k-1])||v.every((x,k)=>!k||x<v[k-1]);
+  function arrange(q,a,s,i){
+    const n=q.choices.length,want=answerSpots(a,s,Math.floor(i/SPOT_BLOCK))[i%SPOT_BLOCK],p=want<n?want:want%n;
+    const r=rng(hash('c|'+a+'|'+s+'|'+i)),rest=q.choices.filter((_,k)=>k!==q.answer);
+    for(let k=rest.length-1;k>0;k--){const j=Math.floor(r()*(k+1));[rest[k],rest[j]]=[rest[j],rest[k]]}
+    rest.splice(p,0,q.choices[q.answer]);
+    if(/가장 (큰|작은)/.test(q.prompt)&&rest.every(c=>!Number.isNaN(numOf(c)))&&monotone(rest.map(numOf))){
+      const w=rest.map((_,k)=>k).filter(k=>k!==p);[rest[w[0]],rest[w[1]]]=[rest[w[1]],rest[w[0]]];
+    }
+    q.choices=rest;q.answer=p;return q;
+  }
+
   /* index번째 칸: kind, cat, 묶음 안 순번 seq, 바퀴 lap, 순열 자리 pos, 묶음 크기 size */
-  function slot(age,mode,index,seed){
-    const a=normAge(age),m=normMode(mode),i=normIndex(index),s=normSeed(seed);
+  /* off(수첩 MVP 이어 순서) = 묶음별로 이미 쓴 수 {story, common, math, english}: 그만큼 순번을 밀어, 판이 바뀌어도 그 판(bank)의 묶음을 한 바퀴 다 돌 때까지 같은 글이 나오지 않는다. 없으면 지금과 한 글자도 다르지 않다 */
+  const offOf=(off,k)=>off&&Number.isFinite(off[k])&&off[k]>0?Math.floor(off[k]):0;
+  function slot(age,mode,index,seed,bank,skip){
+    const a=normAge(age),m=normMode(mode),i=normIndex(index),s=normSeed(seed),P=pools(normBank(bank))[a],QP=P.q;
     if(isQuiz(a,i)){
       const k=quizBefore(a,i),cy=CYCLE[a],off=hash('o|'+s)%20;
       let cat=cy[(k+off)%20],c=Math.floor(k/20)*QUIZ_MIX[a][cat];
       for(let t=0;t<k%20;t++)if(cy[(off+t)%20]===cat)c++;
-      if(!QPOOL[a][cat].length){cat=Object.keys(CATS).find(x=>QPOOL[a][x].length);c=k}
-      const n=QPOOL[a][cat].length;
+      if(!QP[cat].length){cat=Object.keys(CATS).find(x=>QP[x].length);c=k}
+      c+=offOf(skip,cat);
+      const n=QP[cat].length;
       return {kind:'quiz',cat,seq:c,lap:Math.floor(c/n),pos:c%n,size:n};
     }
-    const j=i-quizBefore(a,i),n=BANK[a][m].length;
+    const j=i-quizBefore(a,i)+offOf(skip,'story'),n=P.story.length;
     return {kind:m,seq:j,lap:Math.floor(j/n),pos:j%n,size:n};
   }
 
+  let BYID=null;
   const api={
     AGES:AGES.slice(),MODES:MODES.slice(),LEVELS,
     count(age,mode){return BANK[normAge(age)][normMode(mode)].length;},
@@ -531,16 +598,21 @@
       const i=Number.isFinite(index)?Math.floor(index):0;
       return qcopy(list[((i%n)+n)%n],false);
     },
-    /* 게임 문제(seed는 0 이상 정수, 기본 0): 같은 입력 = 같은 문항, lap = 몇 바퀴째(보기 돌리기). mode는 무엇을 넣어도 읽기(story) */
-    at(age,mode,index,seed){
-      const a=normAge(age),m=normMode(mode),s=normSeed(seed),t=slot(a,m,index,s);
-      if(t.kind==='quiz'){const list=QPOOL[a][t.cat],q=qcopy(list[lapOrder(a,'q-'+t.cat,list,s,t.lap)[t.pos]],false);q.lap=t.lap;return q}
-      const list=BANK[a][m],q=copy(list[lapOrder(a,m,list,s,t.lap)[t.pos]],false);q.lap=t.lap;return q;
+    /* 게임 문제(seed는 0 이상 정수, 기본 0): 같은 입력 = 같은 문항·같은 보기 순서, lap = 몇 바퀴째. 보기는 화면에 보일 순서(arrange). mode는 무엇을 넣어도 읽기(story) */
+    at(age,mode,index,seed,bank,off){
+      const a=normAge(age),m=normMode(mode),s=normSeed(seed),i=normIndex(index),v=normBank(bank),t=slot(a,m,i,s,v,off),P=pools(v)[a],K=v===BANK_VERSION?'':'@'+v;
+      if(t.kind==='quiz'){const list=P.q[t.cat],q=qcopy(list[lapOrder(a,'q-'+t.cat+K,list,s,t.lap)[t.pos]],false);q.lap=t.lap;return arrange(q,a,s,i)}
+      const list=P.story,q=copy(list[lapOrder(a,m+K,list,s,t.lap)[t.pos]],false);q.lap=t.lap;return arrange(q,a,s,i);
     },
     /* 퀴즈 칸인지(모드·시드 무관), 그 20칸 묶음의 퀴즈 칸 수 */
     isQuiz(age,index){return isQuiz(normAge(age),normIndex(index));},
     quizPer20(age,index){return qIn(normAge(age),Math.floor(normIndex(index)/20));},
-    QUIZ_PHASE,QUIZ_MIX,slot,
+    /* 번호 0~index−1에서 묶음별로 쓴 수(판이 끝날 때 이어 순서에 더한다) */
+    used(age,index,seed,bank){const a=normAge(age),n=normIndex(index),o={story:0,common:0,math:0,english:0};for(let i=0;i<n;i++){const t=slot(a,'story',i,seed,bank);o[t.kind==='quiz'?t.cat:'story']++}return o},
+    /* 문항 id → 은행 문항 복사본(기억 늑대가 다시 낼 글). 없으면 null. 보기는 은행 순서 그대로 */
+    byId(id){if(!BYID){BYID=new Map();for(const a of AGES)for(const m of ['story','quiz'])for(const q of BANK[a][m])BYID.set(q.id,q)}const q=BYID.get(id);return q?(q.mode==='quiz'?qcopy(q,false):copy(q,false)):null},
+    setMix,
+    QUIZ_PHASE,QUIZ_MIX,slot,BANK_VERSION,bankCount(age,bank){const P=pools(normBank(bank))[normAge(age)];return {story:P.story.length,common:P.q.common.length,math:P.q.math.length,english:P.q.english.length}},
     hangul,checkLevel,checkCommon,checkQuiz,genRejected,
     snapshot(){const o={};for(const a of AGES){o[a]={};for(const m of MODES)o[a][m]=BANK[a][m].map(q=>copy(q,true));o[a].quiz=BANK[a].quiz.map(q=>qcopy(q,true));}return o;}
   };

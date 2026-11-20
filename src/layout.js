@@ -82,10 +82,33 @@ export const WELL={at:polar(8.9,71),r:.5,stage:2};
    Each slot gives the ground position 'at', the footprint radius 'r' the clearances were checked with, the height 'h' the code shape is drawn at,
    and which model goes there. A model dropped in at 'at', scaled to 'h' and turned to face the village centre fits without moving anything else:
    MILL → watermill.glb + waterwheel.glb (0.15) · KEEP → castle-hall.glb (0.16, it also takes over the hall) ·
-   ROAD_MARK (two per open road, outside the edge) → castle-gate.glb across the road or watchtower.glb on each side (0.16) ·
+   ROAD_MARK (two per open road, outside the edge; 0.15: from stage 3 road 6 has the bridge instead) → castle-gate.glb across the road or watchtower.glb on each side (0.16) ·
    the fence ring's third layer (stone wall, world.js fence layer 3) → wall-segment.glb (0.16). */
-// 0.14 stand-in for the mill village: a hut with a (still) water wheel. The river, the bridge and the working mill come in 0.15.
-export const MILL={at:polar(11.2,247.5),r:1,h:2.2,stage:3,art:'watermill'};
+// 0.14 stand-in for the mill village: a hut with a (still) water wheel. Still drawn with the river off (?river=0 = the 0.14 village).
+export const MILL0={at:polar(11.2,247.5),r:1,stage:3};
+// 0.15 mill (계획서 v015-plan §3): watermill.glb measured r 1.52 would stand too close to the stage-2 cottage at 11.2, so 0.6 further out.
+// ry turns its wheel side (model −x) out to 247.5° (the door, +z, then faces 157.5°): from the camera the wheel disc is seen at about 52°, so it reads turning.
+// wheel: the wheel's axle in the mill's frame after baking to h (watermill.glb WaterWheel pivot [−1.16, 0.92, 0], box-centred, × 2.2/2.25), r its radius.
+export const MILL={at:polar(11.8,247.5),r:1.52,h:2.2,stage:3,art:'watermill',ry:-67.5*D,wheel:{x:-.955,y:.9,r:.85}};
+/* 0.15 river (계획서 §3): a straight band whose point nearest the village centre lies in direction 'dir' (280°, the top of the screen) at the village radius
+   + 'dist' (the water's centre line). It steps back with the radius at stages 3-5. Water 'water' wide with sandy banks 'bank' wide, 'length' long (both ends in the forest).
+   Of the open roads only road 6 (292.5°) crosses it where wolves walk (radius − 1 … + 8, ±0.25 rad), on the bridge; checked in test-dom S-9-3.
+   The plan's 284° let a road-7 straggler at −0.25 rad reach the water at radius 28.5 (castle, inside radius + 8); from 280.5° down road 7 meets it beyond. */
+export const RIVER={dir:280,dist:1.3,water:1.8,bank:.35,length:120,stage:3,road:6,race:.55};
+// The river frame for village radius R: n = unit normal (out of the village), c = the nearest point of the centre line, t = along the river (n turned −90°), d = its distance.
+export function riverFrame(R){const a=RIVER.dir*D,n=[Math.cos(a),Math.sin(a)],d=R+RIVER.dist;return {n,t:[Math.sin(a),-Math.cos(a)],c:[n[0]*d,n[1]*d],d}}
+// Distance of a ground point from the river's centre line (the band is |…| <= water/2 + bank).
+export const riverOffset=(R,x,z)=>{const f=riverFrame(R);return x*f.n[0]+z*f.n[1]-f.d};
+/* The bridge (bridge.glb: travel along +z, 3.34 long, 1.63 wide, h 0.997 = scale 1) sits on road 6 where it crosses the water's centre line, turned along the road.
+   cross = the stretch of road over water (≤ length − 0.8). deck(z): the deck's height along it (an arch: 0.505 in the middle, 0.284 at ±1.46 in the GLB,
+   minus the 0.036 the bake drops it to stand on y = 0), used to lift wolves crossing it. */
+export const BRIDGE={len:3.34,width:1.63,h:.997,art:'bridge',deck:{top:.469,curve:.104,half:1.67}};
+export function bridgeSpot(R){const a=(RIVER.road+.5)*45*D,u=[Math.cos(a),Math.sin(a)],f=riverFrame(R),dot=u[0]*f.n[0]+u[1]*f.n[1],r=f.d/dot;
+ return {at:[u[0]*r,u[1]*r],r,ry:Math.atan2(u[0],u[1]),cross:RIVER.water/dot,u}}
+export const deckY=z=>{const k=BRIDGE.deck,a=Math.abs(z);return a>=k.half+.3?0:Math.max(0,(k.top-k.curve*Math.min(a,k.half)**2)*(a>k.half?1-(a-k.half)/.3:1))};
+// The mill race: a narrow stream from the wheel straight out (247.5°) to the river's centre line. [x0,z0,x1,z1,width]
+export function millRace(R){const a=247.5*D,u=[Math.cos(a),Math.sin(a)],r0=Math.hypot(...MILL.at)-MILL.wheel.x,w=[u[0]*r0,u[1]*r0],f=riverFrame(R),t=(f.d-(w[0]*f.n[0]+w[1]*f.n[1]))/(u[0]*f.n[0]+u[1]*f.n[1]);
+ return [+w[0].toFixed(3),+w[1].toFixed(3),+(w[0]+u[0]*t).toFixed(3),+(w[1]+u[1]*t).toFixed(3),RIVER.race]}
 // The castle keep rises behind the hall (it overlaps the hall's back corner on purpose: the hall becomes the castle).
 export const KEEP={at:[-1.8,-3.9],r:.92,h:6.5,stage:5,art:'castle-hall'};
 // Road-entrance markers stand outside the village edge on both sides of every open wolf road: [distance beyond the radius, lateral offset]

@@ -24,7 +24,8 @@
   const PACE={lo:50,hi:300,ema:.25,first:3,firstEma:.5};
   /* 0.10: 틀린 문제도 첫 고르기까지 걸린 시간으로 읽기 속도를 갱신하고(전에는 한 번에 맞힌 문제만이라 첫 정답 전 완충 0), 처음 first번은 firstEma로 빨리 따라간다 */
   /* 찍기 막기(0.10, 8세 점검: 읽기 모드에서 보기가 열리자마자 찍어도 금화를 그대로 받음): 한 번에 맞힌 금화 × clamp(floor, 1, 답한 시간 ÷ (필요 시간 × FAST_MIN)).
-     번개를 받을 수 있는 순간(필요 시간의 40%)부터는 언제나 1이라 보통·빠른 아이는 깎이지 않는다. 그보다 빨리 누르면 최소 floor(75%) */
+     번개를 받을 수 있는 순간(필요 시간의 40%)부터는 언제나 1이라 보통·빠른 아이는 깎이지 않는다. 그보다 빨리 누르면 최소 floor(75%).
+     단계를 켜면(0.14) 바닥과 기운 지수는 FLAGS.STAGE_GUARD를 쓴다(guardFloor · guardPow) */
   const GUARD={floor:.75};
 
   /* ---------- 0.12 손잡이(프로듀서 결정 A~F의 추천 기본값. 답이 바뀌면 여기만 고친다. 설계: ending-and-progression-v2.md §5, game-plan §11) ----------
@@ -56,10 +57,21 @@
     STAGES:true,              /* true = 마을 반지름·회관 승급·8번째 칸 진행 표시가 단계를 따른다 */
     ROUTES:true,              /* true = 1단계부터 늑대가 '열린 길'(World.STAGE.open)로만 온다. false = 전 단계 8방향(?routes=0) */
     STAGE_AT:[0,5,14,24,36,50],       /* 단계 문턱(이번 판 지은 수). 첫 문턱 5 = 시작 타워 1 + 네 번 삼(설계 초안 6은 8세 보통의 첫 전환이 3분에 걸려 5로) */
-    STAGE_AT_BY_AGE:{9:[0,4,11,19,29,40],10:[0,4,10,17,26,37]}, /* 9·10세: 글이 길어 문제당 시간이 길다(약 31·33초). 첫 문턱 4, 종을 내린 만큼 뒤 문턱도 당긴다 */
+    STAGE_AT_BY_AGE:{9:[0,4,11,19,29,40],10:[0,4,11,19,32,38]}, /* 0.15: 10세 성곽 문턱 31 → 32(0.14.2 · 고친 시뮬을 합친 뒤 3개씩 울타리가 0.13.2 +17%라 밸런스 절 §14.12의 대안대로, §15.3).  9·10세: 글이 길어 문제당 시간이 길다(약 31·33초). 첫 문턱 4, 종을 내린 만큼 뒤 문턱도 당긴다.
+                                         10세는 0.14의 [0,4,10,17,26,37]이면 회관 2(성곽 마을)가 지은 수 26(0.13.2는 32)에 와서 '20분까지 울타리 부서짐'이 0.13.2의 1.7배가 됐다.
+                                         회관 1·2를 11·31로 늦춰 0.13.2(10·32) 수준으로 돌렸다(12판 22.3 → 12.9번, 0.13.2 13.2번. game-plan §14.12) */
     STAGE_HALL:[2,4,5],               /* 이 단계(0부터 셈: 장터 마을 · 성곽 마을 · 성)에 들어서면 회관 1·2·3단계. 8세 기준 지은 수 14·36·50(0.13.2는 10·32·54).
                                          설계 초안 [2,3,5](14·24·50)는 멧돼지·바위 늑대가 너무 일찍 와서 10세가 무너지는 판이 나와 한 단계 늦췄다(시뮬, game-plan §14) */
-    STAGE_BELL_BY_AGE:{9:50,10:46}    /* 단계를 켰을 때의 나이별 종 문턱(하나씩 사는 보통 아이도 한 판 30분 안쪽). 없는 나이는 BELL_BUILT(66) */
+    STAGE_BELL_BY_AGE:{9:50,10:46},   /* 단계를 켰을 때의 나이별 종 문턱(하나씩 사는 보통 아이도 한 판 30분 안쪽). 없는 나이는 BELL_BUILT(66) */
+    STAGE_GUARD:{floor:.75,pow:2},    /* 단계를 켰을 때의 찍기 막기: floor = 바닥 배수(GUARD.floor 자리), pow = 기운에 곱하는 지수(FLOW.guardPow 자리).
+                                         끄면 GUARD.floor .75 · FLOW.guardPow 1(0.13.2와 같음). 찍기 아이의 엔딩이 보통 아이의 3배가 안 돼(7세 2.6배 · 8세 3.0배) 지수를 2로(3.1 · 3.4배).
+                                         필요 시간의 40% 전에 답할 때만 듣고(정직하게 읽는 아이는 배수 1이라 그대로), 여유가 더 필요하면 floor .65(4.1 · 3.9배, 48판). game-plan §14.12 */
+    /* ---------- 0.15 강 · 다리 · 물레방아(계획서 v015-plan, 프로듀서 결정 '26.11.17: 물레방아는 저절로 서고 바퀴만 돈다(금화 없음), 다리 길은 한 줄로) ----------
+       단계 · 길(STAGES · ROUTES)이 켜져 있을 때만 쓴다. 저장 형식은 그대로(새 칸 없음) */
+    RIVER:true,               /* true = 물레방아 마을(단계 3)부터 강 · 다리 · 물레방아 바퀴를 그린다(화면 전용). false = 0.14 화면(?river=0, 다리 규칙도 꺼짐) */
+    BRIDGE:true,              /* true = 단계 3부터 6번 길(다리 길) 늑대가 출현 각도 흔들림 ±0.03rad로 다리 위에 줄지어 온다(World.BRIDGE). false = 0.14처럼 넓게(?bridge=0) */
+    /* ---------- 0.15.2 늑대 무리 대형(기획 wolf-paths-plan-20261119 안 B, 프로듀서 결정 '26.11.19: 무리 대형부터, 따라 도는 늑대는 옆 길 울타리 면까지, 예고는 2차) ---------- */
+    FORMS:true,               /* true = 마을(단계 1)부터 무리마다 곧장 · 휘어 오기 · 갈라지기 · 따라 돌기 가운데 하나로 온다(World.FORM). false = 0.15.1처럼 곧게(?forms=0). 저장 형식은 그대로 */
   };
   /* 흐르는 농장의 경제 쪽 상수(세계 쪽 상수는 world.js FLOW). 값은 scripts/sim-flow.cjs로 맞춤(2026-11-14, game-plan §13.2)
      beat: 박(틱) = 그 문제 필요 시간 × beat × max(paceFloor, pace)/100. 박 하나에 농부 한 명이 World.FLOW.carry알을 나른다
@@ -68,12 +80,16 @@
      boost: 신바람 단계 = 2(6연속 이상, 또는 3연속 + 번개) · 1(번개 또는 3연속 이상) · 0 */
   const FLOW={beat:1.3,paceFloor:60,credit:1,fast:.25,streak:.15,streakMax:.75,guardPow:1,boost1:3,boost2:6};
   const flowOn=s=>!!FLAGS.FLOW&&!(Array.isArray(FLAGS.FLOW_OFF_AGES)&&FLAGS.FLOW_OFF_AGES.includes(s&&s.age));
+  /* 찍기 막기 손잡이(0.14 밸런스): 단계를 켰으면 FLAGS.STAGE_GUARD, 아니면(또는 그 칸이 없으면) GUARD.floor · FLOW.guardPow(0.13.2) */
+  const stageGuard=k=>{const G=FLAGS.STAGES&&FLAGS.STAGE_GUARD;return G&&Number.isFinite(G[k])?G[k]:null};
+  const guardFloor=()=>{const v=stageGuard('floor');return v===null?GUARD.floor:v};
+  const guardPow=()=>{const v=stageGuard('pow');return v===null?FLOW.guardPow:v};
   /* 그 문제의 박(틱) */
   const beatTicks=(s,q)=>Math.max(10,Math.round(needSeconds(q)*FLOW.beat*Math.max(FLOW.paceFloor,Number(s&&s.pace)||100)/100/TICK));
   /* 한 번에 맞힌 정답이 주는 기운과 신바람 단계(streak = 이 정답까지의 연속 수, g = 찍기 막기 배수) */
   function flowGain(streak,fast,g){
     const n=streak|0,gg=Number.isFinite(g)?g:1;
-    return {credit:FLOW.credit*Math.pow(gg,FLOW.guardPow)*(1+(fast?FLOW.fast:0)+Math.min(FLOW.streakMax,FLOW.streak*Math.max(0,n-1))),boost:n>=FLOW.boost2||n>=FLOW.boost1&&fast?2:fast||n>=FLOW.boost1?1:0};
+    return {credit:FLOW.credit*Math.pow(gg,guardPow())*(1+(fast?FLOW.fast:0)+Math.min(FLOW.streakMax,FLOW.streak*Math.max(0,n-1))),boost:n>=FLOW.boost2||n>=FLOW.boost1&&fast?2:fast||n>=FLOW.boost1?1:0};
   }
   /* 농부가 알 n개를 매대에 내려놓음(World 'sold' 사건): 금화는 이때 생긴다. 매대가 부서져 있으면 반값(eggPrice) → 받은 금화 */
   function sellEggs(s,n){const g=Math.max(0,n|0)*eggPrice(s);s.gold+=g;return g}
@@ -123,7 +139,7 @@
   /* 상점 띠 2줄 × 4칸(위치 고정). 8번째 칸: 회관(자동 승급이면 살 수 없는 그림 칸) → 종이 열리면 종(값 없음) → 엔딩 뒤 자유 놀이에서는 잔치 */
   const SHOP=['repair','tower','power','fence','chicken','farmer','pond','hall'];
   const ORDER=['tower','fence','power','chicken','farmer','pond','hall','feast'];/* (0.8 카드 순서, offers 전용) */
-  const NUMS=['gold','level','fence','chickens','hidden','farmers','pond','hall','feast','wins','misses','index','help','late','repairs','broken','power','streak','nest','marketDown','pace','paced','seed'];
+  const NUMS=['gold','level','fence','chickens','hidden','farmers','pond','hall','feast','wins','misses','index','help','late','repairs','broken','power','streak','nest','marketDown','pace','paced','seed','bank'];/* bank = 이 판이 쓰는 문제은행 판(Questions.BANK_VERSION, 0 = 아직 안 정함) */
   /* 타워 강화 단계별 설명(지금 단계 → 다음 단계). 1~3단계 펑·큰 펑·세 갈래, 4~10단계 화살 피해 +1 */
   const POWER_NOTE=['펑! 터져서 둘레도 맞아요','더 크게 펑!','한 번에 세 마리!'].concat(Array(7).fill('화살이 더 세져요!'));
   /* 상식·수학·영어 문제: 생각하는 시간(초, 수학은 계산 시간 포함) */
@@ -138,7 +154,7 @@
   const freshRun=()=>({no:1,village:VILLAGES[0],built0:0,pack:{towers:0,hens:0},wolfMul:100,bell:0,bellQ:-1,prompts:0,shields:0,fq:0,fpick:[],steps:0,
     fox:0,foxSaved:0,foxLost:0,ok:[],miss:[],asked:0,first:0,lost:0,newOk:0,t0:0});
   const freshMeta=()=>({stamps:[],villages:[],acc:[],seenOk:[],from:0});
-  function fresh(age){return {gold:20,level:Math.max(0,(FLAGS.START_TOWERS|0)-1),fence:0,chickens:1,hidden:0,farmers:0,pond:0,hall:0,feast:0,wins:0,misses:0,index:0,help:0,late:0,repairs:0,broken:0,power:0,streak:0,nest:0,marketDown:0,pace:100,paced:0,seed:0,mode:'story',age:age||8,round:null,run:freshRun(),meta:freshMeta()}}
+  function fresh(age){return {gold:20,level:Math.max(0,(FLAGS.START_TOWERS|0)-1),fence:0,chickens:1,hidden:0,farmers:0,pond:0,hall:0,feast:0,wins:0,misses:0,index:0,help:0,late:0,repairs:0,broken:0,power:0,streak:0,nest:0,marketDown:0,pace:100,paced:0,seed:0,bank:0,mode:'story',age:age||8,round:null,run:freshRun(),meta:freshMeta()}}
   const runOf=s=>s.run||(s.run=freshRun()),metaOf=s=>s.meta||(s.meta=freshMeta());
   /* 숨은 상한(산 횟수). 아이에게 보이지 않는다. 타워 1+19=20 · 닭 1+19=20 · 농부 1+9=10 · 잔치 FEAST_MAX */
   const max=key=>key==='feast'?FLAGS.FEAST_MAX:key==='repair'?Infinity:ITEMS[key]?ITEMS[key].prices.length:0;
@@ -220,7 +236,7 @@
   const basket=s=>PAY.basket*(1+(s.farmers|0));
   const eggPrice=s=>{const full=PAY.egg+PAY.hall*clamp(0,3,s.hall|0);return s.marketDown?Math.max(1,Math.floor(full/2)):full};
   /* 찍기 막기 배수(ticks = 풀이 시작부터 맞힐 때까지 틱, 없으면 1) */
-  const guard=(q,ticks)=>Number.isFinite(ticks)&&ticks>=0?clamp(GUARD.floor,1,(ticks+1e-6)*TICK/(needSeconds(q)*FAST_MIN)):1;
+  const guard=(q,ticks)=>Number.isFinite(ticks)&&ticks>=0?clamp(guardFloor(),1,(ticks+1e-6)*TICK/(needSeconds(q)*FAST_MIN)):1;
   function income(s,q,fast,ticks){
     const hens=Math.max(0,s.chickens|0),laid=Math.max(0,hens-(s.hidden|0)),nest=Math.max(0,s.nest|0),cap=basket(s);
     const sold=Math.min(nest+laid,cap),left=Math.min(hens,nest+laid-sold),eggValue=eggPrice(s);
@@ -249,7 +265,8 @@
   /* 이번 판 기록: 푼 문제 수·한 번에 맞힌 수, 결전에 쓸 문제 번호 목록(결전 문제 자체는 넣지 않는다), 처음으로 한 번에 맞힌 문항(q.id, 별 3) */
   const pushCap=(list,v,cap)=>{if(!list.includes(v)){list.push(v);if(list.length>cap)list.splice(0,list.length-cap)}};
   function track(s,q,result,opt){
-    const r=runOf(s),m=metaOf(s),fin=!!(opt&&opt.finale);r.asked++;
+    /* opt.extra(수첩 MVP): 문제 번호를 넘기지 않고 끼워 넣은 특별 문제(쪽지·기억 늑대). 푼 수·한 번에 맞힌 수·새 글에는 세고, 결전 문제 후보 목록(ok·miss)에는 넣지 않는다 */
+    const r=runOf(s),m=metaOf(s),fin=!!(opt&&(opt.finale||opt.extra));r.asked++;
     if(result==='first'){r.first++;if(!fin)pushCap(r.ok,s.index|0,CAPS.ok);
       if(q&&typeof q.id==='string'&&!m.seenOk.includes(q.id)){m.seenOk.push(q.id);r.newOk++;if(m.seenOk.length>CAPS.seenOk)m.seenOk.splice(0,m.seenOk.length-CAPS.seenOk)}}
     else if(!fin)pushCap(r.miss,s.index|0,CAPS.miss);
@@ -264,7 +281,8 @@
       if(FLAGS.BELL_WINS_CAP)grow(s);
       return Object.assign({result,back},inc);
     }
-    s.streak=0;
+    /* opt.keepStreak(수첩 MVP): 기억 늑대가 다시 들고 온 글은 놓쳐도 연속(신바람)을 끊지 않는다. 한 번 놓친 글이라 또 놓치기 쉬운데, 그 때문에 평소 읽기의 신바람·금화가 줄지 않게(복습은 벌이 아니다) */
+    if(!o.keepStreak)s.streak=0;
     if(result==='second'){s.late=0;return {result}}
     const r=raid(s);s.hidden+=r.scared;s.misses++;
     if(o.timeout){s.late++;if(s.late>=2){s.help=Math.min(MAX_HELP,s.help+1);s.late=0}}else s.late=0;
@@ -444,7 +462,7 @@
     const o=opt||{},m=restoreMeta(metaOf(s)),n=fresh(s.age),k=Math.min(START_PACK.max,m.stamps.length);
     const last=m.villages[m.villages.length-1];if(last&&last.no===r.no)last.snap=snapOf(s);
     const pack={towers:k*START_PACK.perStamp.towers,hens:k*START_PACK.perStamp.hens};
-    n.level+=pack.towers;n.chickens=Math.min(HENS_MAX,n.chickens+pack.hens);n.meta=m;n.pace=s.pace;n.paced=s.paced|0;n.seed=o.seed>0?o.seed:0;
+    n.level+=pack.towers;n.chickens=Math.min(HENS_MAX,n.chickens+pack.hens);n.meta=m;n.pace=s.pace;n.paced=s.paced|0;n.seed=o.seed>0?o.seed:0;n.bank=o.bank>0?o.bank|0:0;/* 새 판은 최신 문제은행 판으로(화면이 넘겨 줌) */
     n.run=Object.assign(freshRun(),{no:r.no+1,village:villageOf(r.no+1),built0:pack.towers+pack.hens,pack,wolfMul:nextMul(s),t0:Number.isFinite(o.now)&&o.now>0?o.now:0});
     grow(n);return n;
   }
@@ -520,10 +538,10 @@
     return s;
   }
 
-  const api={API:4,SAVE_VERSION:3,STAGE_NAME,STAGE_MAX,stage,stageAt,stageCount,stageByCount,hallStage,stageInfo,FLAGS,FLOW,flowOn,beatTicks,flowGain,sellEggs,FINALE,FOX,MIGRATE,START_PACK,WOLF_MUL,VILLAGES,VILLAGE_NAME,villageOf,CAPS,FEAST,freshRun,freshMeta,builtNew,autoHall,bellBuilt,bellDue,grow,goldScale,track,lostHen,
+  const api={API:5,SAVE_VERSION:3,STAGE_NAME,STAGE_MAX,stage,stageAt,stageCount,stageByCount,hallStage,stageInfo,FLAGS,FLOW,flowOn,beatTicks,flowGain,sellEggs,FINALE,FOX,MIGRATE,START_PACK,WOLF_MUL,VILLAGES,VILLAGE_NAME,villageOf,CAPS,FEAST,freshRun,freshMeta,builtNew,autoHall,bellBuilt,bellDue,grow,goldScale,track,lostHen,
     bellPrompted,ringBell,finaleNow,finaleSettle,stars,finish,keepPlaying,nextMul,nextRun,foxDue,foxTicks,foxScareOnly,foxCame,foxEnded,restoreRun,restoreMeta,TICK,SPEED,MIN_SEC,MAX_SEC,SLACK,FENCE,HELP,FAST,FAST_BONUS,FAST_MIN,isFast,STREAK,BOUNTY,combo,DASH,DASH_TICKS,MAX_WOLVES,PACE,PAY,REPAIR,CURVE,ITEMS,SHOP,ORDER,POWER_NOTE,THINK,LINES,REC,units,
     HENS_MAX,TOWERS_MAX,FARMERS_MAX,syl,fresh,max,count,needSeconds,baseSeconds,limit,reveal,LEARN,learnTicks,scale,picks,built,wolves,basket,eggPrice,income,raid,settle,price,open,canBuy,buy,shopKeys,shop,recommend,offers,restore,
-    GUARD,guard,trackPace};
+    GUARD,guard,guardFloor,guardPow,trackPace};
   if(typeof module!=='undefined')module.exports=api;
   else root.Combat=api;
 })(typeof window!=='undefined'?window:globalThis);

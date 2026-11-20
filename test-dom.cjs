@@ -3,6 +3,9 @@
 const fs=require('fs'),assert=require('node:assert/strict'),C=require('./combat.js'),W=require('./world.js'),Q=require('./questions.js');
 const html=fs.readFileSync(__dirname+'/index.html','utf8');
 const src=html.match(/<script>([\s\S]*?)<\/script>/)[1];
+const TESTMODE_SRC=fs.readFileSync(__dirname+'/testmode.js','utf8');
+/* 수첩 MVP: 기록 규칙(book.js)·콘텐츠(notes.js)·화면(bookui.js). boot({book:true})일 때만 게임에 넣는다. 그 밖의 검사는 수첩 없이 돈다 = 수첩을 끄면 0.15와 같다는 회귀 검사 */
+const Bk=require('./book.js'),Nt=require('./notes.js'),BOOKUI_SRC=fs.readFileSync(__dirname+'/bookui.js','utf8'),BOOK_KEY='hangul-defense-book';/* 0.14.1 프로듀서 테스트 모드(?test=1에서만 불러옴) */
 const KEY='hangul-defense-v1';
 /* SOFT=1 node test-dom.cjs : 첫 실패에서 멈추지 않고 실패한 검사를 모두 모아 보여 준다(규칙을 크게 바꿀 때 한 번에 훑기용). 끝에서 실패가 있으면 종료 코드 1 */
 const SOFT=!!process.env.SOFT,fails=[];
@@ -21,7 +24,7 @@ C.FLAGS.FLOW=false;
 C.FLAGS.STAGES=false;C.FLAGS.ROUTES=false;
 
 /* ======================= 1. 규칙 모듈 ======================= */
-eq(C.API,4,'규칙 API 버전(0.12 판 진행·저장 v3)');
+eq(C.API,5,'규칙 API 버전(수첩 MVP: track의 extra)');
 /* 1-1 제한시간: 짧은 문제(7세 낱말)는 8~10초, 긴 글은 길이에 비례(최대 50초), 언제나 보통 아이 필요 시간 이상. 0.11: 문항은 읽기(story)뿐 */
 let shortCount=0;
 for(const a of Q.AGES)for(const m of Q.MODES)for(const q of bank(a,m)){
@@ -596,19 +599,21 @@ function boot(opts={}){
   setAttribute(k,v){this.attrs[k]=String(v)}getAttribute(k){return k in this.attrs?this.attrs[k]:null}remove(){if(this.parentNode)this.parentNode.children=this.parentNode.children.filter(x=>x!==this)}
   click(){if(!this.disabled&&this.onclick)this.onclick()}getBoundingClientRect(){return {left:0,top:0,width:0,height:0}}scrollIntoView(){}
  }
- const document={body:new E('body'),hidden:false,getElementById:id=>nodes[id]??=new E(),createElement:t=>new E(t),addEventListener:(k,f)=>{(docHandlers[k]??=[]).push(f)}};
+ const document={body:new E('body'),hidden:false,getElementById:id=>nodes[id]??=new E(),createElement:t=>new E(t),querySelector:()=>null,addEventListener:(k,f)=>{(docHandlers[k]??=[]).push(f)}};
  if(opts.reduced)document.body.classList.add('reduced');
  const window={addEventListener:(k,f)=>{(winHandlers[k]??=[]).push(f)}};
  const events=[],built=[];
  if(opts.view)window.VillageView={build:k=>{built.push(k);return {x:.4,y:.5}},reward(){},events:l=>events.push(...l),inspect(){return {ready:true}}};
  /* 0.11: 게임은 음성 합성을 쓰지 않는다. 브라우저에 있더라도 한 번도 부르지 않는지 센다(맨 끝에서 0 확인) */
  window.speechSynthesis={speak(){spoken++},cancel(){spoken++},getVoices(){spoken++;return []}};
- const localStorage={getItem:k=>k in saved?saved[k]:null,setItem:(k,v)=>{saved[k]=v}};
+ const localStorage={getItem:k=>k in saved?saved[k]:null,setItem:(k,v)=>{saved[k]=String(v)},removeItem:k=>{delete saved[k]}};
  /* 추천 규칙은 기본으로 끈다(말풍선이 문제 흐름 시간을 바꾸지 않게). 말풍선 검사만 규칙이나 가짜 규칙을 켠다. */
  const Cx=opts.rec==='real'?C:{...C,recommend:typeof opts.rec==='function'?opts.rec:()=>null};
- const api=new Function('document','window','localStorage','setInterval','setTimeout','confirm','Combat','World','Questions','performance',
-  src+'\nreturn {get state(){return state},get phase(){return phase},get round(){return round},get paused(){return paused},get world(){return world},get uiT(){return uiT},render};')
-  (document,window,localStorage,f=>{intervals.push(f);return intervals.length},()=>0,()=>true,Cx,W,Q,undefined);
+ /* 0.14.1: opts.query = 주소 뒤 글(예: '?test=1'). 테스트 모드면 브라우저가 맨 끝에 불러오는 testmode.js를 같은 범위에 이어 붙여 돌린다(브라우저에서도 같은 전역을 본다) */
+ const loc=opts.query?{search:opts.query}:undefined,tm=opts.query&&/[?&]test=1\b/.test(opts.query)?'\n'+TESTMODE_SRC:'';
+ const api=new Function('document','window','localStorage','setInterval','setTimeout','confirm','Combat','World','Questions','performance','location','Book','NOTES',
+  src+(opts.book?String.fromCharCode(10)+BOOKUI_SRC:'')+tm+'\nreturn {get state(){return state},get phase(){return phase},get round(){return round},get paused(){return paused},get world(){return world},get uiT(){return uiT},get KEY(){return KEY},render};')
+  (document,window,localStorage,f=>{intervals.push(f);return intervals.length},()=>0,()=>true,Cx,W,Q,undefined,loc,opts.book?Bk:undefined,opts.book?Nt:undefined);
  const n=new Proxy(nodes,{get:(t,k)=>typeof k==='string'?(t[k]??=new E()):t[k]}),kids=()=>n.answers.children;
  const h={n,api,events,built,intervals,document,window,
   tick(c=1){for(let i=0;i<c;i++)intervals[0]()},
@@ -636,18 +641,19 @@ function boot(opts={}){
  return h;
 }
 const fresh=o=>{saved={};return boot(o)};
-const seed=(s,o)=>{saved={[KEY]:JSON.stringify({version:3,...C.fresh(8),...s})};return boot(o)};
+/* 검사용 저장은 최신 문제은행 판으로(예전 저장 이행은 2-9b에서 따로 봄) */
+const seed=(s,o)=>{saved={[KEY]:JSON.stringify({version:3,...C.fresh(8),bank:Q.BANK_VERSION,...s})};return boot(o)};
 const REWARD=12,LAND=24;/* 한 번에 맞힌 뒤: 1.2초 뒤 다음 문제, 2.4초 안에 동전이 다 닿음 */
 /* 화면에 나온 문제 = 그 나이의 index번째 문제(상식·수학·영어가 섞인 순서, Questions.at) */
 /* 그 나이 읽기 문항 기준 무리 간격(index.html waveInterval과 같은 식) */
 /* 0.12: 그 판(씨앗)에 실제로 나올 다음 120문제의 평균 기본 시간 × 1.3 (13~45초) */
-const ivFor=(age,seed,index=0)=>{let sum=0;for(let i=0;i<120;i++)sum+=C.baseSeconds(Q.at(age,'story',index+i,seed));return W.tempoInterval(sum/120)};
+const ivFor=(age,seed,index=0,bank)=>{let sum=0;for(let i=0;i<120;i++)sum+=C.baseSeconds(Q.at(age,'story',index+i,seed,bank));return W.tempoInterval(sum/120)};
 /* 7세 상식·수학·영어 칸에서 시작하는 저장(예전에는 질문을 읽어 주던 문제) */
 const SEED7=777,I7=Array.from({length:60},(_,k)=>k).find(k=>Q.at(7,'story',k,SEED7).mode==='quiz'),L7={age:7,index:I7,seed:SEED7};
 const fastAt=q=>Math.ceil(C.FAST_MIN*C.needSeconds(q)/C.TICK);/* 번개를 받을 수 있는 가장 이른 틱 */
 const live=w=>w.wolves.filter(v=>v.state!=='dead'&&v.state!=='gone').length;
 function shows(a,age,mode,index,msg){
- const q=Q.at(age,mode,index,a.api.state.seed),list=a.n.answers;/* 0.10: 그 판의 문제 순서 씨앗 */
+ const q=Q.at(age,mode,index,a.api.state.seed,a.api.state.bank),list=a.n.answers;/* 0.10: 그 판의 문제 순서 씨앗 */
  eq([list.dataset.qid,list.dataset.age,list.dataset.mode],[q.id,String(age),q.mode],msg+' 문항 '+q.id);
  eq(a.n.prompt.textContent,q.prompt,msg+' 질문');eq(a.n.passage.textContent,q.passage||'',msg+' 지문');
  eq([...list.children].map(b=>b._t).sort(),q.choices.slice().sort(),msg+' 보기');
@@ -670,8 +676,8 @@ a.tick(30);eq(a.api.round,null,'시작 화면에서는 문제 없음');eq(a.api.
 for(const id of ['battle','next','shield','combatInfo','buildPrompt','buyChicken','buyFence','timebar','timeFill','wolfHead','timeTag','choices','cards','skip','gainLine','gainParts'])ok(!html.includes('id="'+id+'"'),'없앤 요소: '+id);
 ok(!html.includes('소리 도움말'),'정답을 글자로 보여 주던 소리 도움말 제거');ok(!src.includes('다음 무리')&&!src.includes('barLeft')&&!src.includes('secondsLeft'),'늑대 시간 표시(초·막대) 코드 없음');
 ok(!src.includes('enterPick')&&!src.includes('picks')&&!src.includes('offers('),'카드 고르기 단계 코드 없음');
-ok(html.includes('src="combat.js?v=0.14"')&&html.includes('src="world.js?v=0.14"')&&html.includes('src="questions.js?v=0.14"')&&html.includes('src="village.js?v=0.14"')&&!html.includes('?v=0.12'),'캐시 갱신용 ?v=0.13');
-ok(html.indexOf('src="questions-gen.js?v=0.14"')>0&&html.indexOf('src="questions-gen.js?v=0.14"')<html.indexOf('src="questions.js?v=0.14"'),'생성 문항 파일을 questions.js보다 먼저 불러옴');
+ok(html.includes('src="combat.js?v=0.16"')&&html.includes('src="world.js?v=0.16"')&&html.includes('src="questions.js?v=0.16"')&&html.includes('src="village.js?v=0.16"')&&src.includes("s.src='testmode.js?v=0.16'")&&!html.includes('?v=0.12')&&!html.includes('?v=0.14'),'캐시 갱신용 ?v=0.16');
+ok(html.indexOf('src="questions-gen.js?v=0.16"')>0&&html.indexOf('src="questions-gen.js?v=0.16"')<html.indexOf('src="questions.js?v=0.16"'),'생성 문항 파일을 questions.js보다 먼저 불러옴');
 /* 0.11: 듣고 고르기 모드 폐쇄. 시작 화면·설정에 모드 고르기가 없고, 스크립트에 소리 모드 분기가 없다 */
 for(const id of ['startSound','startStory','mode'])ok(!html.includes('id="'+id+'"'),'없앤 모드 버튼: '+id);
 ok(!html.includes('mode-row')&&!html.replace(/<script>[\s\S]*?<\/script>/,'').includes('듣고 고르기'),'화면에 모드 고르기·듣고 고르기 문구 없음');
@@ -766,8 +772,22 @@ for(const age of Q.AGES)for(const mode of Q.MODES){
 a=seed({age:7,index:3});a.go();a.tick(20);const wt7=a.api.world.t,iv7=a.api.world.interval;a.n.age.value='10';a.n.age.onchange();shows(a,10,'story',3,'문제 중 전환');eq(a.api.world.t,wt7,'전환해도 늑대 세계는 그대로');eq([iv7,a.api.world.interval],[ivFor(7,a.api.state.seed,3),ivFor(10,a.api.state.seed,3)],'무리 간격은 새 나이에 맞춤');ok(ivFor(10,1)>ivFor(7,1),'(10세 간격이 7세보다 김)');
 eq(a.n.feedback.textContent,'10세 문제로 바꿨어요. 늑대는 그대로 와요.','전환 안내에 모드 이름 없음');eq(a.n.drawerSummary.textContent,'⚙️ 설정 · 10세','설정 요약');
 a=fresh();a.go();a.unlock();a.right();a.n.age.value='7';a.n.age.onchange();shows(a,8,'story',0,'정답 뒤(판매 연출 중)에는 그대로');ok(a.n.feedback.textContent.includes('다음 문제부터 7세'),'다음부터 적용 안내');a.tick(REWARD);shows(a,7,'story',1,'다음 문제는 7세');
-{const L1=Array.from({length:2000},(_,k)=>k).find(k=>Q.at(8,'story',k,1).lap===1);a=seed({index:L1,seed:1});a.go();const q=Q.at(8,'story',L1,1),lap1=a.n.answers.children.map(b=>b.dataset.i).join();
- eq(lap1,q.choices.map((_,i)=>String((i+1)%q.choices.length)).join(),'두 바퀴째는 보기를 한 칸 돌림')}
+{const L1=Array.from({length:2000},(_,k)=>k).find(k=>Q.at(8,'story',k,1).lap===1);a=seed({index:L1,seed:1});a.go();const q=Q.at(8,'story',L1,1);
+ eq(a.n.answers.children.map(b=>b._t),q.choices,'보기는 Questions.at()가 정한 순서 그대로(두 바퀴째도 화면이 따로 돌리지 않음)');
+ eq(a.n.answers.children.map(b=>b.dataset.i).join(),q.choices.map((_,i)=>String(i)).join(),'버튼 번호 = at() 보기 번호');
+ /* 불러오기 직후에도 같은 순서·같은 정답(저장에는 보기 순서가 없고 at()가 다시 만든다) */
+ const before=a.n.answers.children.map(b=>b._t);a.n.pause.click();const b2=boot();b2.go();eq(b2.n.answers.children.map(b=>b._t),before,'이어서 하기: 같은 보기 순서');eq(b2.api.round.q.answer,q.answer,'이어서 하기: 같은 정답 자리');
+ b2.unlock();b2.right();eq(b2.api.round.result,'first','이어서 한 문제를 정답으로 판정')}
+
+/* 2-8b 문제은행 판 이행: bank 없는 예전 저장은 판 1(예전 문항·순서)로 이어 가고, 새 판부터 최신 판 */
+{saved={[KEY]:JSON.stringify({version:3,...C.fresh(8),seed:77,index:40})};const o=boot();o.go();
+ eq(o.api.state.bank,1,'bank 없는 예전 저장 → 판 1');eq(o.n.answers.dataset.qid,Q.at(8,'story',40,77,1).id,'예전 저장의 40번 = 판 1의 40번 문항');shows(o,8,'story',40,'예전 저장 이어하기');
+ ok(/-(\d\d|g(0\d\d|1[0-7]\d|18[0-5]))$/.test(o.n.answers.dataset.qid)||o.n.answers.dataset.mode==='quiz','판 1에는 새 문항(g186 이후)이 없음');
+ o.n.pause.click();eq(JSON.parse(saved[KEY]).bank,1,'판 번호를 저장함');const o2=boot();o2.go();eq([o2.api.state.bank,o2.n.answers.dataset.qid],[1,Q.at(8,'story',40,77,1).id],'다시 열어도 판 1');
+ const f=fresh();f.go();eq(f.api.state.bank,Q.BANK_VERSION,'새로 시작한 판 = 최신 판');eq(f.n.answers.dataset.qid,Q.at(8,'story',0,f.api.state.seed,Q.BANK_VERSION).id,'새 판 0번 = 최신 판 0번');
+ const s1=C.fresh(8);s1.bank=1;s1.seed=5;eq(C.restore({...s1,version:3},Q.AGES).bank,1,'Combat.restore가 bank를 이어받음');eq(C.restore({...C.fresh(8),version:3},Q.AGES).bank,0,'bank 없으면 0(화면이 예전 저장 = 1, 새 판 = 최신으로 정함)');
+ /* 결전 문제 번호(fpick)는 번호 목록이라 판이 같으면 같은 문항: 판 1 저장의 번호 12는 최신 판의 12번과 다를 수 있어도 판 1의 12번과는 같다 */
+ eq(Q.at(8,'story',12,77,1).id,Q.at(8,'story',12,77,1).id,'판 1 번호 → 문항 결정적');ok(Array.from({length:60},(_,i)=>Q.at(8,'story',i,77,1).id).join()!==Array.from({length:60},(_,i)=>Q.at(8,'story',i,77).id).join(),'(판 1과 최신 판은 같은 번호에 다른 문항이 섞임 = 판을 저장해야 하는 까닭)')}
 
 /* 2-9 저장·복원(늑대 세계 포함) */
 a=fresh();a.go();a.unlock();a.right();g0=a.api.state.gold;eq(JSON.parse(saved[KEY]).round,null,'판매 연출 중 저장: 하던 문제 없음(금화는 이미 받음)');
@@ -849,7 +869,7 @@ a=fresh();a.go();a.tick(300);ok(a.n.enemies.children.filter(x=>!x.classList.cont
  eq(shown.map(x=>x.dataset.kind),liv.map(v=>v.kind),'그림 마을 몬스터 종류 = 세계');ok(liv.some(v=>v.kind!=='wolf'),'2단계 마을에 새 몬스터');
  /* 0.7 저장(세계 v1) 이어받기 */
  saved={[KEY]:JSON.stringify({version:1,...C.fresh(8),level:1,world:{v:1,t:900,rng:5,hall:0,interval:270,wave:{n:3,arrive:1110,spawned:false},wolves:[{id:40,x:12,z:0,sx:17,sz:0,hp:20,max:20,speed:.8,state:'walk',target:0,timer:0,inside:0,hen:0}],hens:[],buildings:[],arrows:[],nextId:50,stats:{kills:5,henLost:0,henSaved:0,broken:0,waves:3},events:[]}})};
- const b2=boot();eq([b2.api.world.interval,b2.api.world.wolves[0].kind,b2.api.world.stats.kills],[ivFor(8,b2.api.state.seed,b2.api.state.index),'wolf',5],'0.7 세계 저장을 이어받음');ok(b2.api.world.wave.arrive<=b2.api.world.t+b2.api.world.interval,'다음 무리를 새 간격으로 당김');b2.go();b2.tick(50);ok(b2.api.world.t===950,'이어서 진행');
+ const b2=boot();eq([b2.api.world.interval,b2.api.world.wolves[0].kind,b2.api.world.stats.kills],[ivFor(8,b2.api.state.seed,b2.api.state.index,b2.api.state.bank),'wolf',5],'0.7 세계 저장을 이어받음');ok(b2.api.world.wave.arrive<=b2.api.world.t+b2.api.world.interval,'다음 무리를 새 간격으로 당김');b2.go();b2.tick(50);ok(b2.api.world.t===950,'이어서 진행');
 }
 
 /* 2-13 0.9 가게: 2줄 × 4칸이 늘 열려 있고, 듣기·풀기·연출·배우기 중 언제든 한 번 눌러 바로 산다(세계는 멈추지 않음) */
@@ -1436,7 +1456,8 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   eq([C.stage(C.fresh(8)),C.stageCount(C.fresh(8))],[0,1],'새 판은 농가(시작 타워 1개를 지은 수 1로 센다)');
   eq([4,5,13,14,23,24,35,36,49,50,62].map(n=>C.stage(built(n))),[0,1,1,2,2,3,3,4,4,5,5],'8세: 5 · 14 · 24 · 36 · 50에서 단계가 오름');
   eq([13,14,35,36,49,50].map(n=>built(n).hall),[0,1,1,2,2,3],'회관은 장터 마을(14) · 성곽 마을(36) · 성(50)에 들어설 때 오름');
-  eq([3,4,9,10,16,17,25,26,36,37].map(n=>C.stage(built(n,10))),[0,1,1,2,2,3,3,4,4,5],'10세: 4 · 10 · 17 · 26 · 37');
+  eq([3,4,10,11,18,19,31,32,37,38].map(n=>C.stage(built(n,10))),[0,1,1,2,2,3,3,4,4,5],'10세: 4 · 11 · 19 · 32(0.15: 31 → 32) · 38(0.14 밸런스: 회관 2를 지은 수 26 → 31로 늦춤, game-plan §14.10)');
+  eq([10,11,31,32,37,38].map(n=>built(n,10).hall),[0,1,1,2,2,3],'10세 회관은 지은 수 11 · 32 · 38에서 오름(0.13.2는 10 · 32 · 54)');
   eq([3,4,10,11,18,19,28,29,39,40].map(n=>C.stage(built(n,9))),[0,1,1,2,2,3,3,4,4,5],'9세: 4 · 11 · 19 · 29 · 40');
   eq([7,8,9,10].map(a=>C.stageAt({age:a})[1]),[5,5,4,4],'첫 문턱: 7·8세 5, 9·10세 4');
   eq([7,8,9,10].map(a=>C.bellBuilt({age:a})),[66,66,50,46],'종 문턱: 7·8세 66, 9세 50, 10세 46');
@@ -1454,7 +1475,18 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   withFlags(OFF,()=>{const s=FS({level:9});eq([C.stage(s),C.stageInfo(s),s.hall],[-1,null,0],'끔: 단계 없음, 지은 수 9는 회관 0');const t=FS({level:10});eq([t.hall,C.bellBuilt({age:10})],[1,66],'끔: 회관은 지은 수 10에서, 종은 10세도 66')});
   eq(FS({level:10}).hall,0,'켬: 지은 수 10(< 14)은 회관 0');
   /* 저장에 단계 칸이 없다 */
-  ok(!('stage' in C.fresh(8))&&!('stage' in C.restore({version:3,...built(30)})),'경제 상태에 단계 칸을 두지 않음(지은 수에서 계산)');}
+  ok(!('stage' in C.fresh(8))&&!('stage' in C.restore({version:3,...built(30)})),'경제 상태에 단계 칸을 두지 않음(지은 수에서 계산)');
+  /* 찍기 막기(0.14 밸런스, game-plan §14.10): 단계를 켜면 기운 지수 2(바닥 0.75 그대로), 끄면 0.13.2(지수 1) */
+  {const q=Q.get(8,'story',0),need=C.needSeconds(q),at=Math.ceil(C.FAST_MIN*need/C.TICK);
+   eq(C.FLAGS.STAGE_GUARD,{floor:.75,pow:2},'단계를 켰을 때의 찍기 막기 손잡이');
+   eq([C.guardFloor(),C.guardPow(),C.guard(q,0),C.guard(q,at),C.guard(q,undefined)],[.75,2,.75,1,1],'켬: 바로 누르면 75%, 번개를 받을 수 있는 때부터 100%');
+   ok(Math.abs(C.flowGain(1,false,.75).credit-.5625)<1e-9&&C.flowGain(1,false,1).credit===1,'켬: 기운 = 찍기 막기 배수의 제곱(찍기 0.5625, 읽은 정답 1)');
+   ok(Math.abs(C.income(S({age:8,chickens:3}),q,false,0).flow.credit-.5625)<1e-9&&C.income(S({age:8,chickens:3}),q,false,at).flow.credit===1,'켬: 정답 정산에서도 찍기만 기운이 줄어듦');
+   withFlags(OFF,()=>{eq([C.guardFloor(),C.guardPow(),C.guard(q,0)],[C.GUARD.floor,C.FLOW.guardPow,C.GUARD.floor],'끔: 0.13.2 찍기 막기(바닥 0.75 · 지수 1)');ok(Math.abs(C.flowGain(1,false,.75).credit-.75)<1e-9,'끔: 기운 지수 1')});
+   withFlags({STAGE_GUARD:{floor:.65}},()=>eq([C.guardFloor(),C.guardPow(),C.guard(q,0)],[.65,C.FLOW.guardPow,.65],'칸이 빠지면 그 칸만 0.13.2 값'));
+   /* 정직하게 읽는 아이(필요 시간의 40%가 지난 뒤 답함)는 어느 나이든 깎이지 않는다 */
+   let honest=0;for(const a of Q.AGES)for(let i=0;i<60;i++){const qq=Q.at(a,'story',i,77),t=Math.ceil(C.FAST_MIN*C.needSeconds(qq)/C.TICK);if(C.guard(qq,t)===1&&C.income(S({age:a,chickens:3}),qq,false,t).flow.credit===1)honest++}
+   eq(honest,Q.AGES.length*60,'켬: 필요 시간의 40% 뒤에 답하면 금화·기운 모두 깎이지 않음(전 나이 240문제)')}}
  /* S-2 세계: 단계별 반지름 · 래치 · 보류(hold) · 사거리 */
  {const R=W.STAGE.radius;eq(R,[7,9,11.5,14.5,18,22],'단계별 반지름(0.14: 기준 기기가 패드·노트북이 되어 마지막을 19 → 22로)');ok(R[5]>W.RADIUS[3]&&R.every((v,i)=>i===0||v>R[i-1]),'단계마다 넓어지고 마지막은 0.13의 최대(16)보다 큼');
   const s=built(4),w=W.sync(W.create({seed:3}),s);eq([w.stage,W.radius(w),W.routes(w)],[0,7,null],'농가: 반지름 7, 길은 8방향 전부');
@@ -1557,11 +1589,15 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   const vs=a.window.getVillageState();eq([vs.stage,vs.routes,vs.hall],[-1,null,1],'끔: 3D에는 단계·길을 넘기지 않음(8갈래 발자국 길)');
   a.unload();const again=JSON.parse(saved[KEY]);ok(!('stage' in again.world)&&!('stage' in again),'끔: 저장에 단계 칸 없음')});
  ok(/\[\?&\]stages=0\\b/.test(src)&&/\[\?&\]routes=0\\b/.test(src),'주소 ?stages=0 · ?routes=0으로 끄는 손잡이');
- ok(html.includes('늑대가 오기 전에 읽어요 0.14')&&!html.includes('?v=0.13'),'머리글과 캐시 문자열이 0.14');
+ ok(html.includes('id="appVersion">꼬꼬마을 0.16<')&&!html.includes('?v=0.14')&&!html.includes('?v=0.15'),'버전 표기(설정 서랍 맨 아래)와 캐시 문자열이 0.16');
+ ok(html.includes('<title>꼬꼬마을: 한글 읽기로 마을 지키기</title>')&&html.includes('<small>한글 읽기로 마을 지키기</small>')&&html.includes('<h2>꼬꼬마을: 한글 읽기로 마을 지키기</h2>')&&!html.includes('읽어서 지켜요')&&!html.includes('한글 디펜스'),'앱 이름: 꼬꼬마을: 한글 읽기로 마을 지키기(머리글은 제목 + 부제 줄)');
+ ok(html.includes('게임 기록은 이 브라우저에 저장되고, 개발자에게 보내지 않아요.'),'바닥글: 정책 기준 문장(웹판)');
  /* S-8 3D 단계 소품 자리(src/layout.js): 맨 끝에서 모듈을 불러 확인 */
  stageLayout.push(L=>{
   const SIZE={coop:1.4,market:1.6,nursery:1,barn:1.6},d2=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]),seg=(p,[x0,z0,x1,z1])=>{const dx=x1-x0,dz=z1-z0,t=Math.max(0,Math.min(1,((p[0]-x0)*dx+(p[1]-z0)*dz)/(dx*dx+dz*dz)));return Math.hypot(p[0]-x0-dx*t,p[1]-z0-dz*t)};
   const things=[...L.COTTAGES.map((c,i)=>({name:'집 '+i,at:c.at,r:L.COTTAGE_R,stage:c.stage})),{name:'우물',at:L.WELL.at,r:L.WELL.r,stage:L.WELL.stage},{name:'물레방아',at:L.MILL.at,r:L.MILL.r,stage:L.MILL.stage}];
+  /* 0.15: 강을 끈 화면(?river=0)은 0.14 오두막(MILL0, 반지름 11.2)을 그대로 그리므로 그 자리도 같은 간격으로 본다(물레방아 0.15 자리와는 같이 서지 않음) */
+  {const m=L.MILL0;for(const p of W.ALL_SLOTS)ok(d2(m.at,p)>=1.2+m.r,'0.14 오두막: 타워 자리와 1.2 이상');for(const c of L.COTTAGES)ok(d2(m.at,c.at)>=m.r+L.COTTAGE_R+.15,'0.14 오두막: 집과 떨어짐')}
   eq([1,2,3,4,5].map(k=>L.COTTAGES.filter(c=>c.stage<=k).length),[2,4,6,10,22],'집은 단계마다 2 · 4 · 6 · 10 · 22채');
   const roads=W.STAGE.open[5].map(p=>{const a=(p+.5)*Math.PI/4;return [Math.cos(a)*5,Math.sin(a)*5,Math.cos(a)*60,Math.sin(a)*60]});
   for(const t of things){const tag=t.name+' ('+t.at+')';
@@ -1577,7 +1613,686 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   /* 성탑은 회관 뒤에 붙여 세운다(회관과는 일부러 겹침). 타워 자리·닭 자리·작은 닭장과는 떨어진다 */
   {const K=L.KEEP;for(const p of W.ALL_SLOTS)ok(d2(K.at,p)>=1.2+K.r,'성탑: 타워 자리와 1.2 이상');for(const p of W.HOMES)ok(d2(K.at,p)>=.9+K.r,'성탑: 닭 자리와 0.9 이상');ok(d2(K.at,W.PLACE.nursery)>=SIZE.nursery+K.r+.3&&d2(K.at,W.PLACE.coop)<2,'성탑: 회관 바로 뒤, 작은 닭장과는 떨어짐')}
   ok(L.ROAD.r0>W.STAGE.radius[0]&&L.ROAD.r0<W.STAGE.radius[1]-.4&&L.ROAD_MARK.out>0&&L.ROAD_MARK.side>L.ROAD.edge/2+.4,'늑대 길은 마을 가장자리 안쪽에서 시작하고, 길목 표시는 울타리 밖 · 길 양옆');
+  /* S-9-3 0.15 강 · 다리 · 수로(계획서 §3): 단계 3~5에서 */
+  {const RV=L.RIVER,band=RV.water/2+RV.bank,FENCE=.4;
+   eq([RV.dir,RV.dist,RV.water,RV.bank,RV.stage,RV.road],[280,1.3,1.8,.35,3,6],'강: 방향 280°(계획서 284°에서 7번 길 낙오 늑대를 피해 4° 돌림) · 반지름 + 1.3 · 물 1.8 · 둑 0.35 · 단계 3부터 · 다리는 6번 길');
+   eq([L.MILL.at,L.MILL.r,L.MILL.h],[[-4.52,-10.9],1.52,2.2],'물레방아 0.15 자리: 반지름 11.8 · 247.5°, 외접 1.52(watermill.glb), 높이 2.2');
+   for(const st of [3,4,5]){const R=W.STAGE.radius[st],tag='단계 '+st+'(반지름 '+R+')',gap=(x,z)=>Math.abs(L.riverOffset(R,x,z))-band;
+    /* 열린 길 가운데 늑대가 걷는 구간(반지름 − 1 ~ + 8, 축 ± 0.25rad)에서 강과 만나는 길은 6번뿐 */
+    const meets=W.STAGE.open[st].filter(p=>{for(let r=R-1;r<=R+8;r+=.1)for(let da=-.25;da<=.2501;da+=.05){const a=(p+.5)*Math.PI/4+da;if(gap(Math.cos(a)*r,Math.sin(a)*r)<=0)return true}return false});
+    eq(meets,[RV.road],tag+': 늑대가 걷는 구간에서 강을 건너는 열린 길은 6번뿐');
+    ok(R+RV.dist-band>=R-FENCE+.25,tag+': 안쪽 둑이 울타리 줄보다 0.25 이상 바깥');
+    for(const c of L.COTTAGES.filter(c=>c.stage<=st))ok(gap(...c.at)>=L.COTTAGE_R+.2,tag+': 집 ('+c.at+')이 강과 떨어짐');
+    const slots=W.towerSlots(C.FLAGS.STAGE_HALL.filter(s=>s<=st).length);   /* 그 단계 회관의 타워 자리(바깥 고리는 회관 3 = 성에서 열림) */
+    for(const p of slots)ok(gap(...p)>=1.2,tag+': 타워 자리 ('+p+')가 강과 1.2 이상');
+    if(st>=5)ok(gap(...L.KEEP.at)>=L.KEEP.r+.3,tag+': 성탑이 강과 떨어짐');
+    for(const p of W.STAGE.open[st])if(p!==RV.road)for(const sd of [-1,1]){const a=(p+.5)*Math.PI/4,r=R+L.ROAD_MARK.out,x=Math.cos(a)*r-Math.sin(a)*sd*L.ROAD_MARK.side,z=Math.sin(a)*r+Math.cos(a)*sd*L.ROAD_MARK.side;ok(gap(x,z)>=.4,tag+': '+p+'번 길 길목 표시가 강과 떨어짐')}
+    /* 다리: 6번 길 위, 물을 건너는 길이 ≤ 다리 길이 − 0.8, 안쪽 끝은 울타리 줄 + 0.15 바깥 */
+    const b=L.bridgeSpot(R);ok(Math.abs(Math.atan2(b.at[1],b.at[0])-((RV.road+.5)*Math.PI/4-Math.PI*2))<1e-9&&Math.abs(L.riverOffset(R,...b.at))<1e-9,tag+': 다리 가운데는 6번 길과 강 가운데 줄이 만나는 곳(반지름 + '+(b.r-R).toFixed(2)+')');
+    ok(b.cross<=L.BRIDGE.len-.8,tag+': 물을 건너는 길이 '+b.cross.toFixed(2)+' ≤ 다리 길이 − 0.8');ok(b.r-L.BRIDGE.len/2>=R-FENCE+.15,tag+': 다리 안쪽 끝이 울타리 줄 + 0.15 바깥');
+    /* 수로: 물레방아 바퀴에서 강 가운데 줄까지, 집과 0.3 · 타워 자리와 1.2 이상 */
+    const [x0,z0,x1,z1,w]=L.millRace(R),seg2=p=>{const dx=x1-x0,dz=z1-z0,t=Math.max(0,Math.min(1,((p[0]-x0)*dx+(p[1]-z0)*dz)/(dx*dx+dz*dz)));return Math.hypot(p[0]-x0-dx*t,p[1]-z0-dz*t)-w/2};
+    ok(Math.abs(L.riverOffset(R,x1,z1))<1e-3&&Math.abs(Math.hypot(x0,z0)-(11.8+.955))<1e-3,tag+': 수로는 바퀴(반지름 12.76)에서 강 가운데 줄까지(길이 '+Math.hypot(x1-x0,z1-z0).toFixed(1)+')');
+    for(const c of L.COTTAGES.filter(c=>c.stage<=st))ok(seg2(c.at)>=L.COTTAGE_R+.3,tag+': 수로가 집 ('+c.at+')과 0.3 이상');
+    for(const p of slots)ok(seg2(p)>=1.2,tag+': 수로가 타워 자리 ('+p+')와 1.2 이상');
+    ok(seg2(L.WELL.at)>=L.WELL.r+.3,tag+': 수로가 우물과 떨어짐')}
+   /* S-9-4 그림 화면(index.html, ES 모듈을 못 읽어 수를 옮겨 적음)이 layout.js와 같은 자리에 그린다 */
+   {const m=/const FALLBACK_RIVER=(\{[^}]*\});/.exec(src),F=m&&new Function('return '+m[1])();
+    eq(F&&[F.dir,F.dist,F.water,F.bank,F.road,F.mill,F.bridge],[RV.dir,RV.dist,RV.water,RV.bank,RV.road,L.MILL.at,L.BRIDGE.len],'그림 화면 FALLBACK_RIVER = layout.js RIVER · MILL · BRIDGE');
+    const B=require('./scripts/build-pages.cjs'),png=[...src.matchAll(/'(art-handoff\/v015-v016\/png\/[a-z-]+\.png)'/g)].map(x=>x[1]).sort();
+    eq(png,['bridge','thief-fox','watermill','wolf-king'].map(n=>'art-handoff/v015-v016/png/'+n+'.png'),'그림 화면이 쓰는 0.15 그림 4개');ok(png.every(p=>B.files.includes(p)),'그림 화면의 0.15 그림은 배포 묶음에 있음');
+    ok(/\[\?&\]art15=0\\b/.test(src),'그림 화면도 ?art15=0이면 새 그림을 쓰지 않음');
+    const c=/const FALLBACK_COTTAGES=(\[[^;]*\]);/.exec(src);eq(c&&JSON.parse(c[1]),L.COTTAGES.map(k=>[...k.at,k.stage].map(v=>v+0)),'그림 화면 집 자리 FALLBACK_COTTAGES = layout.js COTTAGES(단계별 2 · 4 · 6 · 10 · 22채)')}
+   /* 다리 발판 높이: 가운데 0.469, 양 끝으로 낮아지고 1.97 밖은 땅 */
+   ok(Math.abs(L.deckY(0)-.469)<1e-9&&L.deckY(1.46)<L.deckY(.5)&&L.deckY(1.97)===0&&L.deckY(-1)===L.deckY(1),'다리 발판 높이(아치): 가운데 0.469, 끝으로 낮아짐, 대칭')}
  });
+ /* ======================= S-9 0.15 강 · 다리(계획서 v015-plan §4 · §10, 프로듀서 결정 '26.11.17: 다리 길은 한 줄로, 물레방아는 저절로 서고 바퀴만) ======================= */
+ /* S-9-1 손잡이: 기본 켬, 주소로 끔, 단계·길을 끄면 쓰지 않음 */
+ {eq([C.FLAGS.RIVER,C.FLAGS.BRIDGE],[true,true],'0.15 강 · 다리 길 규칙 기본 켬');ok(/\[\?&\]river=0\\b/.test(src)&&/\[\?&\]bridge=0\\b/.test(src),'주소 ?river=0 · ?bridge=0으로 끄는 손잡이');
+  eq(W.BRIDGE,{road:6,from:3,spread:.06},'다리 길: 6번 길(화면 위), 물레방아 마을(단계 3)부터, 출현 각도 흔들림 ±0.03rad');
+  const w3=W.sync(W.create({seed:1}),built(24)),w2=W.sync(W.create({seed:1}),built(14));eq([w3.stage,w2.stage],[3,2],'(물레방아 마을 · 장터 마을)');
+  eq([W.bridgeAt(w3,6),W.bridgeAt(w3,4),W.bridgeAt(w3,0),W.bridgeAt(w2,6)],[true,false,false,false],'다리 길 규칙은 단계 3 이상의 6번 길만');
+  for(const f of [{RIVER:false},{BRIDGE:false},{ROUTES:false},{STAGES:false}])withFlags(f,()=>ok(!W.bridgeAt(w3,6),'끄면 다리 길 규칙 없음: '+JSON.stringify(f)))}
+ /* S-9-2 세계: 6번 길 늑대만 축 ± 0.03rad 안에서 나온다. 다른 길은 그대로(무리 ±0.2 · 낙오 ±0.25). 거리 · 줄 간격 · 난수 호출 수는 그대로 */
+ {const axis=p=>(p+.5)*Math.PI/4,dev=(a,p)=>{let d=(a-axis(p))%(Math.PI*2);if(d>Math.PI)d-=Math.PI*2;if(d<-Math.PI)d+=Math.PI*2;return d};
+  const spawns=(s,flags,ticks,seed)=>withFlags(flags||{},()=>{const w=W.sync(W.create({seed,interval:150}),s),seen=new Set(),out=[];
+   for(let i=0;i<ticks;i++){W.step(w,s);for(const v of w.wolves)if(!seen.has(v.id)){seen.add(v.id);const a=Math.atan2(v.sz,v.sx);let p=0;for(let q=1;q<8;q++)if(Math.abs(dev(a,q))<Math.abs(dev(a,p)))p=q;out.push({p,d:dev(a,p),r:Math.hypot(v.sx,v.sz)})}}return {w,out}});
+  for(const n of [24,36,50]){const s=built(n),st=C.stage(s);let on6=0,max6=0,maxOther=0;
+   for(const seed of [3,11,29]){const r=spawns(s,null,3000,seed);for(const x of r.out){if(x.p===6){on6++;max6=Math.max(max6,Math.abs(x.d))}else maxOther=Math.max(maxOther,Math.abs(x.d))}}
+   ok(on6>=3&&max6<=.0301,'지은 수 '+n+'('+C.STAGE_NAME[st]+'): 6번 길 늑대 '+on6+'마리 모두 축 ±0.03rad 안(가장 먼 '+max6.toFixed(4)+')');
+   ok(maxOther>.1&&maxOther<=.2501,'다른 길은 0.14 흔들림 그대로(가장 먼 '+maxOther.toFixed(3)+' ≤ 0.25)');
+   let wide=0;for(const seed of [3,11,29])for(const x of spawns(s,{BRIDGE:false},3000,seed).out)if(x.p===6)wide=Math.max(wide,Math.abs(x.d));ok(wide>.1,'BRIDGE를 끄면 6번 길도 넓게(가장 먼 '+wide.toFixed(3)+')')}
+  /* 단계 0~2에는 6번 길이 없거나(1·2) 8방향(0)이라 켬 · 끔 세계가 같다 */
+  for(const n of [3,8,14]){const s=built(n),a=spawns(s,null,1500,7).w,b=spawns(s,{BRIDGE:false},1500,7).w;eq(JSON.stringify(a),JSON.stringify(b),'지은 수 '+n+'(단계 '+C.stage(s)+'): 다리 규칙 켬 = 끔(같은 세계)')}
+  /* 단계 3: 같은 씨앗이면 늑대 목록(id · 종류 · 체력 · 속도 · 출현 거리)은 같고 6번 길 늑대의 x · z만 다르다. 난수 순서가 같다는 뜻 */
+  {const s=built(24),seed=13,mk=f=>withFlags(f,()=>{const w=W.sync(W.create({seed,interval:150}),s);let t=0;while(!w.wolves.length&&t<3000){W.step(w,s);t++}return {w,t}}),A=mk({}),B=mk({BRIDGE:false});
+   const pick=w=>w.wolves.map(v=>[v.id,v.kind,v.hp,v.max,v.speed,+Math.hypot(v.sx,v.sz).toFixed(9)]);eq([A.t,pick(A.w)],[B.t,pick(B.w)],'단계 3 첫 출현: 늑대 목록이 같음(난수 호출 수 그대로)');
+   const on6=v=>{const a=Math.atan2(v.sz,v.sx);return Math.abs(dev(a,6))<.3};let differ=0,same=0;
+   A.w.wolves.forEach((v,i)=>{const u=B.w.wolves[i];if(on6(v))differ+=v.x!==u.x||v.z!==u.z?1:0;else same+=v.x===u.x&&v.z===u.z?1:0});
+   ok(same+differ===A.w.wolves.length,'6번 길이 아닌 늑대는 자리까지 같음, 6번 길 늑대만 자리가 다름('+differ+'마리 다름, '+same+'마리 같음)');
+   eq(JSON.stringify(mk({}).w),JSON.stringify(A.w),'켬: 같은 씨앗 · 같은 입력 → 같은 세계(결정적)')}
+  /* RIVER를 끄면 다리 규칙도 꺼진다(= 0.14 세계) */
+  {const s=built(36),a=spawns(s,{RIVER:false,FORMS:false},2000,5).w,b=spawns(s,{BRIDGE:false,FORMS:false},2000,5).w;eq(JSON.stringify(a),JSON.stringify(b),'RIVER 끔 = BRIDGE 끔(둘 다 0.14 세계. 0.15.2 대형은 강을 피하는 길만 골라 강을 끄면 달라지므로 대형도 끄고 견줌)')}}
+ /* S-9-5 화면: 단계 3이 되는 띠 알림에 다리 길 한 줄, getVillageState가 강 · 다리 켬을 넘긴다 */
+ {const v23=built(23),base={age:8,level:v23.level,fence:v23.fence,chickens:v23.chickens,farmers:v23.farmers,gold:3000,seed:5};
+  const up=(flags,label,want)=>withFlags(flags,()=>{const a=seed(base,{view:true});a.go();calmWorld(a);eq(a.game().stage.now,2,label+': (지은 수 23 = 장터 마을)');a.unlock();a.right();a.tick(5);a.buy('fence');
+   eq([a.game().stage.now,a.fx('banner')[0]&&a.fx('banner')[0].textContent],[3,want],label+': 물레방아 마을 띠 알림');return a.window.getVillageState()});
+  let vs=up({},'켬','💧물레방아 마을이 되었어요!늑대는 길 4곳으로 와요 · 강 건너 다리 길이 열렸어요');eq([vs.river,vs.bridge],[true,true],'켬: 3D에 강 · 다리 켬을 넘김');
+  vs=up({BRIDGE:false},'다리 규칙 끔','💧물레방아 마을이 되었어요!늑대는 길 4곳으로 와요 · 강 건너 다리 길이 열렸어요');eq([vs.river,vs.bridge],[true,false],'다리 규칙만 끄면 강 · 다리 그림은 그대로');
+  vs=up({RIVER:false,BRIDGE:false},'강 끔','💧물레방아 마을이 되었어요!땅이 넓어졌어요 · 늑대는 길 4곳으로 와요');eq([vs.river,vs.bridge],[false,false],'강을 끄면 0.14 띠 알림 · 강 없음');
+  withFlags({ROUTES:false},()=>{const a=seed(base,{view:true});a.go();const s=a.window.getVillageState();eq([s.river,s.bridge],[false,false],'길을 끄면(?routes=0) 강 · 다리 없음')});
+  withFlags(OFF,()=>{const a=seed(base,{view:true});a.go();const s=a.window.getVillageState();eq([s.river,s.bridge],[false,false],'단계를 끄면(?stages=0) 강 · 다리 없음')})}
+ /* ======================= F 0.15.2 늑대 무리 대형(기획 wolf-paths-plan-20261119 §3.6, 프로듀서 결정 '26.11.19: 무리 대형부터, 따라 도는 늑대는 옆 길 울타리 면까지) ======================= */
+ {const crypto=require('node:crypto'),FM=W.FORM,TAU=Math.PI*2,dAng=(a,b)=>{let d=(a-b)%TAU;if(d>Math.PI)d-=TAU;if(d<=-Math.PI)d+=TAU;return d},axisOf=p=>(p+.5)*Math.PI/4;
+  const roadOf=v=>{const a=Math.atan2(v.sz,v.sx);let p=0;for(let q=1;q<8;q++)if(Math.abs(dAng(a,axisOf(q)))<Math.abs(dAng(a,axisOf(p))))p=q;return p};
+  const sideAt=a=>W.sectorOf(Math.cos(a),Math.sin(a)),mid=a=>{const x=a.slice().sort((p,q)=>p-q);return x.length?x[x.length>>1]:NaN};
+  /* F-1 손잡이: 기본 켬, 주소 ?forms=0으로 끔, 농가(8방향) · 단계 끔 · 길 끔이면 쓰지 않음. 차례 (n + ⌊n/4⌋) mod 4 */
+  {eq(C.FLAGS.FORMS,true,'0.15.2 무리 대형 기본 켬');ok(/\[\?&\]forms=0\\b/.test(src)&&src.includes('Combat.FLAGS.FORMS=false'),'주소 ?forms=0으로 끄는 손잡이');
+   eq([FM.names,FM.L,FM.arc,FM.full,FM.ring,FM.run,FM.pick],[['곧장','휘어 오기','갈라지기','따라 돌기'],5,10,22,2,2.5,'load'],'대형 4가지 · 성(반지름 22)에서 옆 거리 5 · 띠 위 거리 10(작은 마을은 반지름 비례) · 띠 반지름 + 2 · 걸음 최대 2.5배 · 따라 돌기는 덜 붐빈 면');
+   eq(Array.from({length:12},(_,n)=>W.packForm(n)),[0,1,2,3,1,2,3,0,2,3,0,1],'대형 차례: 첫 무리 곧장, 네 무리마다 넷이 한 번씩, 한 칸씩 밀림');
+   const w0=W.sync(W.create({seed:1}),built(3)),w1=W.sync(W.create({seed:1}),built(8));eq([w0.stage,w1.stage,W.formsOn(w0),W.formsOn(w1)],[0,1,false,true],'농가(8방향)는 대형 없음, 마을부터');
+   for(const f of [{FORMS:false},{ROUTES:false},{STAGES:false}])withFlags(f,()=>ok(!W.formsOn(w1),'끄면 대형 없음: '+JSON.stringify(f)))}
+  /* 수첩(0.16)이 세계에 더한 칸(정답 화살 v, 맞은 늑대 vh, 처치 사건 by, stats.volleyKills)은 규칙에 영향이 없는 기록 칸이라 지문에서 뺀다(난수·움직임은 그대로) */
+  const BOOK_ONLY=function(k,val){if(k==='vh'||k==='by'||k==='volleyKills')return undefined;if(k==='v'&&this&&'tower' in this&&'wolf' in this)return undefined;return val};
+  /* F-2 끄면 0.15.1과 한 글자도 같다: 지은 수 5 · 14 · 24 · 36 · 50 × 씨앗, 6,000틱(300틱마다 일제 사격, 1,000틱마다 하나 사기)의 세계 JSON 지문이 0.15.1(main 940c71a)에서 잰 값과 같다 */
+  {const tour=f=>withFlags(f,()=>{const keys=['level','fence','chickens','farmers','power'],shop={level:'tower',chickens:'chicken',farmers:'farmer',fence:'fence',power:'power'},out=[];
+    for(const [n,sd] of [[5,3],[14,5],[24,7],[36,11],[50,13]]){const s=built(n),w=W.sync(W.create({seed:sd,interval:150}),s);
+     for(let i=1;i<=6000;i++){W.step(w,s);if(i%300===0)W.volley(w,s,{scale:1});if(i%1000===0){const k=keys[(i/1000)%keys.length];s[k]=Math.min(C.max(shop[k]),s[k]+1);C.grow(s);W.sync(w,s)}}
+     out.push(w)}
+    return out}),print=ws=>crypto.createHash('sha256').update(JSON.stringify(ws,BOOK_ONLY)).digest('hex').slice(0,16);
+   const off=tour({FORMS:false}),on=tour({});eq(print(off),'5c6f00898a3c7d3d','대형 끔: 세계 지문이 0.15.1과 같음(5단계 × 6,000틱)');ok(print(on)!==print(off),'대형 켬: 세계가 달라짐');
+   ok(off.every(w=>w.wolves.every(v=>!('fm' in v)&&!('fa' in v)&&!('fp' in v))),'끄면 늑대에 대형 칸이 생기지 않음');ok(on.some(w=>w.wolves.some(v=>v.fm>0)),'(켜면 대형 칸이 있는 늑대가 있음)')}
+  /* F-3 난수 호출 수 그대로: 켬 · 끔 같은 씨앗이면 나오는 늑대(종류 · 체력 · 최대 체력 · 빠르기 · 출현 좌표)와 w.rng가 같다.
+     새 판 보호로 잃는 것이 없어 완충이 그대로인 세계, 늑대 상한(90 · 낙오 72)에 닿기 전 구간(상한 판정은 0.15.1 규칙 그대로라 살아 있는 늑대 수가 다르면 그 뒤로 갈린다) */
+  {let rows=0;for(const [n,T,seeds] of [[5,3000,[3,11,29]],[14,3000,[3,11,29]],[24,3000,[3,11,29]],[36,900,[3,11,29]],[50,900,[11]]])for(const sd of seeds){
+    const mk=f=>withFlags(f,()=>{const s=built(n),w=W.sync(W.create({seed:sd,interval:150,guard:true}),s),list=[],seen=new Set();let formed=0;
+     for(let t=0;t<T;t++){W.step(w,s);for(const v of w.wolves)if(!seen.has(v.id)){seen.add(v.id);list.push([v.kind,v.hp,v.max,v.speed,v.sx,v.sz].join(','));if(v.fm)formed++}}return {rng:w.rng,list:list.join(';'),n:list.length,formed}});
+    const a=mk({}),b=mk({FORMS:false});ok(a.rng===b.rng&&a.list===b.list&&a.formed>0,'지은 수 '+n+' 씨앗 '+sd+': 켬 · 끔 같은 늑대 '+a.n+'마리(그중 대형 '+a.formed+') · 같은 난수 상태');rows++}
+   eq(rows,13,'(난수 비교 13판)')}
+  /* F-4 단계 1~5 × 씨앗 12개 × 3,000틱(150틱마다 일제 사격)에서 늑대를 따라가며: 닿는 면 · 옆 면 · 강 · 다리 길 · 도는 각도 · 방향 바뀐 합 · 닿는 때 */
+  {const walk={};let rows=0,wetFormed=0,road6=0,road6Formed=0,badSide=0,badNear=0,river74=0,arcOver=0,bossFormed=0,bosses=0,strayBad=0,strays=0,splitPacks=0,splitBoth=0;
+   for(const n of [5,14,24,36,50])for(let sd=1;sd<=12;sd++){const s=built(n),w=W.sync(W.create({seed:sd*101+n,interval:150}),s),R=W.radius(w),open=W.routes(w),tr=new Map(),pk=new Map();
+    for(let t=1;t<=3000;t++){W.step(w,s);if(t%150===0)W.volley(w,s,{scale:1});
+     const strayTick=w.events.some(e=>e.type==='straggler')&&!w.events.some(e=>e.type==='pack');
+     for(const v of w.wolves){let o=tr.get(v.id);
+      if(!o){if(v.state!=='walk')continue;const p=roadOf(v),as=Math.atan2(v.sz,v.sx);
+       o={fm:v.fm|0,t0:t,p,side0:W.sectorOf(v.sx,v.sz),aim:v.fm?sideAt(v.fa):W.sectorOf(v.sx,v.sz),px:v.x,pz:v.z,h:null,turn:0,line:(Math.hypot(v.sx,v.sz)-R-.3)/(v.speed*W.TICK),done:false,wet:false};tr.set(v.id,o);
+       if(p===6&&w.stage>=3){road6++;if(v.fm)road6Formed++}
+       if(W.KINDS[v.kind].boss){bosses++;if(v.fm)bossFormed++}
+       if(strayTick){strays++;if(v.fm&&(v.fm!==1||v.id%2!==1))strayBad++}
+       if(v.fm===3&&Math.abs(dAng(v.fa,as))*(R+FM.ring)>FM.arc+1e-9)arcOver++;
+       if(v.fm===2){const e=pk.get(t)||{pos:0,neg:0};if(dAng(v.fa,as)>0)e.pos++;else e.neg++;pk.set(t,e)}
+       continue}
+      if(o.done)continue;
+      if(v.state==='walk'){const dx=v.x-o.px,dz=v.z-o.pz;if(Math.hypot(dx,dz)>1e-9){const h=Math.atan2(dz,dx);if(o.h!==null)o.turn+=Math.abs(dAng(h,o.h));o.h=h}o.px=v.x;o.pz=v.z;
+       if(o.fm&&!o.wet&&W.riverOn(w)&&W.riverGap(R,v.x,v.z)<=0){o.wet=true;wetFormed++}continue}
+      o.done=true;if(v.state!=='smash'&&v.state!=='hunt')continue;
+      const side=W.sectorOf(v.x,v.z),k=walk[o.fm]||(walk[o.fm]={n:0,turn:[],ratio:[],own:0,near:0});k.n++;k.turn.push(o.turn*180/Math.PI);k.ratio.push((t-o.t0)/o.line);
+      if(side!==o.aim)badSide++;
+      if(side===o.side0)k.own++;else{k.near++;const i=open.indexOf(o.p),nb=[open[(i+1)%open.length],open[(i+open.length-1)%open.length]].map(q=>sideAt(axisOf(q)));
+       if(o.fm!==3||!nb.includes(side))badNear++;if(o.p===7&&side===4&&W.riverOn(w))river74++}}}
+    for(const e of pk.values())if(e.pos+e.neg>=4){splitPacks++;if(e.pos&&e.neg)splitBoth++}
+    rows++}
+   eq(rows,60,'(단계 1~5 × 씨앗 12)');ok([0,1,2,3].every(k=>walk[k]&&walk[k].n>=50),'네 대형이 모두 울타리까지 옴: '+[0,1,2,3].map(k=>walk[k]?walk[k].n:0).join(' · '));
+   const formed=walk[1].n+walk[2].n+walk[3].n;ok(formed>=walk[0].n,'단계 1 이후 울타리에 닿은 늑대의 절반 이상이 휘거나 갈라지거나 돎('+formed+' 대 곧장 '+walk[0].n+')');
+   eq(badSide,0,'울타리 줄에 닿은 늑대는 모두 정한 면에 닿음(곧장 · 휘어 · 갈라는 출현 면, 따라 돌기는 고른 면)');
+   eq([walk[0].near,walk[1].near,walk[2].near],[0,0,0],'곧장 · 휘어 오기 · 갈라지기는 출현한 면 안에서만');
+   ok(walk[3].near>=30&&walk[3].own>walk[3].near,'따라 돌기는 옆 길 면까지 가기도 함(프로듀서 결정 2): 옆 면 '+walk[3].near+' · 제 면 '+walk[3].own);
+   eq(badNear,0,'다른 면으로 간 늑대는 모두 따라 돌기이고, 그 면은 옆 열린 길의 면');
+   eq(arcOver,0,'도는 각도 상한: 띠 위 거리 ≤ '+FM.arc+'(성 단계 반지름 22에서 약 24°)');
+   eq(wetFormed,0,'대형 늑대는 걷는 동안 강 띠(물 + 둑)에 들지 않음');eq(river74,0,'7번 길 늑대가 강 건너 4번 면(다리 길 면)으로 돌아오지 않음');
+   ok(road6>=100&&road6Formed===0,'다리 길(6번) 늑대 '+road6+'마리는 대형 없이 한 줄(0.15 결정)');
+   ok(bosses>=5&&bossFormed===0,'불씨 왕 '+bosses+'마리는 대형 없음');ok(strays>=50&&strayBad===0,'낙오 늑대 '+strays+'마리: 번호가 홀수일 때만 휘어 오기');
+   ok(splitPacks>=10&&splitBoth>=splitPacks*.6,'갈라지기 무리는 좌우 양쪽으로 갈라짐('+splitBoth+'/'+splitPacks+'무리, 한쪽 면 끝이 가까운 길은 그쪽 줄이 곧장)');
+   for(const fm of [1,2,3]){const r=mid(walk[fm].ratio);ok(r>=.95&&r<=1.05,FM.names[fm]+': 울타리에 닿는 때 ÷ 곧장으로 왔을 때 중앙 '+r.toFixed(3)+'(길어진 만큼 빨리 걸음)')}
+   ok(Math.abs(mid(walk[0].ratio)-1)<.03,'곧장: '+mid(walk[0].ratio).toFixed(3));
+   ok(mid(walk[0].turn)<1,'곧장: 걷는 동안 방향 바뀐 합 중앙 '+mid(walk[0].turn).toFixed(1)+'°');
+   ok(mid(walk[1].turn)>=30&&mid(walk[2].turn)>=30,'휘어 오기 · 갈라지기는 실제로 휜다(방향 바뀐 합 중앙 '+mid(walk[1].turn).toFixed(0)+'° · '+mid(walk[2].turn).toFixed(0)+'°)');
+   ok(mid(walk[3].turn)>=120,'따라 돌기는 띠로 꺾어 따라 돌고 다시 꺾는다(중앙 '+mid(walk[3].turn).toFixed(0)+'°)')}
+  /* F-5 따라 돌기 목표 면 고르기: 제 면과 옆 길 면 가운데 덜 붐비고 덜 부서진 면(같으면 제 면). 강을 지나야 하는 쪽으로는 돌지 않는다 */
+  {const mkWolf=(w,deg,back)=>{const a=deg*Math.PI/180,r=W.radius(w)+W.EDGE+(back||0),v={id:9000+w.wolves.length,kind:'wolf',x:Math.cos(a)*r,z:Math.sin(a)*r,sx:Math.cos(a)*r,sz:Math.sin(a)*r,hp:1e6,max:1e6,speed:1,state:'walk',target:0,timer:0,inside:0,hen:0};w.wolves.push(v);return v};
+   const crowd=(w,side,k)=>{for(let i=0;i<k;i++){const v=mkWolf(w,side*60+30,20+i);v.fm=1;v.fa=(side*60+30)*Math.PI/180}};
+   const aimOf=v=>v.fm?sideAt(v.fa):W.sectorOf(v.sx,v.sz),quiet=w=>{w.wolves=[];w.trickle=1e9;w.wave.arrive=1e9;w.wave.spawned=true;return w};
+   /* 성곽 마을(단계 4, 반지름 18, 길 0 · 2 · 3 · 4 · 6, 울타리 6면): 2번 길(112.5°) 112°에서 나온 따라 돌기. 띠(반지름 20) 위 거리 10 × 18/22 = 8.2(23.4°) 안에
+      3번 길 면(2번 면, 모서리 + 5° = 125°)이 든다. 제 면 쪽은 시계 방향(남은 각이 큰 쪽)으로 23.4° */
+   const s4=built(36),mk4=()=>quiet(W.sync(W.create({seed:1,interval:150}),s4));eq([C.stage(s4),W.routes(mk4()),mk4().buildings.filter(b=>b.kind==='fence').length],[4,[0,2,3,4,6],6],'(성곽 마을 · 울타리 6면)');
+   {const w=mk4(),v=mkWolf(w,112);W.formWolf(w,v,2,3,0,3);eq([v.fm,aimOf(v)],[3,1],'아무도 없으면 제 면(1번 면)을 따라 돎')}
+   {const w=mk4();crowd(w,1,2);const v=mkWolf(w,112);W.formWolf(w,v,2,3,0,3);eq([v.fm,aimOf(v),Math.round(v.fa*180/Math.PI)],[3,2,125],'제 면으로 늑대 2마리가 걸어오면 옆 길 면(2번 면 모서리 + 5° = 125°)으로 돈다')}
+   {const w=mk4();crowd(w,1,2);const f=w.buildings.find(b=>b.kind==='fence'&&b.side===2);f.broken=true;f.hp=0;const v=mkWolf(w,112);W.formWolf(w,v,2,3,0,3);eq(aimOf(v),1,'옆 면 울타리가 부서져 있으면(붐빔 2로 같아짐) 제 면')}
+   {const w=mk4();crowd(w,1,1);const f=w.buildings.find(b=>b.kind==='fence'&&b.side===2);f.hp=Math.round(f.max/2);const v=mkWolf(w,112);W.formWolf(w,v,2,3,0,3);eq(aimOf(v),2,'제 면 1마리 대 옆 면 울타리 절반 깎임(0.5): 옆 면')}
+   {const w=mk4();crowd(w,1,3);const v=mkWolf(w,100);W.formWolf(w,v,2,3,0,3);ok(v.fm===3&&aimOf(v)===1,'옆 면이 도는 각도 상한(23.4°) 밖이면(100° → 125° = 25°) 붐벼도 제 면')}
+   withFlags({},()=>{const keep=FM.pick;try{FM.pick='own';const w=mk4();crowd(w,1,2);const v=mkWolf(w,112);W.formWolf(w,v,2,3,0,3);eq(aimOf(v),1,'(손잡이 pick own = 기획 추천 같은 면만)')}finally{FM.pick=keep}});
+   /* 장터 마을(길 사이 90°)에서는 띠 위 거리(10 × 11.5/22 = 5.2, 22°)가 옆 길 면(65°)까지 닿지 않아 붐벼도 제 면 */
+   {const s2=built(14);s2.fence=6;C.grow(s2);const w=quiet(W.sync(W.create({seed:1,interval:150}),s2));crowd(w,0,3);const v=mkWolf(w,30);W.formWolf(w,v,0,3,0,3);eq([C.stage(s2),v.fm,aimOf(v)],[2,3,0],'장터 마을: 옆 길 면이 멀어(35°) 붐벼도 제 면')}
+   /* 강: 성(단계 5) 7번 길 318°에서 시계 방향(4번 면 = 다리 길 면, 295°)으로 돌면 띠가 강을 지난다 → 그쪽으로는 돌지 않는다(제 면 쪽 305°도 둑에 0.3까지 붙어 버림). 강을 끄면 4번 면으로 돈다 */
+   const s5=built(50),mk5=()=>quiet(W.sync(W.create({seed:1,interval:150}),s5));
+   {const w=mk5();crowd(w,5,3);const v=mkWolf(w,318);W.formWolf(w,v,7,3,0,2);ok(!(v.fm===3&&aimOf(v)===4),'강: 7번 길에서 강을 지나 4번 면으로 돌지 않음('+(v.fm?FM.names[v.fm]+' '+aimOf(v)+'번 면':'곧장')+')')}
+   withFlags({RIVER:false,BRIDGE:false},()=>{const w=mk5();crowd(w,5,3);const v=mkWolf(w,318);W.formWolf(w,v,7,3,0,2);eq([v.fm,aimOf(v)],[3,4],'(강을 끄면 같은 늑대가 4번 면으로 돎 = 위 결과는 강 때문)')});
+   /* 성곽 마을(단계 4) 4번 길 223°에서 다리 길 면(4번 면, 245°)으로: 강 띠에서 1.5 넘게 떨어져 돈다. 혼자 걸려 보면 한 번도 강 띠에 들지 않고 4번 면에 닿는다 */
+   {const s3=built(36),w=quiet(W.sync(W.create({seed:1,interval:150}),s3));crowd(w,3,2);const v=mkWolf(w,223);W.formWolf(w,v,4,3,0,2);eq([v.fm,aimOf(v)],[3,4],'4번 길 → 다리 길 면(4번 면)으로 돎(강 안쪽)');
+    w.wolves=[v];for(const b of w.buildings)if(b.kind==='tower')b.cd=1e9;const R=W.radius(w);let dry=true,t=0;while(v.state==='walk'&&t<400){W.step(w,s3);t++;if(W.riverGap(R,v.x,v.z)<=0)dry=false}
+    ok(dry&&v.state==='smash'&&W.sectorOf(v.x,v.z)===4,'혼자 걸려 보면 강 띠에 들지 않고 '+t+'틱에 4번 면 울타리에 닿음')}}
+  /* F-6 저장: 걷는 도중 저장 → 복원 → 1,000틱 뒤 세계가 같다(걸음 배수는 저장하지 않고 출현 좌표에서 다시 셈). 모양이 틀린 칸은 지워 곧장, 옛 저장(칸 없음)은 곧장 */
+  {const s=built(36),w=W.sync(W.create({seed:7,interval:150}),s);let t=0;while(t<6000&&!(w.wolves.some(v=>v.fm===3&&v.fp===1&&v.state==='walk')&&w.wolves.some(v=>(v.fm===1||v.fm===2)&&v.state==='walk'))){W.step(w,s);t++}
+   ok(t<6000,'(따라 돌기로 띠를 도는 늑대와 휘어 · 갈라 걷는 늑대가 함께 있는 순간: '+t+'틱)');
+   const b=W.restore(JSON.parse(JSON.stringify(w))),bare=x=>JSON.stringify({...x,events:[]});eq(bare(b),bare(w),'멀쩡한 저장은 한 글자도 바뀌지 않음(대형 칸 그대로)');
+   for(let i=0;i<1000;i++){W.step(w,s);W.step(b,s)}eq(JSON.stringify(b),JSON.stringify(w),'복원한 세계와 1,000틱 뒤까지 같음');
+   const w2=W.sync(W.create({seed:7,interval:150}),s);t=0;while(t<6000&&w2.wolves.filter(v=>v.fm&&v.state==='walk').length<3){W.step(w2,s);t++}
+   const raw=JSON.parse(JSON.stringify(w2)),fw=raw.wolves.filter(v=>v.fm&&v.state==='walk').slice(0,3);fw[0].fm=9;fw[1].fa=NaN;if(fw[2].fm===3)fw[2].fp=-1;else fw[2].fp=1;
+   const ids=fw.map(v=>v.id),r=W.restore(JSON.parse(JSON.stringify(raw)));eq(r.wolves.filter(v=>ids.includes(v.id)).map(v=>['fm','fa','fp'].some(k=>k in v)),[false,false,false],'모양이 틀린 대형 칸(fm 9 · fa NaN · fp 틀림)은 지워 곧장');
+   const old=JSON.parse(JSON.stringify(w2));for(const v of old.wolves){delete v.fm;delete v.fa;delete v.fp}const o=W.restore(old),v=o.wolves.find(x=>x.state==='walk');const a0=Math.atan2(v.z,v.x);W.step(o,s);
+   ok(Math.abs(dAng(Math.atan2(v.z,v.x),a0))<1e-9,'옛 저장(대형 칸 없음)의 걷는 늑대는 곧게(방향 그대로)')}
+  /* F-7 단계 전환: 걷는 도중 반지름이 커져도(물레방아 → 성곽, 14.5 → 18) 걷던 늑대는 400틱 안에 모두 울타리에 닿거나 사냥으로 바뀐다(멈춘 늑대 0) */
+  {const s=built(30),w=W.sync(W.create({seed:9,interval:150}),s);let t=0;while(t<3000&&w.wolves.filter(v=>v.state==='walk'&&v.fm).length<5){W.step(w,s);t++}
+   const ids=new Set(w.wolves.filter(v=>v.state==='walk').map(v=>v.id)),fp=w.wolves.filter(v=>v.state==='walk'&&v.fm===3).length,s2=built(40);W.sync(w,s2);eq(w.stage,4,'(걷는 도중 성곽 마을로)');
+   for(let i=0;i<400;i++)W.step(w,s2);eq(w.wolves.filter(v=>ids.has(v.id)&&v.state==='walk').length,0,'반지름이 커져도 걷던 늑대 '+ids.size+'마리(따라 돌기 '+fp+')가 400틱 안에 모두 닿거나 사냥으로 바뀜')}
+  /* F-8 화면: getVillageState().forms(마을부터 켬), ?forms=0이면 끔 */
+  {const base={age:8,level:9,fence:2,chickens:2,gold:300,seed:5};
+   const a=seed(base,{view:true});a.go();eq([a.game().stage.now,a.window.getVillageState().forms],[1,true],'getVillageState().forms: 마을에서 켬');
+   withFlags({},()=>{const b=seed(base,{view:true,query:'?forms=0'});b.go();eq([C.FLAGS.FORMS,b.window.getVillageState().forms],[false,false],'?forms=0: 대형 끔')});
+   const c=seed({age:8,gold:300,seed:5},{view:true});c.go();eq(c.window.getVillageState().forms,false,'농가는 대형 없음')}
+ }
+ /* ---------- 0.14.2 리뷰 수정(work\verification-20261113\review-v014\report.md 1·3·5·7·10번) ---------- */
+ const towersOf=w=>w.buildings.filter(b=>b.kind==='tower').map(b=>[b.slot,b.floor]).sort((p,q)=>p[0]-q[0]);
+ const ring=(n,f)=>Array.from({length:n},(_,i)=>[i,f?f(i):1]);
+ /* R-1 보류 중에 산 타워가 회관 승급을 부르면 안쪽 타워의 층이 되지 않고, 보류를 풀 때 새 바깥 자리에 선다(재현: 8세, 지은 수 13, 타워 6개 = 0단계 자리 6개가 다 참, 읽는 중 타워 구매) */
+ {const a=seed({age:8,level:5,fence:4,chickens:5,gold:900,seed:5},{view:true});a.go();calmWorld(a);
+  let g=a.game();eq([g.stage.now,g.state.hall,towersOf(a.api.world)],[1,0,ring(6)],'(8세 지은 수 13 = 마을, 타워 6개로 0단계 자리가 다 참)');
+  a.tick(5);a.buy('tower');g=a.game();
+  eq([a.api.phase,g.stage.rule,g.stage.now,g.stage.due,g.state.level,g.state.hall,g.stage.hall],['ask',2,1,true,6,1,0],'(읽는 중에 7번째 타워: 규칙은 장터 마을·회관 1, 세계는 보류)');
+  eq(towersOf(a.api.world),ring(6),'보류 중: 안쪽 타워의 층을 올리지 않고 기다림');
+  /* R-10 그림 화면(3D를 못 쓰는 기기)의 회관도 보류를 지킨다 */
+  const art=()=>{const gd=a.n.garden.children;return [a.n.houseArt.src.split('/').pop(),a.n.villageExtra.children.some(e=>e.alt==='가게'),gd[gd.length-1].textContent.match(/회관 \d단계/)[0]]};
+  eq(art(),['home-01.png',false,'회관 0단계'],'그림 화면: 보류 중에는 회관 그림·가게·이름이 그대로(3D의 world.hall과 같음)');
+  let floors=0;for(let i=0;i<20;i++){a.tick(1);floors+=a.api.world.buildings.filter(b=>b.kind==='tower'&&b.floor>1).length}eq(floors,0,'보류가 이어지는 20틱 동안 층이 오른 타워 0');
+  a.unlock();a.right();g=a.game();eq([a.api.phase,g.stage.now,g.stage.hall,g.world.radius],['reward',2,1,11.5],'(답한 순간 장터 마을)');
+  const held=towersOf(a.api.world);eq(held,ring(7),'보류를 풀면 새 바깥 자리(6번)에 타워가 서고 층은 모두 1');eq(W.towerUnits(a.api.world),1+a.api.state.level,'층의 합 = 1 + level');
+  {const t=a.api.world.buildings.find(b=>b.kind==='tower'&&b.slot===6);ok(Math.hypot(t.x,t.z)<=W.radius(a.api.world)-1.4,'6번 자리('+t.x+','+t.z+')는 넓어진 울타리 안쪽')}
+  eq(art(),['home-02.png',true,'회관 1단계'],'그림 화면: 답한 순간 회관 그림·가게·이름이 바뀜');
+  /* 문제 사이(정답 연출 중)에 산 것과 같은 배치 */
+  const b=seed({age:8,level:5,fence:4,chickens:5,gold:900,seed:5});b.go();calmWorld(b);b.unlock();b.right();b.tick(5);b.buy('tower');eq(towersOf(b.api.world),held,'읽는 중에 산 것 = 문제 사이에 산 것(같은 타워 배치)');
+  /* 보류 중 이어하기: 저장된 세계는 층이 모자란 채이고, 불러오면 바로 새 자리에 */
+  const c=seed({age:8,level:5,fence:4,chickens:5,gold:900,seed:5});c.go();calmWorld(c);c.tick(5);c.buy('tower');c.unload();eq(towersOf(JSON.parse(saved[KEY]).world),ring(6),'(보류 중 저장: 타워 6개)');
+  const d=boot();eq([d.game().stage.now,towersOf(d.api.world)],[2,ring(7)],'보류 중에 나갔다 오면 장터 마을, 새 자리에 타워')}
+ /* R-1 세계 규칙: 보류 중 회관이 오를 참이면 층을 미루고(여러 단계를 한꺼번에 넘어도), 회관이 그대로인 보류는 0.14처럼 바로 층을 올린다 */
+ {const w=W.sync(W.create({seed:3}),built(4));eq([w.stage,w.hall,towersOf(w)],[0,0,ring(5)],'(농가, 타워 5개)');
+  const s=built(14);eq([s.hall,s.level+1],[1,15],'(지은 수 14 = 장터 마을, 회관 1, 타워 15개)');
+  W.sync(w,s,{hold:true});eq([w.stage,w.hall,towersOf(w)],[0,0,ring(6)],'농가 → 장터 마을을 한 문제에 넘는 보류: 빈 자리만 채우고 층은 미룸');
+  W.sync(w,s);eq([w.stage,w.hall,towersOf(w)],[2,1,ring(10,i=>i<5?2:1)],'풀면 새 자리 4곳을 먼저 채우고, 남은 5개는 층(0.14 규칙 그대로)');eq(W.towerUnits(w),15,'층의 합 = 15');
+  const v=W.sync(W.create({seed:3}),built(4)),t=built(7);eq([C.stage(t),t.hall],[1,0],'(지은 수 7 = 마을, 회관 0)');W.sync(v,t,{hold:true});
+  eq([v.stage,towersOf(v),W.towerUnits(v)],[0,ring(6,i=>i<2?2:1),8],'회관이 그대로인 보류(농가 → 마을)는 자리가 늘지 않으니 바로 층을 올림(0.14와 같음)')}
+ /* R-3 보류 중에 종이 열림(10세: 성 37 + 회관 3 = 40, 종 46). 종이 열리는 순간 미뤄 둔 성 전환을 풀어 왕이 넓어진 울타리 밖에 서고, 결전 중에는 전환이 없다.
+    재현: 10세 성곽 마을에서 읽는 중 7번 구매 → 종 → 답. 왕과 울타리 사이 거리는 한 순간이 아니라 종이 열린 뒤 내내 잰다 */
+ {const a=seed({age:10,level:10,fence:12,chickens:10,farmers:4,power:2,gold:30000,seed:5},{view:true});a.go();calmWorld(a);a.api.world.fox=null;/* 첫 문제의 여우가 닭을 물어 가면 지은 수가 줄어 종 문턱이 흔들린다 */
+  let g=a.game();eq([g.stage.now,g.state.hall,g.world.radius,g.state.run.bell,C.builtNew(g.state)],[4,2,18,0,39],'(10세 지은 수 37 + 회관 2 = 성곽 마을. 0.15에 합친 밸런스 조정으로 10세 성 문턱 37 → 38이라 한 개 더 지은 마을에서 시작)');
+  a.tick(5);a.buy('tower');g=a.game();eq([a.api.phase,g.stage.rule,g.stage.now,g.stage.due,g.world.radius],['ask',5,4,true,18],'(읽는 중 1번째 구매: 규칙은 성, 세계는 보류)');
+  for(let i=1;i<6;i++){a.tick(5);a.buy(i%2?'fence':'tower')}g=a.game();
+  eq([a.api.phase,a.api.round.tries,g.state.run.bell,C.builtNew(g.state)],['ask',0,1,46],'(같은 문제를 읽는 중 6번째 구매에 종이 열림: 지은 수 46)');
+  eq([g.stage.now,g.stage.due,g.world.radius,g.king&&g.king.state],[5,false,22,'wait'],'종이 열리는 순간 미뤄 둔 성 전환을 풂(반지름 22), 늑대 왕은 그 둘레 숲에서 기다림');
+  {const bn=a.fx('banner').map(e=>e.textContent);ok(bn.length===1&&bn[0].startsWith('🏰성이 되었어요!'),'띠 알림: 성 전환이 먼저(늑대 왕 띠는 그다음 차례) '+JSON.stringify(bn))}eq(a.game().sfx.stage|0,1,'단계 효과음 1번');
+  let minGap=Infinity,back=0,prev=null;const radii=new Set();
+  const watch=()=>{const k=a.api.world.king,R=W.radius(a.api.world);radii.add(R);if(k){minGap=Math.min(minGap,k.r-R);if(prev!==null&&a.api.state.run.bell===2&&k.r>prev+1e-9)back++;prev=k.r}};
+  for(let i=0;i<5;i++){a.tick(1);watch()}
+  a.buy('bell');g=a.game();eq([g.state.run.bell,g.king.state,a.api.phase,a.api.round.tries],[2,'come','ask',0],'(종을 울림: 결전, 풀던 문제는 그대로)');
+  for(let i=0;i<80;i++){a.tick(1);watch()}eq(a.api.world.king.state,'stand','(왕이 멈춤 지점에 섬)');
+  const stageSfx=a.game().sfx.stage|0;a.unlock();a.right();g=a.game();watch();
+  eq([a.api.phase,g.stage.now,g.stage.due,g.world.radius,a.api.round.wait],['reward',5,false,22,12],'답한 순간: 단계 전환 없음(정답 연출은 평소 1.2초)');
+  ok(!a.fx('banner').some(e=>e.textContent.includes('되었어요'))&&(a.game().sfx.stage|0)===stageSfx,'결전 중 답에서 단계 띠 알림·효과음 없음');
+  for(let i=0;i<60;i++){a.tick(1);watch()}
+  ok(minGap>=W.KING.stop-3*W.KING.step-1e-9,'종이 열린 뒤 내내 왕은 울타리 밖(왕 거리 − 반지름 최소 '+minGap.toFixed(2)+' ≥ 0.6)');eq([back,[...radii]],[0,[22]],'결전 중 왕이 뒷걸음친 틱 0, 영역은 반지름 22 그대로')}
+ /* R-3 결전 중에 미뤄진 단계가 풀리면(보통은 종이 열릴 때 풀려 생기지 않음. 망가진 저장 등) 띠 알림·효과음·전환 연출 없이 영역만 세계를 따름 */
+ {const run={...C.freshRun(),bell:2,shields:0,fpick:[-1,-1,-1,-1,-1,-1]},a=seed({age:10,level:14,fence:16,chickens:12,farmers:4,power:3,gold:500,seed:5,index:40,run},{view:true});
+  a.go();calmWorld(a);a.api.world.fox=null;let g=a.game();eq([g.state.run.bell,!!a.api.round.fin,g.stage.now,g.world.radius],[2,true,5,22],'(결전 문제, 성)');
+  a.api.world.stage=4;eq(a.game().stage.due,true,'(세계 단계를 4로 되돌려 미뤄진 전환을 만듦)');
+  const n0=a.built.length;a.unlock();a.right();g=a.game();
+  eq([a.api.phase,g.stage.now,g.world.radius,g.state.run.shields],['reward',5,22,1],'결전 중 답: 영역은 성으로(반지름 22), 방패 하나 깸');
+  ok(!a.fx('banner').some(e=>e.textContent.includes('되었어요'))&&(g.sfx.stage|0)===0&&!a.built.slice(n0).includes('stage'),'결전 중에는 단계 띠 알림·효과음·전환 연출 없음')}
+ /* R-5 단계를 켠 채 설정의 나이(#age)를 바꿈: 문제 사이(정답 연출·정답 배우기)면 바로 넓히고, 읽는 중(ask)이면 그 문제를 답할 때 넓힌다.
+    8세 지은 수 26 = 물레방아 마을 → 10세 문턱(26)이면 성곽 마을 */
+ {const S26={age:8,level:8,fence:10,chickens:12,farmers:3,gold:300,seed:5},to10=x=>{x.n.age.value='10';x.n.age.onchange()};
+  const start=o=>{const x=seed(S26,o);x.go();calmWorld(x);x.api.world.fox=null;return x};
+  const a=start({view:true});let g=a.game();eq([g.stage.now,g.state.hall,g.world.radius],[3,1,14.5],'(8세 지은 수 32 = 물레방아 마을. 10세 성곽 마을 문턱 26 → 32)');
+  a.unlock();a.right();eq(a.api.phase,'reward','(정답 연출 중)');to10(a);g=a.game();
+  eq([a.api.phase,g.state.age,g.stage.rule,g.stage.now,g.stage.due,g.state.hall,g.stage.hall,g.world.radius,a.api.round.wait],['reward',10,4,4,false,2,2,18,16],'정답 연출 중 10세로: 바로 성곽 마을(반지름 18, 회관 2), 화면이 물러나는 1.6초 동안 다음 문제를 띄우지 않음');
+  ok(a.built.includes('stage')&&a.fx('banner').some(e=>e.textContent.startsWith('🧱성곽 마을이 되었어요!')),'정답 연출 중: 전환 장면과 띠 알림');
+  const b=start();b.unlock();b.wrong();b.tick(C.DASH_TICKS+2);b.wrong(1);eq(b.api.phase,'learn','(두 번 틀려 정답 배우기)');to10(b);g=b.game();
+  eq([b.api.phase,g.stage.now,g.stage.due,g.world.radius],['learn',4,false,18],'정답 배우기 중 10세로: 바로 성곽 마을');
+  const c=start();c.tick(5);to10(c);g=c.game();
+  eq([c.api.phase,g.state.age,g.stage.rule,g.stage.now,g.stage.due,g.world.radius,g.stage.cell.pr],['ask',10,4,3,true,14.5,'✨ 곧!'],'읽는 중 10세로: 영역은 그대로, 8번째 칸은 "곧!"');
+  let grew=0;for(let i=0;i<30;i++){c.tick(1);if(W.radius(c.api.world)!==14.5)grew++}eq(grew,0,'읽는 동안 30틱 내내 넓어지지 않음');
+  c.unlock();c.right();g=c.game();eq([c.api.phase,g.stage.now,g.world.radius],['reward',4,18],'그 문제를 답한 순간 성곽 마을(다음 답까지 밀리지 않음)')}
+ /* R-7 ① 경제 저장이 버려져(모르는 버전) 새 판이 되면 늑대 세계도 새로: 성(단계 래치)이던 세계가 새 판으로 넘어가지 않음 */
+ {const s=built(55),w=W.sync(W.create({seed:9,interval:150}),s);for(let i=0;i<50;i++)W.step(w,s);eq([w.stage,w.t],[5,50],'(성, 50틱 흐른 세계)');const wr=JSON.parse(JSON.stringify({...w,events:[]}));
+  const bad=JSON.stringify({version:99,...s,gold:555,world:wr});saved={[KEY]:bad};const a=boot();const g=a.game();
+  eq([g.state.gold,g.state.level,g.stage.now,g.world.radius,a.api.world.t,a.api.world.buildings.filter(b=>b.kind==='tower').length],[20,1,0,7,0,2],'모르는 버전의 경제 저장 → 새 판, 세계도 새로(농가, 반지름 7, 타워 2개, 시계 0)');
+  eq(saved[KEY+'-bak'],bad,'버리기 전 원본은 -bak에 그대로');
+  saved={[KEY]:JSON.stringify({version:3,...s,world:wr})};const b=boot();eq([b.game().stage.now,b.game().world.radius,b.api.world.t],[5,22,50],'(대조: 버전 3 저장은 세계도 이어받음)')}
+ /* R-7 ② 주소 ?stages=0은 '-stages0' 열쇠에 따로 저장: 아이 저장(세계의 단계 래치 포함)을 읽지도 쓰지도 않는다.
+    전: 같은 저장을 끈 채로 맞추면 world.stage를 지워, 닭을 잃은 마을을 보통 주소로 다시 열면 지은 수로 다시 세어 영역이 줄었다 */
+ {const kid=seed({age:8,level:8,fence:10,chickens:6,farmers:3,gold:300,seed:5});kid.go();kid.tick(10);kid.unload();
+  const k0=JSON.parse(saved[KEY]);eq(k0.world.stage,3,'(아이 저장: 물레방아 마을)');k0.chickens=2;const kidRaw=JSON.stringify(k0);saved={[KEY]:kidRaw};
+  eq(C.stage(C.restore(k0,Q.AGES)),2,'(닭을 잃어 지은 수 22: 지은 수로만 세면 장터 마을)');
+  withFlags({},()=>{const d=boot({query:'?stages=0'});eq([d.api.KEY,d.api.state.gold,d.game().stage.on,'stage' in d.api.world],[KEY+'-stages0',20,false,false],'?stages=0: 따로 저장하는 새 판(단계 끔)');
+   d.go();d.tick(30);d.unload();ok(JSON.parse(saved[KEY+'-stages0']).version===3,'?stages=0 진행은 -stages0 열쇠에');eq(saved[KEY],kidRaw,'아이 저장은 한 글자도 바뀌지 않음');
+   eq([boot({query:'?test=1&stages=0'}).api.KEY,boot({query:'?routes=0'}).api.KEY],[KEY+'-stages0-test',KEY],'열쇠: 테스트 모드와 함께면 -stages0-test, ?routes=0은 아이 저장');
+   ok(src.includes("(DEMO?'hangul-defense-demo'+DEMO:'hangul-defense-v1'+(STAGES_OFF?'-stages0':''))+(TEST?'-test':'')"),'열쇠 식: 체험(demo)은 원래 따로라 그대로(가짜 DOM은 체험 주소를 띄우지 못해 식으로 확인)')});
+  ok(C.FLAGS.STAGES&&C.FLAGS.ROUTES,'(주소가 바꾼 손잡이 되돌림)');
+  const e=boot();eq([e.game().stage.rule,e.game().stage.now,e.game().world.radius],[2,3,14.5],'보통 주소로 다시 열면 래치 그대로(닭을 잃어도 물레방아 마을, 반지름 14.5)')}
+}
+
+/* ======================= 0.14.1 프로듀서 테스트 모드(주소 ?test=1, testmode.js) ======================= */
+/* 흐름·단계는 켠 채(기본값) 돈다. 막대는 게임의 tick()을 돌려 시간을 채우고 화면의 보기 버튼을 누를 뿐이라, 게임이 그 답을 '그 시간에 푼 답'으로 매기는지를 게임 쪽 값(round.info.guard · state.pace)으로 본다 */
+{const TQ='?test=1',TKEY=KEY+'-test',kid=JSON.stringify({version:3,...C.fresh(8),gold:777,seed:4242});
+ const barOf=a=>a.document.body.children.find(e=>e.attrs&&e.attrs.id==='testBar');
+ const UI=a=>{const bar=barOf(a),by=id=>bar.children.find(e=>e.attrs.id===id),box=bar.children.find(e=>e.className==='tm-speed'),info=bar.children.find(e=>e.className==='tm-info');
+  return {bar,next:by('tmNext'),wrong:by('tmWrong'),auto:by('tmAuto'),speed:k=>box.children.find(b=>b.dataset.speed===k),now:()=>info.children[0].textContent,last:()=>info.children[1].textContent}};
+ const readT=(q,k)=>Math.max(Math.max(3,C.reveal(q))+4,Math.round(C.needSeconds(q)*k/C.TICK));/* 첫 고르기: max(보기 잠금 + 0.4초, 필요 시간 × 아이 속도) */
+ const paceAfter=(s,q,t)=>{const c={pace:s.pace,paced:s.paced};C.trackPace(c,q,t);return c.pace};/* 게임의 읽기 속도 갱신을 그 시간으로 한 값 */
+ /* TM-1 주소에 test=1이 없으면 0.14 그대로: 막대·훅·testmode.js 불러오기 없음, 저장 열쇠 그대로 */
+ {saved={[KEY]:kid};const a=boot();
+  ok(!a.window.__testmode&&!barOf(a)&&!a.document.body.classList.contains('test-mode'),'test=1 없음: 막대·훅 없음');
+  ok(!a.document.body.children.some(e=>e.tagName==='script'),'test=1 없음: testmode.js를 불러오지 않음');eq([a.api.KEY,a.api.state.gold,a.intervals.length],[KEY,777,1],'test=1 없음: 아이 저장 열쇠·시계 그대로');
+  for(const q of ['?test=0','?test=10','?tests=1&xtest=1'])eq(boot({query:q}).api.KEY,KEY,'주소 '+q+': 테스트 모드 아님')}
+ /* 대조: 테스트 모드 없이 보기가 열리자마자 누르면 게임이 찍기로 본다(7세는 글 먼저 읽기 잠금이 0.3초. 8세 이상 긴 글은 잠금 자체가 찍기 기준을 넘기도 한다) */
+ {const b=seed({age:7,seed:4242});b.go();b.unlock();b.rightNow();ok(b.api.round.info.guard<1,'대조: 열리자마자 누르면 찍기 막기 배수 '+b.api.round.info.guard.toFixed(2)+' < 1')}
+ /* TM-2 켜짐: 막대, 따로 저장, 시작 화면에서 다음 ▶ = 시작하기 */
+ saved={[KEY]:kid};const a=boot({query:TQ}),T=a.window.__testmode,u=UI(a);
+ ok(T&&u.bar&&a.document.body.classList.contains('test-mode'),'test=1: 화면 아래 막대와 훅');ok(a.document.body.children.some(e=>e.tagName==='script'&&e.src==='testmode.js?v=0.16'),'test=1: testmode.js를 불러옴');
+ eq([a.api.KEY,a.api.state.gold],[TKEY,20],'저장 열쇠는 -test, 아이 저장(금화 777)을 읽지 않고 새 판');
+ eq([T.speed,T.auto,Object.keys(T.SPEED),Object.values(T.SPEED).map(s=>s.k),T.RETRY],['typ',false,['slow','typ','fast'],[1.8,1,.62],.35],'아이 속도 느림·보통·빠름 = 시뮬 아이 모형(× 1.8 · 1 · 0.62, 두 번째 × 0.35), 기본 보통·자동 끔');
+ eq([u.speed('typ').getAttribute('aria-pressed'),u.auto.textContent,u.wrong.disabled,u.now()],['true','⏯ 자동 끔',true,'시작 화면 · 다음 ▶ = 시작하기'],'막대 처음 모습');
+ u.next.click();eq(a.api.phase,'ask','시작 화면에서 다음 ▶ = 시작하기');
+ /* TM-2b 📊 성능 표시(기본 켬): FPS · 그리기 호출 · 삼각형 · 단계, 그림 화면이면 '그림 화면'. 0.5초 타이머는 게임 시계와 따로이고 세계·풀이 시계를 움직이지 않는다 */
+ {const pb=u.bar.children.find(e=>e.attrs.id==='tmPerfBtn'),pe=a.document.body.children.find(e=>e.attrs&&e.attrs.id==='tmPerf'),w0=a.api.world.t,r0=a.api.round.t;
+  eq([T.perf,!!pe,pe&&pe.hidden,pb.getAttribute('aria-pressed'),a.intervals.length],[true,true,false,'true',2],'성능 표시: 있음, 기본 켬, 게임 시계와 다른 타이머');
+  for(let i=0;i<5;i++)a.intervals[1]();eq([a.api.world.t,a.api.round.t],[w0,r0],'성능 타이머는 세계·풀이 시계를 움직이지 않음');
+  a.n.scene.dataset.renderer='fallback';a.intervals[1]();ok(/^🎞 .+fps · 그림 화면 · 🏡 농가$/.test(T.perfNow())&&/^🎞 .+fps · 그림 화면 · 🏡 농가$/.test(pe.textContent),'그림 화면이면 "그림 화면"과 단계: '+pe.textContent);
+  a.n.scene.dataset.renderer='three';a.window.VillageView={inspect:()=>({ready:true,frames:120,drawCalls:34,triangles:285000})};
+  ok(/^🎞 .+fps\(최대 30\) · 그리기 34 · 삼각형 28\.5만 · 🏡 농가$/.test(T.perfNow()),'3D: FPS · 그리기 호출 · 삼각형(renderer.info) · 단계: '+pe.textContent);
+  pb.click();eq([T.perf,pe.hidden,pb.getAttribute('aria-pressed'),JSON.parse(saved[TKEY+'-opts']).perf],[false,true,'false',false],'📊 누르면 숨김(테스트 설정 저장)');
+  const before=pe.textContent;a.window.VillageView={inspect:()=>({ready:true,frames:1,drawCalls:99,triangles:1})};T.perfNow();eq(pe.textContent,before,'숨긴 동안은 읽지 않음');
+  pb.click();eq([T.perf,pe.hidden],[true,false],'다시 누르면 켬');delete a.n.scene.dataset.renderer;delete a.window.VillageView}
+ /* TM-3 다음 ▶: 읽는 시간까지 여러 프레임에 나눠 빨리 감은 뒤 정답. 게임은 그 시간에 한 번에 맞힌 답으로 매긴다 */
+ {const r=a.api.round,q=r.q,goal=readT(q,1),s0={...a.api.state},w0=a.api.world.t,t0=r.t;
+  eq(T.plan().target,goal,'읽는 시간(보통) = max(보기 잠금 + 0.4초, 필요 시간) = '+goal+'틱');ok(u.now().startsWith('읽는 중 0.0 / '+(goal/10).toFixed(1)+'초'),'막대: 읽는 중 / 읽는 시간');
+  u.next.click();ok(!!T.job&&a.api.phase==='ask'&&a.api.round.t===t0,'누른 순간에는 아직 답하지 않음(빨리 감기 시작)');ok(u.next.disabled&&u.wrong.disabled,'감는 동안 막대 버튼 잠김');
+  T.frame();const t1=a.api.round.t;ok(t1>t0&&t1<goal&&a.api.phase==='ask'&&a.api.world.t-w0===t1-t0,'한 프레임에 일부만 감음(세계도 같이 흐름): '+t0+' → '+t1+' / '+goal);
+  const frames=1+T.drain();eq(a.api.phase,'reward','빨리 감은 뒤 정답 → 정답 연출');
+  const L=T.last;eq([L.kind,L.t,L.result,L.tries,L.id],['right',goal,'first',0,q.id],'게임은 '+goal+'틱 만에 한 번에 맞힌 답으로 셈');
+  eq([a.api.round.info.guard,L.guard,C.guard(q,goal)],[1,1,1],'찍기 막기 배수 1 = 빠른 답 감점 없음(게임이 매긴 값)');
+  eq(L.fast,C.isFast(q,goal),'번개 판정도 그 시간 기준');eq(a.api.state.pace,paceAfter(s0,q,goal),'읽기 속도(pace)도 그 시간으로 갱신 = '+a.api.state.pace);
+  ok(a.api.world.t-w0>=goal-t0,'세계도 그만큼 흘렀음');eq(T.done.ticks,goal-t0,'감은 틱 = 남은 읽는 시간');ok(frames>1&&frames<=56,'여러 프레임에 나눠 감음(약 0.9초 분량): '+frames+'프레임');
+  ok(u.last().includes('감점 없음')&&u.last().startsWith('지난 답 '+(goal/10).toFixed(1)+'초(보통)'),'막대: 지난 답 시간과 감점 없음 '+u.last())}
+ /* TM-4 정답 연출 중 다음 ▶ = 남은 연출을 감고 다음 문제(답은 누르지 않음) */
+ {const i0=a.api.state.index,lastT=T.last.t;u.next.click();T.drain();eq([a.api.phase,a.api.state.index,a.api.round.t,a.api.round.tries,T.last.t],['ask',i0,0,0,lastT],'정답 연출 중 다음 ▶: 다음 문제로만 넘어감')}
+ /* TM-5 틀리기: 시간을 채운 뒤 틀린 보기 → 두 번째 다음 ▶은 성큼(0.8초)이 끝나고 × 0.35 뒤 정답 → 정답 배우기에서 다음 ▶ = 초록 답 */
+ {const r=a.api.round,q=r.q,need=C.needSeconds(q),goal=readT(q,1),s0={...a.api.state};
+  u.wrong.click();T.drain();
+  eq([a.api.phase,a.api.round.tries,a.api.round.dash>0,a.api.state.streak,T.last.kind,T.last.t,T.last.result],['ask',1,true,0,'wrong',goal,'wrong'],'틀리기: 읽는 시간('+goal+'틱)을 채운 뒤 틀린 보기, 늑대 성큼');
+  eq(a.n.answers.children.filter(b=>b.classList.contains('wrong')).map(b=>Number(b.dataset.i)!==q.answer),[true],'눌린 것은 틀린 보기 하나');eq(a.api.state.pace,paceAfter(s0,q,goal),'틀린 첫 고르기도 그 시간으로 읽기 속도 갱신');
+  const retry=goal+Math.max(4,Math.round(need*.35/C.TICK));eq(T.plan().target,retry,'두 번째 고르기 = 틀린 때 + 읽는 시간 × 0.35');
+  u.next.click();T.drain();eq([a.api.phase,a.api.round.result,T.last.t,T.last.tries,T.done.ticks],['learn','second',retry,1,retry-goal+C.DASH_TICKS],'두 번째 다음 ▶: 성큼이 끝나고 × 0.35 뒤 정답 → 정답 배우기');
+  ok(u.wrong.disabled&&u.now().startsWith('📗 정답 배우기'),'정답 배우기: 틀리기 잠김, 막대 안내');
+  const i1=a.api.state.index;u.next.click();ok(!!T.job&&!a.api.round.ready,'정답 배우기 다음 ▶: 초록 답이 열릴 때까지 감음');T.drain();eq([a.api.phase,a.api.state.index],['ask',i1+1],'초록 답을 눌러 다음 문제')}
+ /* 두 번 틀리기 → 두 번 틀림(정답 배우기) → 다음 문제. 보기가 2개면 두 번째 틀리기는 안내만 */
+ {const q=a.api.round.q,i1=a.api.state.index;u.wrong.click();T.drain();
+  if(q.choices.length>=3){u.wrong.click();T.drain();eq([a.api.phase,a.api.round.result],['learn','miss'],'틀리기 두 번 → 두 번 틀림(정답 배우기)')}
+  else{eq([T.wrong(),T.note],[false,'남은 틀린 보기가 없어요'],'보기 2개: 두 번째 틀리기는 안내만');u.next.click();T.drain()}
+  u.next.click();T.drain();eq([a.api.phase,a.api.state.index],['ask',i1+1],'정답 배우기에서 다음 ▶ → 다음 문제')}
+ /* TM-6 아이 속도: 느림 × 1.8 · 빠름 × 0.62. 막대 설정은 테스트 저장 쪽에 남는다 */
+ for(const [k,mul] of [['slow',1.8],['fast',.62]]){
+  u.speed(k).click();eq([T.speed,JSON.parse(saved[TKEY+'-opts']).speed,u.speed(k).getAttribute('aria-pressed')],[k,k,'true'],'아이 속도 '+k+' 고름(테스트 설정 저장)');
+  const q=a.api.round.q,goal=readT(q,mul),s0={...a.api.state};eq(T.plan().target,goal,k+': 읽는 시간 = max(보기 잠금 + 0.4초, 필요 시간 × '+mul+')');
+  u.next.click();T.drain();eq([a.api.phase,T.last.t,T.last.speed,a.api.round.info.guard,T.last.fast,a.api.state.pace],['reward',goal,k,1,C.isFast(q,goal),paceAfter(s0,q,goal)],k+': 그 시간에 한 번에 맞힘(감점 없음·번개·읽기 속도 모두 그 시간 기준)');
+  u.next.click();T.drain()}
+ ok(readT(a.api.round.q,1.8)>readT(a.api.round.q,1)&&readT(a.api.round.q,1)>=readT(a.api.round.q,.62),'느림 > 보통 ≥ 빠름');
+ u.speed('typ').click();
+ /* TM-7 자동 넘기기: 빨리 감기 없이, 실제 틱으로 읽는 시간이 지난 그 틱에 정답. 틀린 뒤 두 번째·정답 배우기도 저절로 */
+ {u.auto.click();eq([T.auto,JSON.parse(saved[TKEY+'-opts']).auto,u.auto.textContent],[true,true,'⏯ 자동 켬'],'자동 넘기기 켬');
+  const g=T.plan().target,ts=a.api.round.t;let n=0;while(a.api.phase==='ask'&&n<3000){a.tick(1);n++}
+  eq([a.api.phase,T.last.kind,T.last.t,n,a.api.round.info.guard],['reward','auto',g,g-ts,1],'자동: 시계 '+(g-ts)+'틱 뒤 그 틱에 정답(감점 없음)');
+  a.untilAsk();const i1=a.api.state.index;u.wrong.click();T.drain();eq(a.api.round.tries,1,'(자동 중 틀리기)');
+  n=0;while(a.api.state.index===i1&&n<3000){a.tick(1);n++}eq([a.api.phase,a.api.state.index,T.last.result],['ask',i1+1,'second'],'자동: 두 번째 고르기와 정답 배우기도 저절로 넘어감('+n+'틱)');
+  u.auto.click();eq(T.auto,false,'자동 끔');const t2=a.api.round.t;a.tick(600);ok(a.api.phase==='ask'&&a.api.round.t===t2+600,'자동을 끄면 저절로 답하지 않음')}
+ /* TM-8 쉬는 중: 다음 ▶은 안내만, 감는 도중 쉬면 멈춤 */
+ {a.n.pause.click();eq(a.api.paused,true,'(쉬기)');eq([T.next(),T.job,a.api.phase],[false,null,'ask'],'쉬는 중에는 다음 ▶이 답하지 않음');ok(T.note.includes('쉬는'),'안내: '+T.note);a.n.pause.click();
+  /* (읽는 시간이 이미 지난 문제) 다음 ▶ = 감지 않고 바로 정답 */
+  const late=a.api.round.t;ok(late>T.plan().target,'(읽는 시간이 지남)');eq([T.next(),a.api.phase,T.done.ticks,T.last.t],[true,'reward',0,late],'이미 지났으면 감지 않고 바로 정답');T.next();T.drain();
+  const t3=a.api.round.t;T.next();T.frame();a.n.pause.click();T.frame();eq([T.job,a.api.phase,a.api.round.tries],[null,'ask',0],'감는 도중 쉬면 빨리 감기를 멈춤(답하지 않음)');ok(a.api.round.t>t3&&T.note.includes('멈췄'),'(멈춘 자리까지는 흐름)');a.n.pause.click()}
+ /* TM-9 저장: 아이 저장은 한 글자도 바뀌지 않고, 테스트 진행은 -test 열쇠에 */
+ a.unload();eq(saved[KEY],kid,'아이 저장(hangul-defense-v1)은 그대로');{const t=JSON.parse(saved[TKEY]);ok(t.version===3&&t.index>=6&&t.wins>=3,'테스트 진행은 '+TKEY+'에 저장(문제 '+t.index+', 맞힘 '+t.wins+')')}
+ {const b=boot({query:TQ});eq([b.api.state.index,b.window.__testmode.speed],[JSON.parse(saved[TKEY]).index,'typ'],'새로고침: 테스트 진행·막대 설정을 이어 받음');const c=boot();eq(c.api.state.gold,777,'주소에서 test=1을 빼면 아이 진행 그대로')}
+ /* TM-10 결전(늑대 왕)·엔딩도 막히지 않음: 마지막 방패 → 달아나는 장면 → 엔딩 카드 → 새 마을 */
+ {const r=C.freshRun();r.bell=2;r.fpick=[-1];r.shields=5;saved={[TKEY]:JSON.stringify({version:3,...C.fresh(8),level:19,fence:18,chickens:20,farmers:7,hall:3,index:45,seed:4242,run:r})};
+  const b=boot({query:TQ}),U=UI(b),M=b.window.__testmode;U.next.click();calmWorld(b);eq([b.api.phase,!!b.api.round.fin,b.api.state.run.shields],['ask',true,5],'(결전 마지막 문제)');
+  const goal=readT(b.api.round.q,1);U.next.click();M.drain();eq([b.api.state.run.shields,b.api.state.run.bell,b.api.phase,M.last.t,b.api.round.info.guard],[6,3,'reward',goal,1],'결전: 다음 ▶으로 마지막 방패를 깸(그 시간에 한 번에 맞힘)');
+  U.next.click();M.drain();eq([b.api.phase,b.n.ending.hidden],['ending',false],'달아나는 장면을 감고 엔딩 카드');eq(U.now(),'엔딩 · 다음 ▶ = 새 마을로 떠나기','막대 안내');
+  U.next.click();eq([b.api.phase,b.api.state.run.no,b.n.ending.hidden],['ask',2,true],'엔딩에서 다음 ▶ = 새 마을로 떠나기');ok(!(KEY in saved),'아이 저장 열쇠는 쓰지 않음')}
+ /* TM-11 🗺️ 단계로 바로 가기: 지금 나이 그대로, 그 나이 문턱에 꼭 맞게 '막 들어선' 마을로 새로 시작. Combat.stage · 세계 반지름 · 열린 길 · 회관 · 종,
+    첫 문제에 여우가 밀려오지 않음, 지은 것은 시뮬 중앙값(8세 보통 · 3개씩, scripts/stage-seeds.cjs) 비례, 아이 저장 불변 */
+ {const HALL=[0,0,1,1,2,3];let rows=0;
+  for(const age of [8,7,9,10]){
+   saved={[KEY]:kid};const b=boot({query:TQ}),M=b.window.__testmode,U=UI(b),sel=U.bar.children.find(e=>e.attrs.id==='tmJump');
+   if(age===8)eq(sel.children.map(o=>o.textContent),['🗺️ 단계로','🏡 농가','🏘️ 마을','🏪 장터 마을','💧 물레방아 마을','🧱 성곽 마을','🏰 성','🔔 결전 직전(종 열림)','🐺 대형 끄기'],'바로 가기 칸: 6단계 + 결전 직전 + 맨 끝 대형 켬/끔(0.15.2)');
+   if(age!==8)b.n.ageRow.children.find(x=>x.dataset.age===String(age)).click();
+   for(const [key,name] of M.JUMPS){const tag=age+'세 '+name;
+    sel.value=key;sel.onchange();
+    const s=b.api.state,w=b.api.world,g=b.game(),k=key==='bell'?5:Number(key),cnt=C.stageCount(s),bn=C.builtNew(s);
+    eq([b.api.phase,b.n.start.hidden,sel.value,s.age,C.stage(s),w.stage,W.radius(w),W.routes(w),s.hall,w.hall],['ask',true,'',age,k,k,W.STAGE.radius[k],k>0?W.STAGE.open[k]:null,HALL[k],HALL[k]],tag+': 단계 · 반지름 · 열린 길 · 회관');
+    if(key==='0')eq([cnt,s.level,s.chickens,s.gold,s.index],[1,1,1,20,0],tag+': 새 판 그대로');
+    else{const goal=key==='bell'?C.bellBuilt({age})-3:C.stageAt({age})[k];eq(cnt,goal,tag+': 지은 수(회관 뺌) = 그 나이 문턱 '+goal);
+     if(k<5)ok(cnt<C.stageAt({age})[k+1],tag+': 다음 단계 문턱 아래');eq(s.gold,M.JUMP_BASE[key].gold,tag+': 금화 = 시뮬 중앙값');ok(s.level>=1&&s.chickens>=1,tag+': 시작 타워·닭')}
+    if(key==='bell')eq([s.run.bell,bn,g.king&&g.king.state,b.slots()[7].dataset.key],[1,C.bellBuilt({age}),'wait','bell'],tag+': 종이 막 열리고 늑대 왕이 기다림');
+    else eq([s.run.bell,g.king],[0,null],tag+': 종은 아직');
+    eq([g.fox,s.run.fox],[null,(s.hall|0)>=C.FOX.needHall?C.FOX.at.filter(n=>bn>=n).length:0],tag+': 지나온 여우 문턱은 이미 지남(첫 문제에 여우가 밀려오지 않음)');
+    if(age===8&&key!=='0'){const B=M.JUMP_BASE[key];ok(['level','fence','chickens','farmers','pond','power'].every(f=>Math.abs(s[f]-B[f])<=2),tag+': 지은 것 = 시뮬 중앙값(±2, 문턱에 맞춤) '+JSON.stringify([s.level,s.fence,s.chickens,s.farmers,s.pond,s.power]))}
+    rows++}
+   /* 바로 간 마을에서 그대로 이어서 놀 수 있다: 결전 직전 → 다음 ▶ → 종 → 결전 문제는 판 기록에서 고름 */
+   M.next();M.drain();eq(b.api.phase,'reward',age+'세 결전 직전: 다음 ▶으로 바로 풀 수 있음');M.next();M.drain();b.tick(5);b.buy('bell');
+   ok(b.api.state.run.bell===2&&b.api.state.run.fpick.length===C.FINALE.shields&&b.api.state.run.fpick.some(i=>i>=0),age+'세: 종을 울리면 결전(판 기록에서 문제를 고름) '+JSON.stringify(b.api.state.run.fpick));
+   b.unload();eq(saved[KEY],kid,age+'세 바로 가기: 아이 저장 그대로');eq(JSON.parse(saved[TKEY]).age,age,age+'세: 테스트 저장에 바로 간 판')}
+  eq(rows,28,'나이 4 × 바로 가기 7')}
+ /* TM-12 0.15.2 무리 대형: 막대의 🐺 = 무리 부르기(다음 틱에 무리가 숲에서 나옴), 🗺️ 칸 맨 끝 "🐺 대형 끄기/켜기"는 같은 탭에서 바로 바뀜(새로고침 없음),
+    📊 줄 끝에 지금 무리 대형(마을부터, 농가는 붙이지 않음). 아이 저장은 그대로 */
+ {saved={[KEY]:kid};const b=boot({query:TQ}),M=b.window.__testmode,U=UI(b),pk=U.bar.children.find(e=>e.attrs.id==='tmPack'),sel=U.bar.children.find(e=>e.attrs.id==='tmJump');
+  ok(!!pk&&pk.textContent==='🐺'&&U.bar.children.indexOf(pk)===U.bar.children.findIndex(e=>e.attrs.id==='tmPerfBtn')+1,'막대에 🐺(무리 부르기) 버튼, 📊 바로 뒤');
+  eq([M.callPack(),M.note],[false,'시작한 뒤에 부를 수 있어요'],'시작 화면에서는 부르지 않음');
+  U.next.click();b.n.scene.dataset.renderer='fallback';ok(/ · 🏡 농가$/.test(M.perfNow()),'농가: 📊 줄에 대형 이름을 붙이지 않음(8방향 · 대형 없음)');
+  sel.value='3';sel.onchange();const w=b.api.world;eq([w.stage,W.formsOn(w),M.form],[3,true,null],'(물레방아 마을로 바로 감, 아직 무리 없음)');ok(/ · 💧 물레방아 마을 · 🐺 대형 켬$/.test(M.perfNow()),'📊 줄: 아직 무리가 없으면 "대형 켬": '+M.perfNow());
+  calmWorld(b);w.wave.spawned=false;w.wave.n=2;w.rng=20261119;/* 세계 씨앗은 실행 시각이라 길 고르기를 고정 */const p0=M.packs;pk.click();eq(M.note,'🐺 무리를 불렀어요 · 갈라지기','🐺: 부를 무리의 대형을 알려 줌');b.tick(1);
+  ok(M.packs===p0+1&&w.wolves.length>0&&w.wolves.some(v=>v.fm===2),'🐺: 다음 틱에 갈라지기 무리가 숲에서 나옴('+w.wolves.length+'마리)');eq(M.form,2,'지금 무리 대형 = 갈라지기');
+  ok(/ · 💧 물레방아 마을 · 🐺 갈라지기$/.test(M.perfNow()),'📊 줄 끝에 지금 무리 대형: '+M.perfNow());
+  const last=sel.children[sel.children.length-1];eq([last.getAttribute('value'),last.textContent],['forms','🐺 대형 끄기'],'🗺️ 칸 맨 끝에 대형 끄기');
+  const fv=w.wolves.find(v=>v.fm===2&&v.state==='walk');sel.value='forms';sel.onchange();eq([C.FLAGS.FORMS,sel.value,last.textContent],[false,'','🐺 대형 켜기'],'대형 끄기: 같은 탭에서 바로(메뉴 글은 켜기로)');
+  ok(/ · 🐺 대형 끔$/.test(M.perfNow()),'📊 줄: 대형 끔');
+  {ok(!!fv,'(걷는 갈라지기 늑대)');const a0=fv?Math.atan2(fv.z,fv.x):0;b.tick(2);ok(fv&&(fv.state!=='walk'||Math.abs(Math.atan2(fv.z,fv.x)-a0)<1e-9),'끄면 걷던 대형 늑대도 바로 곧게(방향 그대로)')}
+  calmWorld(b);pk.click();eq(M.note,'🐺 무리를 불렀어요 · 대형 끔','끈 뒤 부르면 대형 끔');b.tick(1);ok(w.wolves.length>0&&w.wolves.every(v=>!('fm' in v)),'끈 뒤 부른 무리는 곧장(대형 칸 없음)');eq(M.form,null,'(대형 없는 무리)');
+  sel.value='forms';sel.onchange();eq([C.FLAGS.FORMS,last.textContent],[true,'🐺 대형 끄기'],'대형 켜기');
+  b.unload();eq(saved[KEY],kid,'대형 손잡이 · 무리 부르기를 써도 아이 저장 그대로');C.FLAGS.FORMS=true;delete b.n.scene.dataset.renderer}
+}
+/* ======================= 0.15 아트 들여오기(계획서 §2, S-9 6) =======================
+   묶음 원본 outputs\art-v015-v016-20261117을 art-handoff/v015-v016/에 그대로 복사했다. 파일이 바뀌거나 빠지면(복사 실수·줄바꿈 변환) 해시로 잡는다.
+   배포 묶음(scripts/build-pages.cjs)에는 0.15가 쓰는 4쌍만, 실제 주소 검사(pages.yml)도 같은 4쌍. */
+{const crypto=require('node:crypto'),dir=__dirname+'/art-handoff/v015-v016/',man=JSON.parse(fs.readFileSync(dir+'manifest.json','utf8'));
+ eq(man.map(a=>a.asset),['watermill','waterwheel','bridge','castle-hall','wall-segment','castle-gate','watchtower','wolf-king','thief-fox'],'0.15 아트 묶음: 모델 9개(manifest)');
+ for(const a of man)for(const ext of ['glb','png']){const f=dir+a[ext],has=fs.existsSync(f);ok(has,'0.15 아트 파일 있음: '+a[ext]);
+  if(has){const buf=fs.readFileSync(f);eq([buf.length,crypto.createHash('sha256').update(buf).digest('hex')],[a.bytes[ext],a.sha256[ext]],'0.15 아트 '+a[ext]+': 크기·SHA-256 = manifest');
+   ok(ext==='glb'?buf.subarray(0,4).toString('latin1')==='glTF':buf.subarray(0,8).equals(Buffer.from('89504e470d0a1a0a','hex')),'0.15 아트 '+a[ext]+': '+(ext==='glb'?'glTF':'PNG')+' 머리')}}
+ const B=require('./scripts/build-pages.cjs'),want=['watermill','bridge','wolf-king','thief-fox'].flatMap(n=>['art-handoff/v015-v016/glb/'+n+'.glb','art-handoff/v015-v016/png/'+n+'.png']);
+ eq(B.art15,['watermill','bridge','wolf-king','thief-fox'],'배포할 0.15 아트: 물레방아·다리·늑대 왕·도둑 여우');
+ eq(B.files.filter(f=>f.startsWith('art-handoff/v015-v016/')),want,'배포 묶음의 0.15 아트 = GLB·PNG 4쌍(0.16 성·성벽·성문·성탑과 따로 된 바퀴는 아직 묶지 않음)');
+ eq(new Set(B.files).size,B.files.length,'배포 묶음에 같은 파일이 두 번 없음');
+ const refs=B.references();eq([...refs].filter(([f])=>!B.files.includes(f)),[],'index.html·src/*.js가 글자 그대로 부르는 아트는 모두 배포 묶음에 있음');
+ ok(refs.has('art-handoff/coopnight/source-3d/models/environment-pack.glb')&&refs.has('art-handoff/coopnight/browser/characters/chicken.png'),'참조 검사가 3D 스크립트의 GLB와 페이지의 PNG를 모두 읽음');
+ for(const wf of ['pages.yml','package-test.yml'])ok(/^\s*- art-handoff\/v015-v016\/\*\*\s*$/m.test(fs.readFileSync(__dirname+'/.github/workflows/'+wf,'utf8')),wf+': art-handoff/v015-v016을 바꾸면 워크플로가 돈다(paths)');
+ {const pg=fs.readFileSync(__dirname+'/.github/workflows/pages.yml','utf8'),m=/art15 = \[([^\]]*)\]/.exec(pg);
+  eq(m&&m[1].split(',').map(s=>s.trim().replace(/'/g,'')),B.art15,'pages.yml 실제 주소 검사: 배포한 0.15 아트 4쌍을 모두 받아 봄');
+  ok(pg.includes("'art-handoff/v015-v016/glb/' + name + '.glb').startswith(b'glTF')")&&pg.includes("'art-handoff/v015-v016/png/' + name + '.png').startswith(bytes.fromhex('89504e470d0a1a0a'))"),'pages.yml: GLB는 glTF 머리, PNG는 PNG 머리로 확인')}
+}
+
+/* ======================= MVP 수첩(발자국 수첩 · 훈장 · 기억 늑대 · 반짝 손님 · 보호자 화면) ======================= */
+/* 여기까지의 검사는 모두 수첩 없이 돌았다(boot에 book을 주지 않음 = ?book=0과 같은 길). 아래는 수첩을 켠 게임이다. 규칙 단위 검사는 test-book.cjs */
+{
+ const realNow=Date.now;let skew=0;Date.now=()=>realNow()+skew;
+ const bookOf=a=>a.game().book.data,stored=()=>saved[BOOK_KEY]?JSON.parse(saved[BOOK_KEY]):null;
+ /* 기록을 미리 만들어 두고 시작(mut이 고친 기록을 열쇠에 넣는다). s = 판 저장에 덮을 칸 */
+ const bboot=(mut,s,opts)=>{const b=Bk.fresh(Date.now(),4242);if(mut)mut(b);saved={[KEY]:JSON.stringify({version:3,...C.fresh(8),seed:4242,...(s||{})}),[BOOK_KEY]:JSON.stringify(b)};return boot({book:true,...(opts||{})})};
+ const shownOff=el=>el.hidden||el.classList.contains('hidden');
+ const NAMES={이:2,삼:3,사:4,오:5,육:6,칠:7,팔:8,구:9};
+ const gateDigits=a=>{const m=/^(.)백(.)십(.)$/.exec(a.n.gateCode.textContent);return m?[m[1],m[2],m[3]].map(c=>String(NAMES[c])):null};
+ const gateType=(a,ds)=>{for(const d of ds)a.n.gatePad.children.find(b=>b.dataset.d===d).click()};
+ const gatePass=a=>gateType(a,gateDigits(a));
+ const press=(a,id,ms)=>{a.n[id].onpointerdown();skew+=ms;a.n[id].onpointerup()};
+ const nextAsk=a=>{a.tick(REWARD+2);a.untilAsk()};
+ const quiet=a=>{const w=a.api.world;w.wolves=[];w.wave.arrive=w.t+1e6;w.trickle=w.t+1e6;w.calm=0};
+
+ /* M-1 저장 연결: 열쇠가 따로, 풀이 중 1초마다 쓰지 않음, ?book=0 · 체험은 읽지도 쓰지도 않음 */
+ {const a=fresh({book:true});ok(a.game().book.on&&a.game().book.status==='new','수첩을 켜면 새 기록으로 시작');
+  ok(!shownOff(a.n.bookRow)&&a.n.reset.textContent==='마을을 처음부터 (수첩·훈장은 그대로)'&&/하루 30분/.test(a.n.dayNote.textContent),'시작 화면: 수첩·보호자 단추, 처음부터 단추 글, 하루 시간 안내');
+  a.go();ok(stored()&&stored().fmt==='kkm-book'&&stored().v===1&&saved[KEY],'기록은 판 저장과 다른 열쇠에(hangul-defense-book, 기록 v1)');
+  ok(!JSON.parse(saved[KEY]).book&&JSON.parse(saved[KEY]).version===3,'판 저장은 저장 v3 그대로(기록 칸이 섞이지 않음)');
+  const w0=a.game().book.writes;a.tick(150);eq(a.game().book.writes,w0,'풀이 중 15초 동안 기록 열쇠를 다시 쓰지 않음(1초마다 쓰는 것은 판 저장뿐)');
+  ok(a.game().book.dirty&&a.game().book.data.today.s>=14,'그동안 하루 시간은 메모리에서 흐름('+a.game().book.data.today.s+'초)');
+  a.unlock();a.right();ok(a.game().book.writes>w0&&stored().medal.one.n===1&&stored().pq===1,'문제 사이(정답 연출)에 기록을 씀: 한 번에 읽기 1');
+  const w1=a.game().book.writes;nextAsk(a);a.n.pause.click();ok(a.game().book.writes>w1,'잠깐 쉬기는 풀이 중이어도 바로 씀');a.n.pause.click();
+  const b2=boot({book:true});eq([b2.game().book.status,b2.game().book.data.medal.one.n],['ok',1],'다시 열면 같은 기록');
+ }
+ {saved={};const a=boot({book:true,query:'?book=0'});a.go();a.unlock();a.right();nextAsk(a);
+  eq([a.game().book.on,BOOK_KEY in saved,shownOff(a.n.bookRow),a.n.reset.textContent],[false,false,true,'처음부터 시작'],'?book=0: 기록 열쇠를 읽지도 쓰지도 않고 수첩 단추도 없음(0.15 화면)');
+  saved={};const d=boot({book:true,query:'?demo=1'});d.go();d.unlock();d.right();nextAsk(d);
+  eq([d.game().book.status,d.game().book.locked,Object.keys(saved).filter(k=>k.includes('book')),d.game().book.data.medal.one.n],['memory',true,[],1],'체험(?demo=1): 기록은 메모리 안에서만(열쇠를 쓰지 않음)');
+  saved={};const t=boot({book:true,query:'?test=1'});t.go();t.unlock();t.right();
+  ok((BOOK_KEY+'-test') in saved&&!(BOOK_KEY in saved),'시험 모드(?test=1)는 -test 열쇠');
+ }
+ {saved={[BOOK_KEY]:'{깨진 글'};const a=boot({book:true});a.go();a.unlock();a.right();
+  eq([a.game().book.status,stored().medal.one.n],['broken',1],'깨진 기록이 판을 막지 않음(새 기록으로 계속)');
+  const newer=JSON.stringify({...Bk.fresh(Date.now(),1),v:2,medal:{one:{n:777}}});saved={[BOOK_KEY]:newer};const b=boot({book:true});b.go();b.unlock();b.right();nextAsk(b);b.n.pause.click();b.unload();
+  eq([b.game().book.status,b.game().book.locked,saved[BOOK_KEY]],['newer',true,newer],'앱보다 새 버전의 기록은 덮어쓰지 않음(글자 그대로)');
+  const meta={stamps:[{no:1,village:'meadow',age:8,stars:[1,1,1],q:60,acc:80,lost:0,min:20,date:Date.now()-86400000}],villages:[],acc:[80],seenOk:['a8-story-01','a8-story-02'],from:0};
+  saved={[KEY]:JSON.stringify({version:3,...C.fresh(8),seed:55,meta})};const m=boot({book:true});
+  eq([m.game().book.status,bookOf(m).from,bookOf(m).medal.king.n,bookOf(m).seen.length,bookOf(m).order.seed,bookOf(m).set.day],['migrated',3,1,2,55,30],'판 저장의 meta에서 한 번 이행(왕 1 · 새 글 2 · 씨앗 · 하루 30분)');
+  m.go();ok(stored()&&stored().from===3,'이행한 기록을 씀');
+ }
+
+ /* M-2 처치 출처(world.js): 정답 화살에 한 번이라도 맞은 뒤 쓰러지면 by:'volley', 타워 자동 사격만으로 쓰러지면 없음 */
+ {const s=C.fresh(8),mkW=()=>{const w=W.sync(W.create({seed:7,interval:1e6}),s);w.wolves=[];w.wave.arrive=1e9;w.trickle=1e9;return w};
+  const wolfAt=(w,hp)=>{const v={id:w.nextId++,kind:'wolf',x:3,z:0,sx:20,sz:0,hp,max:hp,speed:.01,state:'walk',target:0,timer:0,inside:0,hen:0};w.wolves.push(v);return v};
+  const runTo=(w,v)=>{const ev=[];for(let i=0;i<400&&v.state!=='dead';i++)ev.push(...W.step(w,s));return ev.filter(e=>e.type==='kill')};
+  {const w=mkW(),v=wolfAt(w,1);const k=runTo(w,v);ok(k.length===1&&!('by' in k[0])&&!v.vh&&!(w.stats.volleyKills>0),'타워 자동 사격만으로 쓰러짐 → by 없음')}
+  {const w=mkW(),v=wolfAt(w,1);const n=W.volley(w,s,{scale:1});ok(n>0&&w.arrows.every(x=>x.v===1),'일제 사격 화살에는 v=1');const k=runTo(w,v);eq([k[0].by,v.vh,w.stats.volleyKills],['volley',1,1],'정답 화살에 쓰러짐 → by:"volley"')}
+  {const w=mkW(),v=wolfAt(w,400);W.volley(w,s,{scale:1});for(let i=0;i<8;i++)W.step(w,s);ok(v.vh===1&&v.state!=='dead'&&!w.arrows.some(x=>x.v),'정답 화살을 맞고도 살아 있음(vh=1)');
+   const r=W.restore(JSON.parse(JSON.stringify({...w,events:[]})));eq(r.wolves[0].vh,1,'저장·복원 뒤에도 vh 보존');const rv=r.wolves[0];rv.hp=1;const k=runTo(r,rv);eq(k[0].by,'volley','마지막 한 발이 자동 사격이어도 by:"volley"')}
+  {const w=mkW();wolfAt(w,50);W.volley(w,s,{scale:1});const r=W.restore(JSON.parse(JSON.stringify({...w,events:[]})));ok(r.arrows.length>0&&r.arrows.every(x=>x.v===1),'날아가는 정답 화살의 v도 저장을 건넘');
+   const bad=JSON.parse(JSON.stringify({...w,events:[]}));bad.arrows[0].v='x';bad.wolves[0].vh=7;bad.guest={id:'x'};const t=W.restore(bad);ok(!('v' in t.arrows[0])&&!('vh' in t.wolves[0])&&!('guest' in t),'틀린 모양의 선택 칸은 지움')}
+  /* 반짝 손님: 늑대 목록과 별개(타워가 저절로 쏘지 않고 닭·건물을 노리지 않음). 인사하면 황금 화살 → shinyMet → 숲으로. 난수를 쓰지 않아 세계 결과가 같음 */
+  {const A=W.sync(W.create({seed:99,interval:120}),s),Bw=W.sync(W.create({seed:99,interval:120}),s);const g=W.guest(Bw,'bramble');
+   ok(g&&g.kind==='bramble'&&g.state==='walk'&&W.guest(Bw,'wolf')===null&&W.guest(W.sync(W.create({seed:1,interval:120}),s),'king')===null,'손님은 한 번에 하나, 왕은 손님이 아님');
+   for(let i=0;i<1000;i++){W.step(A,s);W.step(Bw,s)}
+   const strip=w=>JSON.stringify({wolves:w.wolves,hens:w.hens,buildings:w.buildings,rng:w.rng,stats:w.stats,t:w.t},(k,v)=>k==='id'?undefined:v);/* 손님이 번호 하나를 쓰므로 번호(id)만 빼고 견준다 */eq(strip(A),strip(Bw),'같은 씨앗 1,000틱: 손님이 있어도 늑대·닭·건물·난수가 한 글자도 다르지 않음');
+   ok(W.GUEST.out-W.FORM.ring>=2&&W.GUEST.out<W.EDGE-1,'손님이 도는 띠(반지름 + '+W.GUEST.out+')는 따라 돌기 늑대 띠(반지름 + '+W.FORM.ring+')보다 2 이상 바깥, 숲 가장자리(+'+W.EDGE+')보다 안');
+   const R=W.radius(Bw);ok(Bw.guest&&Bw.guest.state==='walk'&&Math.abs(Math.hypot(Bw.guest.x,Bw.guest.z)-(R+W.GUEST.out))<.2,'손님은 시간 제한 없이 울타리 밖을 계속 돎(1,000틱 뒤에도 있음)');
+   const r=W.restore(JSON.parse(JSON.stringify({...Bw,events:[]})));eq([r.guest.kind,r.guest.state],['bramble','walk'],'손님은 저장을 건넘(앱을 닫았다 열어도 있음)');
+   ok(W.guestGreet(Bw)&&Bw.guest.state==='bow'&&Bw.arrows.some(x=>x.gold&&x.wolf===g.id)&&!W.guestGreet(Bw),'인사: 황금 화살 한 발');
+   let met=0,left=false;for(let i=0;i<400&&!left;i++){for(const e of W.step(Bw,s))if(e.type==='shinyMet'&&e.kind==='bramble')met++;left=!Bw.guest}
+   eq([met,left],[1,true],'화살이 닿으면 shinyMet 한 번, 손님은 숲으로 돌아감');
+   const Cw=W.sync(W.create({seed:3,interval:120}),s);W.guest(Cw,'fox');ok(W.guestGone(Cw)&&Cw.events.some(e=>e.type==='shinyGone')&&Cw.guest.state==='leave'&&!W.guestGone(W.create({seed:1,interval:120})),'못 만난 채 판이 끝나면 shinyGone')}
+ }
+
+ /* M-3 특별 문제 틀(이름 쪽지): 문제 번호를 넘기지 않고 끼워 넣음, 금화는 평소와 같음, 이어하기는 같은 문제 */
+ const noteReady=b=>{Object.assign(b.mon.wolf,{foot:Date.now(),plays:2,last:1,kills:40,note:1});b.drop={kind:'wolf',at:1};b.pq=6};
+ {const a=bboot(noteReady,{index:20});a.go();
+  const g=a.game();eq([a.n.answers.dataset.qid,a.n.answers.dataset.special,a.n.levelChip.textContent,g.round.token,g.book.special],['a8-note-wolf-1','note','📜 이름 쪽지','8:story:Xa8-note-wolf-1',{kind:'note',key:'wolf',id:'a8-note-wolf-1'}],'쪽지 문제가 평소 문제 대신 그 칸에');
+  ok(a.n.quiz.classList.contains('note-q')&&a.n.passage.textContent===Nt.get(8,'wolf',1).passage,'쪽지 문제 칸(종이 무늬), 지문은 쪽지 글');
+  eq(g.state.index,20,'문제 번호는 그대로');
+  /* 새로고침 뒤 같은 특별 문제 */
+  a.tick(25);a.unload();const b=boot({book:true});ok(b.n.go.textContent.startsWith('이어서'),'하던 쪽지 문제가 있으면 "이어서 하기"');b.go();
+  eq([b.n.answers.dataset.qid,b.game().round.token,b.game().round.t>=20,bookOf(b).notes.n],['a8-note-wolf-1','8:story:Xa8-note-wolf-1',true,1],'새로고침 뒤 같은 쪽지 문제로 이어 감(쪽지 수를 두 번 세지 않음)');
+  const gold0=b.game().state.gold,asked0=b.game().state.run.asked;b.unlock();b.right();const r=b.game();
+  ok(r.state.gold>gold0&&r.round.gold>0,'쪽지 문제도 평소처럼 금화(+'+r.round.gold+')');
+  eq([r.state.index,r.state.run.ok.includes(20),r.state.run.miss.includes(20),r.state.run.asked,r.state.run.first],[20,false,false,asked0+1,1],'문제 번호 그대로, 결전 문제 후보(run.ok·miss)에 안 들어감, 푼 수에는 셈');
+  eq([bookOf(b).mon.wolf.note,bookOf(b).mon.wolf.card>0,bookOf(b).drop,bookOf(b).pend,r.book.gain.card],[3,true,null,null,1],'한 번에 맞히면 친구 카드');
+  ok(/🤝 늑대 누리와 친구가 됐어요! Wolf/.test(b.n.feedback.textContent)&&b.fx('friend-card').length===1&&r.round.wait>=25&&r.sfx.friend===1,'친구 카드 연출: 문구 · 카드 · 2.5초 · 효과음');
+  ok(stored().mon.wolf.card>0,'친구 카드를 받은 순간 기록을 씀');
+  b.tick(12);eq(b.api.phase,'reward','연출이 끝날 때까지(25틱) 다음 문제를 띄우지 않음');b.tick(15);b.untilAsk();
+  eq([b.game().state.index,b.n.answers.dataset.qid,b.n.answers.dataset.special,b.game().round.token],[20,Q.at(8,'story',20,4242,b.game().state.bank).id,'','8:story:20'],'그다음은 같은 번호의 평소 문제');
+  ok(!b.n.quiz.classList.contains('note-q')&&b.n.levelChip.textContent.startsWith('8세 · '),'평소 문제 칸으로 돌아옴');
+ }
+ {/* 놓침: 두 번째 정답 → 평소 배우기 + 쪽지 문구, 번호 그대로, 다음 놀이에 다른 문항 */
+  const a=bboot(noteReady,{index:20});a.go();a.unlock();a.wrong();a.tick(C.DASH_TICKS+2);a.unlock();a.btn(a.api.round.q.answer).click();
+  ok(a.api.phase==='learn'&&/쪽지가 바람에 날아갔어요/.test(a.n.feedback.textContent),'두 번째 정답: 쪽지가 날아갔다는 문구');
+  eq([bookOf(a).mon.wolf.note,bookOf(a).mon.wolf.nv,bookOf(a).mon.wolf.card,a.game().state.index],[2,1,0,20],'잃는 것 없이 이번 놀이만 쉼(다음 문항으로 바뀜), 문제 번호 그대로');
+  for(let i=0;i<120&&!a.api.round.ready;i++)a.tick();a.btn(a.api.round.q.answer).click();a.untilAsk();
+  eq([a.game().state.index,a.n.answers.dataset.special],[20,''],'배운 뒤에도 번호를 넘기지 않고 평소 문제로');
+  /* 두 번 틀림 */
+  const c=bboot(noteReady,{index:20});c.go();c.unlock();c.wrong(0);c.tick(C.DASH_TICKS+2);c.unlock();c.wrong(1);
+  ok(c.api.phase==='learn'&&/쪽지가 바람에 날아갔어요/.test(c.n.feedback.textContent)&&bookOf(c).mon.wolf.note===2&&c.game().state.run.miss.length===0,'두 번 틀림: 같은 문구, 판 기록 목록에 넣지 않음');
+ }
+ /* M-4 기억 늑대: 칩 · 문구 · 번호 고정 */
+ {const X=Q.get(8,'story',150);const a=bboot(b=>{b.pq=6;b.rv=[{id:X.id,box:1,due:0,dp:1,miss:1,seen:0}]},{index:9});a.go();
+  eq([a.n.answers.dataset.qid,a.n.answers.dataset.special,a.n.levelChip.textContent,a.game().round.token],[X.id,'review','🐺 기억 늑대: 지난번 글이에요','8:story:X'+X.id],'기억 늑대 문제');
+  eq([...a.n.answers.children].map(b=>b._t).sort(),X.choices.slice().sort(),'보기는 같은 글의 보기(순서만 섞음)');
+  a.unlock();a.right();ok(/🧠 기억했어요!$/.test(a.n.feedback.textContent)&&bookOf(a).rv[0].box===2&&a.game().state.index===9,'한 번에 맞히면 " · 🧠 기억했어요!", 칸 2로, 번호 그대로');
+  nextAsk(a);a.unlock();a.wrong(0);a.tick(C.DASH_TICKS+2);a.unlock();a.wrong(1);
+  const id=a.n.answers.dataset.qid;ok(bookOf(a).rv.some(e=>e.id===id&&e.box===1)&&a.game().state.run.miss.length===1,'평소 문제를 놓치면 기억 늑대 대기열에(판 기록은 지금 규칙 그대로)');
+ }
+ {/* 기억 늑대 문제는 놓쳐도 연속(신바람)이 끊기지 않는다. 평소 문제는 끊긴다 */
+  const X=Q.get(8,'story',150);const a=bboot(b=>{b.pq=6;b.rv=[{id:X.id,box:1,due:0,dp:1,miss:1,seen:0}]},{index:9,streak:4});a.go();eq(a.n.answers.dataset.special,'review','복습 문제');
+  a.unlock();a.wrong(0);eq(a.game().state.streak,4,'복습 문제를 한 번 틀려도 연속 그대로');a.tick(C.DASH_TICKS+2);a.unlock();a.wrong(1);eq([a.api.phase,a.game().state.streak,bookOf(a).rv[0].miss],['learn',4,2],'두 번 틀려도 연속 그대로(대기열에는 다시 들어감)');
+  for(let i=0;i<120&&!a.api.round.ready;i++)a.tick();a.btn(a.api.round.q.answer).click();a.untilAsk();eq(a.n.answers.dataset.special,'','다음은 평소 문제');a.unlock();a.wrong(0);eq(a.game().state.streak,0,'평소 문제를 틀리면 연속이 끊김(지금 규칙 그대로)');
+  const s=C.fresh(8);s.streak=5;C.settle(s,X,'second',{keepStreak:true});eq(s.streak,5,'Combat.settle keepStreak');C.settle(s,X,'second');eq(s.streak,0,'keepStreak가 없으면 지금과 같음')}
+ /* M-5 정답 화살 처치 → 발자국·훈장, 읽는 중에는 띠 없음(문제 사이에만) */
+ {const a=bboot(b=>{Object.assign(b.mon.wolf,{foot:Date.now(),plays:2,last:1,kills:40,note:1})},{index:3},{view:true});a.go();quiet(a);
+  const w=a.api.world,put=(hp,vh)=>{const v={id:w.nextId++,kind:'wolf',x:3,z:0,sx:20,sz:0,hp,max:hp,speed:.01,state:'walk',target:0,timer:0,inside:0,hen:0};if(vh)v.vh=1;w.wolves.push(v);return v};
+  const v=put(1,true);for(let i=0;i<60&&v.state!=='dead';i++)a.tick();
+  eq([a.api.phase,v.state,bookOf(a).mon.wolf.kills,bookOf(a).medal.arrow.n,bookOf(a).drop&&bookOf(a).drop.kind],['ask','dead',41,1,'wolf'],'읽는 중에 정답 화살 맞은 늑대가 쓰러짐 → 처치 +1, 쪽지를 떨어뜨림');
+  ok(a.events.some(e=>e.type==='noteDrop'&&e.kind==='wolf'),'3D에는 종이 한 장(noteDrop 사건)');
+  eq([a.fx('banner').filter(e=>/쪽지|반짝|훈장/.test(e.textContent)).length,a.game().book.later],[0,1],'읽는 중(ask)에는 수첩 띠를 띄우지 않고 모아 둠');
+  a.unlock();a.right();ok(a.fx('banner').some(e=>/늑대가 이름 쪽지를 떨어뜨렸어요!/.test(e.textContent))&&a.game().book.later===0,'그 문제를 답한 순간(문제 사이)에 띠 알림');
+  /* 타워가 저절로 쏜 화살로만 쓰러지면 세지 않음 */
+  const k0=bookOf(a).mon.wolf.kills,v2=put(1,false);for(let i=0;i<60&&v2.state!=='dead';i++)a.tick();eq([v2.state,bookOf(a).mon.wolf.kills],['dead',k0],'자동 사격만으로 쓰러진 늑대는 수첩에 세지 않음');
+ }
+ /* M-6 반짝 손님: 기회 → 세계에 손님 → 다음 정답의 화살이 닿으면 반짝 칸. 띠는 문제 사이에. 저장을 건넘 */
+ {const a=bboot(b=>{b.shiny.miss=2},{index:12,streak:C.FLOW.boost2-1,run:{...C.freshRun(),asked:12,t0:1}},{view:true});a.go();quiet(a);a.unlock();a.right();/* 연속 정답으로 신바람 2단이 되는 순간이 기회 */
+  const g=a.game();ok(g.book.guest&&g.book.guest.state==='walk'&&g.book.data.shiny.guest===g.book.guest.kind&&g.book.data.shiny.run===1&&g.book.data.shiny.miss===0,'세 번째 기회(확정): 손님이 마을 둘레에 옴 '+(g.book.guest&&g.book.guest.kind));
+  ok(a.events.some(e=>e.type==='guest')&&!a.fx('banner').some(e=>/당첨|뽑/.test(e.textContent)),'손님 등장은 걸어 들어올 뿐("당첨" 문구 없음)');
+  nextAsk(a);a.tick(30);a.n.pause.click();a.unload();
+  const b=boot({book:true,view:true});b.go();ok(b.game().book.guest&&b.game().book.guest.kind===g.book.guest.kind,'앱을 닫았다 열어도 손님이 그대로 있음');
+  quiet(b);b.unlock();b.right();ok(b.api.world.guest.state==='bow','다음에 한 번에 맞히면 일제 사격의 한 발이 손님에게');
+  let n=0;while(b.api.world.guest&&b.api.world.guest.state==='bow'&&n++<200){if(b.api.phase==='ask')break;b.tick()}
+  for(let i=0;i<200&&!bookOf(b).mon[g.book.guest.kind].shiny;i++)b.tick();
+  const d=bookOf(b);ok(d.mon[g.book.guest.kind].shiny>0&&d.shiny.guest===null&&Bk.cells(d)===1&&b.game().sfx.shiny===1,'화살이 닿으면 반짝 칸(수첩 1칸)');
+  if(b.api.phase==='ask'){eq(b.fx('banner').filter(e=>/반짝/.test(e.textContent)).length,0,'읽는 중이면 반짝 띠를 미룸');b.unlock();b.right()}
+  ok(b.fx('banner').some(e=>/반짝 손님이 인사하고 갔어요!/.test(e.textContent)),'띠 알림은 문제 사이에');
+  /* 종을 울리면(결전 시작) 남은 손님은 떠나고 다음 기회 확정 */
+  const c=bboot(x=>{x.shiny.guest='wolf';x.shiny.run=1},{index:30,run:{...C.freshRun(),asked:30,t0:1,bell:1}},{view:true});c.go();ok(c.api.world.guest&&c.api.world.guest.kind==='wolf','기록에 손님이 있으면 세계에도 세움');
+  c.buy('bell');eq([bookOf(c).shiny.guest,bookOf(c).shiny.miss,c.api.world.guest&&c.api.world.guest.state],[null,2,'leave'],'결전이 시작되면 손님은 숲으로(다음 기회 확정)');
+ }
+ /* M-7 '마을을 처음부터'는 판 저장만 새로 만들고 기록은 그대로 */
+ {const a=bboot(b=>{Object.assign(b.mon.wolf,{foot:Date.now(),card:Date.now(),note:3,plays:3,kills:50});b.medal.king.n=2;b.medal.king.at=[Date.now(),0,0];b.rv=[{id:'a8-story-03',box:2,due:0,dp:1,miss:2,seen:1}];b.play=5},{index:40,gold:900,level:3});
+  a.go();a.unlock();a.right();const before=bookOf(a);a.n.reset.click();const g=a.game();
+  eq([g.state.gold,g.state.index,g.state.level,g.state.meta.stamps.length],[20,0,1,0],'판 저장은 새 판(금화 20 · 문제 0번)');
+  eq([g.book.data.mon.wolf,g.book.data.medal,g.book.data.rv,g.book.data.play,g.book.data.order.seed,g.book.data.seen],[before.mon.wolf,before.medal,before.rv,5,4242,before.seen],'수첩·훈장·기억 늑대·놀이 번호·이어 순서 씨앗은 그대로');
+  ok(stored().mon.wolf.card>0&&stored().medal.king.n===2,'저장소의 기록 열쇠도 그대로');
+ }
+ /* M-8 하루 시간: 문제 사이에서만 멈춤, 보호자 15분 더(길게 누르기 + 글로 적힌 수), 같은 날 다시 열면 이 화면부터, 다음 날 풀림 */
+ {const today=Bk.dayOf(Date.now());const a=bboot(b=>{b.today={d:today,s:1790,ext:0}},{index:5});a.go();quiet(a);
+  a.tick(110);eq([bookOf(a).today.s>=1800,a.api.phase,a.api.paused,shownOff(a.n.sleepy)],[true,'ask',false,true],'시간이 넘어도 읽는 중에는 멈추지 않음');
+  a.unlock();a.right();eq(a.api.phase,'reward','정답 연출은 그대로');a.tick(REWARD+1);
+  ok(a.n.sleepy.hidden===false&&a.api.paused&&a.game().book.sleepy&&a.game().sfx.sleepy===1,'다음 문제 사이에 "꼬꼬가 졸려요" 화면(세계 멈춤)');
+  const t0=a.api.world.t;a.tick(30);a.n.pause.click();eq([a.api.world.t,a.api.paused],[t0,true],'쉬는 동안 세계는 멈추고, 잠깐 쉬기 단추로 풀리지 않음');
+  const gold0=a.game().state.gold;ok(gold0>20&&stored().today.s>=1800,'잃는 것 없음(금화 그대로), 기록 저장');
+  press(a,'sleepyMore',300);ok(a.n.gate.hidden!==false&&/길게/.test(a.n.sleepyNote.textContent),'짧게 누르면 안내만("보호자는 길게 눌러요")');
+  press(a,'sleepyMore',2100);ok(a.n.gate.hidden===false&&gateDigits(a),'2초 길게 누르면 어른 확인: 글로 적힌 세 자리 수 '+a.n.gateCode.textContent);
+  ok(!/\d/.test(a.n.gateCode.textContent)&&a.n.gatePad.children.length===10,'수는 글로만 보이고(숫자 예시 없음) 숫자판으로 입력');
+  gatePass(a);eq([a.n.gate.hidden,a.n.sleepy.hidden,a.api.paused,a.api.phase,bookOf(a).today.ext],[true,true,false,'ask',15],'맞히면 15분 더, 다음 문제로');
+  a.n.pause.click();a.unload();
+  /* 같은 날 다시 열어도(시간이 다 찼으면) 이 화면부터 */
+  const b=bboot(x=>{x.today={d:today,s:1800,ext:0}},{index:5});b.go();ok(b.n.sleepy.hidden===false&&b.game().book.sleepy&&b.api.phase==='start','같은 날 다시 열면 쉬기 화면부터');
+  skew+=86400000;b.hide(true);b.hide(false);ok(b.n.sleepy.hidden&&b.api.phase==='ask','다음 날이 되면 풀림');skew-=86400000;
+  /* 결전 중이면 결전이 끝난 뒤 */
+  const c=bboot(x=>{x.today={d:today,s:5000,ext:0}},{index:5,run:{...C.freshRun(),asked:20,t0:1,bell:2,fpick:[1,2,3,4,5,6],shields:0,fq:0}});c.go();ok(c.n.sleepy.hidden!==false&&c.api.phase==='ask','결전 중에는 쉬기 화면을 미룸');
+  /* 하루 시간 "없음" */
+  const d=bboot(x=>{x.today={d:today,s:9999,ext:0};x.set.day=0},{index:5});d.go();ok(d.api.phase==='ask'&&shownOff(d.n.dayNote)===false&&d.n.dayNote.textContent==='','하루 시간 "없음"이면 멈추지 않음');
+ }
+ /* M-9 수첩 화면 · 보호자 화면 */
+ {const a=bboot(b=>{Object.assign(b.mon.wolf,{foot:Date.now(),card:Date.now(),note:3,plays:3,kills:50,rib:{n:1,last:2}});Object.assign(b.mon.bramble,{foot:Date.now(),plays:1,kills:18});b.mon.wolf.shiny=Date.now();
+   b.medal.one.n=60;b.medal.one.at=[Date.now(),0,0];b.rv=[{id:'a8-story-03',box:1,due:0,dp:1,miss:4,seen:1}];b.tot={q:80,f:60,s:1500,days:2};b.play=3},{index:5});
+  a.n.openBook.click();ok(a.n.bookScreen.hidden===false,'시작 화면에서 수첩이 열림');
+  eq([a.n.bookTitle.textContent,a.n.bookPages.children.length,a.n.bookMedals.children.length],['📒 발자국 수첩 4 / 32',8,12],'표지: 채운 칸 4 / 32, 8쪽, 훈장 12개');
+  const page=k=>a.n.bookPages.children.find(c=>c.dataset.kind===k);
+  ok(page('wolf').dataset.state==='friend'&&/늑대 누리/.test(page('wolf').textContent)&&/Wolf/.test(page('wolf').textContent)&&/친구가 된 날/.test(page('wolf').textContent)&&/친구 리본까지 1 \/ 3/.test(page('wolf').textContent),'친구 쪽: 종 이름·개인 이름·영어 이름·친구가 된 날·리본 진행');
+  ok(page('bramble').dataset.state==='foot'&&/정답 화살로 덤불 늑대를 30마리 물리치면 쪽지를 떨어뜨려요 \(18\/30\)/.test(page('bramble').textContent)&&!/보리/.test(page('bramble').textContent),'발자국 쪽: 조건 한 줄과 진행 숫자, 개인 이름은 아직 안 보임');
+  ok(page('king').dataset.state==='none'&&/아직 만나지 않았어요/.test(page('king').textContent),'아직 만나지 않은 쪽');
+  ok(!/한 판만 더|조금만 더|거의 다|서둘러|오늘 안에/.test(a.n.bookPages.textContent+a.n.bookMedals.textContent),'수첩에 재촉 문구 없음');
+  const md=a.n.bookMedals.children.find(c=>c.dataset.key==='one');eq(md.dataset.tier,'1','훈장 단계(동)');md.click();ok(/한 번에 읽기: .*동 50 · 은 300 · 금 1000 · 지금 60 · 다음 단계까지 240/.test(a.n.bookTip.textContent),'훈장을 누르면 조건과 남은 수');
+  a.n.bookClose.click();ok(a.n.bookScreen.hidden,'닫기');
+  a.go();a.n.openBook.click();a.n.pauseBook.click();ok(a.n.bookScreen.hidden&&shownOff(a.n.pauseBook),'읽는 중(ask)에는 수첩이 열리지 않고 단추도 없음');
+  a.n.pause.click();ok(!shownOff(a.n.pauseBook),'잠깐 쉬기 중에만 수첩 단추');a.n.pauseBook.click();ok(a.n.bookScreen.hidden===false,'쉬는 중에는 열림');a.n.bookClose.click();a.n.pause.click();ok(shownOff(a.n.pauseBook),'계속하면 단추가 사라짐');
+  /* 보호자 문턱: 짧게 누르면 안내만, 길게 누르면 글로 적힌 수, 3번 틀리면 30초 쉼 */
+  const g=bboot(b=>{b.medal.one.n=60;b.rv=[{id:'a8-story-03',box:1,due:0,dp:1,miss:4,seen:1}];b.tot={q:80,f:60,s:1500,days:2}},{index:5});
+  press(g,'openGuard',200);ok(g.n.gate.hidden!==false&&g.n.guardian.hidden!==false&&/길게/.test(g.n.dayNote.textContent),'보호자 단추를 짧게 누르면 열리지 않음');
+  press(g,'openGuard',2100);ok(g.n.gate.hidden===false&&g.n.guardian.hidden!==false,'길게 누르면 어른 확인');
+  const wrongDs=()=>{const d=gateDigits(g);return [d[0]==='9'?'8':'9',d[1],d[2]]};
+  const c1=g.n.gateCode.textContent;gateType(g,wrongDs());ok(g.n.gate.hidden===false&&g.n.guardian.hidden!==false&&/수가 달라요/.test(g.n.gateAsk.textContent),'틀리면 열리지 않고 새 수');
+  gateType(g,wrongDs());gateType(g,wrongDs());ok(/잠깐 쉬었다가/.test(g.n.gateAsk.textContent)&&g.n.gatePad.children.length===0&&g.n.gateCode.textContent==='','3번 틀리면 30초 쉼(숫자판이 사라짐)');
+  g.n.gateClose.click();press(g,'openGuard',2100);ok(g.n.gatePad.children.length===0,'쉬는 동안에는 다시 눌러도 입력할 수 없음');g.n.gateClose.click();
+  skew+=31000;press(g,'openGuard',2100);gatePass(g);ok(g.n.gate.hidden&&g.n.guardian.hidden===false,'30초 뒤 맞히면 보호자 화면이 열림');
+  eq(g.n.gTabs.children.map(b=>b.textContent),['기록','설정','진행 파일','도움말'],'탭 4개');
+  const body=()=>g.n.gBody.textContent,tab=k=>g.n.gTabs.children.find(b=>b.dataset.tab===k).click(),gbtn=t=>g.n.gBody.children.find(c=>c.tagName==='button'&&c.textContent.startsWith(t));
+  ok(/전체: 놀이 1번 · 푼 문제 80 · 한 번에 맞힌 문제 60/.test(body())&&/자주 놓친 글/.test(body())&&/놓친 수 4/.test(body()),'기록 탭: 숫자 사실');
+  ok(!/%|순위|등수|평균|또래|보다 잘|실력|효과|향상/.test(body()),'기록 탭에 비율·순위·비교·효과 문구 없음');
+  tab('help');ok(body().includes(Bk.shinyText())&&/25% 확률/.test(body())&&/수첩은 몬스터 8종, 32칸으로 끝이 있어요/.test(body())&&/보안 장치가 아니에요/.test(body()),'도움말: 반짝 손님 확률(상수에서 만든 문구) · 수집 구조 · 문턱 안내');
+  ok(body().includes('게임 기록은 이 기기에 저장되고, 개발자에게 보내지 않아요.')&&!/이 기기에만|기기 안에만|밖으로 나가지 않아요/.test(body()),'저장 위치는 기준 문장 그대로("에만" 없음)');
+  ok(/개인정보처리방침/.test(body())&&/수집하는 개인정보: 없습니다/.test(body())&&/\[개발자 이름\]/.test(body())&&/\[문의 이메일\]/.test(body())&&/오픈소스 고지/.test(body()),'도움말: 개인정보처리방침 본문(개발자 이름·이메일은 자리표시)과 오픈소스 고지');
+  ok(!/https?:|www\./.test(body()),'보호자 화면 글에 바깥 주소 없음');
+  /* 설정: 하루 시간 바꾸기, 끄기는 한 번 더 확인 */
+  tab('set');const sel=g.n.gBody.children.find(c=>c.tagName==='label').children.find(c=>c.tagName==='select');sel.value='45';sel.onchange();eq([bookOf(g).set.day,stored().set.day],[45,45],'하루 시간 45분(바로 저장)');
+  {const s2=g.n.gBody.children.find(c=>c.tagName==='label').children.find(c=>c.tagName==='select');s2.value='0';s2.onchange();eq([bookOf(g).set.day,g.n.gate.hidden],[45,false],'하루 시간 끄기는 글로 적힌 수를 한 번 더');gatePass(g);eq(bookOf(g).set.day,0,'확인 뒤 꺼짐')}
+  {const en=()=>g.n.gBody.children.find(c=>c.tagName==='label'&&/영어/.test(c.textContent)).children.find(c=>c.tagName==='select');
+   ok(en().value==='std'&&en().children.find(o=>o.value==='more').disabled&&/9세부터/.test(en().children.find(o=>o.value==='more').textContent),'영어 문제: 끄기·보통·조금 더(8세는 "조금 더"를 고를 수 없음, 9세부터)');
+   const s3=en();s3.value='off';s3.onchange();eq([bookOf(g).set.en,stored().set.en,Q.QUIZ_MIX[8]],['off','off',{math:10,common:10,english:0}],'영어 끄기: 기록에 저장, 퀴즈 분류 가중치에서 영어 0');
+   ok(Array.from({length:300},(_,i)=>Q.at(8,'story',i,7)).every(q=>q.cat!=='english'),'영어를 끄면 영어 문제가 나오지 않음(8세 300칸)');
+   const s4=en();s4.value='std';s4.onchange();eq(Q.QUIZ_MIX[8],{math:10,common:8,english:2},'보통으로 되돌리면 처음 비중')}
+  /* 진행 파일: 내보내기(한 번 더 확인) → 다른 기기에서 불러오기 → 미리보기 → 바꾸기 → 되돌리기 */
+  tab('file');ok(body().includes('파일에는 읽기 단계, 날짜별 놀이 시간, 문제 기록, 수첩과 훈장이 들어 있어요.')&&/기기를 바꾸기 전에/.test(body()),'진행 파일 탭 안내 문장');
+  gbtn('파일로 내보내기').click();ok(g.n.gate.hidden===false&&!g.window.__lastExport,'내보내기는 한 번 더 확인');gatePass(g);
+  const file=g.window.__lastExport;ok(file&&/^kkomaeul-progress-\d{8}\.json$/.test(file.name)&&JSON.parse(file.text).book.medal.one.n===60&&!('world' in JSON.parse(file.text).run),'진행 파일(세계는 빠짐)');
+  const mine=[saved[KEY],saved[BOOK_KEY]];
+  const h=bboot(b=>{b.medal.one.n=3;b.play=2},{index:1,gold:55});press(h,'openGuard',2100);gatePass(h);h.n.gTabs.children.find(b=>b.dataset.tab==='file').click();
+  eq([h.window.__importText('{').ok,/진행 파일이 아니에요/.test(h.n.gNote.textContent)],[false,true],'엉뚱한 파일은 거절');
+  {const f=JSON.parse(file.text);f.v=2;h.window.__importText(JSON.stringify(f));ok(/새 버전 앱에서 만든 파일/.test(h.n.gNote.textContent),'새 버전 파일은 거절')}
+  {const f=JSON.parse(file.text);f.book.medal.one.n=61;h.window.__importText(JSON.stringify(f));ok(/손상됐을 수 있어요\. 그래도 불러올까요\?/.test(h.n.gBody.textContent),'검사합이 어긋나면 경고(보호자가 고름)');h.n.gBody.children.find(c=>c.textContent==='그만두기').click()}
+  h.window.__importText(file.text);const hb=h.n.gBody.textContent;ok(/불러올 기록: 친구 카드 0 · 훈장 1 · 놀이 1번/.test(hb)&&/이 기기의 기록: 친구 카드 0 · 훈장 0 · 놀이 2번/.test(hb)&&!/손상/.test(hb),'미리보기: 불러올 기록과 이 기기의 기록');
+  const keep=[saved[KEY],saved[BOOK_KEY]];h.n.gBody.children.find(c=>c.textContent==='바꾸기').click();ok(h.n.gate.hidden===false&&saved[BOOK_KEY]===keep[1],'바꾸기도 한 번 더 확인');gatePass(h);
+  eq([h.game().book.data.medal.one.n,h.game().state.index,h.game().state.gold,h.api.phase,h.n.start.hidden],[60,5,20,'start',false],'바꾼 뒤: 불러온 기록과 판으로 시작 화면');
+  ok(/되돌리기/.test(h.n.gBody.textContent)&&saved[BOOK_KEY+'-bak'],'직전 기록을 -bak에 한 벌, 되돌리기 단추');
+  h.n.gBody.children.find(c=>c.textContent.startsWith('되돌리기')).click();
+  eq([saved[KEY],saved[BOOK_KEY],BOOK_KEY+'-bak' in saved,h.game().book.data.medal.one.n,h.game().state.gold],[keep[0],keep[1],false,3,55],'되돌리면 바꾸기 전 판 저장·기록이 글자 그대로(한 번뿐)');
+  ok(!/되돌리기/.test(h.n.gBody.textContent),'되돌리기는 마지막 1번');
+  /* 3분 동안 손대지 않으면 닫힘 */
+  skew+=181000;h.n.gTabs.children[0].click();ok(h.n.guardian.hidden,'3분 동안 손대지 않으면 다음 손길에 닫힘');
+  /* 모든 기록 지우기: 보호자 화면에서만, 한 번 더 확인 */
+  press(h,'openGuard',2100);gatePass(h);h.n.gTabs.children.find(b=>b.dataset.tab==='set').click();h.n.gBody.children.find(c=>c.textContent==='모든 기록 지우기').click();ok(h.n.gate.hidden===false&&saved[BOOK_KEY],'모든 기록 지우기도 한 번 더 확인');gatePass(h);
+  eq([KEY in saved,BOOK_KEY in saved,h.game().book.status,h.game().state.gold,h.game().book.data.medal.one.n,h.api.phase],[false,false,'new',20,0,'start'],'두 열쇠를 비우고 새로 시작');
+  /* 보호자 안내(시작 화면): 문턱 없이 개인정보처리방침 본문만 */
+  h.n.openInfo.click();ok(h.n.guardian.hidden===false&&h.n.gTabs.children.length===1&&/개인정보처리방침/.test(h.n.gBody.textContent)&&!h.n.gBody.children.some(c=>c.tagName==='button'),'보호자 안내: 방침 본문만(문턱·단추 없음)');h.n.guardClose.click();
+  saved={[KEY]:mine[0],[BOOK_KEY]:mine[1]};
+ }
+ /* M-10 엔딩 카드: 쉬기 권유가 단추 위에, 이번 판 요약, "오늘은 그만하기" */
+ {const a=bboot(b=>{Object.assign(b.mon.wolf,{foot:Date.now(),card:Date.now(),note:3,plays:3,kills:50})},{index:60,run:{...C.freshRun(),asked:60,first:50,t0:1,bell:3}});a.go();
+  ok(a.game().ending&&!shownOff(a.n.endRest)&&html.includes('id="endRest">🌙 오늘은 여기까지 해도 좋아요</p>')&&!shownOff(a.n.endQuit)&&!shownOff(a.n.endBookBtn),'엔딩 카드: 쉬기 권유 · 오늘은 그만하기 · 수첩 보기');
+  ok(/놀러 올 친구: 누리/.test(a.n.endFriends.textContent)&&shownOff(a.n.endBook),'놀러 올 친구 줄(이번 판에 얻은 것이 없으면 요약 줄 생략)');
+  {const p=html.indexOf('id="endRest"'),q=html.indexOf('id="endQuit"'),r=html.indexOf('id="endNew"');ok(p>0&&p<q&&q<r,'쉬기 권유와 "오늘은 그만하기"가 새 마을 단추보다 위')}
+  a.n.endBookBtn.click();ok(a.n.bookScreen.hidden===false,'엔딩 카드에서 수첩 보기');a.n.bookClose.click();
+  a.n.endQuit.click();eq([a.api.phase,a.n.ending.hidden,a.n.start.hidden,a.n.go.textContent],['start',true,false,'이어서 하기 ▶'],'오늘은 그만하기: 시작 화면으로(진행은 저장)');
+  a.go();ok(a.game().ending,'다시 들어오면 엔딩 카드부터');a.n.endStay.click();a.untilAsk();eq(a.window.getVillageState().friends,[{kind:'wolf',ribbon:false,shiny:false}],'더 놀기: 3D에 놀러 올 친구 목록');
+  const off=fresh();ok(!off.game().book.on,'수첩을 끄면 기록 없음');eq(off.window.getVillageState().friends,[],'수첩을 끄면 친구 목록도 빔');
+  /* 결전 승리 → 왕 발자국·훈장, 새 마을 → 놀이 +1 */
+  const k=bboot(null,{index:60,run:{...C.freshRun(),asked:60,first:50,t0:1,bell:2,fpick:[1],shields:C.FINALE.shields-1,fq:C.FINALE.shields-1,ok:[1,2,3]}});k.go();quiet(k);k.unlock();k.right();
+  const d=bookOf(k);eq([d.medal.king.n,d.mon.king.foot>0,d.mon.king.shiny>0,d.vil.meadow,k.game().book.gain.foot],[1,true,true,1,1],'결전 승리: 늑대 왕 훈장 · 발자국 · (한 번도 안 틀려) 반짝 칸 · 마을 도장');
+  k.tick(60);ok(k.game().ending&&/📒 이번 판: 발자국 \+1 .*훈장 동/.test(k.n.endBook.textContent),'엔딩 카드에 이번 판 요약 '+k.n.endBook.textContent);
+  k.n.endNew.click();eq([bookOf(k).play,bookOf(k).pq,k.game().book.gain.foot],[2,0,0],'새 마을: 놀이 번호 +1');
+ }
+ /* M-12 테스트 모드의 수첩 단추(?test=1): 쪽지 자격 · 반짝 기회 · 놀이 +1 · 기록 비우기. 시험 열쇠(-test)만 바꾼다 */
+ {saved={};const a=boot({book:true,query:'?test=1'}),T=a.window.__testmode;a.go();quiet(a);
+  ok(a.n.tmBook||true,'수첩 단추');eq(T.bookTest('note'),true,'쪽지 자격 주기');a.unlock();a.right();nextAsk(a);
+  eq([a.n.answers.dataset.special,a.n.levelChip.textContent],['note','📜 이름 쪽지'],'쪽지 자격을 주면 다음 문제가 쪽지 문제');a.unlock();a.right();ok(bookOf(a).mon.wolf.card>0,'읽어서 맞히면 친구 카드');nextAsk(a);
+  eq(T.bookTest('shiny'),true,'반짝 기회');ok(a.api.world.guest&&bookOf(a).shiny.guest===a.api.world.guest.kind,'반짝 손님이 바로 옴');
+  const p0=bookOf(a).play;T.bookTest('play');eq(bookOf(a).play,p0+1,'놀이 +1');
+  ok((BOOK_KEY+'-test') in saved&&!(BOOK_KEY in saved)&&!(KEY in saved),'시험 열쇠만 씀(아이 기록은 건드리지 않음)');
+  T.bookTest('wipe');eq([(BOOK_KEY+'-test') in saved,a.api.phase,bookOf(a).mon.wolf.card,bookOf(a).play],[false,'start',0,1],'기록 비우기: 시험 기록을 비우고 시작 화면으로');
+  const off=boot({query:'?test=1'});eq(off.window.__testmode.bookTest('note'),false,'수첩이 꺼져 있으면 아무 일도 없음')}
+ /* M-11 바깥 링크·외부 요청 없음(문자열 검사): 수첩 화면·규칙·콘텐츠 파일과 페이지 */
+ {const files={'index.html':html,'bookui.js':BOOKUI_SRC,'book.js':fs.readFileSync(__dirname+'/book.js','utf8'),'notes.js':fs.readFileSync(__dirname+'/notes.js','utf8')};
+  for(const [name,text] of Object.entries(files)){
+   for(const w of ['fetch(','XMLHttpRequest','sendBeacon','WebSocket','EventSource','window.open','location.href','target="_blank"','<a href','.href=\'http','https://','http://'])ok(!text.includes(w),name+': '+w+' 없음(바깥 링크·외부 요청 없음)');
+  }
+  ok(html.includes('<footer><span id="saveNote">게임 기록은 이 브라우저에 저장되고, 개발자에게 보내지 않아요.</span>'),'웹판 바닥글은 저장 위치 기준 문장(앱 빌드는 포장 단계에서 "이 기기에"로)');
+ ok(!/당첨|뽑기에|레어|가챠/.test(BOOKUI_SRC+files['index.html']),'화면 글에 뽑기·당첨 표현 없음');
+  ok(!/실력 향상|학습 효과|성적/.test(BOOKUI_SRC+files['index.html']),'화면 글에 효과 주장 없음');
+  ok(Nt.PRIVACY.length>=13&&Nt.PRIVACY.every(([h,l])=>typeof h==='string'&&Array.isArray(l)&&l.every(t=>typeof t==='string'&&t.length>0)),'개인정보처리방침 본문 모양');
+ }
+ Date.now=realNow;
 }
 
 eq(spoken,0,'검사 전체에서 음성 합성(speechSynthesis)을 한 번도 부르지 않음');

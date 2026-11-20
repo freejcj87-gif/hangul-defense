@@ -3,7 +3,8 @@
 // what each hall stage adds (dirt roads, lanterns, hay, feast flags). Positions live in layout.js. Everything is vertex-coloured.
 import * as THREE from 'three';
 import { prep, solid, flat, merge } from './geo.js';
-import { MARKET_NEAR, TENTS, STREET_FLAGS, STREET_CRATES, GATE, PATHS, lanterns, LANTERN_BOX, FLAGS3, HAY3, NESTS, COTTAGES, WELL, MILL, KEEP, ROAD_MARK, ROAD } from './layout.js';
+import { MARKET_NEAR, TENTS, STREET_FLAGS, STREET_CRATES, GATE, PATHS, lanterns, LANTERN_BOX, FLAGS3, HAY3, NESTS, COTTAGES, WELL, MILL0, MILL, KEEP, ROAD_MARK, ROAD,
+ RIVER, riverFrame, BRIDGE, bridgeSpot, deckY, millRace } from './layout.js';
 
 const V3=THREE.Vector3;
 const rot=(x,y,z)=>[x,y,z];
@@ -201,18 +202,56 @@ function keep(x,z){
   ['box',0xe2332a,[x+.4,H+2.25,z],[.76,.44,.03]],['cone',0xe2332a,[x+.86,H+2.25,z],[.18,.2,.03],rot(0,0,-Math.PI/2)],['box',0xffd24a,[x+.4,H+2.25,z+.003],[.76,.07,.034]]);
  return parts;
 }
+/* ---------- 0.15 river, bridge and mill (positions in layout.js; the GLB art is baked in village.js and handed in, these are the code-drawn stand-ins) ---------- */
+// The river for village radius R, in its own frame: x along the river, z out of the village (+z = n), origin = the centre line's point nearest the village.
+// Flat decals just above the flower decals (0.035-0.04): sandy banks, water, a deeper channel, a few glints, and the mill race running from the mill wheel.
+// village.js places it at frame.c turned by atan2(n.x, n.z) and can grow it along x (scale.x) when it first appears.
+export function riverGeometry(R){
+ const L=RIVER.length,w=RIVER.water,b=RIVER.bank,f=riverFrame(R),parts=[flat('plane',0xcdb681,0,0,L,w+2*b,.042),flat('plane',0x7fc6e6,0,0,L,w,.045),flat('plane',0x5fb2de,0,.08,L,w*.42,.047)];
+ for(let i=0;i<26;i++){const x=-L/2+4+i*(L-8)/25+Math.sin(i*3.7)*1.2;parts.push(flat('plane',0xd2f1fa,x,(i%3-1)*w*.24,.9+.4*Math.sin(i*2.1),.07,.049))}
+ // the mill race, in river coordinates (from the wheel to the centre line), with a sandy rim and a little splash pool under the wheel
+ const [x0,z0,x1,z1,rw]=millRace(R),loc=(x,z)=>{const dx=x-f.c[0],dz=z-f.c[1];return [dx*f.t[0]+dz*f.t[1],dx*f.n[0]+dz*f.n[1]]},[ax,az]=loc(x0,z0),[bx,bz]=loc(x1,z1),len=Math.hypot(bx-ax,bz-az),ang=Math.atan2(bz-az,bx-ax);
+ parts.push(flat('plane',0xcdb681,(ax+bx)/2,(az+bz)/2,len,rw+.24,.041,-ang),flat('plane',0x7fc6e6,(ax+bx)/2,(az+bz)/2,len,rw,.044,-ang),flat('disc',0xcdb681,ax,az,.62,.5,.041,-ang),flat('disc',0x7fc6e6,ax,az,.5,.38,.044,-ang));
+ return solid(parts);
+}
+// Code-drawn bridge (when bridge.glb is missing), local: travel along +z, the same arch as the GLB deck (layout deckY) so wolves cross it at the same height.
+export function codeBridgeGeometry(){
+ const parts=[],n=11,L=BRIDGE.len,W=1.4;
+ for(let i=0;i<n;i++){const z=-L/2+(i+.5)*L/n,y=deckY(z),slope=Math.atan2(deckY(z-.05)-deckY(z+.05),.1);parts.push(['box',i%2?0xb07a42:0xc08a4e,[0,y-.04,z],[W,.08,L/n*.94],rot(slope,0,0)])}
+ for(const s of [-1,1]){for(const z of [-1.35,-.45,.45,1.35])parts.push(['box',0x7c5028,[s*W/2,deckY(z)+.22,z],[.09,.5,.09]]);
+  for(const [z0,z1] of [[-1.35,-.45],[-.45,.45],[.45,1.35]]){const y0=deckY(z0)+.42,y1=deckY(z1)+.42,len=Math.hypot(z1-z0,y1-y0);parts.push(['box',0x9a6634,[s*W/2,(y0+y1)/2,(z0+z1)/2],[.07,.07,len],rot(-Math.atan2(y1-y0,z1-z0),0,0)])}}
+ return solid(parts);
+}
+// Code-drawn water wheel (when watermill.glb is missing), local: axle along x through the origin, radius MILL.wheel.r · 0.8.
+export function codeWheelGeometry(){
+ const R=MILL.wheel.r*.8,parts=[['ring',0x7c5028,[-.08,0,0],[R,R,.5],rot(0,Math.PI/2,0)],['ring',0x7c5028,[.08,0,0],[R,R,.5],rot(0,Math.PI/2,0)],['cyl6',0x5c3a1c,[0,0,0],[.09,.42,.09],rot(0,0,Math.PI/2)]];
+ for(let i=0;i<4;i++)parts.push(['box',0x9a6634,[0,0,0],[.05,R*1.9,.05],rot(i*Math.PI/4,0,0)]);
+ for(let i=0;i<8;i++){const a=i*Math.PI/4;parts.push(['box',0xc79a5c,[0,Math.cos(a)*R,Math.sin(a)*R],[.3,.05,.2],rot(a,0,0)])}
+ return solid(parts);
+}
+// Code-drawn mill house for the 0.15 spot (the wheel is its own turning piece), local: door on +z, wheel side −x.
+function millHouseParts(){
+ return [['box',0xb7a98a,[0,.06,0],[1.5,.12,1.25]],['box',0xe7d3a6,[0,.72,0],[1.36,1.2,1.1]],['box',0x9a6634,[0,1.34,0],[1.5,.07,1.24]],['cone',0x8a4f33,[0,1.78,0],[1.12,.86,.94],rot(0,Math.PI/6,0)],
+  ['box',0x7a4a24,[.38,.42,.56],[.3,.6,.05]],['box',0x5c3a1c,[-.78,MILL.wheel.y,0],[.3,.14,.14]]];
+}
+const WHITE=new THREE.Color(1,1,1),placed=(g,x,z,ry)=>prep(g,new THREE.Matrix4().compose(new V3(x,0,z),new THREE.Quaternion().setFromAxisAngle(new V3(0,1,0),ry),new V3(1,1,1)),WHITE);
 // What stands at 'stage' (0-5) for a village of 'radius' with the open 'routes' (array of spawn points, or null).
 // → {all, old, fresh}: geometries (null when empty) of everything, of what was already there at the stage before, and of what this stage adds
 //   (the road-entrance markers move out with the edge, so they are always fresh), plus spots [[x,z,height],…] of the fresh things for the effects.
-export function stageProps(stage,radius,routes){
- const old=[],fresh=[],spots=[],put=(at,parts,h,st)=>{if(st===stage){fresh.push(...parts);spots.push([at[0],at[1],h])}else old.push(...parts)};
+// 0.15 opt.river: from stage 3 the mill stands at MILL (opt.house = the baked mill house, else the code house; the wheel is drawn apart by village.js)
+// and the bridge on road 6 (opt.bridge = the baked bridge, else the code bridge) instead of road 6's two markers. Without opt.river: exactly the 0.14 props.
+export function stageProps(stage,radius,routes,opt={}){
+ const old=[],fresh=[],oldG=[],freshG=[],spots=[],put=(at,parts,h,st)=>{if(st===stage){fresh.push(...parts);spots.push([at[0],at[1],h])}else old.push(...parts)};
+ const river=!!opt.river&&stage>=RIVER.stage;
  COTTAGES.forEach((c,k)=>{if(stage>=c.stage)put(c.at,cottage(c.at[0],c.at[1],c.roof,k),1.5,c.stage)});
  if(stage>=WELL.stage)put(WELL.at,well(...WELL.at),1.5,WELL.stage);
- if(stage>=MILL.stage)put(MILL.at,mill(...MILL.at),2.2,MILL.stage);
+ if(river){const [x,z]=MILL.at,g=placed(opt.house||solid(millHouseParts()),x,z,MILL.ry);(stage===MILL.stage?freshG:oldG).push(g);if(stage===MILL.stage)spots.push([x,z,2.2]);
+  const b=bridgeSpot(radius);freshG.push(placed(opt.bridge||codeBridgeGeometry(),b.at[0],b.at[1],b.ry));spots.push([b.at[0],b.at[1],1])}   // the bridge steps out with the river: always fresh
+ else if(stage>=MILL0.stage)put(MILL0.at,mill(...MILL0.at),2.2,MILL0.stage);
  if(stage>=KEEP.stage)put(KEEP.at,keep(...KEEP.at),5,KEEP.stage);
  let marks=0;
- if(stage>=1&&routes)for(const p of routes){const a=spawnAngle(p),r=radius+ROAD_MARK.out,tier=stage<=2?1:stage-1;
+ if(stage>=1&&routes)for(const p of routes){if(river&&p===RIVER.road)continue;const a=spawnAngle(p),r=radius+ROAD_MARK.out,tier=stage<=2?1:stage-1;
   [-1,1].forEach((sd,i)=>{const x=Math.cos(a)*r-Math.sin(a)*sd*ROAD_MARK.side,z=Math.sin(a)*r+Math.cos(a)*sd*ROAD_MARK.side;fresh.push(...roadMark(x,z,tier,i));marks++;if(tier>=3)spots.push([x,z,tier>=4?2.6:1.9])})}
- const geo=list=>list.length?solid(list):null;
- return {all:geo([...old,...fresh]),old:geo(old),fresh:geo(fresh),spots,houses:COTTAGES.filter(c=>stage>=c.stage).length,marks};
+ const geo=(list,extra)=>{const all=[...(list.length?[solid(list)]:[]),...extra];return all.length?(all.length===1?all[0]:merge(all)):null};
+ return {all:geo([...old,...fresh],[...oldG,...freshG]),old:geo(old,oldG),fresh:geo(fresh,freshG),spots,houses:COTTAGES.filter(c=>stage>=c.stage).length,marks,river};
 }
