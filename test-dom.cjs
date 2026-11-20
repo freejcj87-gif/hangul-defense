@@ -2290,6 +2290,12 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   skew+=200000;sec();ok(g.n.guardian.hidden===false&&g.n.gate.hidden===false,'문턱이 떠 있는 동안은 닫지 않음');g.n.gateClose.click();sec();ok(g.n.guardian.hidden===true,'문턱을 닫으면 그때 닫힘');
   skew+=181000;g.n.guardian.onpointerdown();g.n.guardian.hidden=false;sec();ok(g.n.guardian.hidden===true,'3분이 지난 뒤의 손길은 시간을 늘리지 않음');
   g.n.openInfo.click();skew+=400000;sec();ok(g.n.guardian.hidden===false,'보호자 안내(방침 본문만)는 저절로 닫지 않음');g.n.guardClose.click()}
+ /* M-9d 리뷰 0.16 S: 효과음 켜고 끄기가 기록(set.sfx)에 남는다. 전에는 칸만 있고 쓰지 않아 끈 효과음이 다시 열면 켜졌다 */
+ {const a=bboot(b=>{b.set.sfx=0},{index:1});eq(a.n.sfx.checked,false,'기록의 효과음 끔 → 설정 체크 해제');
+  const c=bboot(null,{index:1});eq(c.n.sfx.checked,true,'기록의 효과음 켬 → 설정 체크');c.go();c.n.sfx.checked=false;c.n.sfx.onchange();
+  eq([bookOf(c).set.sfx,stored().set.sfx],[0,0],'풀이 중에 꺼도 기록에 바로 저장');const d=boot({book:true});eq(d.n.sfx.checked,false,'다시 열어도 꺼져 있음');
+  d.n.sfx.checked=true;d.n.sfx.onchange();eq(stored().set.sfx,1,'다시 켜면 저장');
+  saved={};const off=boot({book:true,query:'?book=0'});off.n.sfx.checked=false;off.n.sfx.onchange();ok(!(BOOK_KEY in saved),'?book=0이면 기록 열쇠를 쓰지 않음(0.15와 같음)')}
  /* M-9b 리뷰 0.16 R1: 기록을 다시 읽은 뒤(진행 파일 바꾸기 · 되돌리기 · 모든 기록 지우기) 그 기록의 영어 설정이 문제은행에 바로 반영된다. 전에는 앞 기록의 비중이 다시 열 때까지 남았다 */
  {const src=Bk.fresh(Date.now(),77);src.set.en='off';const file=Bk.exportText(src,{...C.fresh(8),seed:77,bank:Q.BANK_VERSION,version:3},{now:Date.now()});
   const a=bboot(null,{index:1});eq(Q.QUIZ_MIX[8].english,2,'이 기기 기록: 영어 보통');
