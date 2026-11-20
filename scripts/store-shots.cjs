@@ -175,7 +175,7 @@ async function main() {
   const url = 'http://127.0.0.1:' + server.address().port;
   fs.mkdirSync(DIR, { recursive: true });
   const browser = await chromium.launch({ headless: true, args: SWIFT });
-  const manifest = { made: new Date(NOW).toISOString(), commit: process.env.GITHUB_SHA || null, seed: SEED, sizes: {}, shots: [], failed: [] };
+  const manifest = { made: new Date(NOW).toISOString(), commit: process.env.GITHUB_SHA || null, seed: SEED, sizes: {}, shots: [], checks: [], failed: [] };
 
   /* 단계 상태: 테스트 모드의 jumpState(시뮬 중앙값, testmode.js)를 한 번 받아 둔다. 이 페이지는 찍지 않는다 */
   const J = await (async () => {
@@ -193,8 +193,10 @@ async function main() {
     const ctx = await browser.newContext({ viewport: { width: S.w, height: S.h }, deviceScaleFactor: S.dsf, hasTouch: true, reducedMotion: 'no-preference', locale: 'ko-KR', timezoneId: 'Asia/Seoul' });
     await ctx.addInitScript(s => { window.__HOLD_CLOCK = true; try { if (!localStorage.getItem('hangul-defense-book')) { localStorage.setItem('hangul-defense-book', s.book); if (s.run) localStorage.setItem('hangul-defense-v1', s.run); } } catch {} },
       { book: JSON.stringify((scene.book || livedBook)()), run: scene.run ? scene.run(J) : null });
-    const page = await ctx.newPage(), errors = [];
+    const page = await ctx.newPage(), errors = [], external = [];
     page.on('pageerror', e => errors.push(e.message));
+    /* 바깥 요청 기록(있으면 안 됨: 게임은 같은 폴더의 파일만 부른다, policy/03 §1.3 D4) */
+    page.on('request', r => { const u = r.url(); if (!u.startsWith(url) && !/^(data|blob):/.test(u)) external.push(u); });
     await page.goto(url + '/' + (scene.query || ''));
     await page.waitForFunction(() => ['three', 'fallback'].includes(document.querySelector('.scene').dataset.renderer), {}, { timeout: 120000 });
     await page.waitForFunction(() => !window.VillageView || !window.VillageView.inspect || window.VillageView.inspect().ready, {}, { timeout: 120000 }).catch(() => {});
@@ -203,7 +205,7 @@ async function main() {
     const cdp = await ctx.newCDPSession(page); await cdp.send('Animation.enable');
     const frames = async n => { try { const f = await page.evaluate(() => (window.VillageView && window.VillageView.inspect ? window.VillageView.inspect().frames : 0)); await page.waitForFunction(x => !window.VillageView || !window.VillageView.inspect || window.VillageView.inspect().frames >= x, f + n, { timeout: 30000 }); } catch {} };
     const t = {
-      page, ctx, cdp, errors,
+      page, ctx, cdp, errors, external,
       st: () => page.evaluate(() => ({ phase, lock: round ? round.lock : 0, mode: round ? round.q.mode : '', special: !!(round && round.special), answer: round ? round.q.answer : -1, bell: state.run.bell, shields: state.run.shields, bubble: !!rec.bubble })),
       /* 세계 n틱(0.1초씩) + 3D를 같은 만큼 */
       async run(n) { for (let left = n; left > 0; left -= 50) { const k = Math.min(50, left); await page.evaluate(k => { window.__tick(k); try { window.VillageView && window.VillageView.debug({ advance: k / 10 }); } catch {} }, k); await frames(2); } },
@@ -269,7 +271,7 @@ async function main() {
         const a = await audit(t.page);
         if (a.bad.length) throw new Error('찍히면 안 되는 것: ' + a.bad.join(', '));
         const meta = save(name, await t.page.screenshot({ type: 'png' }), S.px);
-        manifest.shots.push({ id: scene.id, size, file: name, ...meta, title: scene.title, alt: scene.alt, state: scene.state, hidden: scene.hide || '', renderer: a.renderer, overflowX: a.overflowX, pageErrors: t.errors.slice(0, 5) });
+        manifest.shots.push({ id: scene.id, size, file: name, ...meta, title: scene.title, alt: scene.alt, state: scene.state, hidden: scene.hide || '', renderer: a.renderer, overflowX: a.overflowX, pageErrors: t.errors.slice(0, 5), externalRequests: t.external.slice(0, 5) });
         console.log('  ' + scene.id + ' ' + name + ' (' + a.renderer + ', ' + ((Date.now() - t0) / 1000).toFixed(0) + '초' + (t.errors.length ? ', 페이지 오류 ' + t.errors.length : '') + ')');
       } catch (e) {
         manifest.failed.push({ id: scene.id, size, error: String(e && e.message || e) });
@@ -314,6 +316,24 @@ async function main() {
       manifest.failed.push({ id: 'G1', size: 'feature', error: String(e && e.message || e) });
       console.log('  실패 G1: ' + (e && e.message || e));
       if (t) { await t.page.screenshot({ path: path.join(DIR, '_fail-feature-G1.png') }).catch(() => {}); await t.ctx.close().catch(() => {}); }
+    }
+  }
+
+  /* 확인용(스토어에 올리지 않음): 개인정보처리방침 페이지(privacy/)를 폰·패드 폭과 다크 모드에서 통째로 찍고, 응답·제목·가로 넘침·스크립트·바깥 요청을 적는다 */
+  if (!ONLY || ONLY.includes('P1')) {
+    for (const [name, w, h, scheme] of [['phone', 390, 844, 'light'], ['pad', 820, 1180, 'light'], ['phone-dark', 390, 844, 'dark']]) {
+      try {
+        const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1, colorScheme: scheme, locale: 'ko-KR' });
+        const page = await ctx.newPage(), ext = [];
+        page.on('request', r => { const u = r.url(); if (!u.startsWith(url) && !/^(data|blob):/.test(u)) ext.push(u); });
+        const res = await page.goto(url + '/privacy/');
+        const info = await page.evaluate(() => ({ title: document.title, overflowX: document.documentElement.scrollWidth > innerWidth + 1, height: document.documentElement.scrollHeight, marks: document.querySelectorAll('mark').length, scripts: document.scripts.length, sections: document.querySelectorAll('section').length }));
+        const file = 'check-privacy-' + name + '-' + w + 'w.png';
+        await page.screenshot({ path: path.join(DIR, file), fullPage: true });
+        manifest.checks.push({ id: 'P1', file, status: res && res.status(), scheme, ...info, externalRequests: ext });
+        console.log('  P1 ' + file + ' (응답 ' + (res && res.status()) + ', 가로 넘침 ' + info.overflowX + ', 스크립트 ' + info.scripts + ', 바깥 요청 ' + ext.length + ')');
+        await ctx.close();
+      } catch (e) { manifest.failed.push({ id: 'P1', size: name, error: String(e && e.message || e) }); console.log('  실패 P1 ' + name + ': ' + (e && e.message || e)); }
     }
   }
 
