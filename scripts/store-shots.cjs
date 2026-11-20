@@ -129,7 +129,9 @@ const SCENES = [
   /* 알·농부는 화면이 가장 가까운 '마을' 단계에서(장터 마을은 마을이 넓어져 알이 작다). 정답 뒤 판매 연출 중: 알을 든 농부가 매대로, 동전이 금화 칸으로 */
   { id: 'T4', file: '04-eggs-farmers', title: '알 → 농부 → 장터', alt: '닭이 알을 낳으면 농부가 장터에 팔아 금화가 생겨요', state: '마을 · 8세 · 닭 6마리 · 농부 3명 · 정답 뒤 판매 연출',
     run: J => runJson(J['8:1'], { chickens: Math.max(6, J['8:1'].chickens | 0), farmers: Math.max(2, J['8:1'].farmers | 0) }), query: QUIET,
-    css: 250, async make(t) { await t.begin(); await t.run(20); await t.answer(); await t.run(7); } },
+    /* 추천 말풍선은 T5가 보여 준다. 여기서는 마을 앞을 가리지 않게 숨긴다(말풍선은 20초에 한 번이라 없는 순간도 실제 화면이다) */
+    hide: '#bubble,#shopTip{visibility:hidden!important}',
+    css: 250, async make(t) { await t.begin(); await t.story(); await t.run(20); await t.answer(); await t.run(7); } },
   /* 말풍선은 문제 사이에만, 20초에 한 번만 뜬다(REC.gap). 앞 문제를 넘기지 않고 첫 정답에서 뜬 말풍선을 찍는다 */
   { id: 'T5', file: '05-shop-bubble', title: '가게와 추천 말풍선', alt: '모은 금화로 언제든 타워, 닭, 농부, 울타리를 사요', state: '마을 · 8세 · 금화 넉넉 · 정답 뒤 추천 말풍선',
     run: J => runJson(J['8:1'], { gold: 420 }), query: QUIET,
@@ -196,7 +198,7 @@ async function main() {
     await page.goto(url + '/' + (scene.query || ''));
     await page.waitForFunction(() => ['three', 'fallback'].includes(document.querySelector('.scene').dataset.renderer), {}, { timeout: 120000 });
     await page.waitForFunction(() => !window.VillageView || !window.VillageView.inspect || window.VillageView.inspect().ready, {}, { timeout: 120000 }).catch(() => {});
-    await page.addStyleTag({ content: CLEAN });
+    await page.addStyleTag({ content: CLEAN + (scene.hide || '') });
     await page.evaluate(() => { try { window.VillageView && window.VillageView.debug({ hold: true }); } catch {} });
     const cdp = await ctx.newCDPSession(page); await cdp.send('Animation.enable');
     const frames = async n => { try { const f = await page.evaluate(() => (window.VillageView && window.VillageView.inspect ? window.VillageView.inspect().frames : 0)); await page.waitForFunction(x => !window.VillageView || !window.VillageView.inspect || window.VillageView.inspect().frames >= x, f + n, { timeout: 30000 }); } catch {} };
@@ -262,7 +264,7 @@ async function main() {
         const a = await audit(t.page);
         if (a.bad.length) throw new Error('찍히면 안 되는 것: ' + a.bad.join(', '));
         const meta = save(name, await t.page.screenshot({ type: 'png' }), S.px);
-        manifest.shots.push({ id: scene.id, size, file: name, ...meta, title: scene.title, alt: scene.alt, state: scene.state, renderer: a.renderer, overflowX: a.overflowX, pageErrors: t.errors.slice(0, 5) });
+        manifest.shots.push({ id: scene.id, size, file: name, ...meta, title: scene.title, alt: scene.alt, state: scene.state, hidden: scene.hide || '', renderer: a.renderer, overflowX: a.overflowX, pageErrors: t.errors.slice(0, 5) });
         console.log('  ' + scene.id + ' ' + name + ' (' + a.renderer + ', ' + ((Date.now() - t0) / 1000).toFixed(0) + '초' + (t.errors.length ? ', 페이지 오류 ' + t.errors.length : '') + ')');
       } catch (e) {
         manifest.failed.push({ id: scene.id, size, error: String(e && e.message || e) });

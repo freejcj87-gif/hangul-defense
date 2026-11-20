@@ -8,6 +8,10 @@ on:
         description: 'tablet, portrait, phone 중 쉼표로(기본 tablet)'
         required: false
         default: 'tablet'
+      only:
+        description: '일부 장면만(예: T4,G1). 비우면 전부'
+        required: false
+        default: ''
   push:
     branches: [claude/release-kit]
 concurrency:
@@ -34,7 +38,8 @@ jobs:
       - name: Take store screenshots
         env:
           SIZES: ${{ github.event.inputs.sizes || 'tablet' }}
-        run: node scripts/store-shots.cjs store-shots "--sizes=$SIZES"
+          ONLY: ${{ github.event.inputs.only || '' }}
+        run: node scripts/store-shots.cjs store-shots "--sizes=$SIZES" "--only=$ONLY"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
