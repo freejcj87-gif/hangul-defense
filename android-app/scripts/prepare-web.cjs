@@ -2,7 +2,8 @@
 /* 웹 게임을 앱에 넣을 묶음(android-app/www/)을 만든다. `npm run sync`가 이것을 돌린 뒤 `cap sync android`로 앱 프로젝트에 복사한다.
    1) 저장소 루트 scripts/build-pages.cjs로 Pages와 똑같은 묶음(.pages-build/)을 새로 만든다(남은 옛 생성물이 앱에 섞이지 않게 먼저 지운다).
    2) www/로 복사한다(robots.txt·.nojekyll은 웹 전용이라 뺀다).
-   3) 앱 안 index.html에만 세 가지를 고친다(웹 배포 파일은 그대로):
+   3) 앱 안 index.html에만 네 가지를 고친다(웹 배포 파일은 그대로):
+      - 바닥글 저장 문장: "이 브라우저에" → "이 기기에"(정책 03 문서 §4 기준 문장).
       - viewport-fit=cover 빼기: 게임은 안전 영역(env(safe-area-inset-*))을 쓰지 않는다. 앱에서는 Capacitor System Bars(insetsHandling native)가
         WebView를 상태 표시줄·탐색 막대 안쪽에 두게 해서, Android 15+ 전체 화면(edge-to-edge)에서도 화면이 막대 밑으로 들어가지 않게 한다.
       - 길게 누르기 글자 선택·탭 강조색 끄기.
@@ -38,6 +39,8 @@ function swap(from, to, label) {
 swap(',viewport-fit=cover"', '"', 'viewport-fit=cover');
 swap('</head>', '<style id="app-shell-css">html{-webkit-tap-highlight-color:transparent}body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}</style></head>', '</head>');
 swap('</body>', '<script src="app-shell.js" defer></script></body>', '</body>');
+/* 저장 위치 기준 문장(정책 03 문서 §4): 웹판 바닥글은 "이 브라우저에", 앱 바닥글은 짧은 문장 "이 기기에". 고쳐 쓰지 않고 글자 그대로 쓴다 */
+swap('<span id="saveNote">게임 기록은 이 브라우저에 저장되고, 개발자에게 보내지 않아요.</span>', '<span id="saveNote">게임 기록은 이 기기에 저장되고, 개발자에게 보내지 않아요.</span>', '바닥글 저장 문장');
 fs.writeFileSync(indexFile, html);
 
 /* app-shell.js가 기대는 게임 쪽 자리(겹창·단추 id, 진행 파일 훅, 도움말의 오픈소스 고지 제목). 게임이 바뀌어 하나라도 없어지면

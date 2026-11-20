@@ -101,6 +101,8 @@ jobs:
           test -f "$public/index.html"
           grep -q 'app-shell.js' "$public/index.html"
           if grep -q 'viewport-fit=cover' "$public/index.html"; then echo 'viewport-fit=cover should be removed in the app copy'; exit 1; fi
+          grep -q '게임 기록은 이 기기에 저장되고, 개발자에게 보내지 않아요.' "$public/index.html"
+          if grep -q '이 브라우저에 저장' "$public/index.html"; then echo 'app footer must say this device, not this browser (policy 03 section 4)'; exit 1; fi
           if grep -q 'appStartPath' "$config"; then echo 'release config must not have appStartPath'; exit 1; fi
           if grep -q 'webContentsDebuggingEnabled' "$config"; then echo 'leave webContentsDebuggingEnabled unset (debug-only default)'; exit 1; fi
           test -f "$public/village.js"
