@@ -276,6 +276,29 @@ function bunting(points,sag,masts=[]){
  return {geometry:solid(parts),center:c};
 }
 
+/* ---------- 0.17 wolf herald (까마귀 · 깃발): built from primitives only. The flag reads World.HERALD.look, the same table the picture village draws as SVG ----------
+   look box: 24 × 32 (y down), pole at x 3 from y 2 (top) to y 31 (ground) → world units: X = (x − 3)·HERALD_K, Y = (31 − y)·HERALD_K; the cloth faces +Z (turned to the camera per instance). */
+const HERALD_K=2.2/29;
+function flatTris(tris,z,color){   // [x0,y0,x1,y1,x2,y2, …] in the look box → one flat, vertex-coloured piece facing +Z
+ const n=tris.length/2,P=new Float32Array(n*3),N=new Float32Array(n*3);
+ for(let i=0;i<n;i++){P[i*3]=(tris[i*2]-3)*HERALD_K;P[i*3+1]=(31-tris[i*2+1])*HERALD_K;P[i*3+2]=z;N[i*3+2]=1}
+ const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(P,3));g.setAttribute('normal',new THREE.BufferAttribute(N,3));return prep(g,new THREE.Matrix4(),new THREE.Color(color));
+}
+function heraldFlagGeometry(look,fm){
+ const k=HERALD_K,X=x=>(x-3)*k,Y=y=>(31-y)*k,cloth=look.cloth[fm],sh=new THREE.Shape(),w=look.stroke/2,tris=[],caps=[];
+ sh.moveTo(X(cloth[0]),Y(cloth[1]));for(let i=2;i+1<cloth.length;i+=2)sh.lineTo(X(cloth[i]),Y(cloth[i+1]));sh.closePath();
+ // white picture: each polyline as quads (round joints = small discs), arrow heads as triangles
+ for(const line of look.line[fm])for(let i=0;i+3<line.length;i+=2){const [ax,ay,bx,by]=line.slice(i,i+4),d=Math.hypot(bx-ax,by-ay)||1,nx=-(by-ay)/d*w,ny=(bx-ax)/d*w;
+  tris.push(ax+nx,ay+ny,bx+nx,by+ny,bx-nx,by-ny, ax+nx,ay+ny,bx-nx,by-ny,ax-nx,ay-ny);caps.push(['dot',0xffffff,[X(ax),Y(ay),.014],[w*k,w*k,1]],['dot',0xffffff,[X(bx),Y(by),.014],[w*k,w*k,1]])}
+ for(const h of look.head[fm])tris.push(...h);
+ return merge([solid([['cyl8',look.pole,[0,Y(31)/2+Y(2)/2,0],[.05,29*k,.05]],['ball',look.knob,[0,Y(2.4),0],.11]]),prep(new THREE.ShapeGeometry(sh),new THREE.Matrix4(),new THREE.Color(look.color[fm])),
+  flatTris(tris,.012,0xffffff),solid(caps)]);
+}
+// A crow facing +Z (head), body ~0.9 long; the wings are a separate flat piece (right wing, root at the body axis) drawn mirrored for the left one.
+function crowGeometry(look){const c=look.crow;return solid([['sphere',c,[0,0,0],[.2,.16,.4]],['ball',c,[0,.07,.36],.14],['cone',0xe9a23b,[0,.05,.55],[.055,.2,.055],[Math.PI/2,0,0]],['box',0x232129,[0,.01,-.44],[.26,.04,.3]],['ball',0xffffff,[.075,.12,.44],.035],['ball',0xffffff,[-.075,.12,.44],.035]])}
+function crowWingGeometry(){const s=new THREE.Shape(),pts=[[0,.16],[.42,.14],[.8,.03],[.74,-.06],[.62,-.04],[.63,-.13],[.49,-.1],[.48,-.19],[0,-.2]];s.moveTo(pts[0][0],-pts[0][1]);for(const [x,z] of pts.slice(1))s.lineTo(x,-z);s.closePath();
+ return prep(new THREE.ShapeGeometry(s),new THREE.Matrix4().makeRotationX(-Math.PI/2),new THREE.Color(0x34313d))}
+
 // The 0.15 models, each its own request: a failed (or stalled, or malformed) file resolves to null instead of failing start(). Everything is settled
 // before the scene first shows (renderer='three'), so a model never swaps in later. `core` = the assets start() cannot do without.
 function loadArt15(loader,core){
@@ -1209,6 +1232,7 @@ async function start(){
     power:powerShown,stunnedTowers:stunned,splashFx:{active:booms.filter(b=>time-b.t0<.8).length,total:boomTotal,scorches:scorches.length},
     arrowsVisible:arrowsDrawn,fireArrows:fireDrawn,wolfPos:[...wolfVis.values()].filter(o=>!o.ghost).slice(0,8).map(o=>[Math.round(o.x*100)/100,Math.round(o.z*100)/100]),
     wolfFace:[...wolfVis.values()].filter(o=>!o.ghost).map(o=>[o.id,+o.ry.toFixed(4),o.state]),   // 0.15.2: every drawn monster's heading (ry) and state, to add up how much a formation turns
+    herald:heraldInfo(),   // 0.17: drawn herald spots (flag and crow places per road, screen positions −1…1), crows and flags drawn, spots still flying off
     chickens:(()=>{const st=read();return st.world&&Array.isArray(st.world.hens)?st.world.hens.length:st.chickens|0})(),
     hensVisible:hensDrawn,hensHidden,hensPeeking:peeking,hensCarried:carriedDrawn,
     buildingsBroken:[...BUILDINGS,...sides].filter(sl=>sl.on&&sl.b&&sl.b.broken).length,
@@ -1722,8 +1746,81 @@ async function start(){
   for(const a of peeks)if(!a.hide){const cyc=(wclock*.8+a.x)%1;sprite(CELL.dot,a.x+camRight.x*.22,.78-cyc*.2,a.z+camRight.z*.22,.08,.12,SKY,less?.9:1-cyc*.8)}
   if(time<popUntil){const {x,z}=marketFront();sprite(CELL.glow,x,2.1,z,1.7,1.7,GOLD,.5,1);for(let i=0;i<3;i++)sprite(CELL.coin,x+camRight.x*(i-1)*.5,2.1+(i%2)*.28,z+camRight.z*(i-1)*.5,.5,.5,WHITE)}
   for(const [x,z] of lanterns(propsStage)){const fl=less?1:.85+.15*Math.sin(time*6+x*3);sprite(CELL.glow,x+.24,1.46,z,1.1*fl,1.1*fl,EMBER,.55,1);decal(CELL.glow,x+.2,z,1.6,EMBER,.22*fl,.8,.04)}   // lanterns glow warm
+  heraldGround();
  }
  let hammersDrawn=0;
+
+ /* ----- 0.17 늑대 예고(까마귀 · 깃발): getVillageState().herald = World.herald가 세계를 바꾸지 않고 미리 읽은 다음 무리의 길 · 대형(index.html이 틱마다 다시 읽음).
+    길마다 한 자리: 길 입구(울타리 바깥, 화면 안에 드는 가장 먼 곳)에 대형 깃발, 그 길 끝 숲 위(화면 안에 드는 가장 먼 곳) 하늘에 까마귀 2 + 그 길 묶음 수 마리가 맴돈다.
+    글자 · 소리 · 깜빡임 · 카메라 움직임 없음. 날아들기 · 날아가기는 World.HERALD.arrive · leave초, 움직임 줄이기면 연출 없이 바로 서고 사라지며 까마귀는 멈춰 있다.
+    그리기: 까마귀 몸 · 날개 · 대형별 깃발이 인스턴스 메시 하나씩(보일 때만, 그림자 없음), 땅 그늘은 기존 효과 풀(그리기 호출 늘지 않음) ----- */
+ // A herald that cannot be built or drawn turns itself off (warn once); it never takes the 3D village down with it (the frame loop falls back on any throw).
+ let HLOOK=(()=>{const H=W('HERALD');return H&&H.look&&Array.isArray(H.look.cloth)&&H.look.cloth.length===4?H.look:null})();
+ const HCROWS=15,hspots=new Map();let hclock=0,crowBody=null,crowWing=null,heraldFlags=[];
+ function heraldOff(error){console.warn('0.17 herald unavailable:',error&&error.message);HLOOK=null;hspots.clear();for(const m of [crowBody,crowWing,...heraldFlags])if(m){m.count=0;m.visible=false}}
+ if(HLOOK)try{
+  const made=[];const add=m=>{made.push(m);return m};
+  try{crowBody=add(instanced(crowGeometry(HLOOK),HCROWS,false));crowWing=add(instanced(crowWingGeometry(),HCROWS*2,false));heraldFlags=[0,1,2,3].map(fm=>add(instanced(heraldFlagGeometry(HLOOK,fm),3,false)))}
+  catch(error){for(const m of made)world.remove(m);crowBody=crowWing=null;heraldFlags=[];throw error}
+  crowBody.name='herald-crow';crowWing.name='herald-wing';heraldFlags.forEach((m,fm)=>{m.name='herald-flag-'+fm});for(const m of made){m.receiveShadow=false;m.visible=false}
+ }catch(error){heraldOff(error)}
+ const heraldScale=()=>Math.max(1,fxScale*.65);   // 0.8 made the flag 3.7 tall at the mill village on a laptop: no room above the fence on the top road (CI 44652792998)
+ const inView=(x,y,z,m)=>{ndc.set(x,y,z).project(camera);return Math.abs(ndc.x)<=m&&ndc.y<=m&&ndc.y>=-m};
+ const ndcOf=(x,y,z)=>{ndc.set(x,y,z).project(camera);return [+ndc.x.toFixed(3),+ndc.y.toFixed(3)]};
+ // where a road's herald stands: the flag on the road outside the fence (the furthest point whose foot and top are on screen between radius + 6 and + 3.2: clear of
+ // the bridge and the road markers; if none is, the furthest on-screen point down to radius + 1.2, just outside the fence: on a pad the side roads of the castle
+ // show only about 2 beyond the fence, wolf-paths-plan §1.2), the crows over the forest end of the same road (the furthest point on screen beyond the flag; on a road
+ // running off the top or the side of the screen they fly lower, then come in over the flag, then over the road inside it)
+ // A road running to the top of the screen has little room above the fence (the river view, 0.15): there the flag is shrunk to fit (down to half; the camera is
+ // orthographic, so screen y is linear in height) and the crows fly low over the road just inside the gate. fk = the flag's size factor.
+ function heraldPlace(p,sc){
+  const a=spawnAngle(p),c=Math.cos(a),s=Math.sin(a),R=Rd,E=num(W('EDGE'))||7,H0=2.3*sc,flagOk=r=>inView(c*r,0,s*r,.86)&&inView(c*r,H0,s*r,.86);let rf=0,fk=1,rc=0,yC=0;
+  for(let r=R+E-1;r>=R+3.2-1e-9&&!rf;r-=.5)if(flagOk(r))rf=r;
+  for(let r=R+2.8;r>=R+1.2-1e-9&&!rf;r-=.4)if(flagOk(r))rf=r;
+  if(!rf){rf=R+1.2;for(let r=R+E-1;r>=R+1.2-1e-9;r-=.4)if(inView(c*r,0,s*r,.74)){rf=r;break}
+   const y0=ndcOf(c*rf,0,s*rf)[1],y1=ndcOf(c*rf,H0,s*rf)[1];if(y1>.86&&y1>y0+1e-6)fk=clamp((.86-y0)/(y1-y0),.5,1)}
+  find:{for(const yk of [3.1,2.4,1.8]){yC=yk*sc;for(let r=R+E+1.5;r>=rf+.8-1e-9;r-=.5)if(inView(c*r,yC,s*r,.72)){rc=r;break find}}
+   for(const yk of [1.8,1.2]){yC=yk*sc;for(let r=rf;r>=R-1.5-1e-9;r-=.5)if(inView(c*r,yC,s*r,.78)){rc=r;break find}}
+   rc=rf;const g0=ndcOf(c*rf,0,s*rf)[1],g1=ndcOf(c*rf,1,s*rf)[1];yC=g1>g0+1e-6?clamp((.78-g0)/(g1-g0),.6*sc,1.8*sc):1.2*sc}
+  return {fx:c*rf,fz:s*rf,cx:c*rc,cz:s*rc,yC,H:H0*fk,fk};
+ }
+ function heraldStep(fdt,less){if(!HLOOK)return;try{heraldMove(fdt,less)}catch(error){heraldOff(error)}}
+ function heraldMove(fdt,less){
+  hclock+=fdt;
+  const h=curS&&curS.herald,live=new Set();
+  if(h&&Array.isArray(h.points)&&Array.isArray(h.forms))h.points.forEach((p,i)=>{const pt=count(p,7),key=num(h.n)+':'+pt;live.add(key);let sp=hspots.get(key);
+   if(!sp){sp={key,point:pt,age:less?9:0,out:-1,phase:pt*1.37+i*.6,dir:pt%2?-1:1,place:null,sc:1,fade:0};hspots.set(key,sp)}
+   sp.form=count(h.forms[i],3);sp.k=clamp(2+(Array.isArray(h.groups)?h.groups.filter(q=>q===p).length:1),3,5);if(sp.out>=0)sp.out=-1});
+  const OUT=num(W('HERALD')?.leave)||.9;
+  for(const sp of [...hspots.values()]){if(!live.has(sp.key)&&sp.out<0)sp.out=0;
+   if(sp.out>=0){sp.out+=fdt;if(less||sp.out>=OUT)hspots.delete(sp.key)}else sp.age+=fdt}
+  writeHerald(less);
+ }
+ const hm=new THREE.Matrix4(),hw=new THREE.Matrix4(),hq=new THREE.Quaternion(),he=new THREE.Euler(0,0,0,'YXZ'),hp=new V3(),hsv=new V3(),MIRROR_X=new THREE.Matrix4().makeScale(-1,1,1);
+ function writeHerald(less){
+  let nb=0,nw=0;const nf=[0,0,0,0],sc=heraldScale(),IN=num(W('HERALD')?.arrive)||.8,OUT=num(W('HERALD')?.leave)||.9;
+  for(const sp of hspots.values()){
+   const P=heraldPlace(sp.point,sc),uIn=less?1:easeOut(clamp(sp.age/IN,0,1)),uOut=sp.out<0?0:less?1:easeIn(clamp(sp.out/OUT,0,1));sp.place=P;sp.sc=sc;sp.fade=1-uOut;
+   // flag: springs up on arrival, lies down when the pack comes out; turned to face the camera with a slight sway
+   const fy=less?1:sp.out>=0?Math.max(.001,1-uOut):Math.max(.001,springy(sp.age)),sway=less?0:.12*Math.sin(hclock*2.1+sp.phase);
+   if(nf[sp.form]<3){const k=sc*P.fk;hq.setFromEuler(he.set(0,toCam+sway,0));hm.compose(hp.set(P.fx,0,P.fz),hq,hsv.set(k,k*fy,k));heraldFlags[sp.form].setMatrixAt(nf[sp.form]++,hm)}
+   // crows: circle the spot (alternate directions per road), lean into the turn, flap; fly in from high and wide, fly off higher and wider
+   for(let j=0;j<sp.k&&nb<HCROWS;j++){
+    const ang=sp.phase+j*Math.PI*2/sp.k+(less?0:sp.dir*hclock*1.25),rad=1.1*sc*(1+2*(1-uIn)+2.5*uOut),y=P.yC+(less?0:.18*sc*Math.sin(hclock*2.6+j*1.7))+4*sc*(1-uIn)+5*sc*uOut;
+    const yaw=Math.atan2(-Math.sin(ang)*sp.dir,Math.cos(ang)*sp.dir),s=.85*sc*(1-.5*uOut),flap=less?.12:.18+.55*Math.sin(hclock*9+j*2.1);
+    hq.setFromEuler(he.set(less?0:-.08,yaw,less?0:.35*sp.dir));hm.compose(hp.set(P.cx+Math.cos(ang)*rad,y,P.cz+Math.sin(ang)*rad),hq,hsv.set(s,s,s));crowBody.setMatrixAt(nb++,hm);
+    hw.makeRotationZ(flap).premultiply(hm);crowWing.setMatrixAt(nw++,hw);hw.makeRotationZ(flap).premultiply(MIRROR_X).premultiply(hm);crowWing.setMatrixAt(nw++,hw)}
+  }
+  crowBody.count=nb;crowWing.count=nw;heraldFlags.forEach((m,fm)=>{m.count=nf[fm]});
+  for(const m of [crowBody,crowWing,...heraldFlags]){m.visible=m.count>0;if(m.count)m.instanceMatrix.needsUpdate=true}
+ }
+ // soft ground shade under the circling crows and at the flag foot (drawn in the existing decal pool: no extra draw call)
+ function heraldGround(){if(HLOOK)for(const sp of hspots.values()){const P=sp.place;if(!P)continue;decal(CELL.glow,P.cx,P.cz,2.6*sp.sc,INK,.16*sp.fade,0,.05);decal(CELL.glow,P.fx,P.fz,.9*sp.sc,INK,.28*sp.fade,0,.05)}}
+ function heraldInfo(){
+  const all=[...hspots.values()],on=all.filter(sp=>sp.out<0&&sp.place);
+  return {on:!!HLOOK,spots:on.length,leaving:all.length-on.length,crows:crowBody?crowBody.count:0,flags:heraldFlags.reduce((n,m)=>n+m.count,0),
+   list:on.map(sp=>{const P=sp.place;return {point:sp.point,form:sp.form,crows:sp.k,size:+(sp.sc*P.fk).toFixed(3),crowY:+P.yC.toFixed(2),flag:[+P.fx.toFixed(2),+P.fz.toFixed(2)],crow:[+P.cx.toFixed(2),+P.cz.toFixed(2)],flagNdc:ndcOf(P.fx,0,P.fz),flagTopNdc:ndcOf(P.fx,P.H,P.fz),crowNdc:ndcOf(P.cx,P.yC,P.cz)}})};
+ }
 
  /* ----- frame loop: 30fps cap, dt-driven, frozen while paused or hidden; the world clock only runs in listen/ask/learn ----- */
  // names only label the debug({tris}) breakdown
@@ -1746,7 +1843,7 @@ async function start(){
   if(!still||dirty){
    updateView(fdt,less);
    animateBuildings(fdt,wdt,less);updateFences(less);animateWolves(fdt,wdt,less);animateHens(fdt,wdt,less);
-   farmersLife(fdt,less);
+   farmersLife(fdt,less);heraldStep(fdt,less);
    if(!less&&!still)stepEffects(fdt);
    // the light dims while wolves are inside the village, and flushes red when the ember king arrives or roars
    sunDim+=((insideWolves>0?1:0)-sunDim)*(less?1:Math.min(1,fdt*2));sun.intensity=2.8-.7*sunDim;

@@ -13,6 +13,8 @@
    - 🐺 무리 부르기(0.15.2): 다음 무리를 지금 숲에 내보낸다(World.callPack, 다음 틱에 나온다). 대형 차례는 무리 번호를 따르므로 4~7번 부르면 넷이 다 나온다.
    - 🗺️ 칸 맨 끝 "🐺 대형 끄기/켜기"(0.15.2): Combat.FLAGS.FORMS를 같은 탭에서 바로 바꾼다(새로고침 없음). 끄면 걷던 대형 늑대도 곧게 걷고, 켜면 다음 무리부터.
      막대 자리가 모자라(패드 세로 820에서 남는 폭 약 70px) 버튼은 🐺 하나만 두고 켬/끔은 메뉴에 넣었다. 저장하지 않는다(새로고침하면 주소 ?forms=0 또는 기본 켬).
+   - 📊 줄 맨 끝 "🐦 다음 무리 …"(0.17 예고): 까마귀 · 깃발이 떠 있는 동안 그 무리가 나올 길(화면 방향과 길 번호) · 대형 · 숲에 나오기까지 남은 초. 예고가 없으면 붙이지 않는다.
+     아이 화면에는 글자가 없다(그림만). 값은 index.html heraldNow(= World.herald, 틱마다 다시 읽음)
    게임은 이 답을 그 시간에 푼 답으로 센다: 빨리 감기는 게임의 tick()(검사 훅 window.__tick과 같은 길)을 돌려 round.t가 실제 틱으로 흐르고,
    누르는 것은 화면의 보기 버튼이라 찍기 막기(Combat.guard)·읽기 속도(trackPace)·번개(isFast) 판정이 아이가 그 시간에 누른 것과 같다.
    규칙·세계 숫자는 건드리지 않는다. 가게는 사람이 직접 산다(자동 구매 없음). 저장은 index.html이 '-test' 열쇠로 따로 한다.
@@ -178,6 +180,11 @@
  function setForms(v){Combat.FLAGS.FORMS=!!v;T.note=v?'🐺 대형 켬: 다음 무리부터 대형으로 와요':'🐺 대형 끔: 0.15.1처럼 곧게 와요';show();perfTick();return Combat.FLAGS.FORMS}
  /* 📊 줄 끝: 마을(단계 1)부터 지금 무리의 대형. 농가 · 단계 끔이면 빈 글 */
  function formText(){try{if(typeof world==='undefined'||!World.routes(world))return '';if(!Combat.FLAGS.FORMS)return '🐺 대형 끔';return '🐺 '+(T.form===null?'대형 켬':World.FORM.names[T.form])}catch{return ''}}
+ /* 0.17 📊 줄 끝: 예고 중이면 다음 무리의 길(3D 화면 방향 · 길 번호) · 대형(길마다 다르면 모두, 다리 길은 곧장) · 숲에 나오기까지 남은 초 */
+ const HERALD_DIR=['오른쪽','오른쪽 아래','아래','왼쪽 아래','왼쪽','왼쪽 위','위','오른쪽 위'];
+ function heraldText(){try{if(!Combat.FLAGS.HERALD||typeof heraldNow!=='function')return '';const h=heraldNow();if(!h)return '';
+  const names=[];for(const f of h.forms){const n=World.FORM.names[f|0];if(!names.includes(n))names.push(n)}
+  return '🐦 다음 무리 '+h.points.map(p=>HERALD_DIR[p]+'('+p+')').join('·')+' · '+names.join('·')+' · '+Math.ceil(h.left*World.TICK)+'초'}catch{return ''}}
  function jump(key,ask){
   const J=JUMPS.find(j=>j[0]===String(key));if(!J||T.job)return false;
   if(ask!==false&&!confirm('🧪 '+J[1]+'에 막 들어선 마을로 새로 시작할까요?\n지금 테스트 판은 사라져요(아이 저장은 그대로예요).'))return false;
@@ -292,7 +299,7 @@
   if(P.last&&P.last.mode===mode&&now>P.last.t){P.samples.push({n:n-P.last.n,ms:now-P.last.t});if(P.samples.length>3)P.samples.shift()}else P.samples=[];
   P.last={mode,n,t:now};
   const ms=P.samples.reduce((a,s)=>a+s.ms,0),fps=ms>0?Math.round(P.samples.reduce((a,s)=>a+s.n,0)*10000/ms)/10:null,f='🎞 '+(fps===null?'…':fps.toFixed(fps>=10?0:1))+'fps';
-  const st=stageText(),fm=formText(),tail=(st?' · '+st:'')+(fm?' · '+fm:'');
+  const st=stageText(),fm=formText(),hd=heraldText(),tail=(st?' · '+st:'')+(fm?' · '+fm:'')+(hd?' · '+hd:'');
   P.text=i?f+'(최대 30) · 그리기 '+(i.drawCalls|0)+' · 삼각형 '+big(i.triangles)+tail:r==='fallback'?f+' · 그림 화면'+tail:'화면 준비 중'+tail;
   set(perfEl,P.text);return P.text;
  }
@@ -307,7 +314,7 @@
  worldStep=function(){baseWorldStep();for(const e of world.events)if(e.type==='pack'){T.packs++;T.form=Number.isInteger(e.form)&&World.formsOn(world)?e.form:null}};
  show();
  /* 검사·프로듀서 콘솔용 */
- window.__testmode={bookTest,get speed(){return opt.speed},get auto(){return opt.auto},get perf(){return opt.perf},setPerf,perfNow:perfTick,jump,jumpState,callPack,setForms,formText,get form(){return T.form},get packs(){return T.packs},JUMP_BASE:JSON.parse(JSON.stringify(JUMP_BASE)),JUMPS:JUMPS.map(j=>j.slice()),get job(){return T.job&&{...T.job}},get last(){return T.last&&{...T.last}},get done(){return T.done&&{...T.done}},get note(){return T.note},
+ window.__testmode={bookTest,get speed(){return opt.speed},get auto(){return opt.auto},get perf(){return opt.perf},setPerf,perfNow:perfTick,jump,jumpState,callPack,setForms,formText,heraldText,get form(){return T.form},get packs(){return T.packs},JUMP_BASE:JSON.parse(JSON.stringify(JUMP_BASE)),JUMPS:JUMPS.map(j=>j.slice()),get job(){return T.job&&{...T.job}},get last(){return T.last&&{...T.last}},get done(){return T.done&&{...T.done}},get note(){return T.note},
   next,wrong,setSpeed,setAuto,plan:()=>phase==='ask'&&round?{t:round.t,target:target(),tries:round.tries,lock:round.lock,dash:round.dash}:null,
   frame(){if(T.job)ffFrame();return !!T.job},drain(max){let n=0;while(T.job&&n<(max||5000)){ffFrame();n++}return n},SPEED:JSON.parse(JSON.stringify(SPEED)),RETRY,AFTER_LOCK,OPT_KEY};
 })();

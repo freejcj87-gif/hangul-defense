@@ -719,6 +719,58 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
    else{ok(res.formed.length>=6&&med(res.formed)>20,tag+': formation wolves turn while they walk, median '+med(res.formed)+'° ('+res.formed.length+' wolves)');
     ok(!res.straight.length||max(res.straight)<8,tag+': the straight ones stay straight (largest '+max(res.straight)+'°)')}
    await shot(page.locator('.stage-card'),'forms-stage'+k+(query?'-off':''));eq(errors,[],tag+' page errors');await ctx.close()}
+  /* 0.17 늑대 예고(까마귀 · 깃발, docs/v017-herald.md): 시계를 세우고(__HOLD_CLOCK + debug hold) 낙오 늑대를 멈춘 뒤 갈라지기 무리(번호 2)가 숲에 나오기 40틱 전으로 맞추면,
+     그 무리의 길마다 길 입구에 대형 깃발 하나 · 그 길 끝 숲 위에 까마귀 3~5마리가 그 길 쪽(길 축 각도)에 생기고 화면 안에 든다. 그리기 예산 안.
+     틱을 하나씩 돌려 무리가 나오면(pack 사건) 예고한 길 = 실제 길이고, 까마귀가 날아가기 시작해 World.HERALD.leave 뒤 까마귀 · 깃발이 0. ?herald=0이면 처음부터 0.
+     기준 화면: 노트북 1366×768 물레방아 마을 · 패드 세로 820×1180 성 · 패드 가로 1180×820 성곽 마을. 캡처 herald-stage<k>-<크기> */
+  for(const [k,query,w,h] of [[3,'',1366,768],[5,'',820,1180],[4,'',1180,820],[3,'/?herald=0',1366,768]]){
+   const tag='herald stage '+k+' '+w+'x'+h+(query?' '+query:''),{ctx,page,errors}=await open({width:w,height:h,query});
+   await seed(page,{age:8,index:0,wins:0,gold:300,farmers:0,power:0,pond:0,hall:0,...VILLAGE[k]});await page.waitForFunction(()=>window.VillageView?.inspect().ready,{},{timeout:45000});
+   await begin(page,{age:8},true);
+   await page.evaluate(()=>{window.VillageView.debug({hold:true});world.wolves=[];world.trickle=1e9;world.rng=20261120;world.wave.n=2;world.wave.spawned=false;world.wave.arrive=world.t+World.TRAVEL+40});
+   await roll(page,1);await view(page,1.2);
+   const vs=await page.evaluate(()=>window.getVillageState().herald);let v=await insp(page);
+   if(query)eq([vs,v.herald.spots,v.herald.crows,v.herald.flags],[null,0,0,0],tag+': no herald at all');
+   else{
+    await shot(page.locator('.stage-card'),'herald-stage'+k+'-'+w+'x'+h);console.log('HERALD_METRICS:'+JSON.stringify({tag,herald:vs,drawn:v.herald,drawCalls:v.drawCalls,triangles:v.triangles}));
+    ok(!!vs&&vs.points.length>=1&&vs.form===2&&vs.left===38,tag+': the page reads the coming pack ahead (roads, formation 2 = split, 38 ticks left): '+JSON.stringify(vs));
+    eq(v.herald.on,true,tag+': the 3D herald was built (it turns itself off on an error instead of taking the village down)');
+    eq([v.herald.list.map(s=>s.point),v.herald.list.map(s=>s.form)],[vs.points,vs.forms],tag+': one herald spot per road of the coming pack, the flag shows that road\'s formation');
+    const off=(xz,p)=>{const d=Math.atan2(xz[1],xz[0])-(p+.5)*Math.PI/4;return Math.abs(Math.atan2(Math.sin(d),Math.cos(d)))};
+    ok(v.herald.list.every(s=>off(s.flag,s.point)<.01&&off(s.crow,s.point)<.01),tag+': flag and crows stand on that road\'s side: '+JSON.stringify(v.herald.list));
+    ok(v.herald.list.every(s=>{const rf=Math.hypot(...s.flag),rc=Math.hypot(...s.crow);return rf>=v.radius+1.2-.01&&rf<=v.radius+World.EDGE-1+.01&&rc>=v.radius-1.5-.01}),tag+': the flag is on the road outside the fence (radius + 1.2 … + 6), the crows over the same road: '+JSON.stringify(v.herald.list.map(s=>[+(Math.hypot(...s.flag)-v.radius).toFixed(2),+(Math.hypot(...s.crow)-v.radius).toFixed(2)])));
+    ok(v.herald.list.every(s=>[s.flagNdc,s.flagTopNdc,s.crowNdc].every(([x,y])=>Math.abs(x)<=.92&&Math.abs(y)<=.92)&&s.size>=.5),tag+': flags (foot and top) and crows are on screen, no flag shrunk below half: '+JSON.stringify(v.herald.list.map(s=>[s.flagNdc,s.flagTopNdc,s.crowNdc,s.size])));
+    ok(v.herald.list.every(s=>s.crows>=3&&s.crows<=5)&&v.herald.crows===v.herald.list.reduce((n,s)=>n+s.crows,0)&&v.herald.flags===vs.points.length,tag+': 3-5 crows per road and one flag per road are drawn: '+JSON.stringify([v.herald.crows,v.herald.flags]));
+    ok(v.drawCalls<=52&&v.triangles<=520000,tag+': draw budget with the herald: '+v.drawCalls+' calls, '+v.triangles+' triangles');
+    let pk=null;for(let i=0;i<60&&!pk;i++)pk=await page.evaluate(()=>{window.__tick(1);window.VillageView.debug({advance:.1});const e=world.events.find(e=>e.type==='pack');return e?e.points:null});
+    eq(pk,vs.groups,tag+': the pack came out on the heralded roads');eq(await page.evaluate(()=>window.getVillageState().herald),null,tag+': no herald while the pack walks');
+    await view(page,.3);v=await insp(page);ok(v.herald.spots===0&&v.herald.leaving>=1&&v.herald.crows>0,tag+': the crows fly off when the pack comes out: '+JSON.stringify([v.herald.spots,v.herald.leaving,v.herald.crows]));
+    await shot(page.locator('.stage-card'),'herald-stage'+k+'-'+w+'x'+h+'-leaving');
+    await view(page,World.HERALD.leave+.4);v=await insp(page);eq([v.herald.spots,v.herald.leaving,v.herald.crows,v.herald.flags],[0,0,0,0],tag+': then crows and flags are gone')}
+   eq(errors,[],tag+' page errors');await ctx.close()}
+  /* 움직임 줄이기: 까마귀는 맴돌지 않고 멈춘 채 둘레에, 날아들기 · 날아가기 없이 바로 서고 사라진다 */
+  {const {ctx,page,errors}=await open({width:1366,height:768,calm:true});await seed(page,{age:8,index:0,wins:0,gold:300,farmers:0,power:0,pond:0,hall:0,...VILLAGE[3]});await page.waitForFunction(()=>window.VillageView?.inspect().ready,{},{timeout:45000});
+   await begin(page,{age:8},true);await page.evaluate(()=>{world.wolves=[];world.trickle=1e9;world.rng=20261120;world.wave.n=1;world.wave.spawned=false;world.wave.arrive=world.t+World.TRAVEL+30});
+   await tick(page,1);await frames(page,2);const a=(await insp(page)).herald;await frames(page,6);const b=(await insp(page)).herald;
+   ok(a.spots>=1&&a.crows>=3&&JSON.stringify(a.list)===JSON.stringify(b.list),'herald reduced motion: shown at once and holding still: '+JSON.stringify(a.list));
+   await tick(page,40);await frames(page,2);const c=(await insp(page)).herald;eq([c.spots,c.leaving,c.crows,c.flags],[0,0,0,0],'herald reduced motion: gone at once when the pack comes out');
+   eq(errors,[],'herald reduced page errors');await ctx.close()}
+  /* 그림 화면(3D 실패 = 환경 GLB를 막음): 같은 길 쪽에 깃발 · 까마귀 그림이 장면 안에 보이고(늑대와 같은 % 변환), 무리가 숲에 나오면 사라진다 */
+  {const ctx=await stageBrowser.newContext({viewport:{width:1366,height:768}});await ctx.addInitScript(HOLD);await ctx.addInitScript(FAKE_TTS);const page=await ctx.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
+   await page.route('**/environment-pack.glb',r=>r.abort());await page.goto(url);await page.waitForFunction(()=>document.querySelector('.scene').dataset.renderer==='fallback');
+   await seed(page,{age:8,index:0,wins:0,gold:300,farmers:0,power:0,pond:0,hall:0,...VILLAGE[3]});await page.waitForFunction(()=>document.querySelector('.scene').dataset.renderer==='fallback');
+   await begin(page,{age:8});await page.evaluate(()=>{world.wolves=[];world.trickle=1e9;world.rng=20261120;world.wave.n=3;world.wave.spawned=false;world.wave.arrive=world.t+World.TRAVEL+40});await tick(page,1);
+   const vs=await page.evaluate(()=>window.getVillageState().herald);
+   const pic=await page.evaluate(()=>{const sc=document.getElementById('scene'),s=sc.getBoundingClientRect(),W=sc.clientWidth,H=sc.clientHeight;
+    return [...document.querySelectorAll('#herald .hflag,#herald .hcrows')].map(e=>{const r=e.getBoundingClientRect(),x=parseFloat(e.style.left),y=parseFloat(e.style.top);
+     return {kind:e.className,point:Number(e.dataset.point),form:e.dataset.form,n:e.children.length,dir:Math.atan2((y/H-.55)/.42,(x/W-.5)/.48),inside:x>=0&&x<=W&&y>=0&&y<=H&&(e.className!=='hflag'||r.width>=20&&r.left>=s.left-1&&r.right<=s.right+1&&r.top>=s.top-1&&r.bottom<=s.bottom+1)}})});
+   const flags=pic.filter(e=>e.kind==='hflag'),crows=pic.filter(e=>e.kind==='hcrows');await shot(page.locator('.stage-card'),'herald-fallback-1366x768');
+   ok(!!vs&&vs.form===3&&flags.length===vs.points.length&&crows.length===vs.points.length,'herald fallback: a flag and a flock per road of the coming pack: '+JSON.stringify([vs,pic.length]));
+   eq(flags.map(e=>[e.point,e.form]),vs.points.map((p,i)=>[p,String(vs.forms[i])]),'herald fallback: each flag shows that road\'s formation');
+   ok(pic.every(e=>{const d=e.dir-(e.point+.5)*Math.PI/4;return Math.abs(Math.atan2(Math.sin(d),Math.cos(d)))<.01&&e.inside}),'herald fallback: on that road\'s side, inside the scene: '+JSON.stringify(pic));
+   ok(crows.every(e=>e.n>=3&&e.n<=5),'herald fallback: 3-5 crows per road');
+   await tick(page,45);eq([await page.locator('#herald > *').count(),await page.evaluate(()=>world.wave.spawned)],[0,true],'herald fallback: gone when the pack comes out');
+   eq(errors,[],'herald fallback page errors');await ctx.close()}
   /* 0.15 전환: 장터 마을 → 물레방아 마을이 되는 정답 뒤 강이 길이 방향으로 흘러들고(0.9초) 바퀴가 집과 함께 솟는다. 정답 연출(1.6초) 안에 끝난다 */
   {const {ctx,page,errors}=await open({width:1366,height:768});await seed(page,{age:8,index:0,wins:0,gold:900,farmers:0,power:0,pond:0,hall:0,level:19,fence:4,chickens:1});await page.waitForFunction(()=>window.VillageView?.inspect().ready,{},{timeout:45000});
    await begin(page,{age:8},true);await page.evaluate(()=>{world.wolves=[];world.peace=-1;window.VillageView.debug({hold:true})});await roll(page,2);
@@ -840,7 +892,7 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
     return {bar:r('testBar'),shop:r('shopWrap'),answers:r('answers'),next:r('tmNext'),wrong:r('tmWrong'),perf:r('tmPerf'),pack:r('tmPack'),perfText,h:innerHeight,w:innerWidth,sw:document.documentElement.scrollWidth}});
    const apart=(p,q)=>p.right<=q.left+.5||q.right<=p.left+.5||p.bottom<=q.top+.5||q.bottom<=p.top+.5;
    ok(b.perf.bottom<=b.bar.top+.5&&b.perf.left>=0&&b.perf.right<=b.w+.5&&apart(b.perf,b.shop)&&apart(b.perf,b.answers),tag+': performance chip above the bar, clear of the shop and answers');
-   ok(/^🎞 .+fps · 그림 화면 · 🏡 농가$/.test(b.perfText),tag+': performance chip (GLB blocked = picture view) '+b.perfText);
+   ok(/^🎞 .+fps · 그림 화면 · 🏡 농가( · 🐦 다음 무리 .+초)?$/.test(b.perfText),tag+': performance chip (GLB blocked = picture view; 0.17 herald text only while a pack is heralded) '+b.perfText);
    ok(b.bar.bottom<=b.h+.5&&b.bar.top>=b.h-80&&b.bar.left<=.5&&b.bar.right>=b.w-.5,tag+': one strip along the bottom (top '+Math.round(b.bar.top)+')');
    ok(b.next.right<=b.w+.5&&b.next.bottom<=b.h+.5&&b.next.right-b.next.left>=100&&b.next.bottom-b.next.top>=44,tag+': next button at the bottom right, big enough');
    ok(b.pack.top>=b.bar.top-.5&&b.pack.bottom<=b.bar.bottom+.5&&b.pack.right-b.pack.left>=44&&b.pack.bottom-b.pack.top>=44,tag+': 0.15.2 wolf-pack button (🐺) sits in the one-strip bar, big enough: '+JSON.stringify(b.pack));
