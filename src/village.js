@@ -1764,22 +1764,25 @@ async function start(){
   catch(error){for(const m of made)world.remove(m);crowBody=crowWing=null;heraldFlags=[];throw error}
   crowBody.name='herald-crow';crowWing.name='herald-wing';heraldFlags.forEach((m,fm)=>{m.name='herald-flag-'+fm});for(const m of made){m.receiveShadow=false;m.visible=false}
  }catch(error){heraldOff(error)}
- const heraldScale=()=>Math.max(1,fxScale*.8);
+ const heraldScale=()=>Math.max(1,fxScale*.65);   // 0.8 made the flag 3.7 tall at the mill village on a laptop: no room above the fence on the top road (CI 44652792998)
  const inView=(x,y,z,m)=>{ndc.set(x,y,z).project(camera);return Math.abs(ndc.x)<=m&&ndc.y<=m&&ndc.y>=-m};
  const ndcOf=(x,y,z)=>{ndc.set(x,y,z).project(camera);return [+ndc.x.toFixed(3),+ndc.y.toFixed(3)]};
  // where a road's herald stands: the flag on the road outside the fence (the furthest point whose foot and top are on screen between radius + 6 and + 3.2: clear of
  // the bridge and the road markers; if none is, the furthest on-screen point down to radius + 1.2, just outside the fence: on a pad the side roads of the castle
  // show only about 2 beyond the fence, wolf-paths-plan §1.2), the crows over the forest end of the same road (the furthest point on screen beyond the flag; on a road
  // running off the top or the side of the screen they fly lower, then come in over the flag, then over the road inside it)
+ // A road running to the top of the screen has little room above the fence (the river view, 0.15): there the flag is shrunk to fit (down to half; the camera is
+ // orthographic, so screen y is linear in height) and the crows fly low over the road just inside the gate. fk = the flag's size factor.
  function heraldPlace(p,sc){
-  const a=spawnAngle(p),c=Math.cos(a),s=Math.sin(a),R=Rd,E=num(W('EDGE'))||7,H=2.3*sc,flagOk=r=>inView(c*r,0,s*r,.86)&&inView(c*r,H,s*r,.86);let rf=0,rc=0,yC=0;
+  const a=spawnAngle(p),c=Math.cos(a),s=Math.sin(a),R=Rd,E=num(W('EDGE'))||7,H0=2.3*sc,flagOk=r=>inView(c*r,0,s*r,.86)&&inView(c*r,H0,s*r,.86);let rf=0,fk=1,rc=0,yC=0;
   for(let r=R+E-1;r>=R+3.2-1e-9&&!rf;r-=.5)if(flagOk(r))rf=r;
   for(let r=R+2.8;r>=R+1.2-1e-9&&!rf;r-=.4)if(flagOk(r))rf=r;
-  if(!rf)rf=R+1.2;
+  if(!rf){rf=R+1.2;for(let r=R+E-1;r>=R+1.2-1e-9;r-=.4)if(inView(c*r,0,s*r,.74)){rf=r;break}
+   const y0=ndcOf(c*rf,0,s*rf)[1],y1=ndcOf(c*rf,H0,s*rf)[1];if(y1>.86&&y1>y0+1e-6)fk=clamp((.86-y0)/(y1-y0),.5,1)}
   find:{for(const yk of [3.1,2.4,1.8]){yC=yk*sc;for(let r=R+E+1.5;r>=rf+.8-1e-9;r-=.5)if(inView(c*r,yC,s*r,.72)){rc=r;break find}}
-   yC=2.4*sc;for(let r=rf;r>=R-1e-9;r-=.5)if(inView(c*r,yC,s*r,.72)){rc=r;break find}
-   rc=rf;yC=1.8*sc}
-  return {fx:c*rf,fz:s*rf,cx:c*rc,cz:s*rc,yC,H};
+   for(const yk of [1.8,1.2]){yC=yk*sc;for(let r=rf;r>=R-1.5-1e-9;r-=.5)if(inView(c*r,yC,s*r,.78)){rc=r;break find}}
+   rc=rf;const g0=ndcOf(c*rf,0,s*rf)[1],g1=ndcOf(c*rf,1,s*rf)[1];yC=g1>g0+1e-6?clamp((.78-g0)/(g1-g0),.6*sc,1.8*sc):1.2*sc}
+  return {fx:c*rf,fz:s*rf,cx:c*rc,cz:s*rc,yC,H:H0*fk,fk};
  }
  function heraldStep(fdt,less){if(!HLOOK)return;try{heraldMove(fdt,less)}catch(error){heraldOff(error)}}
  function heraldMove(fdt,less){
@@ -1800,7 +1803,7 @@ async function start(){
    const P=heraldPlace(sp.point,sc),uIn=less?1:easeOut(clamp(sp.age/IN,0,1)),uOut=sp.out<0?0:less?1:easeIn(clamp(sp.out/OUT,0,1));sp.place=P;sp.sc=sc;sp.fade=1-uOut;
    // flag: springs up on arrival, lies down when the pack comes out; turned to face the camera with a slight sway
    const fy=less?1:sp.out>=0?Math.max(.001,1-uOut):Math.max(.001,springy(sp.age)),sway=less?0:.12*Math.sin(hclock*2.1+sp.phase);
-   if(nf[sp.form]<3){hq.setFromEuler(he.set(0,toCam+sway,0));hm.compose(hp.set(P.fx,0,P.fz),hq,hsv.set(sc,sc*fy,sc));heraldFlags[sp.form].setMatrixAt(nf[sp.form]++,hm)}
+   if(nf[sp.form]<3){const k=sc*P.fk;hq.setFromEuler(he.set(0,toCam+sway,0));hm.compose(hp.set(P.fx,0,P.fz),hq,hsv.set(k,k*fy,k));heraldFlags[sp.form].setMatrixAt(nf[sp.form]++,hm)}
    // crows: circle the spot (alternate directions per road), lean into the turn, flap; fly in from high and wide, fly off higher and wider
    for(let j=0;j<sp.k&&nb<HCROWS;j++){
     const ang=sp.phase+j*Math.PI*2/sp.k+(less?0:sp.dir*hclock*1.25),rad=1.1*sc*(1+2*(1-uIn)+2.5*uOut),y=P.yC+(less?0:.18*sc*Math.sin(hclock*2.6+j*1.7))+4*sc*(1-uIn)+5*sc*uOut;
@@ -1816,7 +1819,7 @@ async function start(){
  function heraldInfo(){
   const all=[...hspots.values()],on=all.filter(sp=>sp.out<0&&sp.place);
   return {on:!!HLOOK,spots:on.length,leaving:all.length-on.length,crows:crowBody?crowBody.count:0,flags:heraldFlags.reduce((n,m)=>n+m.count,0),
-   list:on.map(sp=>{const P=sp.place;return {point:sp.point,form:sp.form,crows:sp.k,flag:[+P.fx.toFixed(2),+P.fz.toFixed(2)],crow:[+P.cx.toFixed(2),+P.cz.toFixed(2)],flagNdc:ndcOf(P.fx,0,P.fz),flagTopNdc:ndcOf(P.fx,P.H,P.fz),crowNdc:ndcOf(P.cx,P.yC,P.cz)}})};
+   list:on.map(sp=>{const P=sp.place;return {point:sp.point,form:sp.form,crows:sp.k,size:+(sp.sc*P.fk).toFixed(3),crowY:+P.yC.toFixed(2),flag:[+P.fx.toFixed(2),+P.fz.toFixed(2)],crow:[+P.cx.toFixed(2),+P.cz.toFixed(2)],flagNdc:ndcOf(P.fx,0,P.fz),flagTopNdc:ndcOf(P.fx,P.H,P.fz),crowNdc:ndcOf(P.cx,P.yC,P.cz)}})};
  }
 
  /* ----- frame loop: 30fps cap, dt-driven, frozen while paused or hidden; the world clock only runs in listen/ask/learn ----- */

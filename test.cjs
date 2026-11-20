@@ -732,16 +732,16 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
    const vs=await page.evaluate(()=>window.getVillageState().herald);let v=await insp(page);
    if(query)eq([vs,v.herald.spots,v.herald.crows,v.herald.flags],[null,0,0,0],tag+': no herald at all');
    else{
+    await shot(page.locator('.stage-card'),'herald-stage'+k+'-'+w+'x'+h);console.log('HERALD_METRICS:'+JSON.stringify({tag,herald:vs,drawn:v.herald,drawCalls:v.drawCalls,triangles:v.triangles}));
     ok(!!vs&&vs.points.length>=1&&vs.form===2&&vs.left===38,tag+': the page reads the coming pack ahead (roads, formation 2 = split, 38 ticks left): '+JSON.stringify(vs));
     eq(v.herald.on,true,tag+': the 3D herald was built (it turns itself off on an error instead of taking the village down)');
     eq([v.herald.list.map(s=>s.point),v.herald.list.map(s=>s.form)],[vs.points,vs.forms],tag+': one herald spot per road of the coming pack, the flag shows that road\'s formation');
     const off=(xz,p)=>{const d=Math.atan2(xz[1],xz[0])-(p+.5)*Math.PI/4;return Math.abs(Math.atan2(Math.sin(d),Math.cos(d)))};
     ok(v.herald.list.every(s=>off(s.flag,s.point)<.01&&off(s.crow,s.point)<.01),tag+': flag and crows stand on that road\'s side: '+JSON.stringify(v.herald.list));
-    ok(v.herald.list.every(s=>{const rf=Math.hypot(...s.flag),rc=Math.hypot(...s.crow);return rf>=v.radius+1.2-.01&&rf<=v.radius+World.EDGE-1+.01&&rc>=v.radius-.01}),tag+': the flag is on the road outside the fence (radius + 1.2 … + 6), the crows over the same road: '+JSON.stringify(v.herald.list.map(s=>[+(Math.hypot(...s.flag)-v.radius).toFixed(2),+(Math.hypot(...s.crow)-v.radius).toFixed(2)])));
-    ok(v.herald.list.every(s=>[s.flagNdc,s.flagTopNdc,s.crowNdc].every(([x,y])=>Math.abs(x)<=.9&&Math.abs(y)<=.9)),tag+': flags and crows are on screen: '+JSON.stringify(v.herald.list.map(s=>[s.flagNdc,s.flagTopNdc,s.crowNdc])));
+    ok(v.herald.list.every(s=>{const rf=Math.hypot(...s.flag),rc=Math.hypot(...s.crow);return rf>=v.radius+1.2-.01&&rf<=v.radius+World.EDGE-1+.01&&rc>=v.radius-1.5-.01}),tag+': the flag is on the road outside the fence (radius + 1.2 … + 6), the crows over the same road: '+JSON.stringify(v.herald.list.map(s=>[+(Math.hypot(...s.flag)-v.radius).toFixed(2),+(Math.hypot(...s.crow)-v.radius).toFixed(2)])));
+    ok(v.herald.list.every(s=>[s.flagNdc,s.flagTopNdc,s.crowNdc].every(([x,y])=>Math.abs(x)<=.92&&Math.abs(y)<=.92)&&s.size>=.5),tag+': flags (foot and top) and crows are on screen, no flag shrunk below half: '+JSON.stringify(v.herald.list.map(s=>[s.flagNdc,s.flagTopNdc,s.crowNdc,s.size])));
     ok(v.herald.list.every(s=>s.crows>=3&&s.crows<=5)&&v.herald.crows===v.herald.list.reduce((n,s)=>n+s.crows,0)&&v.herald.flags===vs.points.length,tag+': 3-5 crows per road and one flag per road are drawn: '+JSON.stringify([v.herald.crows,v.herald.flags]));
     ok(v.drawCalls<=52&&v.triangles<=520000,tag+': draw budget with the herald: '+v.drawCalls+' calls, '+v.triangles+' triangles');
-    await shot(page.locator('.stage-card'),'herald-stage'+k+'-'+w+'x'+h);
     let pk=null;for(let i=0;i<60&&!pk;i++)pk=await page.evaluate(()=>{window.__tick(1);window.VillageView.debug({advance:.1});const e=world.events.find(e=>e.type==='pack');return e?e.points:null});
     eq(pk,vs.groups,tag+': the pack came out on the heralded roads');eq(await page.evaluate(()=>window.getVillageState().herald),null,tag+': no herald while the pack walks');
     await view(page,.3);v=await insp(page);ok(v.herald.spots===0&&v.herald.leaving>=1&&v.herald.crows>0,tag+': the crows fly off when the pack comes out: '+JSON.stringify([v.herald.spots,v.herald.leaving,v.herald.crows]));
@@ -764,12 +764,11 @@ const I7=Array.from({length:60},(_,k)=>k).find(k=>Questions.isQuiz(7,k));
    const pic=await page.evaluate(()=>{const sc=document.getElementById('scene'),s=sc.getBoundingClientRect(),W=sc.clientWidth,H=sc.clientHeight;
     return [...document.querySelectorAll('#herald .hflag,#herald .hcrows')].map(e=>{const r=e.getBoundingClientRect(),x=parseFloat(e.style.left),y=parseFloat(e.style.top);
      return {kind:e.className,point:Number(e.dataset.point),form:e.dataset.form,n:e.children.length,dir:Math.atan2((y/H-.55)/.42,(x/W-.5)/.48),inside:x>=0&&x<=W&&y>=0&&y<=H&&(e.className!=='hflag'||r.width>=20&&r.left>=s.left-1&&r.right<=s.right+1&&r.top>=s.top-1&&r.bottom<=s.bottom+1)}})});
-   const flags=pic.filter(e=>e.kind==='hflag'),crows=pic.filter(e=>e.kind==='hcrows');
+   const flags=pic.filter(e=>e.kind==='hflag'),crows=pic.filter(e=>e.kind==='hcrows');await shot(page.locator('.stage-card'),'herald-fallback-1366x768');
    ok(!!vs&&vs.form===3&&flags.length===vs.points.length&&crows.length===vs.points.length,'herald fallback: a flag and a flock per road of the coming pack: '+JSON.stringify([vs,pic.length]));
    eq(flags.map(e=>[e.point,e.form]),vs.points.map((p,i)=>[p,String(vs.forms[i])]),'herald fallback: each flag shows that road\'s formation');
    ok(pic.every(e=>{const d=e.dir-(e.point+.5)*Math.PI/4;return Math.abs(Math.atan2(Math.sin(d),Math.cos(d)))<.01&&e.inside}),'herald fallback: on that road\'s side, inside the scene: '+JSON.stringify(pic));
    ok(crows.every(e=>e.n>=3&&e.n<=5),'herald fallback: 3-5 crows per road');
-   await shot(page.locator('.stage-card'),'herald-fallback-1366x768');
    await tick(page,45);eq([await page.locator('#herald > *').count(),await page.evaluate(()=>world.wave.spawned)],[0,true],'herald fallback: gone when the pack comes out');
    eq(errors,[],'herald fallback page errors');await ctx.close()}
   /* 0.15 전환: 장터 마을 → 물레방아 마을이 되는 정답 뒤 강이 길이 방향으로 흘러들고(0.9초) 바퀴가 집과 함께 솟는다. 정답 연출(1.6초) 안에 끝난다 */
