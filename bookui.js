@@ -171,7 +171,10 @@
     }
     if(Book.canUndo(localStorage,BK))button(box,'되돌리기(바꾸기 전 기록으로)',()=>{if(Book.undo(localStorage,BK)){bookDirty=false;reloadFromStore();openGuard('file',true);put($('gNote'),'바꾸기 전 기록으로 되돌렸어요.')}});
   }
-  $('importFile').onchange=()=>{try{const f=$('importFile').files&&$('importFile').files[0];if(!f)return;if(f.size>Book.FILE_MAX){put($('gNote'),'진행 파일이 아니에요.');return}const rd=new FileReader();rd.onload=()=>importText(String(rd.result||''));rd.readAsText(f)}catch{}};
+  /* 파일 고르기는 형식으로 거르지 않는다(index.html #importFile에 accept 없음). 메신저·Android Chrome으로 받은 파일은 이름이 .json이 아니거나
+     형식이 application/octet-stream·text/plain이라 accept=".json,application/json"이면 고를 수 없었다(레드팀 r2). 대신 크기(1MB)와 내용(Book.importFile: JSON · fmt · 버전 · 검사합)으로 거른다.
+     읽지 못하면(파일이 사라짐·권한) 그렇다고 알린다 */
+  $('importFile').onchange=()=>{try{const f=$('importFile').files&&$('importFile').files[0];if(!f)return;if(f.size>Book.FILE_MAX){put($('gNote'),'진행 파일이 아니에요.');return}const rd=new FileReader();rd.onload=()=>importText(String(rd.result||''));rd.onerror=()=>put($('gNote'),'파일을 읽지 못했어요. 다시 골라 주세요.');rd.readAsText(f)}catch{put($('gNote'),'파일을 읽지 못했어요. 다시 골라 주세요.')}};
   function tabHelp(box){
     if(!guardInfo){para(box,'보호자 화면에 대하여','g-h');para(box,'보호자 화면의 문턱(길게 누르기와 글로 적힌 수)은 아이가 실수로 누르지 않게 하는 문턱이에요. 보안 장치가 아니에요.');
       para(box,'반짝 손님','g-h');para(box,Book.shinyText());

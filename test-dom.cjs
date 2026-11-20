@@ -2312,6 +2312,19 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   const a=boot({book:true});press(a,'openGuard',2100);gatePass(a);a.n.gTabs.children.find(b=>b.dataset.tab==='file').click();
   ok(!a.n.gBody.children.some(c=>c.tagName==='button'&&c.textContent.startsWith('파일로 내보내기'))&&/이 앱에서는 내보낼 수 없어요/.test(a.n.gBody.textContent),'새 버전 기록: 내보내기 단추 대신 업데이트 안내');
   ok(!a.window.__lastExport&&saved[BOOK_KEY]===newer&&a.n.gBody.children.some(c=>c.tagName==='button'&&c.textContent==='파일 불러오기'),'파일을 만들지 않고 기록은 글자 그대로(불러오기는 그대로 가능)')}
+ /* M-9g 레드팀 r2: 불러오기 파일 고르기를 형식(accept)으로 거르지 않고 크기·내용으로 거른다. 메신저·Android Chrome으로 받은 파일(.txt · octet-stream)도 고를 수 있게 */
+ {ok(html.includes('<input type="file" id="importFile" hidden>')&&!/id="importFile"[^>]*accept=/.test(html),'파일 고르기에 형식 거르기(accept) 없음');
+  const src=Bk.fresh(Date.now(),55);src.play=7;const text=Bk.exportText(src,null,{now:Date.now()}),keepFR=globalThis.FileReader;
+  globalThis.FileReader=class{readAsText(f){if(f.fail){this.onerror&&this.onerror();return}this.result=f.text;this.onload()}};
+  try{const a=bboot(null,{index:1});press(a,'openGuard',2100);gatePass(a);a.n.gTabs.children.find(b=>b.dataset.tab==='file').click();
+   const pick=f=>{a.n.importFile.files=[f];a.n.importFile.onchange()};
+   pick({name:'kkomaeul-progress-20261120 (1).txt',type:'text/plain',size:text.length,text});ok(/불러올 기록: 친구 카드 0 · 훈장 0 · 놀이 7번/.test(a.n.gBody.textContent),'이름이 .txt인 진행 파일도 내용으로 알아보고 미리보기');
+   pick({name:'download',type:'application/octet-stream',size:text.length,text});ok(/불러올 기록: .*놀이 7번/.test(a.n.gBody.textContent),'이름·형식을 모르는 파일(octet-stream)도 내용이 맞으면 미리보기');
+   pick({name:'photo.jpg',type:'image/jpeg',size:5000,text:'ÿØÿàJFIF'});ok(/진행 파일이 아니에요/.test(a.n.gNote.textContent)&&!/불러올 기록/.test(a.n.gBody.textContent),'사진 같은 다른 파일은 내용 검사에서 거름(미리보기 없음)');
+   pick({name:'other.json',type:'application/json',size:20,text:'{"fmt":"other","v":1}'});ok(/진행 파일이 아니에요/.test(a.n.gNote.textContent),'다른 게임의 JSON도 거름');
+   pick({name:'big.json',type:'application/json',size:Bk.FILE_MAX+1,text:''});ok(/진행 파일이 아니에요/.test(a.n.gNote.textContent),'1MB 넘는 파일은 읽기 전에 거름');
+   pick({name:'gone.json',size:10,fail:true});ok(/파일을 읽지 못했어요/.test(a.n.gNote.textContent),'읽기에 실패하면 그렇다고 알림');
+  }finally{if(keepFR===undefined)delete globalThis.FileReader;else globalThis.FileReader=keepFR}}
  /* M-9b 리뷰 0.16 R1: 기록을 다시 읽은 뒤(진행 파일 바꾸기 · 되돌리기 · 모든 기록 지우기) 그 기록의 영어 설정이 문제은행에 바로 반영된다. 전에는 앞 기록의 비중이 다시 열 때까지 남았다 */
  {const src=Bk.fresh(Date.now(),77);src.set.en='off';const file=Bk.exportText(src,{...C.fresh(8),seed:77,bank:Q.BANK_VERSION,version:3},{now:Date.now()});
   const a=bboot(null,{index:1});eq(Q.QUIZ_MIX[8].english,2,'이 기기 기록: 영어 보통');
