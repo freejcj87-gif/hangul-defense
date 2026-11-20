@@ -11,6 +11,8 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(ScreenAwakePlugin.class);
         // 진행 파일 옮기기(보호자 화면): 저장·보내기·불러오기. 권한 없음(ProgressFilePlugin 설명)
         registerPlugin(ProgressFilePlugin.class);
+        // 보호자 문턱의 기기 화면 잠금 확인. 권한 없음(DeviceGatePlugin 설명)
+        registerPlugin(DeviceGatePlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

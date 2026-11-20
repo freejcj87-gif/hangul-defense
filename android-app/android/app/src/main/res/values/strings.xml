@@ -6,4 +6,7 @@
     <string name="custom_url_scheme">io.github.freejcj87gif.hanguldefense</string>
     <!-- 보호자 화면 '진행 파일 옮기기'의 Android 공유 창 제목(ProgressFilePlugin.share) -->
     <string name="progress_share_title">진행 파일 보내기</string>
+    <!-- 보호자 문턱의 기기 화면 잠금 확인(DeviceGatePlugin). 게임이 이유 글(reason)을 주지 않을 때 설명 줄 -->
+    <string name="device_gate_title">보호자 확인</string>
+    <string name="device_gate_description">보호자 화면을 열려면 이 기기의 화면 잠금을 풀어 주세요.</string>
 </resources>

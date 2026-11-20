@@ -16,12 +16,20 @@
       - 내보내기: 게임이 만든 글(window.__lastExport)을 두고 '저장할 곳 고르기'(시스템 문서 화면) · '다른 앱으로 보내기'(Android 공유 창) · '그만두기'.
       - 불러오기: 시스템 문서 화면에서 고른 파일의 글을 게임의 window.__importText로 넘긴다(검사·미리 보기·'바꾸기' 문턱은 게임 그대로).
       플러그인이 없는 껍데기(웹 포함)에서는 아무것도 잡지 않아 웹 방식 그대로다.
-   6) 오픈소스 고지: 보호자 화면 도움말의 '오픈소스 고지' 아래에 '전체 보기'를 붙여 앱 안 oss-licenses.html을 겹창으로 연다(바깥 링크 없음). */
+   6) 오픈소스 고지: 보호자 화면 도움말의 '오픈소스 고지' 아래에 '전체 보기'를 붙여 앱 안 oss-licenses.html을 겹창으로 연다(바깥 링크 없음).
+   7) 기기 잠금 문턱(프로듀서 결정 2026-11-20: 앱의 보호자 문턱은 기기 화면 잠금으로, 잠금이 없으면 웹 어른 문제로).
+      앱 안 플러그인 DeviceGate(DeviceGatePlugin.java, 권한 없음)가 있을 때만 window.__deviceGate를 등록한다. 계약(launch\android\04 문서 §2):
+        window.__deviceGate({reason?}) → Promise<'ok' | 'cancel' | 'none'>, 거부(reject)하지 않는다.
+        'ok' 잠금을 풀었다 → 문턱 통과 / 'cancel' 취소·실패 → 아무것도 하지 않음 / 'none' 잠금이 없거나 확인 화면을 못 엶 → 웹 어른 문제로.
+        웹(브라우저)에는 없다. 이 파일은 defer로 늦게 붙으므로 게임은 부르는 순간에 찾는다. 확인 화면이 떠 있는 동안 또 부르면 같은 약속을 돌려준다. */
 import { App } from '@capacitor/app';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 
 const ScreenAwake = registerPlugin('ScreenAwake');
 const ProgressFile = registerPlugin('ProgressFile');
+const DeviceGate = registerPlugin('DeviceGate');
+const GATE_RESULTS = ['ok', 'cancel', 'none'];
+const REASON_MAX = 80;
 const RELOAD_KEY = 'app-shell-gl-reload-at';
 const RELOAD_GAP_MS = 120000;
 const byId = id => document.getElementById(id);
@@ -30,6 +38,7 @@ let awake = null;
 let glLost = false;
 let fileBusy = false;
 let choiceAt = 0;
+let gatePending = null;
 
 function game() {
   try { return typeof window.getVillageState === 'function' ? window.getVillageState() : null; } catch { return null; }
@@ -179,6 +188,19 @@ function watchGuardian() {
   new window.MutationObserver(() => { closeChoice(); addOssButton(body); }).observe(body, { childList: true });
 }
 
+/* ---------- 7) 기기 잠금 문턱 ---------- */
+function deviceGate(opts) {
+  if (gatePending) return gatePending;
+  const raw = opts && typeof opts.reason === 'string' ? opts.reason.trim() : '';
+  const args = raw ? { reason: raw.slice(0, REASON_MAX) } : {};
+  let ask;
+  try { ask = Promise.resolve(DeviceGate.confirm(args)); } catch { ask = Promise.resolve(null); }
+  /* 알 수 없는 답·네이티브 오류는 'none': 보호자가 웹 어른 문제로라도 들어갈 수 있게 */
+  gatePending = ask.then(r => (r && GATE_RESULTS.includes(r.result) ? r.result : 'none'), () => 'none')
+    .finally(() => { gatePending = null; });
+  return gatePending;
+}
+
 /* ---------- 1) 뒤로 가기 ---------- */
 function closeTop() {
   if (closeOss()) return true;
@@ -199,7 +221,7 @@ function onBack() {
 }
 
 function recoverLostContext() {
-  if (!glLost || fileBusy) return false;
+  if (!glLost || fileBusy || gatePending) return false;
   let last = 0;
   try { last = Number(window.sessionStorage.getItem(RELOAD_KEY)) || 0; } catch { /* 없으면 0 */ }
   const now = Date.now();
@@ -222,5 +244,6 @@ if (Capacitor.isNativePlatform()) {
     setAwake(!!(g && g.running) && !document.hidden);
   }, 1000);
   if (Capacitor.isPluginAvailable('ProgressFile')) document.addEventListener('click', onFileClick, true);
+  if (Capacitor.isPluginAvailable('DeviceGate')) window.__deviceGate = deviceGate;
   watchGuardian();
 }

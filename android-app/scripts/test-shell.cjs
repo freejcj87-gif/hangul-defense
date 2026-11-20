@@ -12,6 +12,8 @@ const assert = require('node:assert/strict');
 const bundle = fs.readFileSync(process.argv[2] || path.resolve(__dirname, '..', 'www', 'app-shell.js'), 'utf8');
 const tick = () => new Promise(done => setTimeout(done, 0));
 const FILE_PLUGIN = { name: 'ProgressFile', methods: [{ name: 'save', rtype: 'promise' }, { name: 'share', rtype: 'promise' }, { name: 'open', rtype: 'promise' }] };
+const GATE_PLUGIN = { name: 'DeviceGate', methods: [{ name: 'confirm', rtype: 'promise' }, { name: 'status', rtype: 'promise' }] };
+const NATIVE_TESTED = new Set(['ProgressFile', 'DeviceGate']);
 
 class El {
   constructor(doc, tag, id) {
@@ -79,11 +81,12 @@ async function start(initial, opt = {}) {
         { name: 'App', methods: [{ name: 'addListener', rtype: 'callback' }, { name: 'removeListener', rtype: 'promise' }, { name: 'minimizeApp', rtype: 'promise' }, { name: 'exitApp', rtype: 'promise' }] },
         { name: 'ScreenAwake', methods: [{ name: 'set', rtype: 'promise' }] },
         ...(opt.noFilePlugin ? [] : [FILE_PLUGIN]),
+        ...(opt.noGatePlugin ? [] : [GATE_PLUGIN]),
       ],
       nativeCallback(plugin, method, options, callback) { if (plugin === 'App' && method === 'addListener') listeners[options.eventName] = callback; return 'callback-1'; },
       nativePromise(plugin, method, options) {
         calls.push(plugin + '.' + method + (plugin === 'ScreenAwake' ? ':' + options.on : ''));
-        if (plugin === 'ProgressFile') { calls.push({ plugin, method, options: JSON.parse(JSON.stringify(options)) }); const r = responses[method]; return typeof r === 'function' ? r(options) : r instanceof Error ? Promise.reject(r) : Promise.resolve(r); }
+        if (NATIVE_TESTED.has(plugin)) { calls.push({ plugin, method, options: JSON.parse(JSON.stringify(options)) }); const r = responses[method]; return typeof r === 'function' ? r(options) : r instanceof Error ? Promise.reject(r) : Promise.resolve(r); }
         return Promise.resolve();
       },
     },
@@ -103,9 +106,10 @@ async function start(initial, opt = {}) {
     gNote.textContent = '진행 파일을 만들었어요: ' + name;
     return ev;
   };
-  const fileCalls = () => calls.filter(c => typeof c === 'object');
-  const plain = () => calls.filter(c => typeof c === 'string' && !c.startsWith('ScreenAwake') && !c.startsWith('ProgressFile'));
-  return { calls, listeners, winListeners, drawer, st, win, session, beat, mutate, exportNow, fileCalls, plain, body, guardian, gBody, gNote, importFile, gate, bookScreen, el, document };
+  const fileCalls = () => calls.filter(c => typeof c === 'object' && c.plugin === 'ProgressFile');
+  const gateCalls = () => calls.filter(c => typeof c === 'object' && c.plugin === 'DeviceGate');
+  const plain = () => calls.filter(c => typeof c === 'string' && !c.startsWith('ScreenAwake') && !c.startsWith('ProgressFile') && !c.startsWith('DeviceGate'));
+  return { calls, listeners, winListeners, drawer, st, win, session, beat, mutate, exportNow, fileCalls, gateCalls, plain, body, guardian, gBody, gNote, importFile, gate, bookScreen, el, document };
 }
 
 (async () => {
@@ -326,6 +330,47 @@ async function start(initial, opt = {}) {
   assert.equal(r.win.document.getElementById('appOss'), null);
   assert.equal(r.guardian.hidden, false, 'back closes the notice overlay first');
   ok('help tab -> "open source notices" button opens the in-app oss-licenses.html overlay; back closes it first');
+
+  /* ---------- 기기 잠금 문턱(window.__deviceGate 계약) ---------- */
+  r = await start({ phase: 'start' }, { noGatePlugin: true });
+  assert.equal(r.win.__deviceGate, undefined, 'no DeviceGate plugin -> no __deviceGate (game keeps its web adult question)');
+  ok('shell without the DeviceGate plugin -> window.__deviceGate is not defined');
+
+  for (const [answer, expect] of [[{ result: 'ok' }, 'ok'], [{ result: 'cancel' }, 'cancel'], [{ result: 'none', why: 'no-lock' }, 'none'], [{ result: 'weird' }, 'none'], [null, 'none'], [new Error('boom'), 'none']]) {
+    r = await start({ phase: 'start' }, { responses: { confirm: answer } });
+    assert.equal(typeof r.win.__deviceGate, 'function');
+    assert.equal(await r.win.__deviceGate({ reason: '보호자 화면을 열어요' }), expect, JSON.stringify(answer instanceof Error ? 'Error' : answer));
+    assert.deepEqual(r.gateCalls(), [{ plugin: 'DeviceGate', method: 'confirm', options: { reason: '보호자 화면을 열어요' } }]);
+  }
+  ok('__deviceGate maps native answers to ok / cancel / none; unknown answers and native errors become none (never rejects)');
+
+  r = await start({ phase: 'start' }, { responses: { confirm: { result: 'ok' } } });
+  assert.equal(await r.win.__deviceGate(), 'ok');
+  assert.equal(await r.win.__deviceGate({ reason: '   ' }), 'ok');
+  assert.equal(await r.win.__deviceGate({ reason: 'ㄱ'.repeat(120) }), 'ok');
+  assert.deepEqual(r.gateCalls().map(c => c.options), [{}, {}, { reason: 'ㄱ'.repeat(80) }]);
+  ok('__deviceGate reason is optional, blank reasons dropped, long reasons cut to 80 characters');
+
+  let let1;
+  r = await start({ phase: 'start' }, { responses: { confirm: () => new Promise(done => { let1 = done; }) } });
+  const p1 = r.win.__deviceGate({ reason: 'a' }), p2 = r.win.__deviceGate({ reason: 'b' });
+  assert.equal(p1, p2, 'second call while the lock screen is up returns the same promise');
+  await tick();
+  assert.equal(r.gateCalls().length, 1);
+  r.winListeners.webglcontextlost.fn({});
+  r.listeners.resume();
+  assert(!r.calls.includes('reload'), 'no 3D recovery reload while the lock screen is pending');
+  let1({ result: 'cancel' });
+  assert.equal(await p1, 'cancel');
+  r.listeners.resume();
+  assert(r.calls.includes('reload'), '3D recovery runs on the next resume');
+  const p3 = r.win.__deviceGate({ reason: 'c' });
+  assert.notEqual(p3, p1);
+  await tick();
+  assert.equal(r.gateCalls().length, 2, 'after it settles, the next call asks again');
+  let1({ result: 'ok' });
+  assert.equal(await p3, 'ok');
+  ok('__deviceGate while pending -> same promise, one native screen; 3D recovery reload waits; next call asks again');
 
   console.log('PASS app shell ' + n + ' scenarios (simulated bridge)');
 })().catch(error => { console.error(error); process.exit(1); });
