@@ -242,7 +242,13 @@ body.paused *,body.paused *:before,body.paused *:after{animation-play-state:paus
 #quiz.note-q{background:linear-gradient(#fff8e2,#fffdf4 40px);border:2px dashed #c9b27a;border-radius:16px;padding:8px 10px;box-shadow:inset 0 0 0 4px #fffdf4}/* 줄 무늬는 글자를 가로질러서 뺌(CI 캡처 2026-11-19) */
 .fx.fx-note{font-size:26px;animation:noteFall .9s ease-in forwards}@keyframes noteFall{from{transform:translate(-50%,-60px) rotate(-25deg);opacity:0}30%{opacity:1}to{transform:translate(-50%,40px) rotate(20deg);opacity:0}}
 .friend-card{position:absolute;left:50%;top:46%;translate:-50% -50%;z-index:9;display:grid;justify-items:center;gap:2px;padding:14px 24px;border-radius:18px;background:#fffaf0;border:3px solid #f2b931;box-shadow:0 6px 0 #0004;font-weight:900;font-size:20px;white-space:nowrap;animation:cardFlip .6s ease-out}
-.friend-card b{font-size:46px;line-height:1.1}.friend-card small{font-size:15px;color:#3c6b3f}.friend-card.still{animation:none}
+.friend-card b{font-size:46px;line-height:1.1}.friend-card .card-art{width:84px;margin-bottom:2px}.friend-card small{font-size:15px;color:#3c6b3f}.friend-card.still{animation:none}
+/* 0.17 친구 카드 그림 틀(cards.js): 따뜻한 카드 바탕 + 투명 배경 렌더 그림(3:4). 반짝은 금빛 테두리와 지나가는 빛. 그림을 못 불러오면 안쪽이 그림 문자 */
+.card-art{position:relative;display:grid;place-items:center;aspect-ratio:3/4;border-radius:12px;overflow:hidden;background:radial-gradient(130% 85% at 50% 32%,#fffaf0 0%,#fde9c4 58%,#f5d29b 100%);box-shadow:inset 0 0 0 2px #ecd09a}
+.card-art img{display:block;width:100%;height:100%;object-fit:contain}.card-art.emoji{font-size:40px;line-height:1}.card-art.emoji i{font-style:normal}
+.card-art.shiny{background:radial-gradient(130% 85% at 50% 32%,#fffdf4 0%,#fff0bf 45%,#f6c9e0 100%);box-shadow:inset 0 0 0 3px #f2c14e,0 0 8px 2px #ffe27a}
+.card-art.shiny:after{content:'';position:absolute;inset:-30%;background:linear-gradient(115deg,transparent 40%,#fff9 50%,transparent 60%);transform:translateX(-70%);animation:cardShine 3.2s ease-in-out infinite;pointer-events:none}
+@keyframes cardShine{0%,35%{transform:translateX(-70%)}75%,100%{transform:translateX(70%)}}
 @keyframes cardFlip{from{transform:rotateY(90deg);opacity:0}to{transform:none;opacity:1}}
 .book-row{display:flex;gap:8px;margin:0 0 10px}.book-row button{flex:1;min-height:46px;font-size:16px}
 .day-note{margin:0 0 8px;font-size:13px;color:#6a745f;word-break:keep-all}
@@ -253,7 +259,11 @@ body.paused *,body.paused *:before,body.paused *:after{animation-play-state:paus
 .start-card.wide{max-width:780px;text-align:left}.start-card.wide h2{text-align:center}.start-card.wide>button{width:100%;min-height:46px;margin-top:10px}
 .book-pages{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:8px}
 .book-page{display:grid;gap:3px;padding:10px;border-radius:14px;background:#fffdf2;border:2px dashed #c9b27a;font-size:13px;line-height:1.45;word-break:keep-all}
-.book-page .book-pic{font-size:40px;line-height:1.1;text-align:center}.book-page[data-state="foot"] .book-pic{filter:brightness(0) opacity(.35)}.book-page[data-state="none"] .book-pic{opacity:.4}
+.book-page .book-pic{position:relative;display:block;width:min(100%,126px);margin:0 auto 2px}.book-pic>.card-art{width:100%}
+.book-page[data-state="foot"] .book-pic>.card-art:not(.book-shiny)>*{filter:brightness(0) opacity(.35)}
+.book-page[data-state="none"] .book-pic>.card-art{background:#fbf7ea;box-shadow:none;outline:2px dashed #d9cfb2;outline-offset:-5px}.book-page[data-state="none"] .book-pic>.card-art i{opacity:.4}
+.book-pic>.book-shiny{position:absolute;right:-6px;bottom:-6px;width:44px;border-radius:8px}.book-pic>.book-shiny.emoji{font-size:20px}
+.book-pic>i.book-shiny{display:grid;place-items:center;aspect-ratio:3/4;font-style:normal;font-weight:900;font-size:16px;color:#a39b82;background:#f4efe0;box-shadow:inset 0 0 0 2px #d9cfb2}
 .book-page strong{font-size:15px}.book-page em{font-style:normal;color:#3c6b3f;font-weight:800}.book-page small{margin:0;color:#7a826f}
 .book-steps{display:flex;flex-wrap:wrap;gap:3px}.book-steps i{font-style:normal;padding:1px 6px;border-radius:99px;background:#eee7d2;color:#a39b82;font-size:11.5px;white-space:nowrap}.book-steps i.on{background:#d8efc4;color:#2f5a3a;font-weight:800}
 .book-h{margin:14px 0 6px;font-size:16px}
@@ -299,7 +309,7 @@ body.paused *,body.paused *:before,body.paused *:after{animation-play-state:paus
 <div class="start-screen" id="bookScreen" role="dialog" aria-modal="true" aria-label="발자국 수첩" hidden><div class="start-card wide"><h2 id="bookTitle"></h2><div class="book-pages" id="bookPages"></div><h3 class="book-h">🎖️ 지킴이 훈장</h3><div class="book-medals" id="bookMedals"></div><p class="book-tip" id="bookTip" role="status" aria-live="polite"></p><button id="bookClose">닫기</button></div></div>
 <div class="start-screen" id="guardian" role="dialog" aria-modal="true" aria-label="보호자 화면" hidden><div class="start-card wide"><h2>👪 보호자 화면</h2><div class="g-tabs" id="gTabs"></div><div class="g-body" id="gBody"></div><p id="gNote" role="status" aria-live="polite"></p><input type="file" id="importFile" accept=".json,application/json" hidden><button id="guardClose">닫기</button></div></div>
 <div class="start-screen" id="gate" role="dialog" aria-modal="true" aria-label="어른 확인" hidden><div class="start-card"><h2>어른 확인</h2><p class="start-q" id="gateAsk"></p><p class="gate-code" id="gateCode"></p><p class="gate-in" id="gateIn" aria-label="누른 수"></p><div class="gate-pad" id="gatePad"></div><small>아이가 실수로 누르지 않게 하는 문턱이에요. 보안 장치가 아니에요.</small><button id="gateClose">그만두기</button></div></div>
-<script src="combat.js?v=0.16"></script><script src="world.js?v=0.16"></script><script src="questions-gen.js?v=0.16"></script><script src="questions.js?v=0.16"></script><script src="notes.js?v=0.16"></script><script src="book.js?v=0.16"></script><script>/* 체험 주소 ?demo=1~3: 그 회관 단계까지 자란 마을로 시작해 새 몬스터를 바로 본다(프로듀서·보호자 확인용). 저장은 따로 해서 원래 진행을 건드리지 않는다. */
+<script src="combat.js?v=0.16"></script><script src="world.js?v=0.16"></script><script src="questions-gen.js?v=0.16"></script><script src="questions.js?v=0.16"></script><script src="notes.js?v=0.16"></script><script src="cards.js?v=0.16"></script><script src="book.js?v=0.16"></script><script>/* 체험 주소 ?demo=1~3: 그 회관 단계까지 자란 마을로 시작해 새 몬스터를 바로 본다(프로듀서·보호자 확인용). 저장은 따로 해서 원래 진행을 건드리지 않는다. */
 const DEMO=(()=>{try{const m=/[?&]demo=([123])\b/.exec(location.search);return m?Number(m[1]):0}catch{return 0}})();
 /* 0.14.1 프로듀서 테스트 모드 ?test=1: 화면 아래 '다음 ▶' 막대(testmode.js, 이 스크립트 맨 끝에서 불러옴). 저장은 '-test'를 붙인 열쇠에 따로 해서 아이 저장과 섞이지 않는다 */
 const TEST=(()=>{try{return /[?&]test=1\b/.test(location.search)}catch{return false}})();
@@ -1234,10 +1244,15 @@ function friendCard(kind){
  const M=NOTES.MON[kind];round.wait=Math.max(round.wait,FRIEND_TICKS);jingle('friend');view([{type:'friend',kind}]);
  say('🤝 '+M.name+' '+josa(M.nick,'과','와')+' 친구가 됐어요! '+M.en);
  const e=document.createElement('div');e.className='friend-card'+(calm()?' still':'');e.setAttribute('role','status');
- const i=document.createElement('b');i.textContent=NOTE_ICON[kind]||'🐺';const t=document.createElement('span');t.textContent=M.name+' '+M.nick;const en=document.createElement('small');en.textContent=M.en;
+ const i=document.createElement('b');i.append(cardPic(kind,false));const t=document.createElement('span');t.textContent=M.name+' '+M.nick;const en=document.createElement('small');en.textContent=M.en;
  e.append(i,t,en);$('effects').append(e);setTimeout(()=>e.remove(),calm()?1500:2600);
 }
 const NOTE_ICON={wolf:'🐺',bramble:'🌿',boar:'🐗',granite:'🪨',frost:'❄️',ember:'🔥',fox:'🦊',king:'👑'};
+/* 0.17 친구 카드 그림(cards.js, art/cards/*.webp): 카드 바탕 틀에 3D 모형 렌더 그림. cards.js가 없거나 그림을 못 불러오면 위 그림 문자 */
+function cardPic(kind,shiny){
+ if(window.CARDS)return window.CARDS.make(document,kind,shiny,NOTE_ICON[kind]||'🐺');
+ const box=document.createElement('span');box.className='card-art emoji'+(shiny?' shiny':'');const t=document.createElement('i');t.textContent=NOTE_ICON[kind]||'🐺';box.append(t);return box;
+}
 /* 세계의 손님과 기록의 손님을 맞춘다(이어하기·불러오기): 기록에 손님이 있으면 세계에도, 없으면 세계에서도 뺀다 */
 function syncGuest(){
  if(!book){if(world.guest)delete world.guest;return}

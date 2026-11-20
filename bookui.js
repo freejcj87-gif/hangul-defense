@@ -59,7 +59,11 @@
     const box=$('bookPages');box.innerHTML='';
     for(const kind of Book.KINDS){
       const p=Book.page(book,kind),M=NOTES.MON[kind],card=el('div','book-page');card.dataset.kind=kind;card.dataset.state=p.card?'friend':p.foot?'foot':'none';
-      const pic=el('b','book-pic',p.foot?NOTE_ICON[kind]:'❔');pic.setAttribute('aria-hidden','true');
+      /* 0.17 카드 그림: 발자국 뒤에는 카드 그림(발자국 단계는 CSS 그림자, 친구면 그대로), 만나기 전에는 빈 틀 + ❔.
+         오른쪽 아래 작은 칸 = 반짝 칸(받으면 반짝 그림, 발자국 뒤 아직이면 "?"). 그림을 못 불러오면 그림 문자(cardPic, index.html) */
+      const pic=el('b','book-pic');pic.setAttribute('aria-hidden','true');
+      if(p.foot)pic.append(cardPic(kind,false));else{const blank=el('span','card-art emoji');blank.append(el('i','','❔'));pic.append(blank)}
+      if(p.shiny){const s=cardPic(kind,true);s.classList.add('book-shiny');pic.append(s)}else if(p.foot)pic.append(el('i','book-shiny','?'));
       const name=el('strong','',p.card?M.name+' '+M.nick:p.foot?M.name:'아직 만나지 않았어요');
       card.append(pic,name);
       if(p.card){card.append(el('em','',M.en),el('span','book-story',M.line),el('small','','친구가 된 날: '+dateText(p.since)))}
