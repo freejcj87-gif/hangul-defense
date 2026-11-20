@@ -6,6 +6,7 @@ import { KIND_ORDER, RIG, GAIT, RIG_TIME, monsterGeometry, shadowGeometry, rigMa
 import { prep, fuse, solid, flat, merge } from './geo.js';
 import { POND, POND_R, HAY, GARDEN, ZONE, FARM_ZONE, FARM_HOME, PICK, DROP, MARKET_FRONT, MARKET_GATE, TENTS, MILL, RIVER, riverFrame, riverOffset, millRace, bridgeSpot, deckY, BRIDGE as BRIDGE_ART } from './layout.js';
 import { STOREY_H, storeyGeometry, basketGeometry, basketEggs, railGeometry, wallGeometry, marketExtras, STALL_OMIT, NESTS, NEST_MAX, nestSpots, villageProps, lanterns, LANTERN_TOP, drawHammer, trailGeometry, stageProps, riverGeometry, codeWheelGeometry } from './props.js';
+import { book3d } from './book3d.js';   // 0.17 수첩 3D: name note · memory wolf sign · visiting friend (scene only)
 
 const host=document.querySelector('.scene');
 const motion=matchMedia('(prefers-reduced-motion: reduce)');
@@ -1157,15 +1158,15 @@ async function start(){
     case 'fox':{const R=Rgoal+num(W('EDGE')),a=spawnAngle(num(e.point)),x=Math.cos(a)*R,z=Math.sin(a)*R;warns.push({x,z,t0:time,color:ORANGE,life:2.4});dustBurst(x,z,6,.7);break}
     case 'foxSaved':{const fx=s.world&&s.world.fox;if(fx){const x=num(fx.x),z=num(fx.z);flashAt(x,.7,z,2.2,GOLD,.1);starBurst(x,.8,z,10,.9,[GOLD,WHITE],.1)}break}
     case 'foxScare':featherBurst(0,.6,0,8,.8);break;
-    // 수첩 MVP cues: the shiny guest bows when the answer arrow reaches it, a friend card and a dropped name note get a small sparkle (no banner, no sound here)
+    // 수첩 MVP cues: the shiny guest bows when the answer arrow reaches it, a friend card gets a small sparkle (no banner, no sound here). The name note is book3d.js (B3.events)
     case 'shinyMet':{const g=s.world&&s.world.guest;if(g){const x=num(g.x),z=num(g.z);flashAt(x,.9,z,2.2,GOLD,.1);starBurst(x,1,z,12,1,[GOLD,WHITE],.1)}break}
     case 'guest':{const g=s.world&&s.world.guest;if(g)sparkles(num(g.x),1.2,num(g.z),8,.8,GOLD,0,.6);break}
     case 'friend':sparkles(0,2.5,0,12,Math.max(2,Rgoal*.4),GOLD,0,.9);break;
-    case 'noteDrop':sparkles(0,2.2,0,6,Math.max(2,Rgoal*.3),WHITE,0,.8);break;
     case 'dash':{let k=0;for(const o of wolfVis.values()){if(o.state==='dead'||o.ghost)continue;knock(o,0,0,0,2.2);if(k<24){dustBurst(o.x,o.z,4,.6,k*.02);k++}}shake(.06);break}
     default:break;   // 'broken', 'carry' and the rest are drawn from the pulled state
    }
   }
+  B3.events(list);
   dirty=true;
  }
  // Test-only hook (inert unless called): {focus:[x,z,half]|null} close-up camera · {hold:true|false} freeze the view clock (still renders)
@@ -1198,6 +1199,8 @@ async function start(){
  // Public close-up (0.12, the old test-only debug focus made official): focus([x,z,half]) holds the camera on a ground point, focus(null) hands it back.
  // During the wolf-king finale the view also leans toward the king by itself (KING_PULL, see updateView) unless a manual focus is held.
  function focus(f){return debug({focus:Array.isArray(f)?f:null}).focus}
+ const B3=book3d({scene:world,camera,herd:k=>herd[k]&&herd[k].mesh,peek:(()=>{const pv=new V3();return id=>{const o=wolfVis.get(id);if(!o||o.ghost)return null;topOf(o,pv);return {x:pv.x,y:pv.y,z:pv.z,fx:o.x,fz:o.z,size:o.size,state:o.state}}})(),
+  fx:{sparkles,starBurst,ringWave,dustBurst,flashAt},sprite,decal,CELL,C:{WHITE,GOLD,PINK,SKY,CREAM,INK},reduced,scale:()=>fxScale,kindSize:k=>kindInfo(k).size||1,WS});   // 0.17 수첩 3D (src/book3d.js)
  window.VillageView={events,reward(){},build,upgrade:()=>build('tower'),debug,marketScreen,focus,
   inspect(){
    const states={},kinds={};let onScreenW=0,shownW=0,ghosts=0;
@@ -1226,11 +1229,13 @@ async function start(){
     mill:{art:millArt?'glb':'code',shown:wheel.obj.visible,turns:Math.round(millSpin.angle/(Math.PI*2)*100)/100,spinning:millSpin.vel>0,kicks:millSpin.kicks},
     drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,builds:{...builds},effects:particles.length+anims.length,warnings:warns.length,blend:{t:+blendT.toFixed(3),dur:+blendDur.toFixed(3),ticks:blendTicks},shake:shakeNow,
     memory:{geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures}}}};
+ {const base=window.VillageView.inspect;window.VillageView.inspect=()=>({...base(),book3d:B3.inspect()})}   // 0.17: inspect().book3d (note · sign · friend)
 
  /* ----- input: tapping is only ever cosmetic ----- */
  const raycaster=new THREE.Raycaster(),pointer=new THREE.Vector2(),probe=new V3();
  canvas.addEventListener('pointerup',e=>{try{
   const s=read();if(s.paused)return;const r=canvas.getBoundingClientRect();pointer.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);raycaster.setFromCamera(pointer,camera);
+  if(B3.tap(pointer,r)){dirty=true;return}   // 0.17: the name note on the ground
   {let best=null,near=40;   // towers are instanced: pick by screen distance to the tower's middle
    for(const t of towers){if(!t.on)continue;probe.set(t.a.x,towerTop(t)*.55,t.a.z).project(camera);const d=Math.hypot((probe.x-pointer.x)*r.width/2,(probe.y-pointer.y)*r.height/2);if(d<near){near=d;best=t}}
    if(best){wobble(best.a,.08);sparkles(best.a.x,towerTop(best),best.a.z,4,.5);dirty=true;return}}
@@ -1746,7 +1751,7 @@ async function start(){
   if(!still||dirty){
    updateView(fdt,less);
    animateBuildings(fdt,wdt,less);updateFences(less);animateWolves(fdt,wdt,less);animateHens(fdt,wdt,less);
-   farmersLife(fdt,less);
+   farmersLife(fdt,less);B3.step(fdt);
    if(!less&&!still)stepEffects(fdt);
    // the light dims while wolves are inside the village, and flushes red when the ember king arrives or roars
    sunDim+=((insideWolves>0?1:0)-sunDim)*(less?1:Math.min(1,fdt*2));sun.intensity=2.8-.7*sunDim;
@@ -1767,7 +1772,7 @@ async function start(){
   syncRecords(s);curS=s;if(syncStage(s))dirty=true;{const nb=nestShown;updateNest(s);if(nestShown!==nb)dirty=true}
   if(hold){let n=0;while(advance>1e-6&&n<300){const h=Math.min(1/30,advance);advance-=h;n++;step(h,still,less,running)}if(!n&&dirty)step(0,true,less,false)}   // test-only frozen view
   else step(dt,still,less,running);
-  flatPool.begin();airPool.begin();animateArrows(less);ambient(less);drawParticles();flatPool.end();airPool.end();
+  flatPool.begin();airPool.begin();animateArrows(less);ambient(less);B3.sprites(less);drawParticles();flatPool.end();airPool.end();
   if(traceNext){traceNext=false;tracing=true;traced=[]}
   if(!document.hidden)renderer.render(world,camera);
   tracing=false;

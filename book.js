@@ -11,7 +11,7 @@
   /* 모든 상수는 여기(검사·시뮬이 덮어쓸 수 있게, Combat.FLAGS와 같은 방식) */
   const BOOK={
     ON:true,
-    FLAGS:{notes:true,review:true,order:true,shiny:true,medals:true,friends:true},
+    FLAGS:{notes:true,review:true,order:true,shiny:true,medals:true,friends:true,book3d:true},/* book3d(0.17): 마을 안 3D 표현(쪽지 종이·기억 늑대 팻말·친구 방문). ?book3d=0이면 장면만 끔(규칙 그대로) */
     SESSION_GAP:4*HOUR,/* 마지막 활동에서 이만큼 지나 다시 시작하면 새 놀이(§3.6) */
     DAY_DEFAULT:30,DAY_CHOICES:[0,20,30,45,60],DAY_EXTEND:15,/* 하루 시간(분). 0 = 없음. 기본 30분은 프로듀서 결정(2026-11-19) */
     VILLAGES:['meadow','quarry','frost','ember'],/* Combat.VILLAGES와 같아야 함(검사) */
@@ -39,7 +39,13 @@
       std:{7:{math:13,common:6,english:1},8:{math:10,common:8,english:2},9:{math:8,common:8,english:4},10:{math:7,common:9,english:4}},
       more:{9:{math:7,common:7,english:6},10:{math:6,common:8,english:6}}},
     MORE_FROM:9,
-    CAPS:{seen:4000,rv:200,day:35,log:30,count:1e7,friends:4}
+    CAPS:{seen:4000,rv:200,day:35,log:30,count:1e7,friends:4},
+    /* 0.17 수첩 3D(장면 전용: 세계·경제·기록에 쓰지 않는다. 단위는 틱 0.1초 · 장면 거리)
+       note: 떨어진 쪽지 종이가 땅에 남는 틱(그 쪽지 문제가 나오면 그 전에 사라짐) · edge: 종이를 놓는 가장 먼 자리(마을 반지름 + edge, 화면 안)
+       sign: 기억 늑대 문제가 시작된 뒤 새로 오는 늑대를 기다리는 틱(그 뒤에는 울타리 밖에서 다가오는 늑대 가운데 가장 바깥)
+       친구 방문: 늑대·왕·여우가 없는 틈이 quiet틱 이어지면, 지난 방문에서 gap~gap+jitter틱(첫 방문 first, 더 놀기 free~free+jitter) 지난 뒤 한 마리가
+       숲 쪽 r0에서 길을 따라 울타리 밖 r1까지 walk(장면 거리/틱)로 걸어와 stay틱 인사하고 돌아간다. 늑대가 나오면 곧바로 돌아간다(run배 빠르기) */
+    SCENE:{note:900,edge:3.5,sign:30,quiet:30,gap:600,jitter:300,first:300,free:200,walk:.14,run:2,stay:30,r0:6,r1:1.3,river:50}
   };
 
   /* ---------- 작은 도구 ---------- */
@@ -354,6 +360,18 @@
     return KINDS.filter(k=>b.mon[k].card>0).map(k=>({kind:k,ribbon:b.mon[k].rib.n>=BOOK.RIBBON.need,shiny:b.mon[k].shiny>0,card:b.mon[k].card}))
       .sort((x,y)=>(y.ribbon-x.ribbon)||(y.card-x.card)||KINDS.indexOf(x.kind)-KINDS.indexOf(y.kind)).slice(0,BOOK.CAPS.friends).map(f=>({kind:f.kind,ribbon:f.ribbon,shiny:f.shiny}));
   }
+  /* 0.17 친구 방문(장면 전용): 친구 카드를 받은 모든 종 가운데 한 마리를 고른다(처음 만난 친구만이 아니라 모은 친구 전부, 바로 전 방문 친구는 둘 이상이면 피함).
+     ctx: seed(판의 문제 순서 씨앗) · run(판 번호) · n(이번 화면에서 몇 번째 방문) · last(바로 전 방문 종).
+     난수는 이 값들의 해시에서만 만든다: 세계 난수(world.rng)와 기록 난수(b.rng, 반짝 손님)를 건드리지 않고, 기록도 바꾸지 않는다(같은 ctx = 같은 결과).
+     돌려줌 {kind, ribbon, shiny, u, v} (u·v = 길 고르기·다음 간격에 쓰는 [0,1) 두 수) 또는 친구가 없으면 null */
+  function visitPick(b,ctx){
+    if(!BOOK.ON||!BOOK.FLAGS.friends||!b||!isObj(b.mon))return null;
+    const list=KINDS.filter(k=>b.mon[k]&&b.mon[k].card>0);if(!list.length)return null;
+    const c=ctx||{};let x=seedOf(hash('visit|'+(c.seed|0)+'|'+(c.run|0)+'|'+(c.n|0)));x=xs(xs(x));
+    let i=x%list.length;if(list.length>1&&list[i]===c.last)i=(i+1+xs(x)%(list.length-1))%list.length;
+    const k=list[i],m=b.mon[k];x=xs(x);const u=x/4294967296;x=xs(x);const v=x/4294967296;
+    return {kind:k,ribbon:m.rib.n>=BOOK.RIBBON.need,shiny:m.shiny>0,u,v};
+  }
 
   /* ---------- 반짝 손님(§3.4) ---------- */
   /* 한 번에 맞힌 직후 부른다. ctx: run(run.no) · asked(run.asked) · boost2(방금 신바람 2단이 됨) · kinds(지금 나오는 종류 + 여우가 남았으면 'fox') · finale · free(더 놀기).
@@ -538,7 +556,7 @@
     tick,sleepy,extend,nextPlay,beginSession,
     orderFor,advanceOrder,
     tierOf,medals,
-    canDrop,volleyKill,foxSaved,kingWon,rushed,page,cells,friends,
+    canDrop,volleyKill,foxSaved,kingWon,rushed,page,cells,friends,visitPick,
     shinyChance,shinySpawned,shinyMet,shinyGone,shinyText,
     shuffle,nextSpecial,answered,
     finaleStart,newVillage,resetVillage,
