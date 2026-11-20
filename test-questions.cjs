@@ -695,7 +695,8 @@ for(const a of Q.AGES)for(const s of [0,1]){
  const BANK_PRINT={
   1:{"7":"1cddae1b212cf7d3","8":"bb984b66b6f6440a","9":"c4adfc2173d53aef","10":"c17593284c4b32ca"},
   2:{"7":"f4ce17ea386ddc1c","8":"94f2fe2fc27d7cd5","9":"052a2183c5b219a8","10":"30c7d21fbf598113"},
-  3:{"7":"46858a27fecbc8d7","8":"4f55121708b27c3f","9":"bd6bece8c0a1bdb6","10":"489431f831d1171b"}
+  3:{"7":"46858a27fecbc8d7","8":"4f55121708b27c3f","9":"bd6bece8c0a1bdb6","10":"489431f831d1171b"},
+  4:{"7":"0980eb91f56cb0ab","8":"5a3a4ab9ae39f3e3","9":"3d2ba0284da3200e","10":"fc0d2c77f488ca06"}
  };
  const print=v=>{const o={};for(const a of Q.AGES){const h=crypto.createHash('sha1');for(const s of [0,1,7,42,123456])for(let i=0;i<600;i++){const q=Q.at(a,'story',i,s,v);h.update(q.id+'|'+q.choices.join('/')+'|'+q.answer+'|'+q.lap+'\n')}o[String(a)]=h.digest('hex').slice(0,16)}return o};
  eq(Q.BANK_VERSION,Object.keys(BANK_PRINT).length,'은행 판 수 = 지문 표의 줄 수(문항을 붙였으면 BANK_PRINT에 새 판 줄을 더한다)');
