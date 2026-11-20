@@ -1268,7 +1268,7 @@ function reloadFromStore(){
  if(DEMO&&!state.wins&&!state.index)Object.assign(state,DEMO_VILLAGE[DEMO]);
  if(!(state.seed>0))state.seed=newSeed();if(!(state.bank>=1&&state.bank<=Questions.BANK_VERSION))state.bank=kept?1:Questions.BANK_VERSION;if(!state.run.t0)state.run.t0=Date.now();
  bookOpen();applyMix();applySfx();/* 다시 읽은 기록의 영어 설정을 문제은행에(전에는 지우기·바꾸기 전 기록의 비중이 다시 열 때까지 남았다, 리뷰 0.16 R1). 무리 간격(freshWorld)보다 먼저 */
- gainReset();world=freshWorld();flowSync();state.broken=World.brokenCount(world);syncKing(true);resetView();round=null;phase='start';sleepyOn=false;
+ gainReset();ageMark='';world=freshWorld();flowSync();state.broken=World.brokenCount(world);syncKing(true);resetView();round=null;phase='start';sleepyOn=false;
  for(const id of ['ending','sleepy','bookScreen','guardian','gate'])$(id).hidden=true;$('start').hidden=false;$('age').value=String(state.age);drawStart();
 }
 
@@ -1291,7 +1291,8 @@ function changeSetting(){
 }
 /* 판 중간에 나이를 바꾸면 떠나는 나이의 이어 순서를 이 판에서 쓴 만큼 민다(판 끝의 ordDone()은 마지막 나이만 센다). 전에는 떠난 나이의 글이
    다음에 그 나이로 놀 때 처음부터 다시 나왔다(한 바퀴 안 같은 글, 리뷰 0.16 G). 그 나이로 마지막에 답했을 때만(답하지 않고 나이를 오가면 밀지 않음), 같은 자리에서는 한 번만.
-   이 판에서 그 나이로 돌아오면 민 자리부터 낸다(건너뛴 글은 다음 바퀴에 나오고, 같은 글이 되풀이되지는 않음) */
+   이 판에서 그 나이로 돌아오면 민 자리부터 낸다(건너뛴 글은 다음 바퀴에 나오고, 같은 글이 되풀이되지는 않음).
+   ageMark(같은 자리 한 번만)는 새 판을 시작할 때(새 마을 · 마을을 처음부터 · 기록 다시 읽기) 비운다: 처음부터 뒤 새 판도 판 번호가 1이라 앞 판의 표시와 겹쳤다 */
 let ageMark='';
 function ageLeft(old){
  if(!book||old===state.age||!AGES.includes(old)||!Book.BOOK.FLAGS.order||state.seed!==book.order.seed||!(state.index>0)||book.cur.age!==old)return;
@@ -1300,13 +1301,13 @@ function ageLeft(old){
 }
 $('age').value=String(state.age);$('age').onchange=()=>{const age=Number($('age').value);if(!AGES.includes(age)||paused){$('age').value=String(state.age);return}const was=state.age;state.age=age;ageLeft(was);changeSetting()};
 /* 처음부터 시작: 마을·금화·도장(지도)을 새로 만든다. 수첩 MVP: 수첩·훈장·기억 늑대 기록은 지우지 않는다(판 저장만 새로, Book.resetVillage). 모든 기록 지우기는 보호자 화면에서만 */
-$('reset').onclick=()=>{if(!confirm(book?'마을을 처음부터 다시 시작할까요? 수첩과 훈장은 그대로 남아요.':'저장된 금화와 마을을 초기화할까요?'))return;let ord=null;if(book){ord=Book.resetVillage(book,Date.now(),ordDone());bookDirty=true;gainReset()}
+$('reset').onclick=()=>{if(!confirm(book?'마을을 처음부터 다시 시작할까요? 수첩과 훈장은 그대로 남아요.':'저장된 금화와 마을을 초기화할까요?'))return;ageMark='';let ord=null;if(book){ord=Book.resetVillage(book,Date.now(),ordDone());bookDirty=true;gainReset()}
  state=Object.assign(Combat.fresh(state.age),{seed:ord&&ord.seed&&Book.BOOK.FLAGS.order?ord.seed:newSeed(),bank:ord&&ord.bank||Questions.BANK_VERSION},DEMO?DEMO_VILLAGE[DEMO]:{});state.run.t0=Date.now();world=freshWorld();resetView();$('ending').hidden=true;$('sleepy').hidden=true;sleepyOn=false;nextQuestion()};
 /* 엔딩 카드의 두 버튼. 새 마을: 회관 0부터, 도장 수만큼 타워·닭을 덤으로(Combat.nextRun), 늑대 세계도 새로. 더 놀기: 이 마을에서 자유 놀이(잔치가 열리고, 기본은 늑대 없음) */
 $('endNew').onclick=()=>{
  if(phase!=="ending"||state.run.bell<3)return;
  /* 수첩: 놀이 번호 +1, 이 판이 쓴 만큼 이어 순서를 민다. 새 판은 같은 씨앗으로, 문제은행 판은 읽기 묶음 한 바퀴가 끝난 곳에서만 최신으로 올린다(Book.advanceOrder) */
- let ord=null;if(book){ord=Book.newVillage(book,Date.now(),ordDone());bookDirty=true;gainReset()}
+ let ord=null;ageMark='';if(book){ord=Book.newVillage(book,Date.now(),ordDone());bookDirty=true;gainReset()}
  const next=Combat.nextRun(state,{seed:ord&&ord.seed&&Book.BOOK.FLAGS.order?ord.seed:newSeed(),bank:ord&&ord.bank||Questions.BANK_VERSION,now:Date.now()});if(!next)return;
  state=next;world=freshWorld();resetView();$('ending').hidden=true;nextQuestion();
  banner('🗺️',Combat.VILLAGE_NAME[state.run.village]+' 마을에 왔어요!',state.run.built0?'타워와 꼬꼬를 덤으로 데려왔어요':'');

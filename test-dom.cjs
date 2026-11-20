@@ -2357,7 +2357,11 @@ const stageLayout=[];/* 맨 끝에서 src/layout.js(ES 모듈)를 불러 확인�
   /* 시작 화면에서 나이를 바꿔도 같음(하던 판을 다른 나이로 이어 감) */
   const c=bboot(null,{index:0});c.go();quiet(c);for(let i=0;i<10;i++){c.unlock();c.right();c.tick(REWARD+2);c.untilAsk()}c.n.pause.click();c.unload();
   const d=boot({book:true}),i2=d.game().state.index;d.n.ageRow.children.find(b=>b.dataset.age==='9').click();d.n.ageRow.children.find(b=>b.dataset.age==='8').click();d.n.ageRow.children.find(b=>b.dataset.age==='9').click();
-  eq(d.game().book.data.order.off[8],Q.used(8,i2,4242,d.game().state.bank),'시작 화면에서 나이를 바꿔도 떠난 나이를 한 번만 밂');}
+  eq(d.game().book.data.order.off[8],Q.used(8,i2,4242,d.game().state.bank),'시작 화면에서 나이를 바꿔도 떠난 나이를 한 번만 밂');
+  /* '마을을 처음부터' 뒤 새 판도 판 번호가 1: 앞 판과 같은 번호에서 같은 나이를 떠나도 다시 민다(같은 자리 표시는 새 판마다 비움) */
+  const e=bboot(null,{index:0});e.go();quiet(e);const ans=n=>{for(let i=0;i<n;i++){e.unlock();e.right();nextAsk(e)}};
+  ans(5);e.n.age.value='7';e.n.age.onchange();ans(1);e.n.reset.click();e.n.age.value='8';e.n.age.onchange();const o8=bookOf(e).order.off[8].story;
+  ans(5);e.n.age.value='7';e.n.age.onchange();ok(bookOf(e).order.off[8].story>o8,'처음부터 뒤 새 판에서 같은 번호에 같은 나이를 떠나도 다시 밂('+o8+' → '+bookOf(e).order.off[8].story+')');}
  /* M-11 바깥 링크·외부 요청 없음(문자열 검사): 수첩 화면·규칙·콘텐츠 파일과 페이지 */
  {const files={'index.html':html,'bookui.js':BOOKUI_SRC,'book.js':fs.readFileSync(__dirname+'/book.js','utf8'),'notes.js':fs.readFileSync(__dirname+'/notes.js','utf8')};
   for(const [name,text] of Object.entries(files)){
