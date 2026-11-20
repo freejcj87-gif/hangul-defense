@@ -227,7 +227,12 @@ async function main() {
       async longPress(id) { await page.evaluate(id => { const b = document.getElementById(id), n = Date.now; b.onpointerdown(); Date.now = () => n() + 2500; b.onpointerup(); Date.now = n; }, id); },
       async passGate() { await page.evaluate(() => { const N = { 이: 2, 삼: 3, 사: 4, 오: 5, 육: 6, 칠: 7, 팔: 8, 구: 9 }, m = /^(.)백(.)십(.)$/.exec(document.getElementById('gateCode').textContent); for (const c of [m[1], m[2], m[3]]) [...document.getElementById('gatePad').children].find(b => b.dataset.d === String(N[c])).click(); }); },
       /* CSS 애니메이션(동전 비행·튀는 칸)을 ms만큼 실제로 흘린 뒤 멈춘다: 찍는 동안 바뀌지 않게 */
-      async settleCss(ms) { await cdp.send('Animation.setPlaybackRate', { playbackRate: 1 }); await page.waitForTimeout(ms); await cdp.send('Animation.setPlaybackRate', { playbackRate: 0 }); await frames(2); }
+      async settleCss(ms) {
+        await cdp.send('Animation.setPlaybackRate', { playbackRate: 1 }); await page.waitForTimeout(ms);
+        /* 말풍선·가게 안내의 등장(0.25~0.35초, 끝 = 다 보임)은 실제 시간에 달려 반투명으로 찍히기도 해서 끝 상태로 맞춘다. 다른 애니메이션(동전 비행 등)은 그대로 */
+        await page.evaluate(() => { for (const a of document.getAnimations()) if (a.animationName === 'bubbleIn' || a.animationName === 'tipIn') { try { a.finish(); } catch {} } });
+        await cdp.send('Animation.setPlaybackRate', { playbackRate: 0 }); await frames(2);
+      }
     };
     return t;
   }
